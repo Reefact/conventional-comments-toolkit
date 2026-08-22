@@ -1061,53 +1061,439 @@ Les emplacements par défaut ci-dessus sont ceux d'un déploiement public standa
 
 ```
 packages/
-├── core/            # Aucune dépendance DOM ni plateforme
+├── core/            # Aucune dépendance DOM ni plateforme — partagé par A et B
 │   ├── parser       # Analyse d'un commentaire → AST
 │   ├── validator    # AST + config → diagnostics
-│   ├── config       # Chargement, fusion, validation du schéma
+│   ├── config       # Chargement, fusion, validation du schéma, résolution des bornes (§8.1)
 │   └── i18n         # fr / en
-├── adapters/
-│   ├── github/      # Sélecteurs DOM, cycle de vie SPA, API GHE
+├── adapters/        # Composant A — un adaptateur par plateforme
+│   ├── github/      # Sélecteurs DOM, cycle de vie SPA — aucun appel d'API à jeton (§10)
 │   └── azdo/        # Idem Azure DevOps
-├── extension/       # Manifest V3, content scripts, service worker, options
-└── server/          # Composant B — réutilise core/ tel quel
+├── extension/       # Manifest V3, content scripts, service worker, options — une seule extension
+└── server/          # Composant B
+    ├── compliance/  # Logique commune : calcul de conformité, statut, journalisation — réutilise packages/core tel quel
+    └── adapters/    # Un adaptateur serveur par plateforme (réception d'événements, publication de statut)
+        ├── github/
+        └── azdo/
 ```
 
-`core/` est publié comme paquet interne et consommé à l'identique par l'extension et par le compagnon serveur. **Aucune règle de validation ne doit être dupliquée.**
+`packages/core/` est publié comme paquet et consommé à l'identique par l'extension et par le compagnon serveur. **Aucune règle de validation ne doit être dupliquée.**
 
-### 9.2 Interface d'adaptateur
+### 9.2 Interfaces d'adaptateur
 
-Chaque plateforme implémente le même contrat :
+#### 9.2.1 Types partagés
+
+Ces types vivent dans `core/` et ne dépendent d'aucune plateforme. Ils sont la **frontière réelle** : sans eux, les contrats ci-dessous sont des signatures sans contenu, et l'affirmation « implémenter les deux contrats suffit » est fausse.
 
 ```ts
-interface PlatformAdapter {
-  matches(url: URL): boolean;
-  observeEditors(cb: (editor: EditorHandle) => void): Disposable;
-  getSubmitControls(editor: EditorHandle): SubmitControl[];
-  readValue(editor: EditorHandle): string;
-  writeValue(editor: EditorHandle, text: string, caret?: number): void;
-  getThreads(): Promise<ThreadInfo[]>;
-  getCompletionControl(): SubmitControl | null;
-  getCurrentUser(): Promise<UserInfo>;
+type ResolutionState = 'unresolved' | 'resolved' | 'unknown';
+
+interface PrRef {
+  platform: string;                   // identifiant d'adaptateur — jamais une union fermée, sans quoi
+                                      // ajouter une plateforme obligerait à éditer `core/` (§9.2.2)
+  createdAt: string;                   // ISO 8601 — c'est cette date, et elle seule, qui décide du périmètre (§6.2.3)
+  host: string;                        // github.com, ghe interne, dev.azure.com…
+  scope: string[];                     // owner/repo, ou org/project/repo
+  number: number | string;
+}
+
+interface UserInfo {
+  id: string;                          // identifiant stable de plateforme, jamais le nom affiché
+  login: string;
+  displayName?: string;
+  isServiceAccount: boolean;           // §12 — répartition des indicateurs ; **n'entre dans aucune règle
+                                       // de validation** : l'exemption structurelle du §4.2 passe par
+                                       // `CommentInfo.isSystemGenerated`, et les bots par `exemptUsers`
+}
+
+interface CommentInfo {
+  id: string;
+  author: UserInfo;
+  body: string;                        // corps stocké brut — la normalisation est faite par core/ (§3.4.1)
+  createdAt: string;                   // ISO 8601
+  updatedAt?: string;
+  lastEditedBy?: UserInfo;             // §6.1 — exigé pour signaler une édition affaiblissante « avec son auteur » ;
+                                       // absent si la plateforme ne l'expose pas (voir §6.1)
+  permalink: string;                   // requis par la sortie du check (§6.3.1)
+  isSystemGenerated: boolean;          // §4.2 — l'adaptateur le pose depuis les marqueurs de sa plateforme
+  canCarryBlockingState: boolean;      // §4.1 — pilote `W-NOT-BLOCKABLE`. Porté ici, et non par le seul
+                                       // `ThreadInfo`, parce que les commentaires hors fil y sont soumis aussi
+}
+
+interface ThreadInfo {
+  id: string;
+  pr: PrRef;
+  root: CommentInfo;
+  replies: CommentInfo[];              // parcourues pour y trouver une `decision` (§6.1.1)
+  resolution: ResolutionState;         // normalisé ici ; le mapping des états bruts est dans l'adaptateur
+  resolvedBy?: UserInfo;               // absent si la plateforme ne l'expose pas — voir ci-dessous
+  resolvedAt?: string;
+  canCarryBlockingState: boolean;      // hérité de `root` (§4.1) ; présent ici pour la lisibilité des règles
 }
 ```
 
+*`resolvedBy` conditionne toute la gouvernance du §6.1, et il est optionnel : il faut donc dire ce qu'on fait sans lui.* Lorsque la plateforme n'expose pas l'auteur d'une résolution, celle-ci est **acceptée**, et un `notice` de type `resolution-unattributed` est émis. On ne bloque jamais une PR sur une information que l'API ne rend pas — le contraire produirait un fil rouge sans recours, exactement ce que le §6.3 existe pour éviter.
+
+```ts
+interface Diagnostic {
+  code: string;                        // §3.5.2
+  severity: 'warn' | 'error';          // après application de `severities` (§8.2) ; `off` n'apparaît jamais,
+                                       // ces diagnostics étant retirés de la liste (§3.5.1, exclusion)
+  message: string;
+  comment?: CommentInfo;               // absent lors d'une validation de saisie : le commentaire n'existe pas
+                                       // encore, il n'a ni identifiant ni lien permanent
+  fix?: { replacement: string };       // §5.3 — **la ligne de préfixe (§3.4.1) entièrement réécrite**,
+                                       // telle qu'elle doit remplacer la ligne d'origine dans le corps.
+                                       // Une plage de caractères ne suffirait pas : `CA-16` exige qu'un
+                                       // seul `W-DECORATION-STYLE` corrige deux écarts d'une même ligne.
+                                       // Aucune correction ne porte jamais sur la discussion
+}
+
+type NoticeKind =
+  | 'weakening-edit'        // §6.1 — édition affaiblissante de la racine d'un fil bloquant
+  | 'root-deleted'          // §6.1 — suppression de cette racine
+  | 'resolution-refused'    // §6.1 — résolution hors des deux cas admis
+  | 'resolution-unattributed'  // §9.2.1 — plateforme n'exposant pas l'auteur de la résolution
+  | 'floor-override'        // §8.1.2 — clé de dépôt ignorée au titre du plancher
+  | 'invalid-config'        // §8.1.5 — JSON invalide ou valeur hors domaine
+  | 'config-warning'        // §8.1.5 — clé inconnue ignorée ; §8.2 — expression d'allowlist écartée
+  | 'config-vanished'       // §8.1.5 — fichier de configuration disparu d'un dépôt déjà évalué
+  | 'exemption-reset'       // §6.3.2 — étiquette d'exemption retirée après un nouveau commentaire bloquant
+  | 'exemption-refused'     // §6.3.2 — étiquette posée par une personne non habilitée
+  | 'grace-expired'         // §6.4 — délai de grâce dépassé, évaluation impossible
+  | 'unsupported-version';  // §8.1.5, §8.1.3 — schéma, plancher ou core/ trop récent
+
+interface Notice {
+  kind: NoticeKind;
+  message: string;
+  actor?: UserInfo;                    // renseigné dès que le fait a un auteur
+  at?: string;                         // ISO 8601
+  ref?: string;                        // lien permanent, clé de configuration, ou numéro de ligne selon `kind`
+}
+
+interface ComplianceResult {
+  pr: PrRef;                           // §9.2.1 — identité de la PR jugée
+  headSha?: string;                    // §6.4 — renseigné par le composant B **après** l'évaluation, relu
+                                       // juste avant la publication ; `core/` ne le produit pas
+  mode: 'off' | 'assist' | 'warn' | 'enforce';
+  state: 'success' | 'failure' | 'neutral';  // calculé par core/ ; l'adaptateur ne fait que le traduire
+  isDraft: boolean;                    // §6.2.4 — entre dans le calcul de `state`, jamais en échec sur un brouillon
+  activatedAt: string | null;          // §6.2.3 — recopié de `EvaluationContext`, donc toujours la date
+                                       // effective ; sans lui, `encodeSummary()` ne peut pas émettre
+                                       // le champ `activated=`
+  headline: string;                    // résumé humain d'une ligne (§6.3.1) — distinct de la ligne `cc/1`,
+                                       // qui est machine et produite par `encodeSummary()`
+  configFingerprint: string;           // configuration appliquée — seule empreinte comparée par A (§8.1.3, r. 2)
+  coreVersion: string;
+  formatDiagnostics: (Diagnostic & { comment: CommentInfo })[];   // critère 1 (§6.2.1) — toutes sévérités.
+                                       // `comment` y est requis : le §6.3.1 exige un lien permanent par
+                                       // diagnostic, et le `headline` regroupe les diagnostics par commentaire
+  unresolvedBlockingThreads: ThreadInfo[];  // critère 2
+  notices: Notice[];                   // tout ce que le §6.3.1 exige de rendre visible sans en faire un diagnostic
+  docUrl: string;                      // documentation de la convention (§6.3.1)
+  targetUrl?: string;                  // §6.3.1 — page servie par B portant la sortie complète ; requis
+                                       // dès que la plateforme ne rend pas de corps de statut (§B.7)
+  counts: { unresolvedThreads: number;         // §6.3.1 — les trois compteurs de la ligne `cc/1`, comme
+            nonCompliantComments: number;      // champs et non enfouis dans `headline`, sans quoi l'encodeur
+            warnings: number };                // devrait reparser une phrase en langue naturelle
+  actions: { removeLabel?: string };   // §6.3.2 — ce que l'orchestrateur doit **faire** en plus de publier.
+                                       // `evaluate()` est pure : elle demande le retrait de l'étiquette,
+                                       // elle ne l'exécute pas (`removeLabel()`, §9.2.4)
+  blockingThreadIds: string[];         // §6.1 — les fils bloquants observés **à ce tour**, résolus compris.
+                                       // `unresolvedBlockingThreads` ne suffirait pas, un fil bloquant
+                                       // résolu n'y figurant pas. Voir §6.1 pour la règle d'accumulation
+  correctedThreadIds: string[];        // §6.1 — fils dont la racine remplit les deux conditions de
+                                       // l'exception de correction : à **retirer** de l'ensemble persisté
+  newFirstVerdicts: Record<string, { blocking: boolean; hadConflict: boolean }>;  // §6.1 — à persister pour
+                                       // les racines observées pour la **première** fois, jamais réécrit
+  exemption?: { by: UserInfo; at: string }; // §6.3.2
+}
+
+interface PublishedSummary {
+  state: 'success' | 'failure' | 'neutral';  // le verdict, pas ses ingrédients — voir ci-dessous
+  isDraft: boolean;
+  exempted: boolean;                   // §6.3.2
+  mode: 'off' | 'assist' | 'warn' | 'enforce';
+  coreVersion: string;
+  configFingerprint: string;
+  activatedAt: string | null;          // §6.2.3 — permet à A de calculer `inScope` quand la date est posée
+                                       // par le point d'entrée d'administration et non par le fichier
+  unresolvedBlockingCount: number;     // des fils
+  nonCompliantCommentCount: number;    // des commentaires, pas des diagnostics (§6.3.1)
+  warningCount: number;                // des diagnostics (§6.3.1)
+}
+```
+
+*`PublishedSummary` ne porte **aucune liste de fils**, délibérément.* Une liste aurait demandé un second format machine à publier, à reparser et à tenir synchronisé, sur une seule des deux plateformes — pour une information que l'extension a déjà sous les yeux : les fils sont dans le DOM de la page qu'elle décore. Le **décompte** vient donc du résumé publié, qui fait autorité, et les **ancres** du DOM local, qui les porte.
+
+*`PublishedSummary` porte `state` pour la même raison que `ComplianceResult` : le §6.5 dit que l'extension « **reflète** l'état, elle ne le crée pas ». Sans ce champ, elle devrait le recalculer à partir du mode et des compteurs — donc juger — et elle se tromperait : sur une PR en brouillon ou exemptée, le serveur publie du vert avec des compteurs non nuls (§6.2.4, §6.3.2), et une extension qui déduirait « bloqué » griserait le bouton de merge d'une PR que la source de vérité laisse passer.*
+
+```ts
+// Seuls `pr` et `sequence` sont consommés : le §6.4 impose de relire l'état courant plutôt que de se
+// fier au contenu de l'événement, et les trois sources de déclenchement produisent le même recalcul
+// complet. `kind`, `actor` et `occurredAt` sont conservés pour la journalisation et le diagnostic
+// d'exploitation, jamais pour un verdict — attribuer une édition à qui a déclenché un recalcul serait
+// une accusation fausse (§6.1).
+interface ReviewEvent {
+  kind: 'comment.created' | 'comment.edited' | 'comment.deleted'
+      | 'thread.resolved' | 'thread.unresolved' | 'pr.updated'
+      | 'label.added' | 'label.removed'    // §6.3.2 — sans eux, l'exemption de PR n'est pas détectable
+      | 'pr.readyForReview';               // §6.2.4 — sortie du brouillon
+  pr: PrRef;
+  actor: UserInfo;
+  occurredAt: string;
+  sequence: number;                    // attribué par le composant B, non par la plateforme (§6.4)
+}
+
+interface Disposable { dispose(): void; }
+```
+
+**Pourquoi `state` figure dans le résultat.** Sans lui, l'adaptateur devrait recalculer le verdict à partir du mode, des deux listes et de l'exemption — donc **juger**, ce que le §9.2.4 lui interdit — et il ne le pourrait pas de toute façon, la règle du brouillon (§6.2.4) dépendant d'un appel séparé. `core/` produit les trois états, `neutral` couvrant le délai de grâce du §6.4 ; l'adaptateur les traduit vers `GitStatusState` ou vers la conclusion d'un *check run*.
+
+#### 9.2.2 Contrat de `core/`
+
+Les deux contrats d'adaptateur des §9.2.3 et §9.2.4 sont typés à la virgule près. La fonction sur laquelle repose toute la thèse de parité du §2 ne l'était pas : `core/` n'apparaissait que comme « AST + config → diagnostics » dans l'arborescence du §9.1. Or c'est **la seule interface que les deux composants appellent**, et donc la seule dont un désaccord de signature produirait la divergence que ce document existe pour empêcher.
+
+```ts
+// La configuration du §8.2 une fois résolue et bornée, et le document de plancher du §8.1.1.
+// Leur forme est celle de ces deux sections ; ils sont nommés ici parce que les signatures
+// ci-dessous les prennent, et qu'une fonction dont l'entrée n'a pas de forme n'a pas de contrat.
+type EffectiveConfig = /* §8.2, toutes clés résolues, dans les bornes du §8.1.1 */ object;
+type Floor           = /* §8.1.1, document de plancher */ object;
+
+// Ce que `core/` ne peut pas lire lui-même, et que le composant B lui passe (§6.4, stockage).
+// Trois résultats, et non deux : un fichier **absent** est le cas nominal du §8.1.5 et n'a rien de dégradé ;
+// une lecture **impossible** l'est, et c'est elle — et elle seule — qui désarme la condition 4 du §5.4.
+// Les confondre ferait qu'un dépôt sans fichier de configuration éteindrait `enforce` côté extension.
+type ConfigRead =
+  | { status: 'found'; text: string }
+  | { status: 'absent' }
+  | { status: 'unreachable'; reason: string };
+
+// Tout ce qu'une évaluation prend en entrée. Rassemblé en un objet parce que le §6 en ajoute
+// régulièrement, et qu'une liste de paramètres positionnels aurait fini par diverger de lui.
+interface EvaluationInput {
+  pr: PrRef;
+  platform: PlatformProfile;           // §3.5.1 étages −1 et 0 ; sans lui, aucun bloc de suggestion
+                                       // ni commande slash n'est reconnu côté serveur, et `CA-06` échoue
+  threads: ThreadInfo[];
+  loose: { comment: CommentInfo; zone: Zone }[];   // §4.1 — la zone décide de `scope.validateReviewSummary`,
+                                       // `CommentInfo` seul ne la porte pas
+  config: EffectiveConfig;
+  configNotices: Notice[];             // remontées par `resolveConfig()` : elles sont **transportées** vers
+                                       // `ComplianceResult.notices`, que le §6.3.1 déclare obligatoire.
+                                       // Elles ne commandent aucun verdict — c'est le rôle de `forceState`,
+                                       // que l'orchestrateur arme après les avoir lues
+  forceState?: { state: 'neutral' | 'failure'; because: NoticeKind };  // le verdict est imposé, quoi que
+                                       // disent les listes : `neutral` pour le délai de grâce (§6.4), la
+                                       // configuration disparue et la configuration invalide sous un mode
+                                       // inférieur à `enforce` ; `failure` pour une configuration invalide
+                                       // **sous `enforce`** (§8.1.5). C'est **l'orchestrateur** qui
+                                       // l'arme, en inspectant les `notices` rendues par `resolveConfig()`
+  ctx: EvaluationContext;
+}
+
+// Ce que `core/` ne peut pas lire lui-même, et que le composant B lui passe (§6.4, stockage).
+interface EvaluationContext {
+  activatedAt: string | null;          // §6.2.3 — la date **effective**, résolue par l'orchestrateur :
+                                       // celle de la configuration effective si elle en porte une, sinon
+                                       // celle du stockage (§6.4), sinon `null`
+  isDraft: boolean;                    // §6.2.4
+  exemption?: { by: UserInfo; at: string };   // §6.3.2 — telle que **posée**, pas telle qu'admise :
+                                       // c'est `evaluate()` qui vérifie l'habilitation et peut la refuser
+  isOverrideMember: (u: UserInfo) => boolean;   // §6.1, §6.1.1, §6.3.2 — appartenance à
+                                       // `resolverOverrideGroup`, **résolue en amont** par l'orchestrateur
+                                       // via `isInGroup()` (§9.2.4) pour **tout auteur apparaissant sur la
+                                       // PR** — restreindre aux résolveurs et poseurs d'étiquette omettrait
+                                       // les auteurs de réponses `decision`, et les refuserait toutes.
+                                       // La décision reste dans `core/` ; seule la lecture en sort
+  knownBlockingThreadIds: string[];    // §6.1 — monotonie du caractère bloquant
+  firstVerdicts: Record<string, { blocking: boolean; hadConflict: boolean }>;  // §6.1, par racine
+}
+
+// Tout ce qui est propre à une plateforme entre par ici, et `core/` n'en connaît rien d'autre.
+// Sans cet objet, les étages −1 et 0 du §3.5.1 obligeraient `core/` à embarquer des marqueurs de
+// plateforme, ce que le §9.1 lui interdit — et l'affirmation « implémenter les deux contrats suffit »
+// (§9.2.4) serait fausse : ajouter une plateforme demanderait d'éditer `core/`.
+interface PlatformProfile {
+  id: string;                          // 'github', 'azdo', ou toute autre — jamais une union fermée
+  suggestionInfoString: string | null; // §3.5.1 étage 0 ; `null` = la plateforme n'a pas d'étage 0
+  slashPrefixes: string[];             // §4.2 — commandes reconnues par la plateforme
+}
+
+interface ValidationInput {
+  body: string;                        // corps brut, avant le prétraitement du §3.4.1
+  platform: PlatformProfile;           // §3.5.1 étages −1 et 0
+  isSystemGenerated: boolean;          // §4.2 — message de plateforme, entrée de timeline ; l'adaptateur
+                                       // le traduit depuis les marqueurs de sa plateforme, il ne juge pas
+  zone: Zone;                          // §4.1, défini au §9.2.3 — pilote `scope.validateReplies`
+                                       // (`zone === 'reply'`) et `scope.validateReviewSummary` ; `'conversation'` couvre le commentaire
+                                       // général hors diff, `'review-body'` le corps d'une revue en lot
+  canCarryBlockingState: boolean;      // §4.1
+  author?: UserInfo;                   // côté serveur, l'auteur du commentaire ; côté saisie, l'utilisateur
+                                       // courant (`getCurrentUser()`), sans quoi un compte de `exemptUsers`
+                                       // recevrait à la frappe des diagnostics que le serveur n'émettra pas
+  comment?: CommentInfo;               // idem — renseigné côté serveur, jamais côté saisie
+}
+
+// Les fonctions que A et B appellent à l'identique. Aucune ne fait d'entrée-sortie :
+// l'épinglage et la lecture du stockage restent en dehors (§9.2.4).
+function validate(input: ValidationInput, config: EffectiveConfig): Diagnostic[];   // §3.5
+function isBlocking(input: ValidationInput, config: EffectiveConfig): boolean;      // §3.3
+function resolveConfig(floor: Floor, org: ConfigRead, repo: ConfigRead,
+                       pinned: EffectiveConfig | null, previouslyEvaluated: boolean
+                      ): { config: EffectiveConfig; notices: Notice[] };            // §8.1.2, §8.1.3 r. 1
+function fingerprint(config: EffectiveConfig): string;                              // §8.1.3, r. 2
+function evaluate(input: EvaluationInput): ComplianceResult;                        // §6.2.1, §6.3.1
+function encodeSummary(result: ComplianceResult): string;                           // §6.3.1, ligne `cc/1`
+function decodeSummary(line: string): PublishedSummary | null;                      // §9.2.3
+```
+
+**Ce qui est épinglé, et quand.** Sur une **première** évaluation, l'appelant passe `pinned: null` et la configuration rendue **est** celle à épingler : le composant B la persiste telle quelle et ne la réécrit jamais (§8.1.3). Sur les suivantes, la valeur rendue est déjà le mélange de l'épinglée et du vivant — l'épingler à son tour écraserait l'original et viderait la règle de son sens. Lorsque la règle 3 du §8.1.3 impose une seconde passe sans cache, c'est le résultat de la **seconde** qui est épinglé.
+
+`previouslyEvaluated` est ce qui départage les deux lignes « fichier absent » du §8.1.5 : sans lui, `resolveConfig()` ne peut pas produire `config-vanished`, et la contre-épreuve de `CA-29` n'a aucun chemin d'implémentation.
+
+`encodeSummary()` et `decodeSummary()` sont **dans `core/`, et pas dans les adaptateurs**, pour la raison que le §6.3.1 donne : un seul format, écrit et testé une seule fois. Les mettre côté adaptateur en donnerait deux, et la seule couture entre les deux composants serait la première à diverger.
+
+`resolveConfig()` rend **aussi des `notices`**, et non la seule configuration : `floor-override`, `invalid-config` avec sa ligne fautive, `config-warning`, `config-vanished` et `unsupported-version` naissent tous de la résolution, et d'elle seule. Sans ce second membre, cinq `NoticeKind` du §9.2.1 n'auraient aucun producteur, alors que le §6.3.1 les déclare obligatoires dans la sortie.
+
+`evaluate()` est la fonction qui produit le verdict — `state` compris, que le §9.2.1 et le §B.7 attribuent tous deux à `core/`. Sans elle, ce verdict n'aurait aucun producteur déclaré, et l'adaptateur serait ramené à le recalculer, ce que le §9.2.4 lui interdit. Son `EvaluationContext` porte ce que `core/` ne peut pas lire lui-même : l'état brouillon, l'exemption de PR, les fils déjà observés comme bloquants et les verdicts de première observation (§6.4).
+
+**L'épinglage n'est pas dans `core/`, il l'alimente.** `resolveConfig()` prend la configuration épinglée en **paramètre** : c'est le composant B qui la lit dans son stockage (§6.4) et la lui passe, parce qu'aucune de ces fonctions ne fait d'entrée-sortie. `core/` porte la **règle** de mélange — quelle valeur l'emporte, clé par clé (§8.1.3) —, pas l'accès à l'état. Le composant A passe `null` pour `pinned` et `false` pour `previouslyEvaluated` : il n'épingle pas (§8.1.3, règle 2), et la distinction entre les deux cas de fichier absent n'a d'effet que sur le statut publié, dont il n'est pas l'auteur.
+
+`fingerprint()` mérite d'être ici plutôt que dans chaque composant : c'est la fonction qui décide si A et B « se voient » d'accord (§8.1.3, règle 2). Deux implémentations qui sérialiseraient la configuration différemment — ordre des clés, valeurs par défaut incluses ou non — produiraient un désaccord permanent sur des configurations identiques. Elle est **normativement dans `core/`**, et son entrée est la configuration effective, jamais le texte des fichiers dont elle est issue.
+
+**Son domaine est clos, et il exclut ce que l'extension ne peut pas connaître.** Partager la fonction ne suffit pas si les deux composants ne lui donnent pas le même objet. N'entrent dans l'empreinte que les clés qui **gouvernent le verdict** et que **les deux composants résolvent** :
+
+`mode`, `formatSeverity`, `severities`, `labels` (`id`, `enabled`, `blockingByDefault`, `alwaysNonBlocking`, `aliases`), `decorations`, `rules`, `scope`, `exemptUsers`, `allowlistPatterns`, `activation.activatedAt`.
+
+En sont **exclues** : `server.*` et `exemptionLog.*`, qui n'existent que côté serveur ; `telemetry.*`, `language`, `badgeStyle` et `labels[].color`, qui ne changent aucun verdict ; `configUrl`, `configCacheTtlSeconds` et `coreMinVersion`, qui décrivent la manière dont la configuration a été obtenue et non ce qu'elle dit. **Toute clé du §8.2 absente de la première liste est exclue, sans exception** — y compris `resolverOverrideGroup`, `overrideLabel`, `docUrl` et `labels[].icon`, et y compris une clé ajoutée au schéma plus tard : l'inscrire dans l'empreinte est un geste délibéré, jamais un effet de bord. `resolverOverrideGroup` mérite un mot, car il gouverne bien le critère 2 : il en est exclu parce que la règle est une **conjonction** — gouverner le verdict *et* être résolu par les deux composants —, et que l'extension ne résout pas l'appartenance à un groupe (§10). Une clé hors de la liste ne doit jamais faire diverger l'empreinte, sans quoi la règle 2 du §8.1.3 signalerait un désaccord là où il n'y en a pas et désarmerait le blocage d'envoi en permanence.
+
+`validate()` prend le **corps brut** et non une ligne prétraitée : le prétraitement du §3.4.1 est à l'intérieur, c'est ce qui garantit qu'aucun appelant ne puisse l'oublier ou le faire à sa façon. C'est la contrepartie de `CA-06`, dont le corpus est injecté **en amont** de ces fonctions, au niveau des adaptateurs.
+
+#### 9.2.3 Contrat client (composant A)
+
+```ts
+// `Zone` dit *où vit* le commentaire : les quatre emplacements que le tableau du §4.1 distingue et qui
+// peuvent porter un commentaire soumis à validation.
+// Elle est employée par `core/` comme par les deux adaptateurs. Ce que *fait* l'utilisateur est une notion d'interface, portée
+// séparément par `action` : le composant serveur ne la produit jamais, et une édition n'en reste
+// pas moins située dans une zone.
+type Zone = 'thread-root' | 'reply' | 'review-body' | 'conversation';
+
+interface EditorContext {
+  zone: Zone;                          // sans elle, le défaut « réponses non validées » (§4.1) est inapplicable
+  action: 'compose' | 'edit';          // §4.3 — l'édition est un point de sortie au même titre que la
+                                       // création. Aucune règle de validation n'en dépend : les deux
+                                       // produisent le même `ValidationInput`. Le champ existe pour que
+                                       // l'extension sache quel contrôle intercepter (§5.4)
+  pr: PrRef;
+  threadId?: string;                   // renseigné pour `zone: 'reply'` et pour toute `action: 'edit'`
+  commentId?: string;                  // renseigné pour 'edit'
+  canCarryBlockingState: boolean;      // §4.1 — pilote `W-NOT-BLOCKABLE`
+  inScope: boolean;                    // périmètre d'activation de la PR (§6.2.3)
+}
+
+interface EditorHandle {
+  id: string;
+  element: Element;
+  context: EditorContext;
+}
+
+interface SubmitControl {
+  element: Element;
+  kind: 'submit' | 'submit-and-resolve' | 'complete-pr';
+}
+
+interface PlatformAdapter {
+  matches(url: URL): boolean;          // §2 — activation par domaine, `optional_host_permissions` (§A.4, §B.4)
+  platformProfile(): PlatformProfile;  // §9.2.2 — marqueurs propres à la plateforme, passés à `validate()`
+  getRepoConfig(pr: PrRef): Promise<ConfigRead>;      // §8.1.2 niveau 1 — fichier du dépôt, lu sur la session
+  getOrgConfig(url: string | null): Promise<ConfigRead>;  // §8.1.2 niveau 2 — URL issue du canal de plancher
+  observeEditors(cb: (editor: EditorHandle) => void): Disposable;  // §4.1 — zones ; l'appel du cb est l'instant
+                                                                   // mesuré par la NFR d'injection (§10)
+  getSubmitControls(editor: EditorHandle): SubmitControl[];  // §4.3 — tous les points de sortie, §5.4 — interception
+  readValue(editor: EditorHandle): string;
+  writeValue(editor: EditorHandle, text: string, caret?: number): void;  // §5.1, §5.2 — insertion de préfixe ;
+                                                                          // stratégie d'écriture imposée par le §9.3
+  getThreads(): Promise<ThreadInfo[]>;      // depuis le DOM de la page uniquement (§10) ; `resolution` vaut
+                                           // 'unknown' si l'état n'y est pas rendu. Jamais d'appel d'API.
+  getCompletionControl(): SubmitControl | null;   // §6.5 — désactivation visuelle du bouton de complétion.
+                                       // `getSubmitControls()` ne renvoie **jamais** de contrôle de kind
+                                       // 'complete-pr' : lui seul l'expose, et il n'est jamais intercepté
+  getCurrentUser(): Promise<UserInfo>;      // depuis le DOM ; sert au rendu et à l'exemption d'auteur de
+                                            // l'étage −1 (§3.5.1), jamais à une décision d'autorisation
+  readPublishedResult(): PublishedSummary | null;   // lu dans le DOM, jamais par appel d'API (§8.1.3, §10)
+}
+```
+
+**Ces deux méthodes sont les seules requêtes réseau de l'extension, et elles demandent leur justification.** Sans elles, l'extension ne connaît ni les labels, ni `activatedAt`, ni les seuils : elle valide contre les défauts produit et diverge du serveur sur le cas le plus banal — un dépôt qui a ajouté un label. Le §8.1.5 lui prescrit d'ailleurs trois comportements de repli sur le fichier de dépôt, ce qui suppose qu'elle le lise.
+
+Il en faut **deux**, et pas seulement la première : le composant B résout trois niveaux (§8.1.2), et une extension qui n'en résoudrait que deux calculerait un `configFingerprint` qui ne peut **jamais** coïncider avec celui du serveur dès qu'une organisation renseigne le niveau 2. La règle 2 du §8.1.3 désarmerait alors le blocage d'envoi en permanence — le mode de défaillance exact que cette règle existe pour prévenir. Résoudre la même configuration des deux côtés n'est pas un confort, c'est la condition pour que l'empreinte veuille dire quelque chose.
+
+Les deux lectures sont **mises en cache pour `configCacheTtlSeconds`** — valeur de la **configuration effective précédemment résolue**, ou 3600 s tant qu'aucune ne l'a été, la clé vivant dans le document qu'elle sert à mettre en cache. Lorsque le plancher impose la clé, il la fixe des deux côtés et la règle 4 est satisfaite par construction ; sinon, les deux composants convergent sur la même valeur dès la première résolution — comme côté serveur (§8.1.3, règle 4), et faites **hors du chemin critique du chargement de page** : la NFR de 50 ms du §10 porte sur ce chemin, et l'extension assiste avec la configuration précédemment mise en cache en attendant la réponse.
+
+Elle est compatible avec le §10, qui interdit trois choses précises : détenir un jeton ou un secret, faire sortir du contenu de commentaire, de code ou de diff, et prendre une décision d'autorisation. Lire un fichier de configuration versionné, sur la **session déjà authentifiée** de la personne qui regarde la page, n'est aucune des trois : rien ne sort, rien n'est décidé, et le fichier est visible de quiconque a accès au dépôt.
+
+Quand une lecture est **impossible** — route inaccessible, dépôt privé derrière une API à jeton, politique réseau —, la méthode renvoie `{ status: 'unreachable' }` et l'extension **se rabat sur le niveau inférieur, en signalant son état dégradé** dans les options et dans son indicateur. Elle ne bloque jamais l'envoi sur une règle qu'elle n'a pas pu lire : le composant B reste la source de vérité, et c'est lui qui tranchera.
+
+Le champ `context` est indispensable : sans lui, l'extension ne peut pas distinguer une racine de fil d'une réponse, ni une rédaction d'une édition — donc ne peut pas appliquer le tableau du §4.1, dont c'est pourtant le cœur, à commencer par son défaut « les réponses ne sont pas validées ».
+
+#### 9.2.4 Contrat serveur (composant B)
+
+```ts
+interface ServerPlatformAdapter {
+  platformProfile(): PlatformProfile;                // §9.2.2 — même profil que côté client, même source
+  listOpenPrs(repo: { host: string; scope: string[] }): Promise<PrRef[]>;  // §6.4 source 2 et §6.2.4 :
+                                       // sans elle, la réconciliation périodique et le rapport à blanc —
+                                       // tous deux normatifs — n'ont aucun point d'entrée, `parseEvent()`
+                                       // étant le seul autre producteur de `PrRef`
+  matchesWebhook(payload: unknown): boolean;         // §6.4 — déclenchement, voie nominale
+  verifySignature(payload: unknown, headers: Record<string, string>): boolean;  // §6.4
+  parseEvent(payload: unknown): Omit<ReviewEvent, 'sequence'>;  // §6.4 — la séquence est attribuée par B,
+                                                                // jamais déduite de la charge utile
+  fetchThreads(pr: PrRef): Promise<ThreadInfo[]>;
+  fetchStandaloneComments(pr: PrRef): Promise<{ comment: CommentInfo; zone: Zone }[]>;  // §4.1 — zones
+                                        // `'conversation'` et `'review-body'` : soumises au critère 1, hors de tout fil
+  fetchConfigFile(pr: PrRef,
+                  opts?: { bypassCache: boolean }): Promise<ConfigRead>;   // §8.1.2 niveau 1 — branche
+                                                             // par défaut ; caché comme le niveau 2
+  fetchOrgConfig(url: string | null,
+                 opts?: { bypassCache: boolean }): Promise<ConfigRead>;  // §8.1.2 niveau 2 ; `bypassCache`
+                                                             // est ce que la règle 3 du §8.1.3 exige
+  fetchLabels(pr: PrRef): Promise<{ name: string; by: UserInfo; at: string }[]>;  // §6.3.2 — « par qui et quand »
+  fetchHeadSha(pr: PrRef): Promise<string>;          // §6.4 — relu juste avant publication
+  isDraft(pr: PrRef): Promise<boolean>;              // §6.2.4
+  publishStatus(pr: PrRef, result: ComplianceResult): Promise<void>;  // §6.3.1 — format. Appelée seulement
+                                       // quand le mode autorise une publication : c'est l'orchestrateur
+                                       // qui en décide (§6.2.2), jamais l'adaptateur
+  removeLabel(pr: PrRef, name: string): Promise<void>;   // §6.3.2 — remise à zéro de l'exemption ; seule écriture
+                                                         // du contrat en dehors du statut
+  isInGroup(user: UserInfo, group: string): Promise<boolean>;  // resolverOverrideGroup (§6.1.1)
+}
+```
+
+*Aucune méthode ne demande à la plateforme qui a le droit de résoudre un fil.* Les deux plateformes du périmètre l'autorisent à tout le monde (§A.6, §B.5), et la règle du §6.1 est de toute façon vérifiée **après coup** par `core/` sur `ThreadInfo.resolvedBy`. Une telle méthode n'aurait donc aucun appelant.
+
+**Ce qui reste hors des adaptateurs, donc dans `core/` :** le calcul de conformité, la résolution de la configuration et la **règle** de mélange de sa partie épinglée — l'accès au stockage restant en dehors (§9.2.2) —, la normalisation d'entrée, et la décision de **retenir ou non** une résolution au sens du §6.1. Un adaptateur traduit et transporte ; il ne juge jamais.
+
+La frontière passe exactement là : **traduire `fixed` ou `wontFix` en `ResolutionState.resolved` est une traduction**, et elle appartient donc à l'adaptateur — les tables des §A.6 et §B.5 sont sa spécification. **Décider qu'une résolution est retenue** parce que son auteur est celui du commentaire racine est un jugement, et il appartient à `core/`. C'est pourquoi `ThreadInfo.resolution` est déjà typé `ResolutionState` à la frontière : ce que l'adaptateur livre est normalisé, pas arbitré.
+
+Ce découpage définit également le point d'extension pour une plateforme non prévue au périmètre initial (§1, non-objectifs) : implémenter les deux contrats et les types ci-dessus suffit à intégrer une nouvelle plateforme sans toucher au reste de `core/`. C'est une affirmation opposable — toute règle du corps du document qui exigerait une donnée qu'aucune méthode ne rend serait un défaut de cette section, pas une liberté d'implémentation.
+
 ### 9.3 Contraintes d'implémentation connues
 
-| Sujet | GitHub Enterprise | Azure DevOps |
-|-------|-------------------|--------------|
-| Éditeur | `<textarea>` Markdown | `contenteditable` piloté par un état applicatif |
-| Écriture programmatique | Affectation de `value` + `input` event | Manipulation DOM + `beforeinput`/`input` synthétiques ; **risque de désynchronisation de l'état interne — à valider par prototype** |
-| Navigation | SPA (Turbo) — écouter les événements de navigation | SPA — `MutationObserver` sur le conteneur racine |
-| Domaine | Domaine interne variable → `optional_host_permissions` + saisie du domaine dans les options | `dev.azure.com`, `*.visualstudio.com`, ou domaine on-premise |
+Les contraintes concrètes d'implémentation par plateforme (type d'éditeur, écriture programmatique, navigation SPA, gestion des domaines) sont documentées dans les annexes A et B, qui suivent la même trame — quatre rubriques communes en tête de chacune, complétées par ce qui est propre à la plateforme.
 
-**Risque majeur identifié :** l'écriture dans l'éditeur Azure DevOps. Un *spike* technique de validation est requis **avant** l'engagement sur le reste du développement.
+**Stratégie d'écriture programmatique — commune aux deux plateformes.** Les éditeurs pilotés par un état applicatif absorbent l'affectation directe de `value` : le champ paraît modifié, mais le contenu soumis ne l'est pas. C'est vrai des vues React de GitHub (§A.2) comme, probablement, de l'éditeur Azure DevOps (§B.2). Les adaptateurs emploient donc **la même méthode partout** — passer par le setter natif de la propriété puis émettre un événement `input` qui remonte, ou recourir à une commande d'insertion de texte du navigateur — et **jamais** `element.value = …`.
+
+**Risque à lever :** un *spike* technique valide cette stratégie sur les deux plateformes, en commençant par établir le type réel de l'éditeur Azure DevOps. Il est mené **en parallèle** du développement de `core/` (§14). Son volet GitHub conditionne la seule **insertion de préfixe** de `P2` (`CA-02`) et doit donc aboutir tôt ; le reste de `P2` — validation, retour visuel, diagnostics — n'en dépend pas et démarre sans l'attendre. La barre d'outils (§5.1) et la saisie rapide (§5.2) en relèvent en revanche pleinement : l'une comme l'autre écrivent dans l'éditeur, et sans le spike il n'en reste que des boutons inertes. Ce risque n'est **pas** spécifique à Azure DevOps, et le dimensionnement de `P2` doit en tenir compte.
 
 ### 9.4 Résilience
 
 - Les sélecteurs DOM sont centralisés dans un fichier unique par adaptateur, versionné et documenté.
-- En cas d'échec de détection : **dégradation silencieuse** vers le mode `off` pour la zone concernée, avec journalisation. L'extension ne doit **jamais** empêcher l'utilisation normale de la plateforme.
-- Test de fumée automatisé (Playwright) sur les deux plateformes, exécuté quotidiennement, pour détecter les ruptures de sélecteurs après une mise à jour éditeur.
+- En cas d'échec de détection : **dégradation de sélecteur** — désactivation locale de la zone concernée, sans rapport ni avec le mode `off` de la configuration (§7) ni avec l'**état dégradé** du §5.4, qui désigne une configuration non lue — avec journalisation locale et remontée télémétrique agrégée si activée (§10). L'extension ne doit **jamais** empêcher l'utilisation normale de la plateforme.
+- Test de fumée automatisé (Playwright), exécuté quotidiennement, pour détecter les ruptures de sélecteurs après une mise à jour d'éditeur. Le détail des cibles à couvrir (versions de plateforme à tester) est précisé dans les annexes A et B.
 
 ---
 

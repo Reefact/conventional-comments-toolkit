@@ -114,6 +114,12 @@ async function renderPrChrome(
   applyCompletionState(adapter.getCompletionControl(), published, lang);
 }
 
+// Point d'entrée du script de contenu : auto-exécution dans une page réelle (jamais
+// sous test, où bootstrap() est appelée explicitement).
+if (typeof document !== 'undefined' && typeof chrome !== 'undefined' && chrome?.runtime) {
+  void bootstrap();
+}
+
 /** §6.5 : grise le bouton de complétion si et seulement si PublishedSummary.state vaut
  * 'failure' — jamais à partir des compteurs. Visuel : le clic n'est PAS intercepté. */
 export function applyCompletionState(

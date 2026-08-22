@@ -75,6 +75,31 @@ export const selectors = {
     candidates: ['[data-testid="resolved-badge"]', 'summary [title*="esolved"]', '.Details--on .color-fg-muted'],
   } satisfies SelectorChain,
 
+  /** Formulaire d'édition d'un commentaire existant (§4.3). */
+  editForm: {
+    name: 'edit-form',
+    candidates: ['.js-comment-edit-form', 'form[data-testid*="edit"]', '[data-testid*="edit-form"]'],
+  } satisfies SelectorChain,
+
+  /** Un commentaire rendu dans un fil — pour distinguer l'édition d'une RACINE de celle
+   * d'une réponse (§4.1), et porter les badges (§5.5). */
+  renderedComment: {
+    name: 'rendered-comment',
+    candidates: ['[data-testid="review-thread-comment"]', '.review-comment', '.js-comment'],
+  } satisfies SelectorChain,
+
+  /** Corps d'un commentaire rendu — badges du §5.5. */
+  commentBody: {
+    name: 'comment-body',
+    candidates: ['[data-testid="comment-body"]', '.comment-body'],
+  } satisfies SelectorChain,
+
+  /** Auteur d'un commentaire rendu. */
+  commentAuthor: {
+    name: 'comment-author',
+    candidates: ['[data-testid="comment-author"]', '.author'],
+  } satisfies SelectorChain,
+
   /** Login de l'utilisateur courant — lu dans le DOM, jamais par API (§10). */
   currentUser: {
     name: 'current-user',

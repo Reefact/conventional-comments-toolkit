@@ -251,23 +251,26 @@ export class AzdoServerAdapter implements ServerPlatformAdapter {
     if (!res.ok && res.status !== 404) throw new Error(`removeLabel failed: HTTP ${res.status}`);
   }
 
-  /** `[Scope]\Nom du groupe` (§B.6) — appartenance transitive via l'API d'identités. */
+  /** `[Scope]\Nom du groupe` (§B.6) — appartenance transitive via l'API d'identités.
+   * L'URL est construite sur l'organisation SANS segment `/..` : la normalisation d'URL
+   * ferait sinon perdre l'organisation (`https://dev.azure.com/org/../_apis` →
+   * `https://dev.azure.com/_apis`) et l'appartenance serait toujours fausse. Une panne
+   * remonte en exception : c'est une incapacité à évaluer (§6.4), pas un refus. */
   async isInGroup(user: UserInfo, group: string): Promise<boolean> {
-    try {
-      const res = await this.#raw(
-        `/../_apis/identities?searchFilter=General&filterValue=${encodeURIComponent(group)}&queryMembership=Expanded&api-version=7.1`,
-        {},
-        true
-      );
-      if (!res.ok) return false;
-      const data = (await res.json()) as {
-        value?: { providerDisplayName?: string; memberIds?: string[] }[];
-      };
-      const identity = data.value?.find((i) => i.providerDisplayName === group) ?? data.value?.[0];
-      return identity?.memberIds?.includes(user.id) ?? false;
-    } catch {
-      return false;
-    }
+    const res = await this.#raw(
+      `/_apis/identities?searchFilter=General&filterValue=${encodeURIComponent(group)}&queryMembership=Expanded&api-version=7.1`,
+      {},
+      true
+    );
+    if (!res.ok) throw new Error(`identities API: HTTP ${res.status}`);
+    const data = (await res.json()) as {
+      value?: { providerDisplayName?: string; memberIds?: string[] }[];
+    };
+    // Jamais de repli sur la première identité de la recherche : sans correspondance
+    // exacte du groupe demandé, la réponse est « non » — se rabattre sur une autre
+    // identité accorderait l'habilitation d'un AUTRE groupe.
+    const identity = data.value?.find((i) => i.providerDisplayName === group);
+    return identity?.memberIds?.includes(user.id) ?? false;
   }
 
   async #pullRequest(pr: PrRef): Promise<AzdoPullRequest> {

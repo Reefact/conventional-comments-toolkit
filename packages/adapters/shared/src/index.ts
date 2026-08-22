@@ -1,6 +1,7 @@
 // Socle commun des adaptateurs client (composant A) : contrat §9.2.3, stratégie
 // d'écriture programmatique §9.3, chaînes de sélecteurs avec repli §9.4/§A.5.
 
+import { splitBody } from '@cct/core';
 import type {
   ConfigRead,
   Disposable,
@@ -146,7 +147,9 @@ export class SelectorLog {
 }
 
 /** Insertion/remplacement de préfixe (§5.1, CA-02) — pur, testable sans DOM.
- * Remplace la ligne de préfixe existante ou en insère une, sans détruire le texte saisi. */
+ * La ligne visée est la LIGNE DE PRÉFIXE du §3.4.1 (blocs délimités et citations
+ * écartés) : citer du code en tête puis cliquer un label ne doit jamais réécrire la
+ * citation. Remplace le préfixe existant ou en insère un, sans détruire le texte saisi. */
 export function computePrefixInsertion(
   currentValue: string,
   newPrefix: { label: string; decorations: string[] },
@@ -155,27 +158,19 @@ export function computePrefixInsertion(
   const decorations = newPrefix.decorations.length > 0 ? ` (${newPrefix.decorations.join(', ')})` : '';
   const prefixText = `${newPrefix.label}${decorations}: `;
 
-  // La ligne de préfixe est la première ligne non vide hors bloc/citation — pour la
-  // saisie, la première ligne portant déjà un préfixe reconnaissable suffit.
   const lines = currentValue.split('\n');
-  let target = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i]!.trim() !== '') {
-      target = i;
-      break;
-    }
-  }
+  const split = splitBody(currentValue);
+  const target = split.prefixLineIndex ?? -1;
 
   const existing = target >= 0 ? /^([A-Za-z]+)(\s*\([^)]*\))?:\s*/.exec(lines[target]!) : null;
   if (existing && target >= 0) {
     const line = lines[target]!;
     const rest = line.slice(existing[0].length);
     const hadLabel = existing[1]!;
-    const hadDecorations = (existing[2] ?? '').replace(/[()\s]/g, '');
     const sameLabel = hadLabel.toLowerCase() === newPrefix.label.toLowerCase();
-    const sameDecorations = hadDecorations === newPrefix.decorations.join(',').replace(/\s/g, '');
-    if (options.toggle && sameLabel && sameDecorations) {
-      // Second clic sur un label déjà actif : retrait (§5.1).
+    if (options.toggle && sameLabel) {
+      // Second clic sur un label déjà actif : retrait (§5.1) — le label seul décide,
+      // pas l'état du sélecteur de décoration.
       lines[target] = rest;
       const nextValue = lines.join('\n');
       return { nextValue, caret: lineStart(lines, target), delta: -existing[0].length, removed: true };
@@ -183,16 +178,26 @@ export function computePrefixInsertion(
     // Remplacement : décoration et sujet conservés (CA-02) — la décoration existante est
     // conservée si le nouveau préfixe n'en apporte pas.
     const keptDecorations =
-      newPrefix.decorations.length === 0 && existing[2] ? existing[2].trim().replace(/^\s*/, ' ') : decorations;
-    const replacement = `${newPrefix.label}${keptDecorations.startsWith(' ') ? keptDecorations : keptDecorations}: `;
+      newPrefix.decorations.length === 0 && existing[2] ? ` ${existing[2].trim()}` : decorations;
+    const replacement = `${newPrefix.label}${keptDecorations}: `;
     lines[target] = `${replacement}${rest}`;
     const nextValue = lines.join('\n');
     const caret = lineStart(lines, target) + replacement.length;
     return { nextValue, caret, delta: replacement.length - existing[0].length, removed: false };
   }
 
-  // Aucun préfixe : insertion en tête, texte déjà saisi conservé.
-  const nextValue = prefixText + currentValue;
+  if (target >= 0) {
+    // Une ligne de préfixe existe mais ne porte pas de préfixe : le préfixe s'insère en
+    // tête de CETTE ligne — jamais sur une citation ou un bloc situé au-dessus.
+    lines[target] = prefixText + lines[target]!;
+    const nextValue = lines.join('\n');
+    const caret = lineStart(lines, target) + prefixText.length;
+    return { nextValue, caret, delta: prefixText.length, removed: false };
+  }
+
+  // Aucune ligne de préfixe (corps vide, tout cité ou tout en bloc) : nouvelle première
+  // ligne, contenu existant conservé en dessous.
+  const nextValue = currentValue === '' ? prefixText : `${prefixText}\n${currentValue}`;
   return { nextValue, caret: prefixText.length, delta: prefixText.length, removed: false };
 }
 

@@ -143,8 +143,8 @@ export class GithubClientAdapter implements PlatformAdapter {
     return containers.map((el, i) => {
       const id = el.id || el.getAttribute('data-thread-id') || `dom-thread-${i}`;
       const resolvedOutcome = queryChain(el, selectors.resolvedMarker);
-      const bodyEl = el.querySelector('.comment-body, [data-testid="comment-body"]');
-      const author = el.querySelector('.author, [data-testid="comment-author"]')?.textContent?.trim() ?? '';
+      const bodyEl = queryChain(el, selectors.commentBody).element;
+      const author = queryChain(el, selectors.commentAuthor).element?.textContent?.trim() ?? '';
       const anchor = el.querySelector('a[href*="#"]')?.getAttribute('href') ?? `#${id}`;
       return {
         id,
@@ -194,6 +194,15 @@ export class GithubClientAdapter implements PlatformAdapter {
     return null;
   }
 
+  /** Commentaires rendus sur la page, pour les badges du §5.5 — surface d'affichage,
+   * hors du contrat normatif §9.2.3. */
+  getRenderedComments(): { element: Element; bodyText: string }[] {
+    return queryChainAll(this.#doc, selectors.commentBody).map((element) => ({
+      element,
+      bodyText: element.textContent ?? '',
+    }));
+  }
+
   /** PrRef depuis l'URL et la page — la date de création est lisible dans le DOM (§6.2.3). */
   currentPr(): PrRef | null {
     const loc = this.#doc.location;
@@ -221,11 +230,28 @@ export class GithubClientAdapter implements PlatformAdapter {
   /** Zone de l'éditeur (§4.1) : réponse dans un fil, corps de revue, conversation
    * générale, ou racine de fil (diff). */
   #contextOf(el: Element, pr: PrRef): EditorContext {
-    const action: 'compose' | 'edit' = el.closest('.js-comment-edit-form, [data-testid*="edit"]')
+    const action: 'compose' | 'edit' = el.closest(selectors.editForm.candidates.join(', '))
       ? 'edit'
       : 'compose';
     const thread = el.closest(selectors.threadContainer.candidates.join(', '));
     if (thread) {
+      // L'ÉDITION du commentaire RACINE d'un fil reste zone 'thread-root' (§4.1, §4.3) :
+      // la classer 'reply' la soustrairait à la validation par défaut et à la monotonie.
+      if (action === 'edit') {
+        const comments = queryChainAll(thread, selectors.renderedComment);
+        const editedComment = el.closest(selectors.renderedComment.candidates.join(', '));
+        const isRootEdit = comments.length > 0 && editedComment === comments[0];
+        if (isRootEdit) {
+          return {
+            zone: 'thread-root',
+            action,
+            pr,
+            threadId: thread.id || undefined,
+            canCarryBlockingState: true,
+            inScope: true,
+          };
+        }
+      }
       return {
         zone: 'reply',
         action,

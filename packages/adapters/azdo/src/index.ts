@@ -37,6 +37,10 @@ export interface AzdoClientOptions {
   log?: SelectorLog;
 }
 
+function firstCommentOf(thread: Element): Element | null {
+  return thread.querySelector('.repos-discussion-comment, [class*="discussion-comment"]');
+}
+
 export class AzdoClientAdapter implements PlatformAdapter {
   #hosts: string[];
   #fetch: typeof fetch;
@@ -143,7 +147,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
         : /active|pending/.test(statusText)
           ? ('unresolved' as const)
           : ('unknown' as const); // non rendu → unknown, compté non résolu (§5.5, §B.5)
-      const body = el.querySelector('.markdown-content, .comment-content')?.textContent ?? '';
+      const body = queryChain(el, selectors.commentBody).element?.textContent ?? '';
       return {
         id,
         pr,
@@ -190,37 +194,80 @@ export class AzdoClientAdapter implements PlatformAdapter {
     return null;
   }
 
+  /** Commentaires rendus sur la page, pour les badges du §5.5. */
+  getRenderedComments(): { element: Element; bodyText: string }[] {
+    return queryChainAll(this.#doc, selectors.commentBody).map((element) => ({
+      element,
+      bodyText: element.textContent ?? '',
+    }));
+  }
+
   currentPr(): PrRef | null {
     const loc = this.#doc.location;
-    // dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}
-    const m = /^\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(loc?.pathname ?? '');
-    if (!m) return null;
+    if (!loc) return null;
+    const path = loc.pathname;
     const { element } = queryChain(this.#doc, selectors.prCreatedAt);
     const createdAt = element?.getAttribute('datetime') ?? '';
-    return {
-      platform: 'azdo',
-      createdAt,
-      host: loc!.hostname,
-      scope: [m[1]!, m[2]!, m[3]!],
-      number: Number(m[4]),
-    };
+    // Forme moderne : dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}
+    let m = /^\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
+    if (m) {
+      return {
+        platform: 'azdo',
+        createdAt,
+        host: loc.hostname,
+        scope: [m[1]!, m[2]!, m[3]!],
+        number: Number(m[4]),
+      };
+    }
+    // Forme historique : {org}.visualstudio.com/{project}/_git/{repo}/pullrequest/{id}
+    // — l'organisation vit dans le sous-domaine (§B.1).
+    if (loc.hostname.endsWith('.visualstudio.com')) {
+      m = /^\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
+      if (m) {
+        const org = loc.hostname.split('.')[0]!;
+        return {
+          platform: 'azdo',
+          createdAt,
+          host: loc.hostname,
+          scope: [org, m[1]!, m[2]!],
+          number: Number(m[3]),
+        };
+      }
+    }
+    return null;
   }
 
   #toHandle(el: Element): EditorHandle | null {
     const pr = this.currentPr();
     if (!pr) return null;
     this.#editorSeq++;
+    // L'édition est un point de sortie au même titre que la création (§4.3) ; l'édition
+    // d'une RACINE de fil reste zone 'thread-root' — la classer 'reply' la soustrairait
+    // à la validation par défaut (§4.1).
+    const action: 'compose' | 'edit' = el.closest(selectors.editForm.candidates.join(', '))
+      ? 'edit'
+      : 'compose';
     const inThread = el.closest(selectors.threadContainer.candidates.join(', '));
-    const context: EditorContext = inThread
-      ? {
-          zone: 'reply',
-          action: 'compose',
-          pr,
-          threadId: inThread.id || undefined,
-          canCarryBlockingState: false,
-          inScope: true,
-        }
-      : { zone: 'thread-root', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
+    let context: EditorContext;
+    if (inThread) {
+      const isRootEdit =
+        action === 'edit' &&
+        el.closest(selectors.commentBody.candidates.map((c) => `${c}, [class*="comment"]`).join(', ')) !== null &&
+        firstCommentOf(inThread) !== null &&
+        firstCommentOf(inThread)!.contains(el);
+      context = isRootEdit
+        ? { zone: 'thread-root', action, pr, threadId: inThread.id || undefined, canCarryBlockingState: true, inScope: true }
+        : {
+            zone: 'reply',
+            action,
+            pr,
+            threadId: inThread.id || undefined,
+            canCarryBlockingState: false,
+            inScope: true,
+          };
+    } else {
+      context = { zone: 'thread-root', action, pr, canCarryBlockingState: true, inScope: true };
+    }
     return { id: `azdo-editor-${this.#editorSeq}`, element: el, context };
   }
 }

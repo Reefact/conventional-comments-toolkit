@@ -1,0 +1,66 @@
+// Sélecteurs DOM Azure DevOps — fichier unique, versionné (§9.4). L'éditeur exact est à
+// établir par le spike P1' (§B.2) : ces chaînes couvrent l'hypothèse <textarea> et
+// l'hypothèse d'un éditeur riche ; quand aucune ne matche, la dégradation silencieuse
+// s'applique (CA-11) et l'extension n'empêche jamais l'usage normal de la plateforme.
+
+import type { SelectorChain } from '@cct/adapter-shared';
+
+export const selectors = {
+  editors: {
+    name: 'editors',
+    candidates: [
+      'textarea.comment-textarea',
+      '.repos-discussion-comment-editor textarea',
+      '.vc-discussion-comment-editor textarea',
+      'textarea[aria-label*="omment"]',
+    ],
+  } satisfies SelectorChain,
+
+  threadContainer: {
+    name: 'thread-container',
+    candidates: ['.repos-discussion-thread', '.vc-discussion-thread-box'],
+  } satisfies SelectorChain,
+
+  submitButtons: {
+    name: 'submit-buttons',
+    candidates: [
+      // « Comment » ET « Comment & resolve » — les deux passent par la validation (§B.6).
+      'button[data-testid*="comment"]',
+      '.repos-discussion-comment-editor button.bolt-button.primary',
+      'button.bolt-button.primary',
+    ],
+  } satisfies SelectorChain,
+
+  completeButton: {
+    name: 'complete-button',
+    candidates: ['button[data-testid*="complete"]', '#pull-request-complete-button', 'button[aria-label*="omplete"]'],
+  } satisfies SelectorChain,
+
+  renderedThreads: {
+    name: 'rendered-threads',
+    candidates: ['.repos-discussion-thread', '.vc-discussion-thread-box'],
+  } satisfies SelectorChain,
+
+  /** État de résolution rendu — Azure DevOps affiche le statut du fil dans un menu ;
+   * lorsqu'il n'est pas lisible, `resolution: 'unknown'`, compté non résolu (§B.5, §5.5). */
+  threadStatus: {
+    name: 'thread-status',
+    candidates: ['.repos-discussion-thread-status', '[aria-label*="status"]'],
+  } satisfies SelectorChain,
+
+  currentUser: {
+    name: 'current-user',
+    candidates: ['.bolt-header-user-avatar img[alt]', 'img.user-avatar[alt]'],
+  } satisfies SelectorChain,
+
+  prCreatedAt: {
+    name: 'pr-created-at',
+    candidates: ['.repos-pr-header time', 'time[datetime]'],
+  } satisfies SelectorChain,
+
+  /** Description des PR Status rendus — c'est là que vit la ligne cc/1 (§B.7). */
+  statusDescriptions: {
+    name: 'status-descriptions',
+    candidates: ['.pr-status-list .pr-status-description', '[data-testid*="pr-status"]', '.repos-pr-status'],
+  } satisfies SelectorChain,
+};

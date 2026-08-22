@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "floor": {
+      "title": "Plancher d'entreprise (§8.1.1)",
+      "description": "Document de plancher : minimumMode, configUrl, bornes. Doit porter la même valeur que le canal du composant serveur.",
+      "type": "object",
+      "properties": {
+        "floorVersion": { "type": "integer" },
+        "configUrl": { "type": "string" },
+        "minimumMode": { "type": "string", "enum": ["off", "assist", "warn", "enforce"] },
+        "formatSeverity": { "type": "string", "enum": ["warn", "error"] },
+        "configCacheTtlSeconds": { "type": "integer" }
+      }
+    },
+    "allowedHosts": {
+      "title": "Hôtes pré-autorisés",
+      "description": "Domaines GHES / Azure DevOps Server et hôte de configUrl, pré-autorisés par la politique (§10, §A.4, §B.4).",
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@cct/extension",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@cct/core": "1.0.0",
+    "@cct/adapter-shared": "1.0.0",
+    "@cct/adapter-github": "1.0.0",
+    "@cct/adapter-azdo": "1.0.0"
+  }
+}

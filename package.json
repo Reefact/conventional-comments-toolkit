@@ -5,20 +5,22 @@
   "type": "module",
   "workspaces": [
     "packages/core",
+    "packages/adapters/shared",
     "packages/adapters/github",
     "packages/adapters/azdo",
     "packages/extension",
     "packages/server"
   ],
   "scripts": {
-    "build": "tsc -b packages/core packages/adapters/github packages/adapters/azdo packages/server packages/extension",
+    "build": "tsc -b packages/core packages/adapters/shared packages/adapters/github packages/adapters/azdo packages/server packages/extension",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b --force packages/core packages/adapters/github packages/adapters/azdo packages/server packages/extension",
+    "typecheck": "tsc -b --force packages/core packages/adapters/shared packages/adapters/github packages/adapters/azdo packages/server packages/extension",
     "spike": "node spikes/p1-prime/run.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "happy-dom": "^20.11.6",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },

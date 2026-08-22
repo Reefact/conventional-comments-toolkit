@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Conventional Comments Toolkit — options</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; max-width: 40em; margin: 2em auto; padding: 0 1em; }
+      fieldset { margin-bottom: 1.5em; }
+      .degraded { color: #b3261e; }
+      label { display: block; margin: 0.5em 0; }
+    </style>
+  </head>
+  <body>
+    <h1>Conventional Comments Toolkit</h1>
+
+    <fieldset>
+      <legend>Hôtes autorisés</legend>
+      <p>
+        Seul <code>github.com</code> est pré-déclaré. Les domaines GitHub Enterprise Server,
+        <code>*.ghe.com</code> (résidence de données), Azure DevOps Server et l'hôte de la
+        configuration d'organisation passent par <code>optional_host_permissions</code>,
+        activés à la demande (§A.4, §B.4).
+      </p>
+      <label>
+        Ajouter un domaine :
+        <input type="text" id="host-input" placeholder="ghes.example.interne" />
+        <button id="host-add" type="button">Autoriser</button>
+      </label>
+      <ul id="host-list" aria-live="polite"></ul>
+    </fieldset>
+
+    <fieldset>
+      <legend>Préférences locales (§8.1.2)</legend>
+      <p>Langue, thème, raccourcis, style de badge — jamais le mode ni la liste des labels.</p>
+      <label>
+        Langue de l'interface :
+        <select id="language">
+          <option value="">(suivre la configuration puis la plateforme)</option>
+          <option value="fr">français</option>
+          <option value="en">english</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>État</legend>
+      <p id="degraded-state" aria-live="polite">—</p>
+      <p id="selector-log">—</p>
+    </fieldset>
+
+    <script src="options.js" type="module"></script>
+  </body>
+</html>

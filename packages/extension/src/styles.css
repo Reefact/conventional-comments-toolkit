@@ -1,0 +1,129 @@
+/* Styles de l'extension — thèmes clair/sombre respectés via les variables de la
+   plateforme quand elles existent, prefers-reduced-motion respecté (§10). Hauteur
+   réservée pour la pastille : aucun layout shift pendant la frappe (§5.3). */
+
+.cct-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0;
+  align-items: center;
+}
+
+.cct-label-button {
+  border: 1px solid var(--cct-label-color, currentColor);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.cct-label-button[aria-pressed='true'] {
+  background: var(--cct-label-color, ButtonFace);
+  color: Canvas;
+}
+
+.cct-decoration-group {
+  display: inline-flex;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cct-decoration-segment {
+  border: none;
+  padding: 2px 8px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.cct-decoration-segment[aria-checked='true'] {
+  background: Highlight;
+  color: HighlightText;
+}
+
+.cct-free-decoration {
+  font-size: 12px;
+  padding: 2px 6px;
+  max-width: 12em;
+}
+
+.cct-feedback {
+  min-height: 1.6em; /* pas de layout shift (§5.3) */
+  font-size: 12px;
+}
+
+.cct-diagnostics {
+  margin: 2px 0 0;
+  padding-left: 1.2em;
+}
+
+.cct-diagnostics li[data-severity='error'] { color: #b3261e; }
+.cct-diagnostics li[data-severity='warn'] { color: #8a6d00; }
+
+.cct-fix,
+.cct-alias button {
+  margin-left: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cct-border-ok { outline: 1px solid #2e7d32 !important; }
+.cct-border-warn { outline: 1px solid #f9a825 !important; }
+.cct-border-error { outline: 2px solid #b3261e !important; }
+
+.cct-banner {
+  border: 1px solid #b3261e;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.cct-badge {
+  display: inline-block;
+  font-size: 11px;
+  border: 1px solid var(--cct-label-color, currentColor);
+  padding: 0 6px;
+  margin-right: 6px;
+}
+
+.cct-badge-pill { border-radius: 999px; }
+.cct-badge-flat { border-radius: 2px; }
+
+.cct-merge-blocked { opacity: 0.5; }
+
+.cct-quick-list {
+  list-style: none;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  max-height: 12em;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.cct-quick-list [aria-selected='true'] {
+  background: Highlight;
+  color: HighlightText;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cct-toolbar *,
+  .cct-feedback * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

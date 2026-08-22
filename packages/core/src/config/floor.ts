@@ -97,32 +97,34 @@ export function applyFloor(
     overridden('formatSeverity');
   }
 
-  // severities — ensemble de codes dont la sévérité ne peut pas être abaissée.
+  // severities — ensemble de codes dont la sévérité ne peut pas être abaissée (§8.1.1).
+  // Le plancher est un minimum, jamais une valeur imposée : il ne peut que RELEVER la
+  // sévérité effective — explicite, ou celle du tableau §3.5.2 quand rien n'est écrit.
   if (floor.severities) {
     for (const [code, min] of Object.entries(floor.severities)) {
-      const current = out.severities[code];
-      if (current !== undefined && SEVERITY_SCALE[current] < SEVERITY_SCALE[min]) {
+      const effective = out.severities[code] ?? (code.startsWith('E-') ? 'error' : 'warn');
+      if (SEVERITY_SCALE[effective] < SEVERITY_SCALE[min]) {
         out.severities[code] = min;
-        overridden(`severities.${code}`);
-      } else if (current === undefined) {
-        // La sévérité par défaut du tableau §3.5.2 peut être sous le plancher : imposer.
-        out.severities[code] = min;
+        overridden(`severities.${code}`); // n'émet que si un niveau inférieur avait écrit
       }
     }
   }
 
-  // labels — ids dont ni enabled ni blockingByDefault ne peuvent passer à false
-  // en dessous du plancher. Le plancher n'invente pas de label : il protège ceux
-  // que la configuration connaît.
+  // labels — ids dont ni enabled ni blockingByDefault ne peuvent passer à false en
+  // dessous du plancher (§8.1.1). La contrainte porte sur la VALEUR EFFECTIVE, comme
+  // pour toutes les autres clés du plancher — c'est la clé par laquelle un dépôt éteint
+  // la contrainte le plus complètement, et une lecture limitée aux seules écritures
+  // laisserait passer une valeur héritée. Le plancher n'invente pas de label : il
+  // protège ceux que la configuration connaît.
   if (floor.labels?.minimum) {
     for (const id of floor.labels.minimum) {
       const label = out.labels.find((l) => l.id === id);
       if (!label) continue;
-      if (written.has(`labels.${id}.enabled`) && !label.enabled) {
+      if (!label.enabled) {
         label.enabled = true;
         overridden(`labels.${id}.enabled`);
       }
-      if (written.has(`labels.${id}.blockingByDefault`) && !label.blockingByDefault) {
+      if (!label.blockingByDefault) {
         label.blockingByDefault = true;
         overridden(`labels.${id}.blockingByDefault`);
       }

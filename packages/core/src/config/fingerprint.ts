@@ -28,7 +28,12 @@ export function fingerprintDomain(config: EffectiveConfig): FingerprintDomain {
   return {
     mode: config.mode,
     formatSeverity: config.formatSeverity,
-    severities: Object.entries(config.severities).sort(([a], [b]) => (a < b ? -1 : 1)),
+    // Une surcharge égale à la sévérité du tableau §3.5.2 ne change aucun verdict : elle
+    // est écartée, pour que deux configurations sémantiquement identiques produisent la
+    // même empreinte (§8.1.3, règle 2 — jamais de désaccord fabriqué).
+    severities: Object.entries(config.severities)
+      .filter(([code, sev]) => sev !== (code.startsWith('E-') ? 'error' : 'warn'))
+      .sort(([a], [b]) => (a < b ? -1 : 1)),
     labels: [...config.labels]
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map((l) => ({

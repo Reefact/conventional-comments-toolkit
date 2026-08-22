@@ -102,6 +102,21 @@ export function resolveConfig(
   // configUrl provient exclusivement du canal de plancher (§8.1.2).
   config.configUrl = vetted.unsupported ? null : vetted.floor.configUrl ?? null;
 
+  // Limite basse de sévérité (§8.2), appliquée quel que soit le chemin — y compris quand
+  // le plancher n'a pas pu être appliqué : un code E- ne descend jamais sous warn.
+  for (const [code, sev] of Object.entries(config.severities)) {
+    if (code.startsWith('E-') && sev === 'off') {
+      config.severities[code] = 'warn';
+      if (!notices.some((n) => n.kind === 'config-warning' && n.ref === `severities.${code}`)) {
+        notices.push({
+          kind: 'config-warning',
+          message: `severity of "${code}" cannot go below "warn" (§8.2): value "off" raised to "warn"`,
+          ref: `severities.${code}`,
+        });
+      }
+    }
+  }
+
   return { config, notices };
 }
 

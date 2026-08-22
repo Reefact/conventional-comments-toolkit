@@ -38,6 +38,13 @@ export interface PublishedRecord {
   threadIds: string[];
   commentIds: string[];
   at: string;
+  /** Ligne machine cc/1 telle que publiée (§6.3.1). */
+  machineLine?: string;
+  /** Résumé humain d'une ligne. */
+  headline?: string;
+  /** Sortie humaine complète du §6.3.1 — c'est elle que sert la page derrière la
+   * targetUrl : « la même sortie », pas un condensé. */
+  humanOutput?: string;
 }
 
 export interface RepoEvaluationFlag {
@@ -101,6 +108,9 @@ export interface Storage {
   nextSequence(prKey: string): Promise<number>;
   getLastPublishedSequence(prKey: string): Promise<number>;
   setLastPublishedSequence(prKey: string, sequence: number): Promise<void>;
+  // Index chemin → clé de PR, pour la page de statut (§6.3.1) — l'URL ne porte pas l'hôte.
+  setPrPathAlias(alias: string, prKey: string): Promise<void>;
+  getPrPathAlias(alias: string): Promise<string | null>;
 }
 
 interface State {
@@ -118,6 +128,7 @@ interface State {
   indicatorSamples: IndicatorSample[];
   sequences: Record<string, number>;
   lastPublishedSequences: Record<string, number>;
+  prPathAliases: Record<string, string>;
 }
 
 function emptyState(): State {
@@ -136,6 +147,7 @@ function emptyState(): State {
     indicatorSamples: [],
     sequences: {},
     lastPublishedSequences: {},
+    prPathAliases: {},
   };
 }
 
@@ -258,7 +270,16 @@ export class MemoryStorage implements Storage {
     this.state.lastPublishedSequences[key] = sequence;
     await this.persist();
   }
+  async setPrPathAlias(alias: string, prKey: string): Promise<void> {
+    this.state.prPathAliases[alias] = prKey;
+    await this.persist();
+  }
+  async getPrPathAlias(alias: string): Promise<string | null> {
+    return this.state.prPathAliases[alias] ?? null;
+  }
 }
+
+/* MemoryStorage se termine ici ; FileStorage hérite de tout. */
 
 /** Stockage fichier JSON, écriture atomique (fichier temporaire puis rename). */
 export class FileStorage extends MemoryStorage {

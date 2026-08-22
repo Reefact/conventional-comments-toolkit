@@ -13,6 +13,7 @@ import {
 } from '@cct/core';
 import type { ServerPlatformAdapter, PlatformOperationalFacts } from './adapter.js';
 import type { Storage } from './storage.js';
+import { resolveOverrideMembership } from './membership.js';
 import { prKey, repoKey } from './keys.js';
 
 export interface DryRunReportEntry {
@@ -61,6 +62,9 @@ export class AdminEntryPoint {
         adapter.fetchStandaloneComments(pr),
         adapter.isDraft(pr),
       ]);
+      // L'habilitation est résolue comme à l'évaluation : un fil résolu par un membre
+      // habilité avec une decision valide ne doit pas apparaître comme un futur échec.
+      const isOverrideMember = await resolveOverrideMembership(adapter, config, threads, loose);
       const result: ComplianceResult = evaluate({
         pr,
         platform: adapter.platformProfile(),
@@ -71,7 +75,7 @@ export class AdminEntryPoint {
         ctx: {
           activatedAt: hypotheticalActivatedAt,
           isDraft,
-          isOverrideMember: () => false,
+          isOverrideMember,
           knownBlockingThreadIds: await storage.getKnownBlockingThreads(prKey(pr)),
           firstVerdicts: await storage.getFirstVerdicts(prKey(pr)),
         },

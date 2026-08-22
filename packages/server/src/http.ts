@@ -63,7 +63,14 @@ async function route(deps: HttpDeps, req: IncomingMessage, res: ServerResponse):
     if (!registration.adapter.verifySignature(payload, headers)) {
       return send(res, 401, { error: 'invalid signature' });
     }
-    const event = registration.adapter.parseEvent(payload);
+    let event;
+    try {
+      event = registration.adapter.parseEvent(payload);
+    } catch {
+      // Charge signée mais hors périmètre (ex. commentaire d'une issue simple, qui n'est
+      // pas une PR) : ignorée, jamais une erreur serveur.
+      return send(res, 202, { ignored: true });
+    }
     // Seuls `pr` (et la séquence attribuée par B) sont consommés : l'évaluation relit
     // l'état courant, jamais le contenu de l'événement (§6.4, §9.2.1).
     void registration.scheduler.trigger(event.pr, 'webhook').catch(() => {});
@@ -156,8 +163,9 @@ async function adminRoute(
   }
 }
 
-/** Page portant la même sortie que le statut (§6.3.1) : sur toute plateforme sans corps
- * de statut, un check rouge serait sans elle un mur sans explication. */
+/** Page portant la même sortie que le statut (§6.3.1) : la ligne machine cc/1, le
+ * résumé humain et la sortie complète — sur toute plateforme sans corps de statut, un
+ * check rouge serait sans elle un mur sans explication. */
 async function statusPage(deps: HttpDeps, path: string, res: ServerResponse): Promise<void> {
   // /status/pr/{platform}/{...scope}/{number}
   const parts = path.slice('/status/pr/'.length).split('/').map(decodeURIComponent);
@@ -165,39 +173,20 @@ async function statusPage(deps: HttpDeps, path: string, res: ServerResponse): Pr
   const platform = parts[0]!;
   const number = parts[parts.length - 1]!;
   const scope = parts.slice(1, -1);
-  // La clé publiée porte l'hôte ; on cherche le dernier résultat publié correspondant.
-  const key = await findPrKey(deps.storage, platform, scope, number);
+  // L'URL ne porte pas l'hôte : l'index chemin → clé de PR, écrit à la publication,
+  // fait la correspondance quelle que soit l'instance (github.com, GHES, Server…).
+  const alias = `${platform}/${scope.join('/')}#${number}`;
+  const key = await deps.storage.getPrPathAlias(alias);
   if (!key) return send(res, 404, { error: 'no published result for this PR' });
   const record = await deps.storage.getLastPublished(key);
   if (!record) return send(res, 404, { error: 'no published result for this PR' });
-  return send(res, 200, { prKey: key, lastPublished: record });
-}
-
-async function findPrKey(
-  storage: Storage,
-  platform: string,
-  scope: string[],
-  number: string
-): Promise<string | null> {
-  // Les clés sont `${platform}:${host}:${scope}#${number}` : l'hôte est inconnu de
-  // l'URL ; le suffixe suffit à identifier la PR.
-  const suffix = `:${scope.join('/')}#${number}`;
-  const probe = prKey({
-    platform,
-    host: '',
-    scope,
-    number,
-    createdAt: '',
+  return send(res, 200, {
+    prKey: key,
+    machineLine: record.machineLine ?? null,
+    headline: record.headline ?? null,
+    humanOutput: record.humanOutput ?? null,
+    lastPublished: record,
   });
-  void probe;
-  // Parcours défensif : le stockage n'expose pas d'énumération de clés ; on tente les
-  // hôtes canoniques connus, puis la forme sans hôte.
-  const hosts = platform === 'github' ? ['github.com'] : platform === 'azdo' ? ['dev.azure.com'] : [''];
-  for (const host of hosts) {
-    const key = `${platform}:${host}${suffix}`;
-    if ((await storage.getLastPublished(key)) !== null) return key;
-  }
-  return null;
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {

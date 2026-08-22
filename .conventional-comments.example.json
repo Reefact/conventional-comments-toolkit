@@ -1,0 +1,39 @@
+{
+  "$schema": "https://conventional-comments-toolkit.dev/schema/v1.json",
+  "version": 1,
+  "mode": "assist",
+  "labels": [
+    { "id": "issue", "enabled": true, "blockingByDefault": true, "alwaysNonBlocking": false, "icon": "🔨", "color": "#B3261E", "aliases": ["bug"] },
+    { "id": "nitpick", "enabled": true, "blockingByDefault": false, "alwaysNonBlocking": true },
+    { "id": "decision", "enabled": true, "blockingByDefault": false, "alwaysNonBlocking": true },
+    { "id": "typo", "enabled": false, "blockingByDefault": false }
+  ],
+  "decorations": {
+    "allowFree": true,
+    "known": [
+      { "id": "blocking", "forces": "blocking" },
+      { "id": "non-blocking", "forces": "non-blocking" },
+      { "id": "if-minor", "forces": "non-blocking" },
+      { "id": "security", "forces": null }
+    ]
+  },
+  "severities": { "W-MISSING-DECORATION": "off" },
+  "scope": { "validateReplies": false, "validateReviewSummary": true },
+  "rules": { "minSubjectLength": 5, "maxSubjectLength": 120, "minDecisionSubjectLength": 20 },
+  "formatSeverity": "warn",
+  "exemptUsers": ["dependabot[bot]", "github-actions[bot]"],
+  "allowlistPatterns": ["^LGTM$"],
+  "resolverOverrideGroup": ["acme/tech-leads"],
+  "overrideLabel": "cc-override",
+  "activation": { "activatedAt": "2026-09-01T00:00:00Z" },
+  "configUrl": null,
+  "coreMinVersion": "1.0.0",
+  "configCacheTtlSeconds": 3600,
+  "badgeStyle": "pill",
+  "shortcuts": { "abbreviations": { "?i": "issue: ", "?ib": "issue (blocking): " } },
+  "docUrl": "https://conventionalcomments.org/",
+  "server": { "coalesceWindowSeconds": 10, "gracePeriodSeconds": 900, "reconcileIntervalSeconds": 900, "statusTargetUrl": null },
+  "exemptionLog": { "endpoint": null },
+  "language": "fr",
+  "telemetry": { "enabled": false, "endpoint": null }
+}

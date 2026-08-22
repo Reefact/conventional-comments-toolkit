@@ -15,6 +15,7 @@ export {
 } from './compliance/storage.js';
 export { ConfigCache } from './compliance/cache.js';
 export { AdminEntryPoint, AdminError, type DryRunReportEntry } from './compliance/admin.js';
+export { computeIndicators, type Indicators } from './compliance/indicators.js';
 export { prKey, repoKey } from './compliance/keys.js';
 export type { ServerPlatformAdapter, PlatformOperationalFacts } from './compliance/adapter.js';
 export { GithubServerAdapter, githubFacts, renderHumanOutput } from './adapters/github/index.js';

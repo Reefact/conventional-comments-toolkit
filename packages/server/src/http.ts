@@ -10,6 +10,7 @@ import type { AdminEntryPoint } from './compliance/admin.js';
 import { AdminError } from './compliance/admin.js';
 import type { Storage } from './compliance/storage.js';
 import type { ConfigCache } from './compliance/cache.js';
+import { computeIndicators } from './compliance/indicators.js';
 import { prKey } from './compliance/keys.js';
 
 export interface PlatformRegistration {
@@ -149,7 +150,7 @@ async function adminRoute(
       if (path.startsWith('/admin/indicators/')) {
         const repoKeyParam = decodeURIComponent(path.slice('/admin/indicators/'.length));
         const samples = await deps.storage.readIndicatorSamples(repoKeyParam);
-        return send(res, 200, { samples });
+        return send(res, 200, { indicators: computeIndicators(samples), samples });
       }
       throw new AdminError(404, 'unknown admin route');
   }

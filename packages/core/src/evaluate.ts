@@ -248,7 +248,10 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
 
   let state: ComplianceResult['state'];
   if (forceState) {
-    state = forceState.state; // le verdict est imposé, quoi que disent les listes (§9.2.2)
+    // Le verdict est imposé, quoi que disent les listes (§9.2.2) — mais une PR en
+    // brouillon reçoit un statut toujours informatif, jamais en échec (§6.2.4) : un
+    // échec imposé y est rabattu en neutre, le motif restant porté par les notices.
+    state = forceState.state === 'failure' && ctx.isDraft ? 'neutral' : forceState.state;
     if (!notices.some((n) => n.kind === forceState.because)) {
       notices.push({ kind: forceState.because, message: t(lang, `notice.${forceState.because}`, { detail: '' }) });
     }

@@ -502,25 +502,223 @@ C'est le cas 2 de la règle de gouvernance du §6.1. Une résolution qui n'entre
 
 ### 6.2 Mise en œuvre serveur (composant B — source de vérité)
 
-**GitHub Enterprise**
-- GitHub App ou Action abonnée aux événements `pull_request`, `pull_request_review`, `pull_request_review_comment`, `issue_comment`, `pull_request_review_thread`.
-- Publie un *commit status* / *check run* nommé `conventional-comments` avec deux critères : (1) tous les commentaires sont conformes, (2) aucun fil bloquant non résolu.
-- Ce check est déclaré **required** dans la protection de branche → le bouton *Merge* est désactivé nativement.
-- Activer en complément *Require conversation resolution before merging* si l'équipe souhaite l'exigence sur **tous** les fils.
+Principe commun aux deux plateformes : le composant B s'abonne aux événements de revue de code (création/édition/suppression de commentaire, résolution de fil, mise à jour de PR), recalcule la conformité via `core/` (§9.1), et publie un **statut de conformité** sur la PR.
 
-**Azure DevOps**
-- Service Hook sur `Pull request created`, `Pull request updated`, `Pull request commented on` → Azure Function.
-- La fonction publie un **PR Status** (`POST /pullrequests/{id}/statuses`) `succeeded` / `failed`.
-- Ce statut est déclaré comme **policy de branche obligatoire** (*Status checks*) → complétion bloquée nativement.
-- Alternative sans code : policy native *Check for comment resolution*, mais elle ne sait pas distinguer bloquant / non bloquant.
+#### 6.2.1 Deux critères, deux sévérités distinctes
 
-### 6.3 Rôle de l'extension
+| # | Critère | Sévérité par défaut | Configurable |
+|---|---------|---------------------|:---:|
+| 1 | Tous les commentaires **soumis à validation** — zones du §4.1, hors exclusions du §4.2, sur une PR dans le périmètre d'activation du §6.2.3 — sont conformes au format | **Avertissement** — n'échoue pas le check, listé dans le résumé | `formatSeverity: warn \| error` |
+| 2 | Aucun fil bloquant n'est non résolu (§4.1, colonne « peut porter un état bloquant ») | **Échec** — fait échouer le check | non |
+
+**Une troisième cause d'échec existe, hors critères.** Une configuration **syntaxiquement invalide, ou portant une valeur hors du domaine d'une clé connue** — la troisième ligne du tableau du §8.1.5 — fait échouer le check sous `enforce`. Une configuration simplement **illisible** relève, elle, de l'incapacité à évaluer et du délai de grâce : c'est une autre ligne du même tableau, au comportement inverse. Elle ne figure pas au tableau parce qu'elle ne porte sur aucun commentaire : ce n'est pas un critère de conformité, c'est l'aveu qu'aucun critère n'a pu être évalué. Elle emprunte le canal `forceState` du §9.2.2, et non `formatSeverity`.
+
+Cette séparation est délibérée. Confondre les deux revient à faire échouer un merge pour un `nitpik:` mal orthographié aussi sûrement que pour un `issue:` non traité — ce qui n'est défendable pour personne et n'est pas ce que demande O3. Le critère 2 seul porte l'objectif O3 ; le critère 1 relève de l'hygiène de forme et alimente les indicateurs du §12.
+
+Une organisation qui veut la conformité de forme stricte peut passer `formatSeverity` à `error`, sous réserve du plancher défini au §8.1.
+
+#### 6.2.2 Le composant B lit le mode
+
+**Le composant B lit la même configuration `mode` que l'extension** (§7, §8.1) et adapte son comportement :
+
+| Mode | Comportement du composant B |
+|------|------------------------------|
+| `off` | Ne publie aucun statut — **sauf les deux incidents du §8.1.5 sur un dépôt déjà évalué** : fichier disparu (`config-vanished`) et configuration invalide (`invalid-config`), publiés en neutre quel que soit le mode. **Attention** : si le check est déclaré obligatoire dans la protection de branche, son absence bloque toutes les PR — le retrait de la protection doit accompagner le passage en `off` (voir la procédure du §6.3.3). |
+| `assist` | Ne publie aucun statut. Mêmes réserve et mêmes deux exceptions. |
+| `warn` | Publie un statut **jamais en échec** — au vert dans le cas courant, neutre dans les trois cas où l'évaluation n'a pas pu se faire (délai de grâce du §6.4, configuration disparue et configuration invalide du §8.1.5). Le résumé liste les non-conformités et les fils bloquants non résolus à titre informatif. Ne bloque jamais. |
+| `enforce` | Publie un statut au vert ou en échec selon les critères du §6.2.1. |
+
+Sans cette règle, un dépôt en mode `warn` avec le composant B déployé verrait ses PR bloquées, en contradiction directe avec le tableau du §7.
+
+En mode `enforce`, ce statut est déclaré comme vérification **obligatoire** dans les règles de protection de la branche cible, ce qui bloque la complétion/le merge tant qu'il n'est pas au vert. Réserve à connaître : sur les deux plateformes, les administrateurs et les acteurs de bypass déclarés peuvent malgré tout compléter la PR tant que l'option interdisant le contournement des règles n'est pas activée — O3 étant classé *Must*, cette option fait partie de la configuration requise (voir annexes).
+
+Les mécanismes concrets (nature de l'intégration serveur, API de publication de statut, option de protection à activer) sont détaillés dans les annexes A (GitHub) et B (Azure DevOps).
+
+#### 6.2.3 Périmètre d'activation
+
+Le jour de l'activation du composant B sur un dépôt, les PR déjà ouvertes contiennent un historique de commentaires écrits avant que la convention ne soit outillée. Sans règle de périmètre, **tous les résumés de statut se rempliraient simultanément de diagnostics** portant sur des commentaires que plus personne ne peut corriger — et passeraient au rouge sous `formatSeverity: error`. C'est le meilleur moyen de tuer l'adoption d'un outil le jour de son arrivée.
+
+**Règle retenue : le périmètre se décide par PR.** Une PR est dans le périmètre si sa date de création est postérieure à `activatedAt` (fixée par dépôt au moment de l'activation, §8.2). **En l'absence de cette date** — fichier, configuration d'organisation et point d'entrée d'administration tous muets —, **aucune PR n'est dans le périmètre** : l'outil assiste et ne contraint pas. Poser la date *est* l'acte d'activation, et le défaut penche du côté qui ne surprend personne. Une PR est donc **entièrement dedans ou entièrement dehors** : les deux critères du §6.2.1 s'appliquent d'un bloc, ou pas du tout.
+
+**Ce que le composant B publie sur une PR hors périmètre.** Sous `warn` et `enforce`, un statut **au vert**, dont le résumé porte « PR antérieure à l'activation », ou « activation non datée » lorsque aucune date n'a été posée (§6.2.3) — sous `assist` et `off`, le silence du §6.2.2 continue de s'appliquer, le mode restant maître de ce qui est publié. Là où il publie, il ne se tait pas : sur un dépôt en `enforce` où le check est déclaré obligatoire, un statut absent bloque la PR définitivement (§6.2.2) — et le présent paragraphe assume qu'une branche de release puisse rester hors périmètre plusieurs mois. Un statut absent est par ailleurs indistinguable d'une panne. `CA-15` exige qu'aucun statut **en échec** n'apparaisse ; il n'autorise pas le silence.
+
+Ce choix privilégie une règle **transitoire** sur une règle permanente. Les PR ouvertes au moment de la bascule finissent par se fermer : au bout de quelques semaines, toutes les PR sont postérieures à l'activation et le filtre ne discrimine plus rien. La règle se liquide d'elle-même.
+
+L'alternative — comparer la date de **chaque commentaire** — offrirait une couverture immédiate et complète. Elle coûte trois règles permanentes, à spécifier et à maintenir pour la durée de vie du produit :
+
+- comparer **la date de création, et jamais celle de dernière modification** — sans quoi corriger une faute d'orthographe dans un vieux commentaire fait basculer un statut vert ;
+- **étendre explicitement le filtre au critère 2** — sans quoi un fil bloquant antérieur à la bascule bloque la PR ;
+- **propager la date jusqu'à l'extension** — sans quoi celle-ci refuse en mode `enforce` l'édition d'un commentaire dont le serveur se désintéresse, divergence A/B visible dans un cas fréquent.
+
+Trois règles permanentes contre une règle transitoire : c'est ce rapport qui a décidé.
+
+**Limite assumée.** Une PR de longue durée ouverte avant la bascule — typiquement une branche de release vivante plusieurs mois — reste hors périmètre jusqu'à sa fermeture, y compris pour les commentaires qui y seront écrits bien après l'activation. Le coût est accepté parce qu'il est borné dans le temps et visible de tous. Si l'expérience montre que ces PR concentrent trop d'enjeu, la parade sera une étiquette d'inclusion symétrique du `cc-override` du §6.3.2, réutilisant la même machinerie ; elle n'est pas prévue à ce stade.
+
+**Conséquence pour le composant A.** La date de création de la PR étant lisible dans la page, l'extension applique le même périmètre que le serveur : sur une PR hors périmètre, elle se comporte comme en mode `assist` (barre d'outils, complétion, retour visuel) et ne bloque jamais l'envoi, quel que soit le mode configuré — **sauf si ce mode est `off`, auquel cas elle reste inactive**. Le périmètre d'activation soustrait à la contrainte ; il n'ajoute jamais d'assistance là où le mode l'a éteinte (§7). C'est ce qui garantit que A et B répondent la même chose sur ce point.
+
+#### 6.2.4 Rapport à blanc, PR en brouillon, et silence du serveur
+
+**Rapport à blanc.** Le composant B expose un point d'entrée d'administration — commande d'exploitation ou appel authentifié, au choix de l'implémentation — qui prend un dépôt et une date de bascule hypothétique, **restitue** la liste de ce qui échouerait si l'outil était activé : commentaires non conformes et fils bloquants non résolus, avec leurs liens permanents. Il **ne publie aucun statut** et n'écrit rien sur les PR. L'accès est réservé aux personnes habilitées à activer l'outil sur le dépôt. C'est le prérequis raisonnable à toute activation : une équipe ne devrait jamais découvrir l'ampleur du chantier le jour où le check devient obligatoire. Le rapport à blanc est aussi le bon outil pour calibrer la date `activatedAt` (§6.2.3) — et le même point d'entrée permet de **la poser** pour un dépôt dont le fichier de configuration ne la porte pas (§6.4, stockage).
+
+**PR en brouillon.** Sur une PR marquée comme brouillon, le composant B évalue mais publie un statut **toujours informatif**, jamais en échec. Une PR en brouillon est un travail en cours : y faire clignoter du rouge pendant des jours n'apporte rien et entraîne à ignorer le signal. Le statut redevient contraignant à la sortie du brouillon.
+
+**Le composant B ne poste jamais de commentaire.** Toute l'information passe par la sortie du check (§6.3.1), qui nomme les auteurs concernés avec un lien permanent vers chaque commentaire. Deux raisons : un robot qui commente une PR à chaque évaluation devient un bruit que l'on apprend à filtrer — et il serait lui-même soumis à la convention qu'il fait respecter, ce qui n'a aucun sens.
+
+La conséquence est assumée : **le relecteur qui a écrit un commentaire non conforme n'est pas notifié activement** ; il est nommé dans la sortie du check, à charge de l'auteur de la PR de le solliciter. Une notification active relève des mécanismes propres à chaque plateforme ; elle n'est portée par aucun objectif du §1 et reste hors périmètre de cette version.
+
+### 6.3 Sortie du check et soupapes d'urgence
+
+Un check qui bloque un merge sans dire pourquoi, et sans moyen de passer outre, produit un incident au premier trimestre — et le réflexe qu'il déclenche (« un administrateur retire la protection de branche ») détruit durablement la crédibilité de l'outil. Le §6.1.1 traite le cas d'un fil précis qu'on décide de ne pas traiter ; les deux mécanismes ci-dessous traitent le cas où c'est la PR entière qui est en urgence.
+
+#### 6.3.1 Format normatif de la sortie
+
+Le composant B produit, pour chaque évaluation, une sortie structurée (`ComplianceResult`, §9.2) contenant obligatoirement :
+
+- un **résumé humain** d'une ligne (`headline`) indiquant trois nombres, dont deux ne comptent pas la même chose : le nombre de **fils** bloquants non résolus, le nombre de **commentaires** non conformes au sens du §3.5.2 — un commentaire portant trois erreurs compte pour un —, et le nombre total de **diagnostics** de sévérité `warn`, qui se comptent un par un. Le §12 en tire un taux de conformité, qui n'a de sens que par commentaire ;
+- pour **chaque fil bloquant non résolu** (`unresolvedBlockingThreads`) : lien permanent vers le commentaire, auteur, label, et première ligne du sujet ;
+- pour **chaque diagnostic de format, quelle que soit sa sévérité** (`formatDiagnostics`) : lien permanent, code (§3.5), sévérité, et correction proposée quand elle est calculable. Toutes sévérités, et pas seulement les erreurs : un commentaire qui ne porte que des avertissements est **conforme** (§3.5.2) et sortirait donc de la liste, alors que le résumé humain ci-dessus doit les compter et que le §12 les suit séparément ;
+- **deux empreintes distinctes**, et non une seule : la **version de `core/`** (`coreVersion`) et l'**empreinte de la configuration** (`configFingerprint`) telle qu'elle a **effectivement servi à juger cette PR** — partie épinglée, modifications élargissantes ultérieures et bornes d'entreprise comprises (§8.1.3). Les séparer est nécessaire : la règle 5 du §8.1.3 pose qu'un écart de version entre l'extension et le serveur est **le cas normal**, et une empreinte unique confondrait cet écart permanent avec un désaccord de configuration, qui est l'anomalie ;
+- un lien vers la documentation de la convention (`docUrl`) ;
+- les **faits signalés** (`notices`) — tout ce que les règles du document exigent de rendre visible sans que ce soit un diagnostic de format : édition affaiblissante et suppression d'une racine bloquante, avec leur auteur (§6.1) ; résolution refusée, avec sa cause, ou **acceptée sans auteur connu** sur une plateforme qui n'expose pas le résolveur (§6.1) ; clé de dépôt ignorée au titre du plancher (§8.1.2) ; configuration invalide, avec sa ligne fautive, ou **fichier de configuration disparu** d'un dépôt déjà évalué (§8.1.5) ; **avertissement de configuration** — clé inconnue ignorée, `configUrl` posée au mauvais niveau, expression d'allowlist écartée (§8.1.5, §8.2) ; version de **schéma, de plancher** ou de `core/` non supportée (§8.1.5, §8.1.3) ; délai de grâce dépassé (§6.4) ; retrait de l'étiquette d'exemption (§6.3.2). Chacun porte son type, son message, et l'auteur et l'horodatage lorsqu'ils existent.
+
+Ces six éléments sont **obligatoires au sens strict pour `ComplianceResult`** : chacun a un champ dédié (§9.2.1), et une implémentation qui n'en remplirait pas un serait détectable par le type. Ce que la **plateforme en publie**, en revanche, dépend de ce qu'elle sait rendre — voir ci-dessous. La distinction est nécessaire : le §9.2.4 interdit à l'adaptateur de juger, il ne lui promet pas un corps de statut qui n'existe pas partout.
+
+**Ce que l'extension peut en relire.** `ComplianceResult` est l'objet interne du composant B ; ce qui traverse jusqu'à la page est un sous-ensemble, `PublishedSummary` (§9.2.1), que `readPublishedResult()` reconstitue. La distinction n'est pas cosmétique : les deux plateformes ne rendent pas la même chose.
+
+| | Ce que porte le statut | Où vit la ligne `cc/1` |
+|---|---|---|
+| **GitHub** | un *check run* avec un titre et un corps Markdown (§A.8) | le **titre** du check run, rendu sur la page de la PR |
+| **Azure DevOps** | un *PR Status* : un état, une **description d'une ligne**, une URL, un `context` (§B.7) | la **description**, rendue sur la page de la PR |
+
+La ligne est publiée **là où la plateforme la rend sur la page de la PR**, et nulle part ailleurs : c'est la seule condition pour que `readPublishedResult()` puisse la lire sans appel d'API (§10). Le corps du check run, sur GitHub, n'est pas rendu sur cette page — il porte la sortie humaine du §6.3.1, pas la ligne machine.
+
+Le composant B **encode donc le résumé dans une ligne de texte** — `state`, `isDraft`, `exempted`, `mode`, `activatedAt`, `coreVersion`, `configFingerprint` et les trois compteurs — publié là où le tableau ci-dessus le prescrit — `output.title` du check run sur GitHub, description du statut sur Azure DevOps. **Le format est donné ici, une fois**, parce que c'est la seule couture entre les deux composants et que `readPublishedResult()` (§9.2.3) doit le relire caractère pour caractère :
+
+```
+cc/1 state=failure draft=0 exempt=0 mode=enforce activated=2026-09-01T00:00:00Z core=1.4.0 cfg=9f3a1c7e t=3 c=7 w=12
+```
+
+Une ligne, un préfixe de version `cc/1`, puis des couples `clé=valeur` séparés par une espace, dans cet ordre : `state`, `draft`, `exempt`, `mode`, `activated` (ou `-` si nulle), `core`, `cfg` (l'empreinte, en hexadécimal), puis les trois compteurs `t` (fils bloquants non résolus), `c` (commentaires non conformes) et `w` (diagnostics d'avertissement). Règles de robustesse, normatives : les **espaces multiples** entre couples sont tolérés ; un **préfixe de version inconnu** fait ignorer la ligne, l'extension se comportant comme si aucun résultat n'était publié ; un **champ obligatoire manquant**, **présent en double**, ou dont la valeur ne respecte pas son domaine — `t=abc`, `draft=2` — produit le même effet. En revanche l'**ordre des couples n'est pas contraignant à la lecture** : il est normatif à l'écriture, pour qu'un seul encodage existe, et le décodeur lit par clé. Les booléens s'écrivent `0` ou `1`, jamais autrement. Mesurée sur des cas types, la ligne fait de **91 à 116 caractères** — très en deçà de ce qu'une description de statut accepte sur l'une ou l'autre plateforme, ce qui est la raison pour laquelle tous les champs y sont bornés : énumérations, semver, hexadécimal, ISO 8601, entiers. `state` porte le verdict, et lui seul : le §6.5 interdit de le recalculer depuis les compteurs. Les autres champs ne sont pas là pour le déduire, mais pour être **affichés** : `isDraft` et `exempted` expliquent au lecteur pourquoi une PR passe au vert malgré des compteurs non nuls, `activatedAt` permet à l'extension de calculer `inScope` (§6.2.3), `mode` et `coreVersion` disent **sous quelles conditions le serveur a jugé cette PR** : l'extension les affiche dans son panneau de diagnostic — « jugée en `enforce` par `core/` 1.4.0 » — et rien de plus. En particulier, un écart de `coreVersion` ne déclenche **rien** : la règle 2 du §8.1.3 le pose explicitement, et `CA-32` le teste. Aucun de ces champs ne sert au verdict ; deux ne servent qu'à l'affichage, et le document préfère le dire que le laisser deviner. C'est ce qui rend `CA-32` passable sur les deux plateformes.
+
+La langue de cette sortie suit la règle de résolution du §8.1. **Un statut en échec doit permettre d'identifier la cause en un clic au plus** : dans le corps du statut là où la plateforme en rend un, et sinon par la `targetUrl` du statut, qui pointe vers une page servie par le composant B portant la même sortie. Cette `targetUrl` est **obligatoire** sur toute plateforme sans corps de statut (§B.7) — sans elle, un check rouge y serait un mur sans explication.
+
+#### 6.3.2 Exemption au niveau d'une PR
+
+Une PR peut être sortie du périmètre de blocage par apposition d'une étiquette dédiée (`cc-override` par défaut, configurable). Effet : le critère 2 n'est plus évalué, le statut passe au vert, et le résumé indique explicitement que la PR a été exemptée, par qui et quand.
+
+- Le droit d'apposer cette étiquette est restreint aux membres de `resolverOverrideGroup` (§8.2) ; sur les plateformes qui ne permettent pas de restreindre nativement la pose d'une étiquette, le composant B **vérifie a posteriori** et refuse l'exemption posée par une personne non habilitée. Le refus est signalé (`exemption-refused`, §9.2.1) **avec la personne qui l'a posée**, et l'étiquette est **laissée en place** : la retirer serait indistinguable de la remise à zéro ci-dessous, et priverait l'équipe de la trace du geste. Une étiquette présente sans effet, et dite telle dans la sortie du check, se comprend ; une étiquette qui disparaît sans explication, non.
+- Chaque exemption est journalisée (§10) : identifiant de PR, auteur, horodatage, et motif si la plateforme permet d'en attacher un à l'étiquette.
+- L'exemption est **remise à zéro** à chaque **fil bloquant dont l'identifiant n'était pas dans l'ensemble des fils déjà observés au tour précédent** (§6.1) et dont la zone peut porter un état bloquant (§4.1) : le composant B **retire l'étiquette** et émet un `notice`. Cette formulation est celle qui se calcule — « un nouveau commentaire bloquant » se lirait de trois façons, qui divergent dès que le service a été indisponible. Elle ne devient ainsi pas un blanc-seing permanent sur une PR de longue durée — et le geste est visible. L'ignorer silencieusement laisserait `cc-override` affichée sur une PR redevenue bloquée, ce que tout le monde lirait comme un défaut. C'est le seul droit en **écriture** du composant B en dehors du statut, et il figure à ce titre dans les permissions du §6.4.
+
+#### 6.3.3 Interrupteur général et retour arrière
+
+Le passage de `enforce` à un mode inférieur doit être réalisable **en quelques minutes sur l'ensemble des dépôts**, sans intervention par dépôt :
+
+- la configuration d'organisation (§8.1) est le point de bascule : un assouplissement du `mode` est une modification élargissante, donc appliquée aux PR déjà ouvertes sans attendre leur fermeture (§8.1.3, règle 1) ;
+- **un assouplissement du `mode` invalide immédiatement le cache de configuration**, au lieu d'attendre son expiration. Sans cette invalidation, « quelques minutes » deviendrait « jusqu'à `configCacheTtlSeconds` », une heure par défaut — et le retour arrière cesserait d'être une soupape. C'est la seconde situation de contournement du cache, à côté de celle de la règle 3 du §8.1.3 ;
+- en mode `warn`, et en `warn` **uniquement**, le composant B continue de publier un statut **jamais en échec** (§6.2.2), ce qui débloque immédiatement les PR **sans exiger le retrait de la protection de branche** — c'est la propriété qui rend le retour arrière sûr. Les modes `assist` et `off` ne publient aucun statut : y revenir depuis `enforce` exige de retirer d'abord la protection de branche, sans quoi l'absence de statut bloque toutes les PR. **`warn` est donc le mode de repli, pas `off`** ;
+- la procédure de retour arrière, incluant l'ordre des opérations et la personne habilitée, est documentée avant tout passage en `enforce` sur un dépôt pilote (§14, P6).
+
+### 6.4 Architecture d'exécution du composant B
+
+Le §9.1 décrit le découpage en modules du composant B ; la présente section décrit son exécution.
+
+**La séquence, en un coup d'œil.** C'est le seul *déroulement* de ce document — tout le reste en est des règles — et les règles qui le composent sont dispersées sur sept sections. Les voici dans l'ordre, chacune renvoyant à l'endroit où elle est justifiée. Cet encadré n'ajoute aucune règle ; il dit dans quel ordre les appliquer.
+
+```
+ 1. Déclenchement : webhook, réconciliation périodique, ou ré-exécution manuelle    §6.4
+ 2. Sur webhook seulement : matchesWebhook → verifySignature → parseEvent           §9.2.4
+ 3. Attribuer une séquence : compteur monotone par PR, quelle que soit la source    §6.4
+ 4. Coalescer par PR sur server.coalesceWindowSeconds ; l'évaluation coalescée
+    porte la PLUS HAUTE des séquences regroupées                                    §6.4
+ 5. Relire l'état courant : threads, commentaires hors fil, étiquettes, brouillon,
+    fichier de dépôt, document d'organisation — jamais le contenu de l'événement    §6.4
+ 6. Si une lecture est impossible : armer degradedSince, puis
+    – dans le délai de grâce : abandonner sans rien publier
+    – au-delà, et sur un dépôt déjà évalué seulement : listes vides + dernière
+      configuration connue + forceState neutral                                     §6.4, §8.1.5
+ 7. resolveConfig(floor, org, repo, pinned, previouslyEvaluated) → {config, notices} §8.1.2
+ 8. Lire les notices : config-vanished ou configuration invalide → armer forceState  §8.1.5
+ 9. Pré-résoudre isInGroup() pour tout auteur apparaissant sur la PR                §9.2.2
+10. evaluate(...) → ComplianceResult                                                §6.2.1
+11. Si le résultat porte E-UNKNOWN-LABEL ou E-UNKNOWN-DECORATION : seconde passe
+    avec fetchConfigFile(bypassCache) ET fetchOrgConfig(bypassCache) ;
+    seul ce second verdict compte, et c'est lui qu'on épingle                       §8.1.3 r.3
+12. Persister : configuration épinglée (première évaluation seulement), verdicts de
+    première observation, fils bloquants observés moins les corrigés, séquence,
+    dernière configuration effective résolue, drapeau « déjà évalué »               §6.4
+13. Cinq portes, dans cet ordre :
+    a. dépôt jamais évalué ET fichier de dépôt absent ? ne rien publier             §6.4
+    b. séquence périmée ?                                                           §6.4
+    c. le mode n'autorise pas la publication, hors exceptions du §8.1.5 ?           §6.2.2
+    d. relire le SHA de tête et le poser sur le résultat                            §6.4
+    e. résultat identique au dernier publié, SHA compris ?                          §6.4
+14. publishStatus(pr, result) — l'adaptateur y appelle encodeSummary() pour la
+    ligne cc/1, et rend la sortie humaine à partir de headline et des listes        §6.3.1
+15. Persister le résultat publié, pour la comparaison du tour suivant               §6.4
+16. Exécuter result.actions.removeLabel s'il est renseigné                          §6.3.2
+```
+
+ Ces éléments conditionnent la phase P5 et ne peuvent pas être laissés à l'implémentation : plusieurs d'entre eux (ordre des événements, comportement en panne) déterminent si une PR peut rester bloquée sans recours.
+
+**Déclenchement.** Trois sources, toutes trois nécessaires :
+1. les événements de plateforme (webhooks / service hooks) — voie nominale ;
+2. une **réconciliation périodique** des PR ouvertes, toutes les `server.reconcileIntervalSeconds` (§8.2) — filet de sécurité contre les événements perdus, non reçus pendant une indisponibilité, ou jamais émis. C'est aussi le repli de toute détection qu'une plateforme n'assure pas par événement (§B.7) ;
+3. un **déclenchement manuel** — le bouton de réexécution natif que les deux plateformes attachent à un statut, dont la réception vaut demande de réévaluation de la PR concernée.
+
+**Coalescence et idempotence.** Une revue soumise en lot génère autant d'événements que de commentaires : le recalcul doit être **coalescé par PR** avec une fenêtre de regroupement (`server.coalesceWindowSeconds`, §8.2, lue dans la dernière configuration connue du dépôt — la fenêtre s'ouvre avant qu'on ait relu le fichier), et non exécuté une fois par événement. Chaque évaluation est idempotente et porte une clé `(dépôt, PR, SHA)` ; une évaluation dont le résultat est identique au précédent ne republie pas de statut. **Deux résultats sont identiques** lorsque `headSha`, `state`, les trois compteurs, `configFingerprint`, l'**ensemble des `kind`** de `notices` et les **identifiants des fils et commentaires listés** coïncident. Seuls les **horodatages** restent hors comparaison : un `notice` réémis à chaque évaluation — `resolution-unattributed` par exemple — rendrait sinon la règle inopérante.
+
+`headSha` doit y figurer, contrairement à ce que sa nature de donnée de publication pourrait suggérer : il change à chaque **push**, et un push qui ne touche aucun commentaire laisse tout le reste identique. L'en exclure interdirait de republier, aucun statut n'existerait sur le nouveau SHA, et la PR resterait bloquée — le cas que le paragraphe suivant nomme. Les identifiants listés doivent y figurer pour une raison voisine : un fil résolu pendant qu'un autre devient bloquant laisse les compteurs inchangés, et le corps du check continuerait de nommer le mauvais.
+
+**Ordre des événements.** Les webhooks ne garantissent pas l'ordre de livraison. Un recalcul déclenché par un événement ancien ne doit jamais écraser le résultat d'un recalcul plus récent : chaque évaluation porte un numéro de séquence **attribué par le composant B** — un compteur monotone par PR, incrémenté à la réception de **tout** déclenchement, quelle qu'en soit la source. Il ne vient pas de la plateforme : ni GitHub ni Azure DevOps n'émettent de compteur par PR, et le déduire d'un horodatage serait un jugement dans un adaptateur à qui le §9.2.4 l'interdit. C'est aussi ce qui donne une séquence à la réconciliation périodique et à la réexécution manuelle, qui ne produisent aucun événement. `ReviewEvent.sequence` porte cette valeur une fois attribuée. Une évaluation **coalescée porte la plus haute** des séquences des déclenchements qu'elle regroupe — prendre la plus basse ferait rejeter la publication par la règle qui suit. **Règle de consommation** : une évaluation ne publie que si sa séquence est supérieure à celle de la dernière publication pour cette PR, persistée (§6.4, stockage) ; sinon elle est abandonnée sans rien écrire.
+
+Ce compteur ne détecte pas à lui seul un désordre de livraison — il est monotone dans l'ordre de *réception*, pas d'émission. Ce qu'il garantit, c'est qu'une évaluation lente ne peut pas écraser le résultat d'une évaluation plus récente déjà publiée. C'est l'autre garde de la même phrase qui traite le désordre lui-même : chaque évaluation **relit l'état courant depuis l'API avant de publier** plutôt que de se fier au contenu de l'événement. Sans cette garde, un `comment.created` non conforme arrivé après le `comment.edited` qui le corrige laisse la PR rouge sans événement futur pour la rattraper.
+
+**Suppression.** L'événement de suppression de commentaire fait partie du périmètre souscrit. Sans lui, la suppression du commentaire racine du dernier fil bloquant laisse le check rouge indéfiniment.
+
+**SHA de publication.** Le statut est publié sur le SHA de tête de la PR **au moment de la publication**, relu juste avant l'appel. Un statut publié sur un SHA devenu obsolète laisse la PR bloquée.
+
+**Indisponibilité.** Le check étant obligatoire en mode `enforce`, l'absence de statut bloque tous les merges. Deux situations très différentes se cachent derrière le mot « panne », et elles n'ont pas le même recours.
+
+**Le composant B est vivant mais ne peut pas évaluer** — API de plateforme injoignable, limite d'appels atteinte. Il reste capable de publier. La règle est : **tant que `maintenant − degradedSince ≤ gracePeriodSeconds`, l'évaluation est abandonnée sans rien publier** — le statut précédent reste en place et la PR n'est pas dérangée par une panne passagère. **Au-delà**, `evaluate()` est appelée avec des listes vides, `forceState: { state: 'neutral', because: 'grace-expired' }` (§9.2.2), et **la dernière configuration effective connue pour ce dépôt** — à défaut, les valeurs par défaut du produit dans les bornes du plancher. La dégradation peut en effet venir de l'impossibilité de lire la configuration elle-même : exiger une configuration fraîche à ce moment serait exiger ce qui manque. `evaluate()` rend alors un statut `neutral`, accompagné d'un message orientant vers le §6.3.3. `degradedSince` est remis à zéro dès la première évaluation qui aboutit. Ce statut **laisse passer le merge sur les deux plateformes**, et c'est vérifiable : GitHub compte `neutral` parmi les conclusions qui satisfont une vérification obligatoire, au même titre que `success` et `skipped` ; Azure DevOps traite `notApplicable` comme retirant l'exigence de policy pour cette PR (§A.8, §B.7). Le comportement est donc **fermé pendant le délai de grâce, puis ouvert** — et non « fail-closed », qui nommerait l'inverse de ce qui se passe après le délai.
+
+**Le composant B est lui-même indisponible.** Il ne publie rien, par définition, et aucune règle interne ne peut y remédier : la PR reste bloquée. Le seul recours est la procédure du §6.3.3, dont le délai d'exécution est la disponibilité réellement engagée. C'est ce que mesure la NFR du §10, et c'est pourquoi cette procédure doit être écrite et son exécutant désigné **avant** tout passage en `enforce` (§14, P6).
+
+**Stockage.** Le composant B a besoin d'un état persistant pour douze objets :
+
+- le **journal des exemptions de PR** (§10) ;
+- la **configuration épinglée de chaque PR ouverte** (§8.1.3) ;
+- le **verdict de la première observation de chaque racine bloquante** — au minimum son caractère bloquant et la présence d'un `E-CONFLICT` —, **écrit une fois et jamais réécrit**. Sans lui, l'exception de correction du §6.1 est indécidable : après édition, le corps précédent n'existe plus. Et s'il suivait la *dernière* évaluation au lieu de la première, l'exception se retournerait en chemin d'évasion : il suffirait d'introduire volontairement un `E-CONFLICT`, de laisser une évaluation l'enregistrer, puis de le « corriger » en `non-blocking` pour éteindre le fil. C'est la première observation qui dit si le conflit était là dès l'origine, donc si l'édition est une mise en conformité ;
+- le **dernier plancher valide connu**, sur lequel se replie le §8.1.1 quand `floorVersion` dépasse la version supportée ;
+- la **dernière configuration effective résolue**, par dépôt — ce n'est ni le cache du §8.1.2, qui expire, ni la configuration épinglée du §8.1.3, qui est par PR et jamais réécrite. C'est elle que lisent la fenêtre de coalescence, avant qu'aucun fichier n'ait été relu, et l'appel de fin de délai de grâce, quand plus rien n'est lisible ;
+- le **début de l'incapacité à évaluer** (`degradedSince`), par dépôt — un début d'incident ne se déduit d'aucun état courant, et sans lui le délai de grâce ci-dessus n'a pas d'origine ;
+- le **dernier résultat publié** par PR, sans lequel la règle d'idempotence ci-dessus — « une évaluation dont le résultat est identique au précédent ne republie pas de statut » — n'a rien à comparer ;
+- l'ensemble des **fils déjà observés comme bloquants**, par PR (§6.1) — de ces douze objets, celui qui ne se déduit d'**aucun état courant de la PR** : la monotonie du caractère bloquant porte sur l'historique des éditions d'un commentaire, que les permissions énumérées plus bas ne couvrent pas et que les API ne rendent pas. Sans cette persistance, `CA-36` est intestable et la règle du §6.1 inapplicable ;
+- la **date de bascule `activatedAt`** par dépôt, uniquement lorsqu'elle n'est pas portée par le fichier de configuration — le point d'entrée d'administration du §6.2.4 la pose alors, en même temps qu'il restitue le rapport à blanc qui a servi à la calibrer. Elle est dans ce cas **republiée dans `PublishedSummary`** (§9.2.1), faute de quoi l'extension ne pourrait pas calculer le périmètre que le §6.2.3 lui demande d'appliquer. Tant qu'aucun statut n'est publié sur un tel dépôt, l'extension ne sait pas trancher `inScope` : elle traite la PR comme **hors périmètre**, ce qui relève de la condition 2 du §5.4 et n'ajoute aucune condition nouvelle ;
+- le **fait qu'un dépôt ait déjà été évalué** — c'est-à-dire qu'un statut y a été publié au moins une fois —, avec la date de cette dernière publication. Sans lui, la distinction du §8.1.5 entre un dépôt jamais activé et un fichier de configuration disparu est indécidable. Sur un dépôt **jamais évalué et sans fichier de configuration**, la porte 13.a arrête le cycle avant toute publication : aucun check n'apparaît sur un dépôt qui n'a rien demandé. Le mode, lui, est jugé à la porte 13.c et non plus tôt — il n'est connu qu'à l'étape 7, et les deux exceptions du §8.1.5 doivent pouvoir le franchir ;
+- les **compteurs** du §12 ;
+- les **numéros de séquence** d'évaluation, garde contre le désordre des événements.
+
+Le choix de la technologie est libre ; l'existence de ce stockage ne l'est pas.
+
+**Sécurité d'ingestion.** Vérification de la signature de chaque événement entrant, protection contre le rejeu, et rejet des charges non signées. Aucun secret n'est stocké côté extension (§10) : la totalité des identifiants de service vit côté B.
+
+**Permissions.** Les autorisations demandées par l'intégration serveur sont énumérées par plateforme dans les annexes, et limitées à : lecture du fichier de configuration ; lecture des commentaires — y compris ceux qui ne relèvent d'aucun fil (§4.1) —, de l'état des fils, des étiquettes de PR et de l'identité de qui les a posées (§6.3.2), de l'état brouillon et de la date de création d'une PR (§6.2.3, §6.2.4) ; écriture du statut ; **retrait de l'étiquette d'exemption** (§6.3.2), seul droit en écriture en dehors du statut ; lecture de l'appartenance aux groupes de `resolverOverrideGroup`.
+
+**Périmètre d'installation.** Une intégration installée au niveau d'une organisation reçoit les événements de tous ses dépôts. L'activation est **explicite et par dépôt** : en l'absence de fichier `.conventional-comments.json` sur la branche par défaut **et tant que le dépôt n'a jamais été évalué**, le composant B ne publie aucun statut. Sur un dépôt déjà évalué, la disparition du fichier est un incident et non une désactivation, et le composant B le signale quel que soit le mode résiduel (§8.1.5). Sans cette règle, l'installation seule ferait apparaître un check sur des centaines de dépôts qui n'ont rien demandé.
+
+**Budget d'appels.** Le recalcul complet d'une PR à plusieurs centaines de commentaires implique une pagination ; le composant respecte les limites d'appel primaires et secondaires de chaque plateforme, avec temporisation exponentielle et reprise.
+
+### 6.5 Rôle de l'extension
 
 L'extension **reflète** l'état, elle ne le crée pas :
 
-- désactive visuellement le bouton *Complete* / *Merge* et affiche le motif ;
-- liste les fils bloquants non résolus avec liens directs ;
-- ne doit **jamais** être la seule barrière — si l'extension est absente, la policy serveur s'applique quand même.
+- **grise le bouton de complétion/merge si et seulement si `PublishedSummary.state` vaut `'failure'`** (§9.2.1), et **renvoie vers le statut publié, qui porte la cause** — elle ne l'a pas elle-même, `PublishedSummary` ne portant que des scalaires. Jamais à partir des compteurs : sur une PR en brouillon ou exemptée, le serveur publie du vert avec des compteurs non nuls (§6.2.4, §6.3.2), et une extension qui en déduirait « bloqué » mentirait sur une PR que la source de vérité laisse passer ;
+- ce grisage est **visuel et n'intercepte pas le clic** : le blocage réel est celui de la protection de branche, et l'extension n'a pas à s'interposer devant une décision que le serveur a déjà prise. C'est la différence avec le contrôle d'envoi du §5.4, qui intercepte, lui, parce qu'il n'existe aucune barrière en aval au moment où l'on publie un commentaire. Ici, elle signale ; elle n'arbitre pas (§10) ;
+- liste les fils bloquants non résolus avec liens directs, le décompte venant du résumé publié et les ancres du DOM (§5.5) ;
+- ne doit **jamais** être la seule barrière — si l'extension est absente, la vérification serveur s'applique quand même.
+
+**Dépendance à retenir** : cette section (comme la colonne « PR bloquée » du tableau §7) ne s'applique que si le composant B est déployé sur le dépôt. Une extension installée sans composant B associé peut assister et valider la saisie (composant A), mais ne peut **pas** garantir le blocage de la complétion de PR — voir la note du §7.
 
 ---
 
@@ -547,45 +745,313 @@ Les modes `assist` et `warn` sont **identiques côté extension** — dans les d
 
 ### 8.1 Emplacement et précédence
 
-Par ordre de priorité décroissant :
+La configuration se résout en **deux temps**.
 
-1. `.conventional-comments.json` à la racine de la branche par défaut du dépôt.
-2. Configuration d'organisation, servie par une URL interne (`configUrl`), mise en cache 1 h.
-3. Politique d'entreprise poussée par le navigateur (`managed_storage` / `3rdparty`).
-4. Préférences locales de l'utilisateur — **limitées** : langue, thème, raccourcis, style de badge. L'utilisateur ne peut ni assouplir le mode ni modifier la liste des labels.
+#### 8.1.1 Bornes (plancher)
 
-### 8.2 Schéma
+Un **plancher** fixe un mode minimum (`minimumMode`) et une liste de règles non désactivables. Aucune configuration de niveau inférieur ne peut assouplir le mode en deçà de ce plancher ni désactiver une règle qu'il impose ; un dépôt peut en revanche durcir davantage.
+
+**Point structurant : le plancher a deux canaux distincts, un par composant.**
+
+| Composant | Canal | Portée |
+|-----------|-------|--------|
+| **A — Extension** | Politique d'entreprise poussée par le navigateur (clé de manifeste `storage.managed_schema`, API `chrome.storage.managed`, nœud de politique `3rdparty`) | Le poste de travail |
+| **B — Serveur** | Configuration d'installation du service : variable d'environnement, secret de déploiement, ou fichier de configuration dans un dépôt d'administration protégé | Le service, donc l'organisation entière |
+
+Un canal de navigateur est **structurellement illisible par le composant B**, qui n'a pas de navigateur. Faire porter le plancher au seul `managed_storage` reviendrait à ne le faire appliquer que par le composant explicitement décrit comme contournable (§2) — c'est-à-dire à ne pas l'appliquer du tout. Les deux canaux doivent donc porter **la même valeur de plancher**, et le composant B publie l'empreinte de la configuration qu'il applique (`configFingerprint`, §6.3.1), ce qui rend tout désaccord visible.
+
+**Forme du plancher.** Les deux canaux portent le **même document**, dont voici le schéma. Il ne reprend que les clés plancher-ables : un plancher n'est pas une configuration et ne fixe aucune valeur par défaut.
 
 ```json
 {
-  "$schema": "https://<interne>/cc-schema-v1.json",
+  "floorVersion": 1,
+  "configUrl": "https://interne.example/cc/organisation.json",
+  "minimumMode": "warn",
+  "formatSeverity": "warn",
+  "severities": { "E-NO-LABEL": "error", "E-UNKNOWN-LABEL": "error" },
+  "labels":      { "minimum": ["issue", "todo"] },
+  "rules": { "minDecisionSubjectLength": 20 },
+  "activation": { "activatedAt": "2026-09-01T00:00:00Z" },
+  "exemptUsers":       { "minimum": ["<compte-de-service>"], "closed": false },
+  "allowlistPatterns": { "minimum": [], "closed": true },
+  "resolverOverrideGroup": ["org/security-champions"],
+  "configCacheTtlSeconds": 3600
+}
+```
+
+**Deux natures de clés dans ce document.** `minimumMode` et les suivantes sont des **bornes** : elles contraignent ce qu'un niveau inférieur peut écrire. `floorVersion` et `configUrl` sont des **clés de canal** : elles ne bornent rien, elles disent au composant qui lit le plancher comment lire le reste. `configUrl` y figure parce qu'elle n'a pas d'autre emplacement possible — la porter dans le fichier de dépôt reviendrait à laisser un dépôt désigner lui-même la configuration d'organisation qui est censée le contraindre (§8.1.2).
+
+**`configUrl` doit être portée par les deux canaux**, exactement comme les bornes, et pour la même raison : le composant A n'a pas d'autre chemin vers le niveau 2. Si un seul canal la porte, A et B ne résolvent pas la même configuration, leurs `configFingerprint` diffèrent en permanence, et la règle 2 du §8.1.3 désarme le blocage d'envoi en permanence — le mode de défaillance que cette même règle existe pour éviter. Le désaccord reste visible, mais il ne doit pas être l'état nominal.
+
+`floorVersion` suit la même règle que la version du schéma de configuration : un plancher dont la version dépasse celle supportée par le composant qui le lit déclenche le repli du §8.1.5 — mode `assist`, ou le plancher **précédemment connu** s'il est plus strict — et le fait est signalé (`unsupported-version`, §9.2.1). Un plancher qu'on ne sait pas lire ne s'efface jamais en silence.
+
+Toute clé absente n'est **pas** planchée. **En l'absence de politique d'entreprise — canal muet des deux côtés — le plancher vaut `{"minimumMode": "off"}` et n'impose aucune règle** : c'est le cas du déploiement public standard, où la configuration de dépôt et celle d'organisation décident seules. C'est aussi ce que désigne « le plancher en vigueur » partout où le document emploie l'expression.
+
+`minimumMode` porte le plancher de la clé `mode`. Le nom diffère volontairement pour qu'un plancher ne puisse être ni confondu avec une configuration, ni collé tel quel dans l'un des fichiers du §8.2.
+
+**Clés soumises au plancher** (« plancher-ables ») : `mode` (via `minimumMode`), `formatSeverity`, `severities`, `labels[].enabled` et `labels[].blockingByDefault` (via `minimum`), `activation.activatedAt`, `rules.minDecisionSubjectLength`, `exemptUsers`, `allowlistPatterns`, `resolverOverrideGroup` et `configCacheTtlSeconds`. Ce sont celles qui, laissées libres, permettraient soit de se soustraire à la contrainte, soit de faire diverger les deux composants. Les clés purement cosmétiques ou ergonomiques — libellés, icônes, langue, style de badge, seuils de longueur du sujet — restent librement surchargeables.
+
+**Ce que « plancher » signifie, clé par clé.** « Plancher » veut dire *le niveau inférieur ne peut pas assouplir* — mais assouplir ne se traduit pas par la même opération arithmétique selon la clé. Le tableau est donc normatif ; il ne se déduit pas d'une règle générale.
+
+| Clé | Contrainte imposée au niveau inférieur |
+|---|---|
+| `mode` | **Minimum** sur l'échelle des modes : `enforce` > `warn` > `assist` > `off`. Durcir est permis. |
+| `formatSeverity` | **Minimum** sur sa propre échelle, à deux valeurs : `error` > `warn`. |
+| `rules.minDecisionSubjectLength` | **Minimum** numérique : on peut exiger un motif plus long, jamais plus court. |
+| `severities` | Ensemble de codes dont la sévérité **ne peut pas être abaissée**. |
+| `activation.activatedAt` | Valeur effective : **`min(plancher, niveau inférieur)`** — et non `max`, comme sur les autres clés numériques. Une date plus ancienne élargit le périmètre, donc durcit ; repousser la bascule dans le futur est l'assouplissement à interdire. **Seule exception à la règle des bornes en direct** (§8.1.3) : un durcissement de cette clé ne s'applique pas aux PR déjà ouvertes, il est épinglé comme un changement restrictif ordinaire — sans quoi avancer la date ferait entrer d'un coup, sur toutes les PR ouvertes de l'organisation, l'historique que le §6.2.3 a construit une règle entière pour tenir dehors. |
+| `configCacheTtlSeconds` | **Valeur imposée**, ni minimum ni maximum : la règle 4 du §8.1.3 exige la **même** valeur des deux côtés, un écart rouvrant mécaniquement la fenêtre de divergence. |
+| `exemptUsers`, `allowlistPatterns` | Deux contraintes distinctes. `minimum` est le **sous-ensemble** qu'aucun niveau inférieur ne peut retirer. `closed` gouverne l'autre sens : à `true`, **aucun ajout** n'est admis en dessous du plancher. |
+| `labels` | `minimum` : ensemble d'`id` dont ni `enabled` ni `blockingByDefault` ne peuvent passer à `false` en dessous du plancher. Voir la justification ci-dessous — c'est la clé dont l'absence viderait le critère 2. |
+| `resolverOverrideGroup` | Le groupe désigné par le plancher ne peut pas être remplacé par un autre. Un niveau inférieur peut **restreindre** l'habilitation en désignant d'autres groupes : l'habilitation effective est l'**intersection** de toutes les listes en présence — être membre de chacun des groupes cités. Formulée en intersection, la contrainte se vérifie par autant d'appels `isInGroup` (§9.2.4) ; formulée en « sous-groupe », elle exigerait d'inspecter la structure des groupes, ce qu'aucun contrat n'expose. |
+
+Le drapeau `closed` mérite sa justification, car il fait exception à la fusion par union du §8.1.4. Sur `exemptUsers`, la seule contrainte d'un sous-ensemble minimal borne l'opération qui **durcit** — retirer une exemption — et laisse entière celle qui **assouplit** : un dépôt s'ajoute lui-même à la liste et sort de la contrainte, immédiatement et jusque sur ses PR déjà ouvertes, la fusion par union étant élargissante (§8.1.3). Ce serait l'inverse exact du principe posé au §6.1, « durcir est toujours permis, assouplir passe par la gouvernance ». C'est donc `closed` qui rend ces deux clés réellement plancher-ables ; `minimum` seul ne suffit pas.
+
+`overrideLabel` **n'est pas plancher-able** : le nom de l'étiquette d'exemption est libre, et ce qui doit être encadré — le droit de la poser — l'est par `resolverOverrideGroup` (§6.3.2).
+
+**Pourquoi `labels` est plancher-able, alors qu'elle a l'air d'un simple réglage.** C'est la clé par laquelle un dépôt éteint la contrainte le plus complètement, et sans rien désactiver en apparence. Il suffit de pousser sur la branche par défaut :
+
+```json
+{ "labels": [ { "id": "issue", "enabled": false },
+              { "id": "todo",  "enabled": false },
+              { "id": "chore", "enabled": false } ] }
+```
+
+Plus aucun label n'est `blockingByDefault`. Tout `issue:` ressort en `E-UNKNOWN-LABEL` à l'étage 2, n'atteint donc jamais le temps 2, et **aucun fil n'est plus bloquant** : le critère 2 est vide, et sous le défaut `formatSeverity: warn` le check reste **au vert**. Le plancher `enforce`, la gouvernance du §6.1, la monotonie et le départage `E-CONFLICT` deviennent tous inopérants, par un commit qu'une seule personne peut pousser. C'est exactement le test que la phrase ci-dessus énonce — « se soustraire à la contrainte » — et `labels` y échoue plus complètement que `mode`, qui est protégé.
+
+Une erreur d'implémentation typique consisterait à appliquer `max(plancher, dépôt)` à toutes les clés scalaires : sur `activatedAt`, cela produit exactement l'inverse de l'effet recherché.
+
+#### 8.1.2 Valeur effective
+
+Par ordre de priorité décroissante, **au sein des bornes ci-dessus** :
+
+1. `.conventional-comments.json` à la racine de la branche par défaut du dépôt, **mis en cache pour `configCacheTtlSeconds` comme le niveau 2, et des deux côtés**. Un cache asymétrique sur ce niveau ferait diverger les empreintes après chaque modification du fichier, et désarmerait le blocage d'envoi sur tout le dépôt pendant la durée du cache (§8.1.3, règle 2) — l'état nominal deviendrait la panne.
+2. Configuration d'organisation, servie par une URL, mise en cache pour `configCacheTtlSeconds` (3600 s par défaut).
+3. Valeurs par défaut du produit.
+
+**D'où vient cette URL.** `configUrl` provient **exclusivement** du canal de plancher (§8.1.1). Une valeur de déploiement propre au composant B serait invisible de l'extension, qui résoudrait alors deux niveaux là où le serveur en résout trois : c'est admissible comme repli d'exploitation, mais il faut alors savoir que l'extension est en **état dégradé permanent** et que le blocage d'envoi y reste désarmé (§8.1.3, règle 2). Le canal de plancher est le seul emplacement qui n'a pas cette conséquence. Un `configUrl` posé dans le fichier de dépôt est **ignoré**, et le fait signalé (`config-warning`, §9.2.1). Sans cette règle, un dépôt détournerait le niveau 2 vers un document qu'il contrôle et se donnerait à lui-même la configuration d'organisation — ce que toute cette section existe pour empêcher. La résolution serait par ailleurs circulaire : il faudrait lire la configuration pour savoir où aller la chercher.
+
+Le fichier de dépôt étant modifiable par les personnes mêmes que la convention encadre, il ne peut jamais assouplir une clé plancher-able : un `{"mode": "off"}` poussé sur la branche par défaut d'un dépôt dont le plancher d'organisation vaut `enforce` est **ignoré pour la clé `mode`**, et le fait est signalé dans la sortie du check.
+
+Les préférences locales de l'utilisateur restent, dans tous les cas, **limitées** : langue, thème, raccourcis, style de badge. L'utilisateur ne peut ni assouplir le mode ni modifier la liste des labels, quel que soit le niveau de configuration en vigueur.
+
+**Résolution de la langue**, par ordre de priorité décroissante : préférence locale de l'utilisateur, puis clé `language` de la configuration effective, puis langue de l'interface de la plateforme. La sortie du check (§6.3.1), produite hors navigateur, utilise la clé `language` de la configuration effective.
+
+#### 8.1.3 Épinglage et parité A/B
+
+Le §2 pose que « un commentaire jugé conforme par l'extension doit toujours être jugé conforme par le serveur ». Partager `core/` n'y suffit pas : les divergences réalistes ne viennent pas du parseur, mais de la **configuration** — deux composants qui appliquent correctement le même code à deux configurations différentes. Cette section ferme chacune de ces sources.
+
+**1. L'épinglage est monotone.** Une modification de configuration qui pourrait rendre **non conforme un commentaire qui l'était** ne s'applique pas aux PR déjà ouvertes ; une modification qui ne peut qu'**élargir ce qui est accepté** s'applique immédiatement, partout.
+
+| Sens de la modification | Exemples | Effet sur une PR déjà ouverte |
+|---|---|---|
+| **Restrictif** — épinglé | retrait d'un label ou d'une décoration, durcissement d'une sévérité, allongement de `minSubjectLength` | Aucun. La PR reste jugée sur la configuration en vigueur à son ouverture. |
+| **Élargissant** — en direct | ajout d'un label ou d'une décoration, assouplissement du `mode`, ajout d'un compte à `exemptUsers` lorsque le plancher ne ferme pas la liste (§8.1.1) | Immédiat. |
+| **Bornes d'entreprise** (§8.1.1) — en direct **dans les deux sens** | durcissement ou assouplissement du plancher, **hors `activation.activatedAt`** | Immédiat, y compris restrictif. |
+| **Plancher sur `activation.activatedAt`** | avancer la date de bascule | Épinglé, comme un changement restrictif ordinaire (§8.1.1) — sans quoi la borne ferait entrer d'un coup l'historique que le §6.2.3 tient dehors. |
+
+En une phrase : **une modification de configuration ne peut jamais dégrader le jugement porté sur une PR déjà ouverte ; elle peut toujours l'améliorer immédiatement.** C'est le même principe que le blocage monotone du §6.1, appliqué à la configuration au lieu du caractère bloquant d'un fil.
+
+**Comment classer une modification.** Le sens se lit sur le **résultat**, jamais sur le nom de la clé : est **restrictive** toute modification qui pourrait ajouter un diagnostic, rendre un fil bloquant, ou faire échouer un critère qui passait ; est **élargissante** toute modification dont c'est impossible. Le classement est **normatif clé par clé**, comme celui du plancher, et pour la même raison : deux implémentations raisonnables classeraient autrement.
+
+| Clé | Restrictif (épinglé) | Élargissant (en direct) |
+|---|---|---|
+| `mode`, `formatSeverity` | durcissement | assouplissement |
+| `severities[c]` | sévérité plus haute | sévérité plus basse |
+| `labels[]`, `decorations.known[]` | retrait d'une entrée, ou `enabled: false` | ajout d'une entrée, ou `enabled: true` |
+| `labels[].blockingByDefault` | `false → true` | `true → false` |
+| `labels[].alwaysNonBlocking` | `true → false` | `false → true` |
+| `labels[].aliases` | retrait d'un alias | ajout d'un alias |
+| `decorations.known[].forces` | `null → "blocking"` | `"blocking" → null` ou `"non-blocking"` |
+| `decorations.allowFree` | `true → false` | `false → true` |
+| `exemptUsers`, `allowlistPatterns` | retrait d'une entrée | ajout d'une entrée |
+| `rules.minSubjectLength`, `rules.minDecisionSubjectLength` | augmentation | diminution |
+| `rules.maxSubjectLength` | diminution | augmentation |
+| `scope.validateReplies`, `scope.validateReviewSummary` | passage à `true` | passage à `false` |
+| `activation.activatedAt` | date plus **ancienne** — elle élargit le périmètre, donc durcit (§8.1.1) | date plus **récente** |
+| `resolverOverrideGroup` | restriction de l'habilitation | élargissement |
+
+**Clause de fermeture.** Est traitée comme **restrictive** toute clé qui entre dans le domaine de `fingerprint()` (§9.2.2) sans figurer ci-dessus, **et toute clé nouvelle du §8.2 tant qu'elle n'a pas été classée explicitement dans ce tableau**. Les clés que ce tableau **mentionne** suivent la colonne qui les classe — un assouplissement du `mode` s'applique donc en direct, comme la règle 1 l'exige. **Parmi celles qu'il ne mentionne pas**, s'appliquent en direct : celles dont le §9.2.2 établit qu'elles ne gouvernent aucun verdict (`telemetry.*`, `language`, `badgeStyle`, `labels[].color`) et celles qui sont purement opérationnelles ou décrivent la façon dont la configuration a été obtenue (`server.*`, `exemptionLog.*`, `configUrl`, `configCacheTtlSeconds`, `coreMinVersion`, `docUrl`, `shortcuts.*`) — les épingler figerait un réglage d'exploitation sur les PR ouvertes sans rien protéger. Toutes les autres sont épinglées.
+
+Le second membre n'est pas redondant : le §9.2.2 exclut une clé nouvelle de l'empreinte par défaut — « l'inscrire est un geste délibéré » —, si bien qu'un renvoi au seul domaine de `fingerprint()` la rendrait *élargissante*, donc rétroactive, ce qui est l'inverse du filet recherché. Et « ne gouverne aucun verdict » ne se déduit pas de l'exclusion : `resolverOverrideGroup` gouverne le critère 2 et n'est hors de l'empreinte que parce que l'extension ne le résout pas. L'erreur sûre est de retarder un assouplissement, jamais d'infliger un durcissement.
+
+**À quelle granularité.** Le classement porte sur **une clé à la fois**, et sur **une entrée à la fois** pour les clés de liste (`labels`, `decorations.known`, `exemptUsers`, `allowlistPatterns`). Un même commit peut retirer un label et en ajouter un autre : il n'est ni restrictif ni élargissant dans son ensemble, et vouloir le classer d'un bloc n'a pas de réponse. Entrée par entrée, si : le retrait est épinglé, l'ajout s'applique en direct, dans le même commit et sans qu'aucune règle particulière soit nécessaire.
+
+Sans la partie épinglée, merger une modification qui retire un label à 14 h rendrait rétroactivement non conformes tous les `chore:` écrits le matin sur douze autres PR — douze résumés de check qui se remplissent de diagnostics sans qu'aucun commentaire n'ait bougé, et un basculement au rouge si l'organisation a retenu `formatSeverity: error`.
+
+Sans la partie en direct, l'interrupteur général du §6.3.3 ne fonctionnerait pas : ramener l'organisation de `enforce` à `warn` ne débloquerait aucune des PR déjà ouvertes, alors que c'est précisément la propriété de sûreté attendue d'un retour arrière. Les bornes d'entreprise font exception dans les deux sens parce qu'elles sont un garde-fou de gouvernance, pas une règle de jugement : une organisation qui durcit son plancher doit en voir l'effet tout de suite. La seule exception est `activation.activatedAt`, pour la raison donnée au §8.1.1 : y appliquer la règle générale annulerait le périmètre d'activation du §6.2.3 sur toutes les PR ouvertes à la fois.
+
+**Quand elle est écrite.** La configuration épinglée d'une PR est posée à sa **première évaluation** par le composant B, et **jamais réécrite** ensuite — même règle, et même raison, que le verdict de première observation du §6.1 : une valeur réécrite à chaque tour suivrait les durcissements successifs et n'épinglerait plus rien. Une PR ouverte avant le déploiement du composant B est donc épinglée sur la configuration en vigueur au jour de sa première évaluation, et non à sa création : c'est la seule date que le service puisse connaître.
+
+L'épinglage reprend la granularité déjà retenue pour le périmètre d'activation (§6.2.3) — une résolution par PR, jamais par commentaire — et hérite de la même propriété : l'écart introduit par un changement restrictif se résorbe de lui-même à mesure que les PR ouvertes se ferment.
+
+**2. Une seule autorité de résolution.** L'épinglage est un mécanisme du composant B seul : **le composant A n'épingle pas**. Il n'a pas d'état persistant par PR, et le §10 lui interdit l'appel d'API par lequel il obtiendrait la configuration épinglée. Sur une PR ouverte avant un changement restrictif, il juge donc avec la configuration **courante** pendant que le serveur juge avec la configuration **épinglée**.
+
+C'est exactement la suspension annoncée au §2. Elle est dans le sens supportable : le sens **direct** de la règle — ce que A accepte, B l'accepte — reste vrai, puisqu'un B plus permissif accepte a fortiori. C'est le sens **réciproque** qui tombe : A refuserait un envoi que la source de vérité aurait accepté. La règle ferme ce cas :
+
+Le composant B publie dans la sortie du check l'**empreinte de la configuration appliquée** (`configFingerprint`, §6.3.1). L'extension la lit sur la page — elle y est rendue, aucun appel d'API n'est nécessaire (§10) — et la compare à la sienne. En cas d'écart, elle **signale** que sa vue est décalée **et cesse de bloquer l'envoi** : elle se comporte comme en mode `warn` jusqu'à ce que les deux empreintes coïncident. Le désaccord devient visible au lieu d'être subi, et il ne se paie jamais d'un rejet que la source de vérité n'aurait pas prononcé.
+
+**La comparaison porte sur la configuration, et sur elle seule.** Un écart de version de `core/` ne déclenche **pas** cette désescalade : la règle 5 ci-dessous le déclare normal et lui donne son propre traitement. Confondre les deux éteindrait le mode `enforce` côté extension en permanence, puisque la condition serait vraie en permanence — le blocage d'envoi du §5.4 et `CA-01` deviendraient inopérants dans le cas courant, ce qui est l'inverse du but poursuivi.
+
+Quand aucun résultat n'est encore publié sur la PR — première évaluation en cours, ou composant B non déployé —, il n'y a pas d'empreinte à comparer : l'extension applique le mode configuré, comme partout ailleurs.
+
+**Une configuration dégradée ne produit pas un désaccord.** Si l'une des lectures de configuration de l'extension a rendu `{ status: 'unreachable' }` (§9.2.3), l'extension **ne compare pas les empreintes du tout** — la marque vit à côté de l'empreinte, jamais dedans, `fingerprint()` n'ayant pour entrée que la configuration effective (§9.2.2). Le cas est traité comme l'absence d'empreinte ci-dessus, et c'est la condition 4 du §5.4 — configuration lue sans repli — qui décide alors du blocage. Confondre les deux ferait passer une lecture manquée pour un désaccord de configuration, et signalerait un décalage là où il n'y en a pas.
+
+**3. Contournement du cache.** Le cache de configuration (§8.1.2) est contourné dans **deux situations, et deux seulement** : lors d'un assouplissement du `mode` (§6.3.3), et avant un rejet qui dépend de la configuration. La seconde est décrite ici.
+
+Avant d'émettre un rejet qui dépend de la configuration — `E-UNKNOWN-LABEL`, `E-UNKNOWN-DECORATION` — le composant B rafraîchit **les deux niveaux** de configuration en contournant leur cache : un label peut avoir été ajouté au fichier du dépôt aussi bien qu'au document d'organisation.
+
+Concrètement, l'évaluation se fait **en deux passes, et seulement quand il le faut** : une première passe avec la configuration en cache ; si elle produit un `E-UNKNOWN-LABEL` ou un `E-UNKNOWN-DECORATION`, une seconde après `fetchOrgConfig(url, { bypassCache: true })` (§9.2.4). Seul le verdict de la seconde est publié. Les fonctions de `core/` étant pures, c'est l'orchestrateur serveur qui porte cette boucle — elle ne peut pas vivre dans `validate()`.
+
+C'est une application directe de la règle 1 : l'ajout d'un label est une modification élargissante, donc évaluée en direct, y compris sur les PR déjà ouvertes. Sans ce rafraîchissement, la règle serait vraie sur le papier et fausse en pratique pendant toute la durée du cache.
+
+Elle vise une asymétrie précise. Si l'extension est en avance sur le serveur — l'organisation vient d'ajouter un label, l'extension l'a déjà, le serveur pas encore — l'utilisateur écrit un commentaire que l'outil vient de l'aider à composer et le check le signale comme non conforme : c'est le sens de divergence qui dégrade une PR. Dans l'autre sens — extension en retard — elle bloque une saisie que le serveur accepterait, ce qui est agaçant mais se résout en rechargeant la page. On ne paie donc le coût du rafraîchissement que sur le sens gênant, et seulement au moment d'un rejet, c'est-à-dire rarement.
+
+**4. Même durée de cache des deux côtés.** `configCacheTtlSeconds` est plancher-able (§8.1.1) et doit porter la même valeur pour les deux composants. Un TTL asymétrique élargit mécaniquement la fenêtre de divergence.
+
+**5. Compatibilité de `core/`.** L'extension se met à jour automatiquement depuis un store ; le serveur est redéployé au rythme de l'organisation. Un écart de plusieurs semaines est le cas normal, pas l'exception. Le fichier de configuration porte donc `coreMinVersion` : une configuration produite pour une version majeure supérieure à celle du composant qui la lit déclenche **le repli que le §8.1.5 définit pour une version de schéma non supportée — mode `assist`, ou le plancher en vigueur s'il est plus strict** — et l'écart est reporté dans la sortie du check. Les deux cas partagent le même repli parce qu'ils posent le même problème : un document qu'on sait lire mais qu'on ne sait pas appliquer entièrement.
+
+**6. Normalisation d'entrée.** Traitée au §3.4.1, qui est normatif précisément parce que c'est la seule divergence qui se manifestait sur *tous* les commentaires et non sur une fenêtre de temps.
+
+#### 8.1.4 Sémantique de fusion
+
+Sans règle explicite, un dépôt qui ne déclare que deux labels laisse indéterminé s'il en a désormais deux ou dix — et deux implémentations raisonnables produiraient deux produits différents. La règle est donc fixée **par clé** :
+
+| Clé | Fusion |
+|-----|--------|
+| `labels` | **Fusion par `id`.** Un niveau inférieur surcharge les propriétés d'un label existant et peut en ajouter de nouveaux ; il ne supprime jamais un label. Pour retirer un label, lui donner `"enabled": false`. |
+| `decorations.known` | Fusion par `id`, même règle. |
+| `shortcuts.abbreviations` | **Fusion par abréviation**, même règle que `severities` : un niveau inférieur en ajoute ou en redéfinit une sans effacer les autres. |
+| `severities` | **Fusion par code.** Un niveau inférieur surcharge la sévérité d'un code sans effacer celles que le niveau supérieur a posées pour d'autres codes. Les codes absents de tous les niveaux gardent la sévérité du tableau §3.5.2. |
+| `exemptUsers`, `allowlistPatterns` | **Concaténation** (union), sans suppression possible depuis un niveau inférieur — **sauf `closed: true` au plancher** (§8.1.1), qui interdit alors tout ajout depuis un niveau inférieur. |
+| `resolverOverrideGroup` | **Intersection**, jamais remplacement : un niveau inférieur ne peut que restreindre l'habilitation posée au-dessus (§8.1.1). |
+| `rules`, `scope`, et les autres clés scalaires | **Remplacement** de la valeur, clé par clé. |
+
+Les labels optionnels `typo`, `polish` et `quibble` (§3.2) sont livrés désactivés (`"enabled": false`, `blockingByDefault: false`) ; les activer consiste à passer leur `enabled` à `true`.
+
+#### 8.1.5 Configuration absente, illisible ou invalide
+
+Ces cas ne sont pas théoriques : casser le fichier de configuration serait, à défaut de règle, le moyen le plus simple de désactiver le contrôle.
+
+| Situation | Composant A | Composant B |
+|-----------|-------------|-------------|
+| Fichier absent, **jamais évalué auparavant** | Repli sur le niveau inférieur — organisation, puis défauts du produit — dans les bornes du plancher | **Ne publie aucun statut** — le dépôt n'a pas activé l'outil (§6.4, périmètre d'installation) |
+| Fichier absent, **dépôt déjà évalué** | Idem | Publie un statut **neutre** portant `config-vanished`, **quel que soit le mode effectif** — l'une des deux exceptions à la règle du §6.2.2, avec la ligne suivante. La disparition du fichier est un incident, pas une désactivation : sans cette distinction, `git rm .conventional-comments.json` désactiverait le contrôle sur un dépôt en `enforce` — ou, si le check est obligatoire, bloquerait toutes ses PR sans recours |
+| JSON syntaxiquement invalide, ou **valeur inconnue pour une clé connue** (`"mode": "banana"`) | Repli sur le **dernier niveau valide** (organisation, puis défauts), avertissement visible dans les options | Signale « configuration invalide » avec la ligne fautive. Sur un dépôt **déjà évalué**, il publie **quel que soit le mode effectif** — en échec sous `enforce`, neutre portant `invalid-config` sous tout mode inférieur — pour la même raison que la ligne précédente. Sur un dépôt jamais évalué, le mode reste maître |
+| **Lecture impossible** — API injoignable, limite d'appels atteinte (`{ status: 'unreachable' }`, §9.2.2) | Repli sur le niveau inférieur, **en état dégradé** au sens du §5.4 : l'extension assiste et ne bloque plus | Ce n'est ni une absence ni une invalidité, mais une **incapacité à évaluer** au sens du §6.4. Sur un dépôt **déjà évalué** et dans le statut que le mode autorise à publier (§6.2.2) : `degradedSince` s'arme, rien n'est publié pendant le délai de grâce, puis un statut neutre `grace-expired`. Sur un dépôt jamais évalué, le silence de la première ligne continue de s'appliquer — sans quoi une panne d'API ferait apparaître un check sur tous les dépôts non activés d'une organisation |
+| Version de schéma supérieure à celle supportée, ou `coreMinVersion` non satisfaite (§8.1.3) | Repli en mode `assist`, **ou au plancher en vigueur s'il est plus strict** (§8.1.1), avec avertissement | **Le même repli, mot pour mot** : mode `assist`, ou le plancher en vigueur s'il est plus strict. Le motif « version non supportée » est porté dans le statut que ce mode l'autorise à publier. Jamais de blocage implicite |
+
+**Une clé inconnue, elle, est simplement ignorée**, avec un avertissement, et ne déclenche aucun repli. C'est ce qui permet à une configuration écrite pour une version ultérieure d'être lue par une version antérieure sans faire disparaître la contrainte. Le repli est réservé à ce qu'on ne sait pas interpréter : un document illisible, ou une valeur hors du domaine d'une clé connue — dont on ne peut rien conclure, alors qu'une clé inconnue se laisse écarter sans risque.
+
+Un fichier invalide ne fait donc **jamais** disparaître la contrainte : il la signale aussi bruyamment que le mode en vigueur le permet. **Le mode reste maître de ce que le composant B publie** — une configuration cassée ne peut pas faire échouer un check là où un mode inférieur l'interdit, sans quoi une faute de virgule bloquerait un dépôt en repli. Le repli est borné par le plancher, faute de quoi une simple montée de version du schéma permettrait de descendre sous un plancher `enforce`. Il est **identique pour les deux composants** : écrire « repli en `assist` » d'un côté et « applique le plancher » de l'autre les ferait diverger sur un déploiement public, où le plancher vaut `{"minimumMode": "off"}` — A assisterait, B se tairait, sur la même entrée.
+
+**Fichier absent contre `mode: off`.** Ces deux situations n'ont volontairement pas le même effet. Un fichier absent sur un dépôt **jamais évalué** signifie « ce dépôt n'a pas activé l'outil » (§6.4) et le composant B se tait ; sur un dépôt déjà évalué, il publie un neutre **quel que soit le mode effectif**. C'est, avec la configuration **invalide** sur un dépôt déjà évalué, la seule exception à « le mode reste maître », et elle est nécessaire : le fichier ayant disparu, le mode effectif est celui que donnent l'organisation puis les défauts, soit `assist` dans un déploiement courant — donc le silence. Or sur un dépôt où le check est déclaré obligatoire, ce silence bloque **toutes** les PR, sans statut et sans explication. Le mode qui commanderait le silence est ici une conséquence de l'incident, pas une décision : lui obéir reviendrait à laisser un `git rm` provoquer un blocage général muet. Le neutre laisse passer et dit pourquoi.
+
+Le raisonnement vaut mot pour mot pour un fichier **cassé** plutôt que supprimé : le repli sur le niveau inférieur produit le même mode résiduel, donc le même silence, donc le même blocage général. Le §8.1.5 ouvre en observant que « casser le fichier de configuration serait, à défaut de règle, le moyen le plus simple de désactiver le contrôle » — sans exception, la règle écrite transformerait « désactiver » en « bloquer silencieusement », ce qui est pire. Les deux incidents sont donc traités de la même façon. Un `{"mode": "off"}` explicite est une **demande de désactivation**, qui reste soumise au plancher et peut donc être ignorée. Une organisation qui veut rendre l'activation obligatoire ne peut pas s'appuyer sur le seul plancher : elle doit imposer la présence du fichier, par exemple via un dépôt de modèles ou un contrôle d'organisation, hors périmètre de cet outil.
+
+### 8.2 Schéma
+
+Le bloc ci-dessous est un **exemple de configuration de dépôt**, destiné à montrer la forme de chaque clé. Ce ne sont **pas** les valeurs par défaut du produit : il n'énumère que quatre labels sur les treize du §3.2, et sa clé `severities` éteint volontairement un avertissement pour illustrer la surcharge.
+
+**Les valeurs par défaut du produit** sont ailleurs, et par construction : les dix labels par défaut et les trois optionnels du §3.2, les décorations du §3.3, les sévérités du tableau §3.5.2, `mode: "assist"`, `formatSeverity: "warn"`, `severities: {}`, `decorations.allowFree: true`, `docUrl: "https://conventionalcomments.org/"`, `resolverOverrideGroup: []`, `scope: { validateReplies: false, validateReviewSummary: true }`, et les seuils du `rules` ci-dessous. Une implémentation qui construirait ses défauts en recopiant ce bloc livrerait un produit à quatre labels dont `W-MISSING-DECORATION` est éteint — c'est la confusion que ce paragraphe existe pour empêcher.
+
+**`resolverOverrideGroup` vaut la liste vide en dernier recours, et n'habilite alors personne.** C'est un **repli terminal** — la valeur retenue quand *aucun* niveau ne déclare la clé — et non un participant à l'intersection du §8.1.4 : celle-ci ne porte que sur les listes effectivement déclarées, faute de quoi un défaut produit vide annulerait le groupe posé par le plancher lui-même, en contradiction avec « le groupe désigné par le plancher ne peut pas être remplacé » (§8.1.1).
+
+Là où cette valeur s'applique, le cas 2 du §6.1 est sans effet et seule la résolution par l'auteur du commentaire racine est retenue ; l'exemption de PR du §6.3.2 n'est posable par personne. Une liste vide se lirait autrement comme « aucune condition, donc tout le monde » : ce n'est pas la lecture retenue, et le sens sûr est le seul cohérent avec « assouplir passe par la gouvernance ».
+
+**Conséquence, et prérequis au passage en `enforce`.** Sans groupe habilité, les **deux** soupapes du §6.3 sont inertes simultanément : ni `decision` ni exemption de PR. Le seul recours devient l'auteur du commentaire racine — c'est-à-dire qu'un dépôt en `enforce` dont le relecteur est indisponible reste bloqué, le scénario même que le §6.1.1 existe pour traiter. **Désigner `resolverOverrideGroup` est donc un prérequis au passage en `enforce`** (§14, P6), et le composant B émet un `config-warning` (§9.2.1) à chaque évaluation d'un dépôt en `enforce` dont le groupe résolu est vide.
+
+```json
+{
+  "$schema": "https://conventional-comments-toolkit.dev/schema/v1.json",
   "version": 1,
-  "mode": "warn",
+  "mode": "assist",
   "labels": [
-    { "id": "issue", "blockingByDefault": true,  "icon": "🔨", "aliases": ["bug"] },
-    { "id": "nitpick", "blockingByDefault": false, "alwaysNonBlocking": true }
+    { "id": "issue", "enabled": true, "blockingByDefault": true, "alwaysNonBlocking": false,
+      "icon": "🔨", "color": "#B3261E", "aliases": ["bug"] },
+    { "id": "nitpick", "enabled": true, "blockingByDefault": false, "alwaysNonBlocking": true },
+    { "id": "decision", "enabled": true, "blockingByDefault": false, "alwaysNonBlocking": true },
+    { "id": "typo", "enabled": false, "blockingByDefault": false }
   ],
-  "decorations": { "allowFree": true, "known": ["blocking", "non-blocking", "if-minor"] },
+  "decorations": {
+    "allowFree": true,
+    "known": [
+      { "id": "blocking",     "forces": "blocking" },
+      { "id": "non-blocking", "forces": "non-blocking" },
+      { "id": "if-minor",     "forces": "non-blocking" },
+      { "id": "security",     "forces": null }
+    ]
+  },
+  "severities": { "W-MISSING-DECORATION": "off" },
   "scope": {
     "validateReplies": false,
-    "validateReviewSummary": true,
-    "validatePrDescription": false
+    "validateReviewSummary": true
   },
   "rules": {
-    "minSubjectLength": 10,
+    "minSubjectLength": 5,
     "maxSubjectLength": 120,
-    "requireDiscussionOnBlocking": "warn"
+    "minDecisionSubjectLength": 20
   },
-  "allowBypass": true,
-  "exemptUsers": ["azure-pipelines[bot]", "dependabot[bot]"],
-  "allowlistPatterns": ["^LGTM$", "^/[a-z]+"],
-  "resolverOverrideGroup": "tech-leads",
+  "formatSeverity": "warn",
+  "exemptUsers": ["<compte-de-service>"],
+  "allowlistPatterns": ["^LGTM$"],
+  "resolverOverrideGroup": ["acme/tech-leads"],
+  "overrideLabel": "cc-override",
+  "activation": { "activatedAt": "2026-09-01T00:00:00Z" },
+  "configUrl": null,
+  "coreMinVersion": "1.0.0",
+  "configCacheTtlSeconds": 3600,
+  "badgeStyle": "pill",
+  "shortcuts": { "abbreviations": { "?i": "issue: ", "?ib": "issue (blocking): " } },
+  "docUrl": "https://conventionalcomments.org/",
+  "server": { "coalesceWindowSeconds": 10, "gracePeriodSeconds": 900, "reconcileIntervalSeconds": 900,
+              "statusTargetUrl": null },
+  "exemptionLog": { "endpoint": null },
   "language": "fr",
   "telemetry": { "enabled": false, "endpoint": null }
 }
 ```
 
-Le schéma est **versionné**. Une configuration de version supérieure à celle supportée par l'extension déclenche un repli en mode `assist` accompagné d'un avertissement, jamais un blocage.
+Clés introduites par le §6 et le §8.1 :
+
+| Clé | Rôle |
+|-----|------|
+| `formatSeverity` | Sévérité du critère 1 du §6.2.1 — `warn` (défaut) ou `error`. Plancher-able. |
+| `overrideLabel` | Étiquette d'exemption d'une PR (§6.3.2). **Non plancher-able** : son nom est libre. Ce qui est encadré, c'est le droit de la poser, via `resolverOverrideGroup` (§8.1.1). |
+| `activation.activatedAt` | Date de bascule du dépôt (§6.2.3). Une PR est dans le périmètre si sa date de création lui est postérieure. Plancher-able : c'est une clé qui, laissée libre, permettrait de se soustraire à la contrainte en la datant dans le futur. |
+| `configUrl` | **Ignorée si elle est posée ici.** L'URL de la configuration d'organisation provient exclusivement du canal de plancher (§8.1.1, §8.1.2) : la laisser au fichier de dépôt permettrait à un dépôt de désigner lui-même la configuration censée le contraindre. La clé reste dans le schéma pour que sa présence soit diagnosticable (`config-warning`), pas pour être renseignée. |
+| `configCacheTtlSeconds` | Durée du cache de configuration (§8.1.2). Plancher-able, et doit porter la même valeur des deux côtés (§8.1.3, règle 4). |
+| `coreMinVersion` | Version majeure minimale de `core/` requise pour appliquer cette configuration (§8.1.3). En deçà, le repli du §8.1.5 s'applique : mode `assist`, ou le plancher en vigueur s'il est plus strict. |
+| `scope.validateReplies` | Validation des réponses de fil (§4.1). `false` par défaut. |
+| `scope.validateReviewSummary` | Validation du corps d'une revue soumise en lot (§4.1). Sans objet sur les plateformes qui n'ont pas ce concept — voir annexes. |
+| `resolverOverrideGroup` | Groupe ou **liste de groupes** habilités à résoudre un fil bloquant à la place de l'auteur du commentaire (§6.1.1) et à poser l'étiquette d'exemption (§6.3.2). Une liste s'entend en **intersection** : être membre de tous. C'est ce qui rend exprimable la restriction du §8.1.1 — un champ scalaire unique ne le pouvait pas. **La forme de chaque identifiant dépend de la plateforme** et est donnée en annexe (`org/team-slug` sur GitHub, `[Scope]\Nom` sur Azure DevOps) ; l'adaptateur serveur les résout par autant d'appels à `isInGroup` (§9.2.4). Plancher-able. |
+| `rules.minDecisionSubjectLength` | Longueur minimale du motif d'une réponse `decision` (§6.1.1). Défaut : 20. Plancher-able. |
+| `server.coalesceWindowSeconds` | Fenêtre de regroupement des événements d'une même PR (§6.4). Défaut : 10 s. Sans objet côté extension. |
+| `docUrl` | Lien vers la documentation de la convention, porté par la sortie du check (§6.3.1). Une organisation qui documente sa propre déclinaison y pointe la sienne. |
+| `server.statusTargetUrl` | URL **de base** de la page servie par le composant B ; il y ajoute le chemin de la PR évaluée pour former la `targetUrl` du statut (§6.3.1) — une URL unique ne pourrait pas désigner une PR. **Obligatoire sur toute plateforme qui ne rend pas de corps de statut** (§B.7), sans quoi un check rouge y serait un mur sans explication ; absente dans ce cas, un `config-warning` le signale (§8.1.5). |
+| `server.reconcileIntervalSeconds` | Période de la réconciliation des PR ouvertes (§6.4). Défaut : 900 s. C'est le délai maximal de détection de tout ce qu'une plateforme ne notifie pas par événement. |
+| `server.gracePeriodSeconds` | Délai au-delà duquel une incapacité à évaluer fait publier un statut neutre (§6.4). Défaut : 900 s. C'est le réglage qui décide combien de temps une PR peut rester bloquée par une panne : il appartient au schéma, pas à l'implémentation. |
+| `exemptionLog.endpoint` | Destination du journal des exemptions de PR (§6.3.2) — distincte de `telemetry.endpoint`. À `null`, le journal est **local au composant B** et conservé selon le §10 ; la journalisation n'est jamais désactivée, seule sa destination externe l'est. C'est ce qui rend `CA-10` testable sur un déploiement par défaut. |
+| `labels[].enabled` | Active ou désactive un label sans le retirer de la liste (§8.1.4). Les labels optionnels `typo`, `polish`, `quibble` sont livrés à `false`. |
+| `shortcuts.abbreviations` | Table des abréviations extensibles par `Tab` (§5.2) : abréviation → **texte inséré, deux-points et espace compris** (`"?i": "issue: "`). Les raccourcis clavier directs relèvent, eux, des préférences locales de l'utilisateur (§8.1.2). |
+| `labels[].color` | Couleur du bouton et du badge (§5.1, §5.5). Doit satisfaire les contrastes du §10. |
+| `labels[].aliases` | Orthographes acceptées en entrée pour ce label — voir ci-dessous. |
+| `decorations.known[].forces` | `"blocking"`, `"non-blocking"` ou `null` (descriptive). C'est cette clé qui exprime la précédence du §3.3, qu'une simple liste de chaînes ne pouvait pas porter. |
+| `severities` | Sévérité par code de diagnostic (§3.5) : `off`, `warn` ou `error`. Plancher-able — voir la règle ci-dessous. **Cette clé est une surcharge** : les valeurs absentes gardent la sévérité du tableau §3.5.2, qui reste la référence, et sa valeur par défaut est l'objet vide. L'exemple ci-dessus désactive `W-MISSING-DECORATION` à titre d'illustration. |
+
+**Limite basse de sévérité.** Un code `E-` ne peut jamais voir sa sévérité descendre sous `warn`, quel que soit le niveau de configuration. C'est ce qui rend exprimable la liste de règles non désactivables du §8.1.1 : elle se déclare comme un ensemble de codes dont la sévérité ne peut pas être abaissée.
+
+**Alias de label.** Un alias est une orthographe alternative acceptée **en entrée** : `bug: fuite mémoire` est reconnu comme le label `issue` et en hérite intégralement (caractère bloquant, décorations admises, sévérités). L'alias n'est pas un label distinct — il n'apparaît ni dans la barre d'outils, ni dans les indicateurs du §12, où il est comptabilisé sous son label canonique. Un alias ne produit **aucun diagnostic** — c'est une orthographe admise, pas un écart. L'extension propose la réécriture vers la forme canonique comme une commodité d'édition, jamais comme une correction de `Diagnostic.fix` (§9.2.1), et sans l'imposer. `Bug:` cumule deux choses distinctes : la casse est comparée à la forme canonique de l'**alias reconnu**, donc `Bug:` produit `W-CASE` avec la correction `bug:` ; la réécriture vers `issue:` reste une proposition à part, que rien n'exige d'accepter. La comparaison est insensible à la casse.
+
+Le champ `exemptUsers` de l'exemple est un espace réservé : les identités de comptes de service diffèrent d'une plateforme à l'autre et sont données dans les annexes. Aucun motif exemptant un préfixe de commande (`^/…`) ne figure dans les valeurs par défaut : il permettrait de se soustraire à la contrainte en tapant `/x` devant sa phrase. Les commandes slash légitimes relèvent de l'exemption structurelle du §4.2, pas d'un motif configurable.
+
+**Contrainte sur `allowlistPatterns`.** Ces motifs sont fournis par le dépôt et exécutés dans le navigateur du relecteur comme dans le service mutualisé : un motif tel que `^(a+)+$` gèlerait l'un et l'autre. Trois bornes, toutes **statiques**, c'est-à-dire vérifiables avant exécution : **au plus 50 motifs**, **256 caractères** par motif, et **aucun quantificateur imbriqué** — un quantificateur portant sur un groupe qui en contient déjà un, forme dont relève l'essentiel des ReDoS connus. Un motif qui dépasse ces bornes est **ignoré et signalé** (`config-warning`, §9.2.1).
+
+Un délai maximal d'exécution serait le contrôle évident, et il n'est pas retenu : une expression régulière JavaScript s'exécute sur le fil principal et ne s'interrompt pas. La seule façon de la borner dans le temps serait de l'exécuter dans un *worker* que l'on termine — coût disproportionné pour un motif dont on peut refuser la forme à la lecture.
+
+Le schéma est **versionné**. Une configuration dont la version dépasse celle supportée par le composant qui la lit déclenche le repli décrit au §8.1.5 — mode `assist`, ou le plancher en vigueur s'il est plus strict — accompagné d'un avertissement, jamais un blocage silencieux.
+
+Les emplacements par défaut ci-dessus sont ceux d'un déploiement public standard ; une organisation qui déploie via politique d'entreprise peut pointer `$schema` vers ses propres emplacements internes, et y déclarer son `configUrl` — dans le **canal de plancher**, jamais ici (§8.1.1). Voir §10, Compatibilité.
 
 ---
 

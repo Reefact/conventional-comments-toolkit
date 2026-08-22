@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Conventional Comments Toolkit",
+  "version": "1.0.0",
+  "description": "Assistance et validation Conventional Comments pour GitHub et Azure DevOps. La source de vérité reste le compagnon serveur.",
+  "default_locale": "fr",
+  "permissions": ["storage", "scripting", "activeTab"],
+  "optional_host_permissions": ["https://*/*"],
+  "host_permissions": ["https://github.com/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "storage": {
+    "managed_schema": "managed-schema.json"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

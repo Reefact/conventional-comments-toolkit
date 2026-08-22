@@ -1,0 +1,223 @@
+// Contrôleur d'un éditeur (§5) : barre d'outils, saisie rapide, retour visuel débattu à
+// 150 ms, blocage d'envoi sous les quatre conditions du §5.4. Un contrôleur par
+// EditorHandle ; toute la logique de règle vient de core/.
+
+import {
+  analyze,
+  type CommentAnalysis,
+  type EffectiveConfig,
+  type PrRef,
+  type PublishedSummary,
+  type ValidationInput,
+} from '@cct/core';
+import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import { computePrefixInsertion, shiftSelection } from '@cct/adapter-shared';
+import { decideGuard, feedbackState, type GuardDecision } from './guard.js';
+import { buildToolbar } from './ui/toolbar.js';
+import { attachQuickInput } from './ui/quickinput.js';
+import { FeedbackView } from './ui/feedback.js';
+import type { ResolvedClientConfig } from './config-resolver.js';
+
+export const VALIDATION_DEBOUNCE_MS = 150; // §5.3
+
+export interface ControllerDeps {
+  adapter: PlatformAdapter;
+  editor: EditorHandle;
+  resolved: ResolvedClientConfig;
+  published: PublishedSummary | null;
+  lang: string;
+  currentUserLogin: string;
+}
+
+export class EditorController {
+  readonly deps: ControllerDeps;
+  #feedback: FeedbackView | null = null;
+  #timer: ReturnType<typeof setTimeout> | null = null;
+  #lastAnalysis: CommentAnalysis | null = null;
+  #lastDecision: GuardDecision | null = null;
+  #disposers: (() => void)[] = [];
+
+  constructor(deps: ControllerDeps) {
+    this.deps = deps;
+  }
+
+  get config(): EffectiveConfig {
+    return this.deps.resolved.config;
+  }
+
+  attach(): void {
+    const decision = this.evaluateNow();
+    if (decision.inactive) return; // mode off : l'extension reste inactive (§7)
+
+    const host = this.deps.editor.element.parentElement;
+    if (!host) return;
+
+    // §5.1 — barre d'outils au-dessus de la zone de saisie.
+    const toolbar = buildToolbar({
+      config: this.config,
+      lang: this.deps.lang,
+      onLabel: (label, decorations, toggle) => this.insertPrefix(label, decorations, toggle),
+      onFreeDecoration: (decoration) => this.insertPrefix(null, [decoration], false),
+    });
+    host.insertBefore(toolbar, this.deps.editor.element);
+    this.#disposers.push(() => toolbar.remove());
+
+    // §5.3 — pastille permanente sous la zone de saisie, zone aria-live.
+    this.#feedback = new FeedbackView(this.deps.editor.element, this.deps.lang);
+    this.#disposers.push(() => this.#feedback?.dispose());
+
+    // §5.2 — complétion `/` ou `:`, abréviations Tab, navigation clavier.
+    const quick = attachQuickInput({
+      editor: this.deps.editor,
+      adapter: this.deps.adapter,
+      config: this.config,
+      lang: this.deps.lang,
+    });
+    this.#disposers.push(quick.dispose);
+
+    // Validation débattue à 150 ms pendant la frappe (§5.3).
+    const onInput = () => {
+      if (this.#timer) clearTimeout(this.#timer);
+      this.#timer = setTimeout(() => this.refresh(), VALIDATION_DEBOUNCE_MS);
+    };
+    this.deps.editor.element.addEventListener('input', onInput);
+    this.#disposers.push(() => this.deps.editor.element.removeEventListener('input', onInput));
+
+    // §5.4 — interception de chaque point de sortie, raccourci clavier compris (§4.3).
+    for (const control of this.deps.adapter.getSubmitControls(this.deps.editor)) {
+      this.#guardControl(control);
+    }
+    const onKeydown = (e: Event) => {
+      const ke = e as KeyboardEvent;
+      if (ke.key === 'Enter' && (ke.ctrlKey || ke.metaKey)) {
+        if (this.#shouldBlockNow()) {
+          ke.preventDefault();
+          ke.stopPropagation();
+          this.#announceBlock();
+        }
+      }
+    };
+    this.deps.editor.element.addEventListener('keydown', onKeydown, true);
+    this.#disposers.push(() => this.deps.editor.element.removeEventListener('keydown', onKeydown, true));
+
+    this.refresh();
+  }
+
+  dispose(): void {
+    for (const d of this.#disposers) d();
+    this.#disposers = [];
+  }
+
+  /** Analyse courante — c'est analyze() de core/ qui juge, jamais l'extension. */
+  evaluateNow(): GuardDecision {
+    const body = this.deps.adapter.readValue(this.deps.editor);
+    const ctx = this.deps.editor.context;
+    const input: ValidationInput = {
+      body,
+      platform: this.deps.adapter.platformProfile(),
+      isSystemGenerated: false,
+      zone: ctx.zone,
+      canCarryBlockingState: ctx.canCarryBlockingState,
+      author: {
+        id: `login:${this.deps.currentUserLogin.toLowerCase()}`,
+        login: this.deps.currentUserLogin,
+        isServiceAccount: false,
+      },
+    };
+    this.#lastAnalysis = analyze(input, this.config);
+    this.#lastDecision = decideGuard({
+      config: this.config,
+      fingerprint: this.deps.resolved.fingerprint,
+      published: this.deps.published,
+      degraded: this.deps.resolved.degraded,
+      pr: this.prRef(),
+      diagnostics: this.#lastAnalysis.diagnostics,
+    });
+    return this.#lastDecision;
+  }
+
+  refresh(): void {
+    const decision = this.evaluateNow();
+    const analysis = this.#lastAnalysis!;
+    this.#feedback?.render({
+      state: feedbackState(analysis.diagnostics, decision, this.deps.resolved.degraded),
+      diagnostics: analysis.diagnostics, // tous, dans l'ordre du §3.5.1 (§5.3)
+      aliasRewrite: analysis.aliasRewrite,
+      onFix: (replacement) => this.applyLineFix(replacement),
+    });
+    for (const control of this.deps.adapter.getSubmitControls(this.deps.editor)) {
+      // aria-disabled, jamais l'attribut natif disabled : il retirerait le bouton de
+      // l'ordre de tabulation (§5.4, CA-12).
+      if (decision.block) control.element.setAttribute('aria-disabled', 'true');
+      else control.element.removeAttribute('aria-disabled');
+    }
+  }
+
+  /** §5.1 — insertion/remplacement du préfixe, sélection restaurée décalée (CA-02). */
+  insertPrefix(label: string | null, decorations: string[], toggle: boolean): void {
+    const element = this.deps.editor.element as HTMLTextAreaElement;
+    const value = this.deps.adapter.readValue(this.deps.editor);
+    const selStart = element.selectionStart ?? 0;
+    const selEnd = element.selectionEnd ?? 0;
+    const hasSelection = selEnd > selStart;
+
+    const effectiveLabel = label ?? this.#lastAnalysis?.resolved?.label.id ?? 'suggestion';
+    const { nextValue, caret, delta } = computePrefixInsertion(
+      value,
+      { label: effectiveLabel, decorations },
+      { toggle }
+    );
+    this.deps.adapter.writeValue(this.deps.editor, nextValue, hasSelection ? undefined : caret);
+    if (hasSelection) {
+      // Le texte sélectionné n'est pas remplacé ; la sélection est restaurée, décalée de
+      // la longueur du préfixe inséré (§5.1, CA-02).
+      shiftSelection(element, selStart, selEnd, delta);
+    }
+    this.refresh();
+  }
+
+  /** §5.3 — correction en un clic : la ligne de préfixe entièrement réécrite (§9.2.1). */
+  applyLineFix(replacement: string): void {
+    const value = this.deps.adapter.readValue(this.deps.editor);
+    const lines = value.split('\n');
+    // La ligne remplacée est la ligne de préfixe (§3.4.1) : première ligne non vide hors
+    // bloc délimité et citation.
+    let inFence = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!;
+      if (/^\s*(`{3,}|~{3,})/.test(line)) {
+        inFence = !inFence;
+        continue;
+      }
+      if (inFence || /^\s*>/.test(line) || line.trim() === '') continue;
+      lines[i] = replacement;
+      break;
+    }
+    this.deps.adapter.writeValue(this.deps.editor, lines.join('\n'));
+    this.refresh();
+  }
+
+  prRef(): PrRef {
+    return this.deps.editor.context.pr;
+  }
+
+  #shouldBlockNow(): boolean {
+    return this.evaluateNow().block;
+  }
+
+  #announceBlock(): void {
+    this.#feedback?.announceBlocked(this.#lastAnalysis?.diagnostics ?? []);
+  }
+
+  #guardControl(control: SubmitControl): void {
+    const onClick = (e: Event) => {
+      if (this.#shouldBlockNow()) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.#announceBlock();
+      }
+    };
+    control.element.addEventListener('click', onClick, true);
+    this.#disposers.push(() => control.element.removeEventListener('click', onClick, true));
+  }
+}

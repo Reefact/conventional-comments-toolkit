@@ -18,6 +18,7 @@
     "spike": "node spikes/p1-prime/run.mjs"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },

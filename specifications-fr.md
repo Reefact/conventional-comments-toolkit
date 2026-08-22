@@ -606,6 +606,7 @@ La langue de cette sortie suit la règle de résolution du §8.1. **Un statut en
 
 Une PR peut être sortie du périmètre de blocage par apposition d'une étiquette dédiée (`cc-override` par défaut, configurable). Effet : le critère 2 n'est plus évalué, le statut passe au vert, et le résumé indique explicitement que la PR a été exemptée, par qui et quand.
 
+- **Cette vérification suppose que la plateforme dise qui a posé l'étiquette, et quand.** C'est une **capacité de plateforme, à déclarer en annexe**, au même titre que l'auteur d'une résolution (§6.1). Là où elle manque, le **repli** est le suivant : l'étiquette seule **n'accorde jamais l'exemption**, qui passe par le point d'entrée d'administration du §6.2.4, qui enregistre lui-même l'acteur et l'horodatage, et le composant B pose ensuite l'étiquette comme simple marqueur visuel. Le mécanisme ne disparaît donc pas ; c'est son point d'entrée qui change, et `CA-26` se teste sur le chemin que la plateforme permet.
 - Le droit d'apposer cette étiquette est restreint aux membres de `resolverOverrideGroup` (§8.2) ; sur les plateformes qui ne permettent pas de restreindre nativement la pose d'une étiquette, le composant B **vérifie a posteriori** et refuse l'exemption posée par une personne non habilitée. Le refus est signalé (`exemption-refused`, §9.2.1) **avec la personne qui l'a posée**, et l'étiquette est **laissée en place** : la retirer serait indistinguable de la remise à zéro ci-dessous, et priverait l'équipe de la trace du geste. Une étiquette présente sans effet, et dite telle dans la sortie du check, se comprend ; une étiquette qui disparaît sans explication, non.
 - Chaque exemption est journalisée (§10) : identifiant de PR, auteur, horodatage, et motif si la plateforme permet d'en attacher un à l'étiquette.
 - L'exemption est **remise à zéro** à chaque **fil bloquant dont l'identifiant n'était pas dans l'ensemble des fils déjà observés au tour précédent** (§6.1) et dont la zone peut porter un état bloquant (§4.1) : le composant B **retire l'étiquette** et émet un `notice`. Cette formulation est celle qui se calcule — « un nouveau commentaire bloquant » se lirait de trois façons, qui divergent dès que le service a été indisponible. Elle ne devient ainsi pas un blanc-seing permanent sur une PR de longue durée — et le geste est visible. L'ignorer silencieusement laisserait `cc-override` affichée sur une PR redevenue bloquée, ce que tout le monde lirait comme un défaut. C'est le seul droit en **écriture** du composant B en dehors du statut, et il figure à ce titre dans les permissions du §6.4.
@@ -638,25 +639,26 @@ Le §9.1 décrit le découpage en modules du composant B ; la présente section 
     – au-delà, et sur un dépôt déjà évalué seulement : listes vides + dernière
       configuration connue + forceState neutral                                     §6.4, §8.1.5
  7. resolveConfig(floor, org, repo, pinned, previouslyEvaluated) → {config, notices} §8.1.2
- 8. Lire les notices : config-vanished ou configuration invalide → armer forceState  §8.1.5
- 9. Pré-résoudre isInGroup() pour tout auteur apparaissant sur la PR                §9.2.2
-10. evaluate(...) → ComplianceResult                                                §6.2.1
-11. Si le résultat porte E-UNKNOWN-LABEL ou E-UNKNOWN-DECORATION : seconde passe
+ 8. **Périmètre d'installation** : dépôt jamais évalué ET fichier de dépôt absent ?
+    s'arrêter ici — rien n'est évalué, rien n'est persisté, rien n'est publié       §6.4
+ 9. Lire les notices : config-vanished ou configuration invalide → armer forceState  §8.1.5
+10. Pré-résoudre isInGroup() pour tout auteur apparaissant sur la PR                §9.2.2
+11. evaluate(...) → ComplianceResult                                                §6.2.1
+12. Si le résultat porte E-UNKNOWN-LABEL ou E-UNKNOWN-DECORATION : seconde passe
     avec fetchConfigFile(bypassCache) ET fetchOrgConfig(bypassCache) ;
     seul ce second verdict compte, et c'est lui qu'on épingle                       §8.1.3 r.3
-12. Persister : configuration épinglée (première évaluation seulement), verdicts de
-    première observation, fils bloquants observés moins les corrigés, séquence,
-    dernière configuration effective résolue, drapeau « déjà évalué »               §6.4
-13. Cinq portes, dans cet ordre :
-    a. dépôt jamais évalué ET fichier de dépôt absent ? ne rien publier             §6.4
-    b. séquence périmée ?                                                           §6.4
-    c. le mode n'autorise pas la publication, hors exceptions du §8.1.5 ?           §6.2.2
-    d. relire le SHA de tête et le poser sur le résultat                            §6.4
-    e. résultat identique au dernier publié, SHA compris ?                          §6.4
-14. publishStatus(pr, result) — l'adaptateur y appelle encodeSummary() pour la
+13. Persister l'**état de calcul** : configuration épinglée (première évaluation
+    seulement), verdicts de première observation, fils bloquants observés moins les
+    corrigés, séquence, dernière configuration effective résolue                    §6.4
+14. Quatre portes, dans cet ordre :
+    a. séquence périmée ?                                                           §6.4
+    b. le mode n'autorise pas la publication, hors exceptions du §8.1.5 ?           §6.2.2
+    c. relire le SHA de tête et le poser sur le résultat                            §6.4
+    d. résultat identique au dernier publié, SHA compris ?                          §6.4
+15. publishStatus(pr, result) — l'adaptateur y appelle encodeSummary() pour la
     ligne cc/1, et rend la sortie humaine à partir de headline et des listes        §6.3.1
-15. Persister le résultat publié, pour la comparaison du tour suivant               §6.4
-16. Exécuter result.actions.removeLabel s'il est renseigné                          §6.3.2
+16. Une fois la publication **réussie**, persister le résultat publié et poser le
+    drapeau « déjà évalué » ; puis exécuter result.actions.removeLabel              §6.4, §6.3.2
 ```
 
  Ces éléments conditionnent la phase P5 et ne peuvent pas être laissés à l'implémentation : plusieurs d'entre eux (ordre des événements, comportement en panne) déterminent si une PR peut rester bloquée sans recours.
@@ -664,7 +666,7 @@ Le §9.1 décrit le découpage en modules du composant B ; la présente section 
 **Déclenchement.** Trois sources, toutes trois nécessaires :
 1. les événements de plateforme (webhooks / service hooks) — voie nominale ;
 2. une **réconciliation périodique** des PR ouvertes, toutes les `server.reconcileIntervalSeconds` (§8.2) — filet de sécurité contre les événements perdus, non reçus pendant une indisponibilité, ou jamais émis. C'est aussi le repli de toute détection qu'une plateforme n'assure pas par événement (§B.7) ;
-3. un **déclenchement manuel** — le bouton de réexécution natif que les deux plateformes attachent à un statut, dont la réception vaut demande de réévaluation de la PR concernée.
+3. un **déclenchement manuel** — le composant B expose un mécanisme de réévaluation d'une PR, et **utilise l'action intégrée à l'interface de la plateforme là où elle existe**. Le contrat s'arrête là, délibérément : sur Azure DevOps, un statut publié par l'API ne porte aucune action de réexécution, et en ajouter une au menu d'un PR Status exige de développer une *extension Azure DevOps Services* via le modèle de contribution. Exiger « le bouton natif des deux plateformes » ajouterait discrètement un troisième produit à livrer.
 
 **Coalescence et idempotence.** Une revue soumise en lot génère autant d'événements que de commentaires : le recalcul doit être **coalescé par PR** avec une fenêtre de regroupement (`server.coalesceWindowSeconds`, §8.2, lue dans la dernière configuration connue du dépôt — la fenêtre s'ouvre avant qu'on ait relu le fichier), et non exécuté une fois par événement. Chaque évaluation est idempotente et porte une clé `(dépôt, PR, SHA)` ; une évaluation dont le résultat est identique au précédent ne republie pas de statut. **Deux résultats sont identiques** lorsque `headSha`, `state`, les trois compteurs, `configFingerprint`, l'**ensemble des `kind`** de `notices` et les **identifiants des fils et commentaires listés** coïncident. Seuls les **horodatages** restent hors comparaison : un `notice` réémis à chaque évaluation — `resolution-unattributed` par exemple — rendrait sinon la règle inopérante.
 
@@ -695,7 +697,9 @@ Ce compteur ne détecte pas à lui seul un désordre de livraison — il est mon
 - le **dernier résultat publié** par PR, sans lequel la règle d'idempotence ci-dessus — « une évaluation dont le résultat est identique au précédent ne republie pas de statut » — n'a rien à comparer ;
 - l'ensemble des **fils déjà observés comme bloquants**, par PR (§6.1) — de ces douze objets, celui qui ne se déduit d'**aucun état courant de la PR** : la monotonie du caractère bloquant porte sur l'historique des éditions d'un commentaire, que les permissions énumérées plus bas ne couvrent pas et que les API ne rendent pas. Sans cette persistance, `CA-36` est intestable et la règle du §6.1 inapplicable ;
 - la **date de bascule `activatedAt`** par dépôt, uniquement lorsqu'elle n'est pas portée par le fichier de configuration — le point d'entrée d'administration du §6.2.4 la pose alors, en même temps qu'il restitue le rapport à blanc qui a servi à la calibrer. Elle est dans ce cas **republiée dans `PublishedSummary`** (§9.2.1), faute de quoi l'extension ne pourrait pas calculer le périmètre que le §6.2.3 lui demande d'appliquer. Tant qu'aucun statut n'est publié sur un tel dépôt, l'extension ne sait pas trancher `inScope` : elle traite la PR comme **hors périmètre**, ce qui relève de la condition 2 du §5.4 et n'ajoute aucune condition nouvelle ;
-- le **fait qu'un dépôt ait déjà été évalué** — c'est-à-dire qu'un statut y a été publié au moins une fois —, avec la date de cette dernière publication. Sans lui, la distinction du §8.1.5 entre un dépôt jamais activé et un fichier de configuration disparu est indécidable. Sur un dépôt **jamais évalué et sans fichier de configuration**, la porte 13.a arrête le cycle avant toute publication : aucun check n'apparaît sur un dépôt qui n'a rien demandé. Le mode, lui, est jugé à la porte 13.c et non plus tôt — il n'est connu qu'à l'étape 7, et les deux exceptions du §8.1.5 doivent pouvoir le franchir ;
+- le **fait qu'un dépôt ait déjà été évalué** — c'est-à-dire qu'un statut y a été publié au moins une fois —, avec la date de cette dernière publication. Sans lui, la distinction du §8.1.5 entre un dépôt jamais activé et un fichier de configuration disparu est indécidable. Sur un dépôt **jamais évalué et sans fichier de configuration**, l'étape 8 arrête le cycle : aucun check n'apparaît sur un dépôt qui n'a rien demandé, et aucun état n'est écrit pour une PR d'un dépôt qui n'est pas activé — épingler une configuration issue d'un fichier absent n'aurait aucun sens.
+
+  **Ce drapeau se pose après la publication, jamais avant.** Il dit qu'un statut a été publié au moins une fois ; le poser à l'étape 13, avec l'état de calcul, le rendrait vrai avant même que l'étape 8 ne teste s'il est faux — l'opt-in par dépôt de `CA-29` s'annulerait de lui-même dès la première évaluation. C'est pourquoi l'étape 13 persiste l'**état de calcul** et l'étape 16 le **fait d'avoir publié**, et pourquoi les deux ne peuvent pas être fusionnées. Le mode, lui, est jugé à la porte 14.b et non plus tôt — il n'est connu qu'à l'étape 7, et les deux exceptions du §8.1.5 doivent pouvoir le franchir ;
 - les **compteurs** du §12 ;
 - les **numéros de séquence** d'évaluation, garde contre le désordre des événements.
 
@@ -1461,7 +1465,9 @@ interface ServerPlatformAdapter {
   fetchOrgConfig(url: string | null,
                  opts?: { bypassCache: boolean }): Promise<ConfigRead>;  // §8.1.2 niveau 2 ; `bypassCache`
                                                              // est ce que la règle 3 du §8.1.3 exige
-  fetchLabels(pr: PrRef): Promise<{ name: string; by: UserInfo; at: string }[]>;  // §6.3.2 — « par qui et quand »
+  fetchLabels(pr: PrRef): Promise<{ name: string; by?: UserInfo; at?: string }[]>;  // §6.3.2 — `by` et `at`
+                                       // sont absents là où la plateforme n'expose pas la provenance
+                                       // d'une étiquette ; voir §6.3.2 et les annexes
   fetchHeadSha(pr: PrRef): Promise<string>;          // §6.4 — relu juste avant publication
   isDraft(pr: PrRef): Promise<boolean>;              // §6.2.4
   publishStatus(pr: PrRef, result: ComplianceResult): Promise<void>;  // §6.3.1 — format. Appelée seulement
@@ -1627,11 +1633,16 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 | **P5** | Composant serveur + status checks | P1 |
 | **P6** | Mode `enforce` sur dépôt pilote, puis généralisation | P4, P5 |
 
-**Trois prérequis au passage en `enforce`**, dispersés dans le corps du document et rassemblés ici parce qu'ils conditionnent `P6` :
+**Les prérequis au passage en `enforce`**, dispersés dans le corps du document et rassemblés ici parce qu'ils conditionnent `P6`. Les trois premiers valent partout :
 
 1. **`resolverOverrideGroup` est désigné** (§8.2). Sans groupe habilité, les deux soupapes du §6.3 sont inertes en même temps — ni `decision`, ni exemption de PR — et un fil dont l'auteur est indisponible bloque la PR sans recours.
 2. **La procédure de retour arrière est écrite et son exécutant désigné** (§6.3.3), y compris l'ordre des opérations.
 3. **Le check est déclaré obligatoire, et l'option interdisant le contournement des règles est activée** (§6.2.2, annexes) — sans quoi O3 n'est pas satisfait pour les administrateurs.
+
+Sur **Azure DevOps**, deux prérequis s'ajoutent, tous deux tranchés par le spike `P1'` :
+
+4. **La provenance des étiquettes est établie, ou le repli du §6.3.2 est en place** (§B.6) — sans l'un ou l'autre, l'exemption de PR n'a pas de chemin vérifiable, et c'est une des deux soupapes du §6.3.
+5. **La latence de détection respecte la NFR de 60 s** (§B.7) — voie événementielle établie, ou `server.reconcileIntervalSeconds` ≤ 60.
 
 `P4` ne dépend pas de `P3` : la trajectoire du §7 fait de `assist → warn` la première étape d'adoption, et attendre la seconde plateforme pour l'entamer sur la première n'aurait pas de sens. `P3` élargit le périmètre de `P4`, il ne le conditionne pas.
 
@@ -1698,13 +1709,16 @@ GitHub autorise nativement l'auteur de la PR à résoudre les conversations — 
 
 - Soumission d'une revue en lot (plusieurs commentaires *pending* validés en une action) — chacun doit être conforme, l'erreur doit indiquer lequel. C'est la plateforme qui porte le concept de corps de revue global, d'où `scope.validateReviewSummary` (§8.2) ; il est sans objet sur Azure DevOps.
 - Un commentaire commençant par une commande slash reconnue par une GitHub App/Action installée est exempté (§4.2) — par exemple `/rebase`, ou les *comment triggers* d'Azure Pipelines tels que `/azp run`, qui sont une fonctionnalité **GitHub uniquement** et n'existent pas sur Azure Repos.
+- **Provenance d'une étiquette** (§6.3.2) : exposée. L'API de timeline d'une *issue* rend les événements `labeled` avec leur acteur et leur horodatage, ce qui permet de vérifier l'habilitation du poseur et de journaliser l'exemption. Le mécanisme d'exemption par étiquette s'applique donc ici tel qu'il est décrit.
 - **`resolverOverrideGroup`** : un slug d'équipe de l'organisation, sous la forme `org/team-slug`. L'adaptateur serveur le résout via l'API des équipes ; l'appartenance est transitive pour les équipes imbriquées.
 - **Bloc de suggestion** (§4.2, étage 0 du §3.5.1) : un bloc de code délimité dont l'*info string* est `suggestion` — ` ```suggestion ` —, inséré par le bouton dédié de l'éditeur de commentaire de diff. C'est ce marqueur, et lui seul, qui déclenche le label implicite.
 - **Comptes de service.** `dependabot[bot]`, `github-actions[bot]` et `azure-pipelines[bot]` — cette dernière identité étant le login de l'application GitHub d'Azure Pipelines, et non un compte Azure DevOps — figurent typiquement dans `exemptUsers` (§8.2).
 
 ### A.8 Mise en œuvre serveur (composant B)
 
-- GitHub App ou Action, abonnée aux événements `pull_request`, `pull_request_review`, `pull_request_review_comment`, `issue_comment`, `pull_request_review_thread`.
+- **GitHub App** — mise en œuvre nominale —, abonnée aux événements `pull_request`, `pull_request_review`, `pull_request_review_comment`, `issue_comment`, `pull_request_review_thread`. Ce dernier est disponible comme webhook de dépôt, d'organisation et d'App, et lui seul notifie la résolution d'un fil.
+
+  Une **GitHub Action ne peut pas s'y substituer sans perte** : `pull_request_review_thread` ne figure pas parmi les événements déclencheurs de workflows, qui n'offrent que `pull_request`, `pull_request_review`, `pull_request_review_comment` et `pull_request_target`. Une mise en œuvre par Action ne verrait donc les résolutions de fil qu'à la réconciliation périodique (§6.4), avec le délai correspondant — c'est un choix possible, mais il faut l'assumer et régler `server.reconcileIntervalSeconds` en conséquence.
 - Publie un *commit status* / *check run* nommé `conventional-comments`, calculé selon les deux critères du §6.2, en s'appuyant sur GraphQL pour l'état des fils (§A.6).
 - **Restitution lisible par l'extension** (§6.3.1) : la ligne `cc/1` est publiée dans le **titre** du *check run*, que GitHub rend sur la page de la PR. Le **corps** Markdown, lui, porte la sortie humaine du §6.3.1 — fils, auteurs, liens permanents — et n'a pas à être reparsé : l'extension tient ses ancres du DOM de la page.
 - **Où va quoi.** La ligne machine `cc/1` (§6.3.1) occupe l'`output.title` du *check run* — c'est ce que GitHub rend sur la page de la PR, donc le seul emplacement que `readPublishedResult()` puisse lire. Le **résumé humain** (`ComplianceResult.headline`) ouvre le corps Markdown, suivi du détail par fil et par diagnostic. Les deux ne se disputent pas le même champ.
@@ -1765,6 +1779,8 @@ S'il s'avère que la plateforme ne l'expose pas, le cas prévu au §6.1 pour les
 - Boutons « Comment » **et** « Comment & resolve » — les deux doivent passer par la validation.
 - **Pas d'équivalent de revue soumise en lot** : Azure DevOps ne propose pas de corps de revue global comparable à celui de GitHub. La clé `scope.validateReviewSummary` (§8.2) est donc **sans objet** sur cette plateforme et y est ignorée.
 - **Pas de commande slash native.** Les *comment triggers* du type `/azp run` sont une fonctionnalité d'Azure Pipelines réservée aux dépôts **GitHub** ; Azure Repos passe par les policies de branche. L'exemption de commande slash du §4.2 n'a donc pas d'illustration native ici — elle reste disponible pour les commandes d'outils tiers éventuellement installés.
+- **Provenance d'une étiquette : non exposée par l'API documentée.** `GET …/pullRequests/{id}/labels` rend des `WebApiTagDefinition`, dont les seuls champs sont `active`, `id`, `name` et `url` — ni l'auteur de la pose, ni sa date. Le modèle de PR expose les étiquettes sous la même forme. **En l'état, le contrat `fetchLabels()` n'est donc pas implémentable ici**, et le repli du §6.3.2 s'applique : l'étiquette seule n'accorde aucune exemption, qui passe par le point d'entrée d'administration du §6.2.4.
+  Le spike `P1'` (§14) tranche : soit il établit une source fiable de provenance — journal d'audit de l'organisation, ou tout autre point d'API non identifié ici —, soit le repli devient définitif sur cette plateforme. **`P5` ne démarre pas côté Azure DevOps sans cette réponse** : c'est le mécanisme d'urgence du §6.3 qui en dépend.
 - **`resolverOverrideGroup`** : le nom d'un groupe de sécurité Azure DevOps, à l'échelle de l'organisation ou du projet, sous la forme `[Scope]\Nom du groupe`. L'appartenance est transitive pour les groupes imbriqués.
 - **Bloc de suggestion** (§4.2, étage 0 du §3.5.1) : Azure DevOps offre la même fonctionnalité — icône d'ampoule sous la zone de commentaire d'une ligne de diff, bouton *Apply changes* côté auteur — et la rend elle aussi sous forme de **bloc de code délimité**. L'*info string* exact n'est pas documenté et reste **à établir par le spike `P1'`** (§14), qui ouvre déjà cet éditeur (§B.2) : c'est une lecture, pas un développement. Tant qu'il ne l'est pas, l'adaptateur Azure DevOps ne reconnaît aucun bloc de suggestion et ces commentaires relèvent du cas général — un `suggestion:` explicite y reste toujours accepté.
 - **Comptes de service.** Les commentaires de pipeline sont postés par `Project Collection Build Service ({Org})` ou `{Project} Build Service ({Org})` selon la configuration — ce sont ces identités qui figurent dans `exemptUsers` (§8.2). L'identité `azure-pipelines[bot]` n'existe **pas** sur Azure DevOps : c'est le login de l'application GitHub du même produit, et elle relève de l'annexe A.
@@ -1774,7 +1790,9 @@ S'il s'avère que la plateforme ne l'expose pas, le cas prévu au §6.1 pour les
 
 - Service Hook sur `Pull request created`, `Pull request updated`, `Pull request commented on` → déclenche une Azure Function.
 - **Résolutions de fil et étiquettes.** Aucun de ces trois hooks ne notifie un changement de statut de fil ni la pose d'une étiquette. Aucune dérivation n'est nécessaire pour autant : `Pull request updated` **déclenche une réévaluation complète**, et l'étape 6 du §6.4 relit de toute façon l'état courant plutôt que le contenu de l'événement. Les valeurs `thread.resolved`, `label.added` et leurs symétriques (§9.2.1) restent donc sans producteur sur cette plateforme, ce qui est sans conséquence : elles ne sont consommées par rien.
-- **Réserve de latence.** Un changement de statut de fil qui ne s'accompagne d'aucune mise à jour de PR n'est vu qu'à la réconciliation périodique, dont l'intervalle par défaut — 900 s — **excède la NFR de 60 s du §10**. Sur cette plateforme, `server.reconcileIntervalSeconds` doit être abaissé en conséquence.
+- **Réserve de latence, opposable.** Un changement de statut de fil qui ne s'accompagne d'aucune mise à jour de PR n'est vu qu'à la réconciliation périodique, dont l'intervalle par défaut — 900 s — **excède la NFR de 60 s du §10**. Laissée à l'état de remarque, cette observation ferait qu'une configuration par défaut du produit contreviendrait à sa propre exigence non fonctionnelle.
+
+La règle est donc : **sur Azure DevOps, le mode `enforce` exige que `server.reconcileIntervalSeconds` soit ≤ 60**, à moins que le spike `P1'` n'établisse qu'un changement de statut de fil émet bien un `Pull request updated` — auquel cas la voie événementielle porte la latence et l'intervalle par défaut suffit. Le composant B émet un `config-warning` (§9.2.1) à chaque évaluation d'un dépôt Azure DevOps en `enforce` dont l'intervalle dépasse 60 s sans que cette voie soit établie. Le coût en appels d'API d'une réconciliation à 60 s est réel, et c'est précisément ce que le spike permet d'éviter.
 - **`targetUrl` obligatoire** (§6.3.1) : le statut ne portant pas de corps, c'est elle qui donne accès à la sortie complète. Elle pointe vers une page servie par le composant B.
 - La fonction publie un **PR Status** via
   `POST https://dev.azure.com/{organization}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses?api-version=7.1`

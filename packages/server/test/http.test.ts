@@ -153,11 +153,24 @@ describe('couche HTTP — page de statut (targetUrl, §6.3.1)', () => {
       threadIds: ['t1'],
       commentIds: [],
       at: '2026-10-05T00:00:00Z',
+      machineLine: 'cc/1 state=failure draft=0 exempt=0 mode=enforce activated=- core=1.0.0 cfg=aaaa1111 t=1 c=0 w=0',
+      headline: '1 fil bloquant non résolu.',
+      humanOutput: '# Sortie complète\n- [issue: x](https://example.test/c1) — @alice',
     });
+    // L'alias chemin → clé est écrit par l'orchestrateur à la publication ; l'URL de la
+    // page ne porte pas l'hôte (§6.3.1).
+    await storage.setPrPathAlias('github/acme/demo#42', 'github:github.com:acme/demo#42');
     const res = await fetch(`${base}/status/pr/github/acme/demo/42`);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { lastPublished: { state: string } };
+    const body = (await res.json()) as {
+      lastPublished: { state: string };
+      machineLine: string;
+      humanOutput: string;
+    };
     expect(body.lastPublished.state).toBe('failure');
+    // « La même sortie » que le §6.3.1 : ligne machine et sortie humaine complète (CA-25).
+    expect(body.machineLine).toContain('cc/1 ');
+    expect(body.humanOutput).toContain('https://example.test/c1');
   });
 
   it('PR sans résultat publié → 404', async () => {

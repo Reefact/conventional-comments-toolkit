@@ -15,7 +15,7 @@ import { defaultConfig } from '../src/config/defaults.js';
 export const githubProfile: PlatformProfile = {
   id: 'github',
   suggestionInfoString: 'suggestion',
-  slashPrefixes: ['/azp'],
+  slashPrefixes: ['/azp', '/rebase'],
 };
 
 export const azdoProfile: PlatformProfile = {

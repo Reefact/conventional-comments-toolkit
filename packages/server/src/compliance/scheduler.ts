@@ -89,7 +89,8 @@ export class EvaluationScheduler {
  * les événements perdus, et repli de toute détection qu'une plateforme n'assure pas par
  * événement (§B.7). */
 export class Reconciler {
-  #timer: ReturnType<typeof setInterval> | null = null;
+  #timer: ReturnType<typeof setTimeout> | null = null;
+  #stopped = false;
 
   constructor(
     private readonly repos: { platform: string; host: string; scope: string[] }[],
@@ -112,19 +113,35 @@ export class Reconciler {
 
   /** L'intervalle est le minimum des `server.reconcileIntervalSeconds` connus — c'est le
    * délai maximal de détection de tout ce qu'une plateforme ne notifie pas par événement
-   * (§8.2, §B.7). */
+   * (§8.2, §B.7). Il est RELU à chaque tour : une organisation qui le resserre (par
+   * exemple pour satisfaire la NFR de 60 s en `enforce` sur Azure DevOps) ne doit pas
+   * attendre un redémarrage du service. */
   async start(): Promise<void> {
+    this.#stopped = false;
+    const tick = async (): Promise<void> => {
+      if (this.#stopped) return;
+      await this.runOnce();
+      let interval = 900;
+      for (const repo of this.repos) {
+        const cfg = await this.storage.getLastEffectiveConfig(repoKey(repo));
+        if (cfg) interval = Math.min(interval, cfg.server.reconcileIntervalSeconds);
+      }
+      if (this.#stopped) return;
+      this.#timer = setTimeout(() => void tick(), interval * 1000);
+      if (typeof this.#timer === 'object' && 'unref' in this.#timer) this.#timer.unref();
+    };
     let interval = 900;
     for (const repo of this.repos) {
       const cfg = await this.storage.getLastEffectiveConfig(repoKey(repo));
       if (cfg) interval = Math.min(interval, cfg.server.reconcileIntervalSeconds);
     }
-    this.#timer = setInterval(() => void this.runOnce(), interval * 1000);
+    this.#timer = setTimeout(() => void tick(), interval * 1000);
     if (typeof this.#timer === 'object' && 'unref' in this.#timer) this.#timer.unref();
   }
 
   stop(): void {
-    if (this.#timer) clearInterval(this.#timer);
+    this.#stopped = true;
+    if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
   }
 }

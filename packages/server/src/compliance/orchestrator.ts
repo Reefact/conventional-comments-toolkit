@@ -4,6 +4,7 @@
 
 import {
   analyze,
+  encodeSummary,
   evaluate,
   resolveConfig,
   SUPPORTED_FLOOR_VERSION,
@@ -22,7 +23,9 @@ import {
 import type { ServerPlatformAdapter, PlatformOperationalFacts } from './adapter.js';
 import type { Storage, PublishedRecord, IndicatorSample } from './storage.js';
 import { ConfigCache } from './cache.js';
-import { prKey, repoKey } from './keys.js';
+import { MembershipUnreachableError, resolveOverrideMembership } from './membership.js';
+import { renderHumanOutput } from './render.js';
+import { prKey, prPathAlias, repoKey } from './keys.js';
 
 export interface OrchestratorDeps {
   adapter: ServerPlatformAdapter;
@@ -111,37 +114,7 @@ export class Orchestrator {
     }
     // ————— Étape 6 : incapacité à évaluer, délai de grâce (§6.4, §8.1.5) —————
     if (current === null || repoRead.status === 'unreachable' || orgRead.status === 'unreachable') {
-      let degradedSince = await storage.getDegradedSince(rKey);
-      if (degradedSince === null) {
-        degradedSince = now().toISOString();
-        await storage.setDegradedSince(rKey, degradedSince);
-      }
-      const graceSeconds = lastCfg?.server.gracePeriodSeconds ?? 900;
-      const elapsed = now().getTime() - Date.parse(degradedSince);
-      if (elapsed <= graceSeconds * 1000) {
-        return { result: null, published: false, skipped: 'grace' }; // abandon sans rien publier
-      }
-      if (!previouslyEvaluated) {
-        // §8.1.5 : une panne d'API ne fait pas apparaître un check sur un dépôt non activé.
-        return { result: null, published: false, skipped: 'grace' };
-      }
-      // Au-delà : listes vides + dernière configuration connue (à défaut, les défauts
-      // dans les bornes du plancher) + forceState neutre (§6.4).
-      const config =
-        lastCfg ??
-        resolveConfig(floor, { status: 'absent' }, { status: 'absent' }, null, previouslyEvaluated)
-          .config;
-      const result = evaluate({
-        pr,
-        platform: adapter.platformProfile(),
-        threads: [],
-        loose: [],
-        config,
-        configNotices: floorNotices,
-        forceState: { state: 'neutral', because: 'grace-expired' },
-        ctx: await this.buildContext(pKey, rKey, config, null, false, () => false),
-      });
-      return this.publishGates(pr, pKey, rKey, sequence, result, config, previouslyEvaluated);
+      return this.unableToEvaluate(pr, pKey, rKey, sequence, lastCfg, floor, floorNotices, previouslyEvaluated);
     }
     await storage.clearDegradedSince(rKey);
 
@@ -154,28 +127,38 @@ export class Orchestrator {
       return { result: null, published: false, skipped: 'not-activated' };
     }
 
-    // ————— Étapes 9 à 11 —————
-    let evaluation = await this.runEvaluation(pr, pKey, rKey, resolved, floorNotices, current, previouslyEvaluated);
+    // ————— Étapes 9 à 12 —————
+    let result: ComplianceResult;
+    try {
+      let evaluation = await this.runEvaluation(pr, pKey, rKey, resolved, floorNotices, current, previouslyEvaluated);
 
-    // ————— Étape 12 : seconde passe sans cache avant un rejet dépendant de la
-    // configuration (§8.1.3, règle 3) — seul ce second verdict compte —————
-    const needsRefresh = evaluation.result.formatDiagnostics.some(
-      (d) => d.code === 'E-UNKNOWN-LABEL' || d.code === 'E-UNKNOWN-DECORATION'
-    );
-    if (needsRefresh && !evaluation.forced) {
-      repoRead = await cache.read(`repo:${rKey}`, ttl, true, () =>
-        adapter.fetchConfigFile(pr, { bypassCache: true })
+      // Étape 12 : seconde passe sans cache avant un rejet dépendant de la configuration
+      // (§8.1.3, règle 3) — seul ce second verdict compte.
+      const needsRefresh = evaluation.result.formatDiagnostics.some(
+        (d) => d.code === 'E-UNKNOWN-LABEL' || d.code === 'E-UNKNOWN-DECORATION'
       );
-      orgRead =
-        configUrl === null
-          ? { status: 'absent' }
-          : await cache.read(`org:${configUrl}`, ttl, true, () =>
-              adapter.fetchOrgConfig(configUrl, { bypassCache: true })
-            );
-      resolved = resolveConfig(floor, orgRead, repoRead, pinned, previouslyEvaluated);
-      evaluation = await this.runEvaluation(pr, pKey, rKey, resolved, floorNotices, current, previouslyEvaluated);
+      if (needsRefresh) {
+        repoRead = await cache.read(`repo:${rKey}`, ttl, true, () =>
+          adapter.fetchConfigFile(pr, { bypassCache: true })
+        );
+        orgRead =
+          configUrl === null
+            ? { status: 'absent' }
+            : await cache.read(`org:${configUrl}`, ttl, true, () =>
+                adapter.fetchOrgConfig(configUrl, { bypassCache: true })
+              );
+        resolved = resolveConfig(floor, orgRead, repoRead, pinned, previouslyEvaluated);
+        evaluation = await this.runEvaluation(pr, pKey, rKey, resolved, floorNotices, current, previouslyEvaluated);
+      }
+      result = evaluation.result;
+    } catch (e) {
+      if (e instanceof MembershipUnreachableError) {
+        // Une lecture d'appartenance qui échoue est une incapacité à évaluer (§6.4) —
+        // jamais un « non habilité », qui refuserait une résolution sur une panne d'API.
+        return this.unableToEvaluate(pr, pKey, rKey, sequence, lastCfg, floor, floorNotices, previouslyEvaluated);
+      }
+      throw e;
     }
-    const result = evaluation.result;
 
     // ————— Étape 13 : persister l'état de calcul —————
     if (pinned === null) await storage.setPinnedConfig(pKey, resolved.config); // épinglé une fois
@@ -192,6 +175,51 @@ export class Orchestrator {
 
     // ————— Étapes 14 à 16 —————
     return this.publishGates(pr, pKey, rKey, sequence, result, resolved.config, previouslyEvaluated, current);
+  }
+
+  /** Étape 6 du §6.4 : armer `degradedSince`, abandonner pendant le délai de grâce, puis
+   * — sur un dépôt déjà évalué seulement — listes vides + dernière configuration connue
+   * + verdict neutre imposé. */
+  private async unableToEvaluate(
+    pr: PrRef,
+    pKey: string,
+    rKey: string,
+    sequence: number,
+    lastCfg: EffectiveConfig | null,
+    floor: Floor | null,
+    floorNotices: Notice[],
+    previouslyEvaluated: boolean
+  ): Promise<EvaluationOutcome> {
+    const { adapter, storage, now } = this.deps;
+    let degradedSince = await storage.getDegradedSince(rKey);
+    if (degradedSince === null) {
+      degradedSince = now().toISOString();
+      await storage.setDegradedSince(rKey, degradedSince);
+    }
+    const graceSeconds = lastCfg?.server.gracePeriodSeconds ?? 900;
+    const elapsed = now().getTime() - Date.parse(degradedSince);
+    if (elapsed <= graceSeconds * 1000) {
+      return { result: null, published: false, skipped: 'grace' }; // abandon sans rien publier
+    }
+    if (!previouslyEvaluated) {
+      // §8.1.5 : une panne d'API ne fait pas apparaître un check sur un dépôt non activé.
+      return { result: null, published: false, skipped: 'grace' };
+    }
+    const config =
+      lastCfg ??
+      resolveConfig(floor, { status: 'absent' }, { status: 'absent' }, null, previouslyEvaluated)
+        .config;
+    const result = evaluate({
+      pr,
+      platform: adapter.platformProfile(),
+      threads: [],
+      loose: [],
+      config,
+      configNotices: floorNotices,
+      forceState: { state: 'neutral', because: 'grace-expired' },
+      ctx: await this.buildContext(pKey, rKey, config, null, false, () => false),
+    });
+    return this.publishGates(pr, pKey, rKey, sequence, result, config, previouslyEvaluated);
   }
 
   /** Étapes 9 à 11 : armer forceState depuis les notices de résolution, pré-résoudre les
@@ -279,7 +307,13 @@ export class Orchestrator {
 
     // ————— Étape 10 : pré-résoudre isInGroup pour tout auteur de la PR, et pour
     // l'auteur de l'exemption active (§9.2.2) —————
-    const isOverrideMember = await this.resolveMemberships(config, current, exemption?.by);
+    const isOverrideMember = await resolveOverrideMembership(
+      this.deps.adapter,
+      config,
+      current.threads,
+      current.loose,
+      [exemption?.by]
+    );
 
     const ctx = await this.buildContext(pKey, rKey, config, exemption ?? null, current.isDraft, isOverrideMember, activatedAt);
 
@@ -320,46 +354,6 @@ export class Orchestrator {
     };
   }
 
-  /** Habilitation effective : membre de chacun des groupes cités (§8.1.1) ; liste vide →
-   * personne (§8.2). Résolue en amont, la décision reste dans core/. */
-  private async resolveMemberships(
-    config: EffectiveConfig,
-    current: CurrentState,
-    exemptionBy?: UserInfo
-  ): Promise<(u: UserInfo) => boolean> {
-    const groups = config.resolverOverrideGroup;
-    const memberById = new Map<string, boolean>();
-    if (groups.length === 0) return () => false;
-
-    const users = new Map<string, UserInfo>();
-    const add = (u?: UserInfo) => {
-      if (u) users.set(u.id, u);
-    };
-    for (const t of current.threads) {
-      add(t.root.author);
-      add(t.root.lastEditedBy);
-      add(t.resolvedBy);
-      for (const r of t.replies) {
-        add(r.author);
-        add(r.lastEditedBy);
-      }
-    }
-    for (const { comment } of current.loose) add(comment.author);
-    add(exemptionBy); // sur le chemin de repli, il peut n'apparaître nulle part sur la PR
-
-    for (const user of users.values()) {
-      let member = true;
-      for (const group of groups) {
-        if (!(await this.deps.adapter.isInGroup(user, group).catch(() => false))) {
-          member = false;
-          break;
-        }
-      }
-      memberById.set(user.id, member);
-    }
-    return (u: UserInfo) => memberById.get(u.id) ?? false;
-  }
-
   /** Étapes 14 à 16 : quatre portes, publication, persistance du publié, actions. */
   private async publishGates(
     pr: PrRef,
@@ -391,8 +385,14 @@ export class Orchestrator {
       return { result, published: false, skipped: 'mode' };
     }
 
-    // 14.c — relire le SHA de tête juste avant la publication (§6.4).
-    result.headSha = await adapter.fetchHeadSha(pr).catch(() => undefined as unknown as string);
+    // 14.c — relire le SHA de tête juste avant la publication (§6.4). Un échec de cette
+    // relecture est une incapacité : abandon, le statut précédent reste en place — un
+    // statut publié sur un SHA inconnu ou obsolète laisserait la PR bloquée.
+    try {
+      result.headSha = await adapter.fetchHeadSha(pr);
+    } catch {
+      return { result, published: false, skipped: 'grace' };
+    }
 
     // 14.d — résultat identique au dernier publié, SHA compris : ne pas republier ;
     // les actions restent exécutées, elles sont idempotentes (§9.2.4).
@@ -406,6 +406,7 @@ export class Orchestrator {
     // 15 — publication ; 16 — persistance du publié PUIS actions, dans cet ordre (§6.4).
     await adapter.publishStatus(pr, result);
     await storage.setLastPublished(pKey, record);
+    await storage.setPrPathAlias(prPathAlias(pr), pKey);
     await storage.setLastPublishedSequence(pKey, sequence);
     await storage.markRepoEvaluated(rKey, record.at); // après la publication, jamais avant
     await this.executeActions(pr, pKey, result);
@@ -516,6 +517,11 @@ function toPublishedRecord(result: ComplianceResult, at: string): PublishedRecor
     threadIds: result.unresolvedBlockingThreads.map((t) => t.id).sort(),
     commentIds: [...new Set(result.formatDiagnostics.map((d) => d.comment.id))].sort(),
     at,
+    // La page derrière la targetUrl porte « la même sortie » que le §6.3.1 — la ligne
+    // machine et la sortie humaine complète, pas un condensé (§6.3.1).
+    machineLine: encodeSummary(result),
+    headline: result.headline,
+    humanOutput: renderHumanOutput(result),
   };
 }
 

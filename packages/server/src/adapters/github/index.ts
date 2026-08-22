@@ -16,6 +16,7 @@ import {
   type Zone,
 } from '@cct/core';
 import type { ServerPlatformAdapter, PlatformOperationalFacts } from '../../compliance/adapter.js';
+import { renderHumanOutput } from '../../compliance/render.js';
 
 /** Faits d'exploitation GitHub : `pull_request_review_thread` notifie les résolutions
  * (§A.8) et la provenance des étiquettes est exposée par la timeline (§A.7). */
@@ -60,7 +61,7 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
   platformProfile(): PlatformProfile {
     // Même profil que côté client, même source (§9.2.4) : bloc de suggestion identifié
     // par l'info string `suggestion` (§A.7).
-    return { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: ['/azp'] };
+    return { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: ['/azp', '/rebase'] };
   }
 
   matchesWebhook(payload: unknown): boolean {
@@ -92,7 +93,10 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
       thread?: unknown;
       label?: unknown;
     };
-    const prData = p.pull_request ?? p.issue;
+    // Un `issue_comment` sur une issue simple ne référence aucune PR : le champ
+    // `issue.pull_request` n'existe que sur les issues qui SONT des PR.
+    const issueIsPr = p.issue !== undefined && p.issue.pull_request !== undefined;
+    const prData = p.pull_request ?? (issueIsPr ? p.issue : undefined);
     if (!prData) throw new Error('payload does not reference a pull request');
     const host = new URL(this.#opts.apiBase).hostname.replace(/^api\./, '');
     const pr: PrRef = {
@@ -118,8 +122,8 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
 
   async listOpenPrs(repo: { host: string; scope: string[] }): Promise<PrRef[]> {
     const [owner, name] = repo.scope;
-    const prs = await this.#rest<{ number: number; created_at: string }[]>(
-      `/repos/${owner}/${name}/pulls?state=open&per_page=100`
+    const prs = await this.#restPaged<{ number: number; created_at: string }>(
+      `/repos/${owner}/${name}/pulls?state=open`
     );
     return prs.map((p) => ({
       platform: 'github',
@@ -143,6 +147,7 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
                 isResolved
                 resolvedBy { login }
                 comments(first: 100) {
+                  pageInfo { hasNextPage endCursor }
                   nodes {
                     id
                     body
@@ -169,7 +174,34 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
       });
       const connection = data.repository.pullRequest.reviewThreads;
       for (const node of connection.nodes) {
-        const comments = node.comments.nodes;
+        const comments = [...node.comments.nodes];
+        // Réponses au-delà de 100 : pagination par fil (§6.4, budget d'appels).
+        let commentCursor = node.comments.pageInfo?.hasNextPage ? node.comments.pageInfo.endCursor : null;
+        while (commentCursor) {
+          const more: GraphQlThreadComments = await this.#graphql(
+            `query($id: ID!, $cursor: String) {
+              node(id: $id) {
+                ... on PullRequestReviewThread {
+                  comments(first: 100, after: $cursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      id
+                      body
+                      createdAt
+                      lastEditedAt
+                      url
+                      author { login __typename }
+                      editor { login __typename }
+                    }
+                  }
+                }
+              }
+            }`,
+            { id: node.id, cursor: commentCursor }
+          );
+          comments.push(...more.node.comments.nodes);
+          commentCursor = more.node.comments.pageInfo.hasNextPage ? more.node.comments.pageInfo.endCursor : null;
+        }
         if (comments.length === 0) continue;
         const [rootRaw, ...replyRaws] = comments;
         const root = this.#toComment(rootRaw!);
@@ -197,8 +229,8 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
     const out: { comment: CommentInfo; zone: Zone }[] = [];
     // Zone `conversation` : commentaires généraux de la PR (issue comments) — aucun état
     // de résolution sur GitHub (§4.1).
-    const issueComments = await this.#rest<RestIssueComment[]>(
-      `/repos/${owner}/${name}/issues/${pr.number}/comments?per_page=100`
+    const issueComments = await this.#restPaged<RestIssueComment>(
+      `/repos/${owner}/${name}/issues/${pr.number}/comments`
     );
     for (const c of issueComments) {
       out.push({
@@ -216,8 +248,8 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
       });
     }
     // Zone `review-body` : corps des revues soumises en lot (§A.7).
-    const reviews = await this.#rest<RestReview[]>(
-      `/repos/${owner}/${name}/pulls/${pr.number}/reviews?per_page=100`
+    const reviews = await this.#restPaged<RestReview>(
+      `/repos/${owner}/${name}/pulls/${pr.number}/reviews`
     );
     for (const r of reviews) {
       out.push({
@@ -267,11 +299,13 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
    * acteur et leur horodatage. */
   async fetchLabels(pr: PrRef): Promise<{ name: string; by?: UserInfo; at?: string }[]> {
     const [owner, name] = pr.scope;
-    const current = await this.#rest<{ name: string }[]>(
-      `/repos/${owner}/${name}/issues/${pr.number}/labels?per_page=100`
+    const current = await this.#restPaged<{ name: string }>(
+      `/repos/${owner}/${name}/issues/${pr.number}/labels`
     );
-    const timeline = await this.#rest<TimelineEvent[]>(
-      `/repos/${owner}/${name}/issues/${pr.number}/timeline?per_page=100`
+    // Toute la timeline : la provenance d'une étiquette peut être loin dans l'historique
+    // d'une PR active (§A.7) — s'arrêter à la première page la perdrait.
+    const timeline = await this.#restPaged<TimelineEvent>(
+      `/repos/${owner}/${name}/issues/${pr.number}/timeline`
     );
     return current.map((label) => {
       const events = timeline.filter((e) => e.event === 'labeled' && e.label?.name === label.name);
@@ -386,6 +420,17 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
     return (await res.json()) as T;
   }
 
+  /** Pagination REST (§6.4, budget d'appels) : suit `page` tant que la page est pleine. */
+  async #restPaged<T>(path: string): Promise<T[]> {
+    const out: T[] = [];
+    const sep = path.includes('?') ? '&' : '?';
+    for (let page = 1; ; page++) {
+      const batch = await this.#rest<T[]>(`${path}${sep}per_page=100&page=${page}`);
+      out.push(...batch);
+      if (batch.length < 100) return out;
+    }
+  }
+
   async #raw(
     path: string,
     opts: { method?: string; body?: unknown; accept?: string } = {}
@@ -404,41 +449,7 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
   }
 }
 
-/** Sortie humaine du §6.3.1 : headline, fils bloquants non résolus, diagnostics avec
- * leur correction, faits signalés — chaque cause identifiable en un clic (CA-25). */
-export function renderHumanOutput(result: ComplianceResult): string {
-  const lines: string[] = [result.headline, ''];
-  if (result.unresolvedBlockingThreads.length > 0) {
-    lines.push('## Fils bloquants non résolus');
-    for (const t of result.unresolvedBlockingThreads) {
-      lines.push(`- [${firstLine(t.root.body)}](${t.root.permalink}) — @${t.root.author.login}`);
-    }
-    lines.push('');
-  }
-  if (result.formatDiagnostics.length > 0) {
-    lines.push('## Diagnostics de format');
-    for (const d of result.formatDiagnostics) {
-      const fix = d.fix ? ` — correction : \`${d.fix.replacement}\`` : '';
-      lines.push(`- [\`${d.code}\`](${d.comment.permalink}) (${d.severity}) ${d.message}${fix}`);
-    }
-    lines.push('');
-  }
-  if (result.notices.length > 0) {
-    lines.push('## Faits signalés');
-    for (const n of result.notices) {
-      const actor = n.actor ? ` — @${n.actor.login}` : '';
-      const at = n.at ? ` — ${n.at}` : '';
-      lines.push(`- \`${n.kind}\` ${n.message}${actor}${at}`);
-    }
-    lines.push('');
-  }
-  lines.push(`[Documentation de la convention](${result.docUrl})`);
-  return lines.join('\n');
-}
-
-function firstLine(body: string): string {
-  return body.split(/\r?\n/).find((l) => l.trim() !== '')?.slice(0, 80) ?? '(vide)';
-}
+export { renderHumanOutput } from '../../compliance/render.js';
 
 function mapEventKind(p: {
   action?: string;
@@ -468,6 +479,15 @@ interface GraphQlComment {
   editor: { login: string; __typename?: string } | null;
 }
 
+interface GraphQlThreadComments {
+  node: {
+    comments: {
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      nodes: GraphQlComment[];
+    };
+  };
+}
+
 interface GraphQlThreads {
   repository: {
     pullRequest: {
@@ -477,7 +497,10 @@ interface GraphQlThreads {
           id: string;
           isResolved: boolean;
           resolvedBy: { login: string } | null;
-          comments: { nodes: GraphQlComment[] };
+          comments: {
+            pageInfo?: { hasNextPage: boolean; endCursor: string | null };
+            nodes: GraphQlComment[];
+          };
         }[];
       };
     };

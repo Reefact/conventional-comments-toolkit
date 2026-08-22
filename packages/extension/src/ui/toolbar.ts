@@ -12,21 +12,8 @@ export interface ToolbarOptions {
   onFreeDecoration: (decoration: string) => void;
 }
 
-const EXAMPLES: Record<string, string> = {
-  praise: 'praise: gestion d’erreur très lisible',
-  nitpick: 'nitpick: virgule finale',
-  suggestion: 'suggestion (non-blocking): extraire une méthode',
-  issue: 'issue: fuite mémoire sur le handler',
-  todo: 'todo: renommer la variable',
-  question: 'question (non-blocking): pourquoi ce choix ?',
-  thought: 'thought: on pourrait factoriser plus tard',
-  chore: 'chore: relancer le job de couverture',
-  note: 'note: ce module part en refonte au Q3',
-  decision: 'decision: hors périmètre, dette suivie en PROJ-142',
-  typo: 'typo: « recieve » → « receive »',
-  polish: 'polish: aligner les imports',
-  quibble: 'quibble: nom un peu long',
-};
+// Les exemples d'infobulle sont localisés dans strings.ts (§5.1 : « dans la langue de
+// l'interface »).
 
 export function buildToolbar(opts: ToolbarOptions): HTMLElement {
   const doc = globalThis.document;
@@ -48,8 +35,11 @@ export function buildToolbar(opts: ToolbarOptions): HTMLElement {
     if (label.color) button.style.setProperty('--cct-label-color', label.color);
     // Infobulle : définition + exemple, dans la langue de l'interface (§5.1).
     const description = ui(opts.lang, `label.${label.id}`);
-    const example = EXAMPLES[label.id];
-    button.title = example ? `${description}\n${ui(opts.lang, 'label.example', { example })}` : description;
+    const example = ui(opts.lang, `example.${label.id}`);
+    button.title =
+      example !== `example.${label.id}`
+        ? `${description}\n${ui(opts.lang, 'label.example', { example })}`
+        : description;
     button.addEventListener('click', () => {
       const toggle = activeLabel === label.id;
       opts.onLabel(label.id, selectedDecorations, toggle);

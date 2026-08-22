@@ -35,6 +35,21 @@ const fr: Record<string, string> = {
   'label.polish': 'Amélioration de finition.',
   'label.quibble': 'Point de détail discutable.',
   'label.example': 'Exemple : « {example} »',
+  'example.praise': 'praise: gestion d’erreur très lisible',
+  'example.nitpick': 'nitpick: virgule finale',
+  'example.suggestion': 'suggestion (non-blocking): extraire une méthode',
+  'example.issue': 'issue: fuite mémoire sur le handler',
+  'example.todo': 'todo: renommer la variable',
+  'example.question': 'question (non-blocking): pourquoi ce choix ?',
+  'example.thought': 'thought: on pourrait factoriser plus tard',
+  'example.chore': 'chore: relancer le job de couverture',
+  'example.note': 'note: ce module part en refonte au T3',
+  'example.decision': 'decision: hors périmètre, dette suivie en PROJ-142',
+  'example.typo': 'typo: « recieve » → « receive »',
+  'example.polish': 'polish: aligner les imports',
+  'example.quibble': 'quibble: nom un peu long',
+  'banner.filter': 'Filtrer par label',
+  'banner.filter.all': 'tous',
 };
 
 const en: Record<string, string> = {
@@ -70,6 +85,21 @@ const en: Record<string, string> = {
   'label.polish': 'Finishing touch.',
   'label.quibble': 'Debatable detail.',
   'label.example': 'Example: "{example}"',
+  'example.praise': 'praise: very readable error handling',
+  'example.nitpick': 'nitpick: trailing comma',
+  'example.suggestion': 'suggestion (non-blocking): extract a method',
+  'example.issue': 'issue: memory leak in the handler',
+  'example.todo': 'todo: rename the variable',
+  'example.question': 'question (non-blocking): why this choice?',
+  'example.thought': 'thought: we could factor this out later',
+  'example.chore': 'chore: re-run the coverage job',
+  'example.note': 'note: this module is being reworked in Q3',
+  'example.decision': 'decision: out of scope, debt tracked in PROJ-142',
+  'example.typo': 'typo: "recieve" → "receive"',
+  'example.polish': 'polish: align the imports',
+  'example.quibble': 'quibble: slightly long name',
+  'banner.filter': 'Filter by label',
+  'banner.filter.all': 'all',
 };
 
 const catalogs: Record<string, Record<string, string>> = { fr, en };

@@ -58,6 +58,18 @@ export const selectors = {
     candidates: ['.repos-pr-header time', 'time[datetime]'],
   } satisfies SelectorChain,
 
+  /** Formulaire d'édition d'un commentaire existant — décide d'action: 'edit' (§4.3). */
+  editForm: {
+    name: 'edit-form',
+    candidates: ['.repos-discussion-comment--editing', '[class*="comment-edit"]'],
+  } satisfies SelectorChain,
+
+  /** Corps d'un commentaire rendu — badges du §5.5. */
+  commentBody: {
+    name: 'comment-body',
+    candidates: ['.markdown-content', '.comment-content'],
+  } satisfies SelectorChain,
+
   /** Description des PR Status rendus — c'est là que vit la ligne cc/1 (§B.7). */
   statusDescriptions: {
     name: 'status-descriptions',

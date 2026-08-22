@@ -45,29 +45,39 @@ export class ClientConfigResolver {
     const floor = await this.#floorProvider().catch(() => null);
     const configUrl = floor?.configUrl ?? null;
 
-    const repoRead = await this.#cached(`repo:${pr.host}/${pr.scope.join('/')}`, () =>
+    const repo = await this.#cached(`repo:${pr.host}/${pr.scope.join('/')}`, () =>
       adapter.getRepoConfig(pr)
     );
-    const orgRead =
+    const org =
       configUrl === null
-        ? ({ status: 'absent' } as ConfigRead)
+        ? { read: { status: 'absent' } as ConfigRead, degraded: false }
         : await this.#cached(`org:${configUrl}`, () => adapter.getOrgConfig(configUrl));
 
-    const { config, notices } = resolveConfig(floor, orgRead, repoRead, null, false);
+    const { config, notices } = resolveConfig(floor, org.read, repo.read, null, false);
     this.#lastTtl = config.configCacheTtlSeconds;
-    const degraded = repoRead.status === 'unreachable' || orgRead.status === 'unreachable';
+    // §5.4, condition 4 : une lecture qui a rendu `unreachable` met en état dégradé MÊME
+    // si une valeur en cache permet de continuer à assister — masquer la dégradation
+    // laisserait le blocage d'envoi armé sur des règles qu'on ne sait plus fraîches.
+    const degraded = repo.degraded || org.degraded;
     return { config, notices, fingerprint: fingerprint(config), degraded };
   }
 
-  async #cached(key: string, fetcher: () => Promise<ConfigRead>): Promise<ConfigRead> {
+  async #cached(
+    key: string,
+    fetcher: () => Promise<ConfigRead>
+  ): Promise<{ read: ConfigRead; degraded: boolean }> {
     const entry = this.#cache.get(key);
-    if (entry && this.#now() - entry.fetchedAt < this.#lastTtl * 1000) return entry.value;
+    if (entry && this.#now() - entry.fetchedAt < this.#lastTtl * 1000) {
+      return { read: entry.value, degraded: false };
+    }
     const value = await fetcher();
-    // Une lecture impossible n'est pas mise en cache : l'extension retentera, et
-    // l'assistance continue avec la configuration précédemment en cache (§9.2.3).
-    if (value.status !== 'unreachable') this.#cache.set(key, { value, fetchedAt: this.#now() });
-    else if (entry) return entry.value;
-    return value;
+    if (value.status !== 'unreachable') {
+      this.#cache.set(key, { value, fetchedAt: this.#now() });
+      return { read: value, degraded: false };
+    }
+    // Lecture impossible : l'assistance continue avec la dernière valeur connue (même
+    // expirée), mais l'état dégradé est signalé — jamais masqué (§5.4, §9.2.3).
+    return { read: entry ? entry.value : value, degraded: true };
   }
 
   invalidate(): void {

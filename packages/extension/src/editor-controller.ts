@@ -4,6 +4,7 @@
 
 import {
   analyze,
+  splitBody,
   type CommentAnalysis,
   type EffectiveConfig,
   type PrRef,
@@ -27,7 +28,22 @@ export interface ControllerDeps {
   published: PublishedSummary | null;
   lang: string;
   currentUserLogin: string;
+  /** Raccourcis directs (§5.2, ex. Alt+I → issue) — préférences locales de l'utilisateur
+   * (§8.2), clé « Alt+<lettre> » → id de label. */
+  directShortcuts?: Record<string, string>;
 }
+
+/** Table par défaut des raccourcis directs (§5.2) — surchargable par les préférences. */
+export const DEFAULT_DIRECT_SHORTCUTS: Record<string, string> = {
+  'Alt+I': 'issue',
+  'Alt+S': 'suggestion',
+  'Alt+N': 'nitpick',
+  'Alt+T': 'todo',
+  'Alt+Q': 'question',
+  'Alt+P': 'praise',
+  'Alt+C': 'chore',
+  'Alt+D': 'decision',
+};
 
 export class EditorController {
   readonly deps: ControllerDeps;
@@ -89,6 +105,17 @@ export class EditorController {
     }
     const onKeydown = (e: Event) => {
       const ke = e as KeyboardEvent;
+      // Raccourcis directs (§5.2) : Alt+<lettre> insère le label correspondant.
+      if (ke.altKey && !ke.ctrlKey && !ke.metaKey && ke.key.length === 1) {
+        const combo = `Alt+${ke.key.toUpperCase()}`;
+        const table = this.deps.directShortcuts ?? DEFAULT_DIRECT_SHORTCUTS;
+        const label = Object.hasOwn(table, combo) ? table[combo] : undefined;
+        if (label !== undefined && this.config.labels.some((l) => l.id === label && l.enabled)) {
+          ke.preventDefault();
+          this.insertPrefix(label, [], false);
+          return;
+        }
+      }
       if (ke.key === 'Enter' && (ke.ctrlKey || ke.metaKey)) {
         if (this.#shouldBlockNow()) {
           ke.preventDefault();
@@ -176,23 +203,15 @@ export class EditorController {
     this.refresh();
   }
 
-  /** §5.3 — correction en un clic : la ligne de préfixe entièrement réécrite (§9.2.1). */
+  /** §5.3 — correction en un clic : la ligne de préfixe entièrement réécrite (§9.2.1).
+   * La ligne visée est déterminée par le MÊME algorithme que la validation (§3.4.1) —
+   * un repérage divergent corrigerait une autre ligne que celle qui a été jugée. */
   applyLineFix(replacement: string): void {
     const value = this.deps.adapter.readValue(this.deps.editor);
-    const lines = value.split('\n');
-    // La ligne remplacée est la ligne de préfixe (§3.4.1) : première ligne non vide hors
-    // bloc délimité et citation.
-    let inFence = false;
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]!;
-      if (/^\s*(`{3,}|~{3,})/.test(line)) {
-        inFence = !inFence;
-        continue;
-      }
-      if (inFence || /^\s*>/.test(line) || line.trim() === '') continue;
-      lines[i] = replacement;
-      break;
-    }
+    const split = splitBody(value);
+    if (split.prefixLineIndex === null) return;
+    const lines = value.split(/\r?\n/);
+    lines[split.prefixLineIndex] = replacement;
     this.deps.adapter.writeValue(this.deps.editor, lines.join('\n'));
     this.refresh();
   }

@@ -6,9 +6,11 @@ import type { Floor, PublishedSummary } from '@cct/core';
 import type { PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
+import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage } from './config-resolver.js';
 import { EditorController } from './editor-controller.js';
 import { buildBannerModel, renderBanner } from './ui/banner.js';
+import { decorateComment } from './ui/badges.js';
 import { ui } from './ui/strings.js';
 
 declare const chrome: {
@@ -107,8 +109,43 @@ async function renderPrChrome(
     profile.slashPrefixes
   );
   if (model.count > 0 || published !== null) {
-    const banner = renderBanner(model, published, lang);
+    // Filtre local par label (§5.5) : masque les ancres du bandeau ET les fils rendus.
+    const labelOfThread = new Map<string, string | null>();
+    for (const t of threads) {
+      const a = analyze(
+        {
+          body: t.root.body,
+          platform: profile,
+          isSystemGenerated: t.root.isSystemGenerated,
+          zone: 'thread-root',
+          canCarryBlockingState: t.canCarryBlockingState,
+          author: t.root.author,
+        },
+        resolved.config
+      );
+      labelOfThread.set(t.id, a.resolved?.label.id ?? null);
+    }
+    const banner = renderBanner(model, published, lang, {
+      filterLabels: enabledLabels(resolved.config).map((l) => l.id),
+      onFilter: (labelId) => {
+        for (const li of banner.querySelectorAll('li[data-thread-id]')) {
+          const threadId = (li as HTMLElement).dataset['threadId']!;
+          const visible = labelId === null || labelOfThread.get(threadId) === labelId;
+          (li as HTMLElement).style.display = visible ? '' : 'none';
+        }
+      },
+    });
     doc.body.insertAdjacentElement('afterbegin', banner);
+  }
+
+  // Badges des commentaires publiés (§5.5) — rendu visuel, contenu stocké intact.
+  const withRendered = adapter as PlatformAdapter & {
+    getRenderedComments?: () => { element: Element; bodyText: string }[];
+  };
+  if (withRendered.getRenderedComments) {
+    for (const { element, bodyText } of withRendered.getRenderedComments()) {
+      decorateComment(element, bodyText, resolved.config, profile);
+    }
   }
 
   applyCompletionState(adapter.getCompletionControl(), published, lang);

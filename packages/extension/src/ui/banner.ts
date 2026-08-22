@@ -63,10 +63,18 @@ export function buildBannerModel(
   return { count: local.length, anchors, fromPublished: false, partial: false };
 }
 
+export interface BannerRenderOptions {
+  /** Labels disponibles pour le filtre local (§5.5). */
+  filterLabels?: string[];
+  /** Appelé quand le filtre change ; null = tous. */
+  onFilter?: (labelId: string | null) => void;
+}
+
 export function renderBanner(
   model: BannerModel,
   published: PublishedSummary | null,
-  lang: string
+  lang: string,
+  options: BannerRenderOptions = {}
 ): HTMLElement {
   const doc = globalThis.document;
   const root = doc.createElement('div');
@@ -86,9 +94,31 @@ export function renderBanner(
     root.appendChild(partial);
   }
 
+  // Filtre local par label dans la liste des fils (§5.5).
+  if (options.filterLabels && options.filterLabels.length > 0) {
+    const filterLabel = doc.createElement('label');
+    filterLabel.className = 'cct-banner-filter';
+    filterLabel.textContent = ` ${ui(lang, 'banner.filter')} : `;
+    const select = doc.createElement('select');
+    const all = doc.createElement('option');
+    all.value = '';
+    all.textContent = ui(lang, 'banner.filter.all');
+    select.appendChild(all);
+    for (const id of options.filterLabels) {
+      const option = doc.createElement('option');
+      option.value = id;
+      option.textContent = id;
+      select.appendChild(option);
+    }
+    select.addEventListener('change', () => options.onFilter?.(select.value === '' ? null : select.value));
+    filterLabel.appendChild(select);
+    root.appendChild(filterLabel);
+  }
+
   const list = doc.createElement('ul');
   for (const anchor of model.anchors) {
     const li = doc.createElement('li');
+    li.dataset['threadId'] = anchor.threadId;
     const a = doc.createElement('a');
     a.href = anchor.href;
     a.textContent = anchor.threadId;

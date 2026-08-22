@@ -73,7 +73,11 @@ export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void
       const caret = element.selectionStart ?? 0;
       const before = element.value.slice(0, caret);
       const token = /(\S+)$/.exec(before)?.[1];
-      const expansion = token !== undefined ? opts.config.shortcuts.abbreviations[token] : undefined;
+      // Object.hasOwn : une table venue de JSON ne doit jamais « étendre » constructor,
+      // toString… hérités du prototype.
+      const abbreviations = opts.config.shortcuts.abbreviations;
+      const expansion =
+        token !== undefined && Object.hasOwn(abbreviations, token) ? abbreviations[token] : undefined;
       if (token !== undefined && expansion !== undefined) {
         ke.preventDefault();
         const next = element.value.slice(0, caret - token.length) + expansion + element.value.slice(caret);

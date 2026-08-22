@@ -558,7 +558,7 @@ Trois règles permanentes contre une règle transitoire : c'est ce rapport qui a
 
 #### 6.2.4 Rapport à blanc, PR en brouillon, et silence du serveur
 
-**Rapport à blanc.** Le composant B expose un point d'entrée d'administration — commande d'exploitation ou appel authentifié, au choix de l'implémentation — qui prend un dépôt et une date de bascule hypothétique, **restitue** la liste de ce qui échouerait si l'outil était activé : commentaires non conformes et fils bloquants non résolus, avec leurs liens permanents. Il **ne publie aucun statut** et n'écrit rien sur les PR. L'accès est réservé aux personnes habilitées à activer l'outil sur le dépôt. C'est le prérequis raisonnable à toute activation : une équipe ne devrait jamais découvrir l'ampleur du chantier le jour où le check devient obligatoire. Le rapport à blanc est aussi le bon outil pour calibrer la date `activatedAt` (§6.2.3) — et le même point d'entrée permet de **la poser** pour un dépôt dont le fichier de configuration ne la porte pas (§6.4, stockage).
+**Rapport à blanc.** Le composant B expose un point d'entrée d'administration — commande d'exploitation ou appel authentifié, au choix de l'implémentation — qui prend un dépôt et une date de bascule hypothétique, **restitue** la liste de ce qui échouerait si l'outil était activé : commentaires non conformes et fils bloquants non résolus, avec leurs liens permanents. **Ce rapport** ne publie aucun statut et n'écrit rien sur les PR ; l'interdiction porte sur lui, non sur le point d'entrée, qui porte les deux opérations d'écriture nommées plus bas. L'accès est réservé aux personnes habilitées à activer l'outil sur le dépôt. C'est le prérequis raisonnable à toute activation : une équipe ne devrait jamais découvrir l'ampleur du chantier le jour où le check devient obligatoire. Le rapport à blanc est aussi le bon outil pour calibrer la date `activatedAt` (§6.2.3) — et le même point d'entrée permet de **la poser** pour un dépôt dont le fichier de configuration ne la porte pas (§6.4, stockage). C'est enfin lui qui, sur le **seul chemin de repli** du §6.3.2, **accorde une exemption de PR** : il vérifie que le demandeur appartient à `resolverOverrideGroup` (§8.2) — **atteindre le point d'entrée ne suffit pas**, les deux habilitations sont distinctes —, persiste l'exemption active (§6.4), puis pose l'étiquette (`addLabel()`, §9.2.4), dans cet ordre.
 
 **PR en brouillon.** Sur une PR marquée comme brouillon, le composant B évalue mais publie un statut **toujours informatif**, jamais en échec. Une PR en brouillon est un travail en cours : y faire clignoter du rouge pendant des jours n'apporte rien et entraîne à ignorer le signal. Le statut redevient contraignant à la sortie du brouillon.
 
@@ -604,12 +604,17 @@ La langue de cette sortie suit la règle de résolution du §8.1. **Un statut en
 
 #### 6.3.2 Exemption au niveau d'une PR
 
-Une PR peut être sortie du périmètre de blocage par apposition d'une étiquette dédiée (`cc-override` par défaut, configurable). Effet : le critère 2 n'est plus évalué, le statut passe au vert, et le résumé indique explicitement que la PR a été exemptée, par qui et quand.
+Une PR peut être sortie du périmètre de blocage par une **exemption**, que porte une étiquette dédiée (`cc-override` par défaut, configurable) — posée par la personne habilitée, ou par le composant B pour son compte selon le chemin décrit ci-dessous. Effet : le critère 2 n'est plus évalué, le statut passe au vert, et le résumé indique explicitement que la PR a été exemptée, par qui et quand.
 
-- **Cette vérification suppose que la plateforme dise qui a posé l'étiquette, et quand.** C'est une **capacité de plateforme, à déclarer en annexe**, au même titre que l'auteur d'une résolution (§6.1). Là où elle manque, le **repli** est le suivant : l'étiquette seule **n'accorde jamais l'exemption**, qui passe par le point d'entrée d'administration du §6.2.4, qui enregistre lui-même l'acteur et l'horodatage, et le composant B pose ensuite l'étiquette comme simple marqueur visuel. Le mécanisme ne disparaît donc pas ; c'est son point d'entrée qui change, et `CA-26` se teste sur le chemin que la plateforme permet.
+- **Cette vérification suppose que la plateforme dise qui a posé l'étiquette, et quand.** C'est une **capacité de plateforme, à déclarer en annexe**, au même titre que l'auteur d'une résolution (§6.1). Il existe donc **deux chemins**, dont un seul s'applique par plateforme :
+
+  - **Provenance exposée** — `fetchLabels()` rend `by` et `at` (§9.2.4). La chaîne est *étiquette posée → provenance lue → habilitation vérifiée → exemption*. Elle se **relit intégralement de l'état courant de la PR** à chaque évaluation : le composant B n'a rien à retenir d'un tour sur l'autre, et `ctx.exemption` (§9.2.2) vient de l'étiquette.
+  - **Provenance non exposée** — le **repli**, aujourd'hui le cas d'Azure DevOps (§B.6). `fetchLabels()` y rend `by` et `at` absents, et l'étiquette seule **n'accorde jamais l'exemption**. La chaîne devient *point d'entrée d'administration (§6.2.4) → habilitation vérifiée → exemption `{by, at}` **persistée** par le composant B (§6.4) → étiquette posée par B comme marqueur visuel* (`addLabel()`, §9.2.4). **La persistance n'est pas un détail d'implémentation** : sans elle, l'évaluation suivante ne verrait que `cc-override` présente, sans auteur ni date, et ne pourrait plus reconnaître l'exemption qu'elle avait elle-même accordée. C'est le stockage, et non la plateforme, qui porte ici la provenance ; `ctx.exemption` en vient. L'ordre compte : l'habilitation se vérifie **avant** la persistance, et l'étiquette se pose **après** — une étiquette posée sans exemption enregistrée mentirait à tout le monde jusqu'au tour suivant.
+
+  Le mécanisme ne disparaît donc pas ; ce qui change est son point d'entrée et la **source de sa provenance**, et `CA-26` se teste sur le chemin que la plateforme permet.
 - Le droit d'apposer cette étiquette est restreint aux membres de `resolverOverrideGroup` (§8.2) ; sur les plateformes qui ne permettent pas de restreindre nativement la pose d'une étiquette, le composant B **vérifie a posteriori** et refuse l'exemption posée par une personne non habilitée. Le refus est signalé (`exemption-refused`, §9.2.1) **avec la personne qui l'a posée**, et l'étiquette est **laissée en place** : la retirer serait indistinguable de la remise à zéro ci-dessous, et priverait l'équipe de la trace du geste. Une étiquette présente sans effet, et dite telle dans la sortie du check, se comprend ; une étiquette qui disparaît sans explication, non.
-- Chaque exemption est journalisée (§10) : identifiant de PR, auteur, horodatage, et motif si la plateforme permet d'en attacher un à l'étiquette.
-- L'exemption est **remise à zéro** à chaque **fil bloquant dont l'identifiant n'était pas dans l'ensemble des fils déjà observés au tour précédent** (§6.1) et dont la zone peut porter un état bloquant (§4.1) : le composant B **retire l'étiquette** et émet un `notice`. Cette formulation est celle qui se calcule — « un nouveau commentaire bloquant » se lirait de trois façons, qui divergent dès que le service a été indisponible. Elle ne devient ainsi pas un blanc-seing permanent sur une PR de longue durée — et le geste est visible. L'ignorer silencieusement laisserait `cc-override` affichée sur une PR redevenue bloquée, ce que tout le monde lirait comme un défaut. C'est le seul droit en **écriture** du composant B en dehors du statut, et il figure à ce titre dans les permissions du §6.4.
+- Chaque exemption est journalisée (§10) : identifiant de PR, auteur, horodatage, et motif si la plateforme permet d'en attacher un à l'étiquette. **Ce journal est un historique, jamais la source de vérité d'une évaluation** : il conserve les exemptions révoquées au même titre que les vivantes. Ce qui vaut maintenant pour une PR est, selon le chemin, l'étiquette et sa provenance ou l'**exemption active** du §6.4 — les deux ne se confondent pas.
+- L'exemption est **remise à zéro** à chaque **fil bloquant dont l'identifiant n'était pas dans l'ensemble des fils déjà observés au tour précédent** (§6.1) et dont la zone peut porter un état bloquant (§4.1) : le composant B **supprime l'exemption active persistée** si elle existe (§6.4) et **retire l'étiquette**, puis émet un `notice`. Les deux gestes sont indissociables sur le chemin de repli : effacer l'état sans retirer l'étiquette laisserait `cc-override` affichée sur une PR redevenue bloquée, et retirer l'étiquette sans effacer l'état laisserait la PR exemptée sans que rien ne le montre. Cette formulation est celle qui se calcule — « un nouveau commentaire bloquant » se lirait de trois façons, qui divergent dès que le service a été indisponible. Elle ne devient ainsi pas un blanc-seing permanent sur une PR de longue durée — et le geste est visible. L'ignorer silencieusement laisserait une PR redevenue bloquée en état exempté, ce que tout le monde lirait comme un défaut. **Pose et retrait de l'étiquette d'exemption sont les deux seuls droits en écriture** du composant B en dehors du statut — la pose sur le seul chemin de repli —, et ils figurent à ce titre dans les permissions du §6.4.
 
 #### 6.3.3 Interrupteur général et retour arrière
 
@@ -642,7 +647,9 @@ Le §9.1 décrit le découpage en modules du composant B ; la présente section 
  8. **Périmètre d'installation** : dépôt jamais évalué ET fichier de dépôt absent ?
     s'arrêter ici — rien n'est évalué, rien n'est persisté, rien n'est publié       §6.4
  9. Lire les notices : config-vanished ou configuration invalide → armer forceState  §8.1.5
-10. Pré-résoudre isInGroup() pour tout auteur apparaissant sur la PR                §9.2.2
+10. Pré-résoudre isInGroup() pour tout auteur apparaissant sur la PR, et pour
+    l'auteur de l'exemption active — sur le chemin de repli du §6.3.2, il peut
+    n'apparaître nulle part sur la PR                                               §9.2.2
 11. evaluate(...) → ComplianceResult                                                §6.2.1
 12. Si le résultat porte E-UNKNOWN-LABEL ou E-UNKNOWN-DECORATION : seconde passe
     avec fetchConfigFile(bypassCache) ET fetchOrgConfig(bypassCache) ;
@@ -658,7 +665,8 @@ Le §9.1 décrit le découpage en modules du composant B ; la présente section 
 15. publishStatus(pr, result) — l'adaptateur y appelle encodeSummary() pour la
     ligne cc/1, et rend la sortie humaine à partir de headline et des listes        §6.3.1
 16. Une fois la publication **réussie**, persister le résultat publié et poser le
-    drapeau « déjà évalué » ; puis exécuter result.actions.removeLabel              §6.4, §6.3.2
+    drapeau « déjà évalué » ; puis exécuter result.actions.removeLabel — qui
+    supprime aussi l'exemption active persistée, s'il y en a une                    §6.4, §6.3.2
 ```
 
  Ces éléments conditionnent la phase P5 et ne peuvent pas être laissés à l'implémentation : plusieurs d'entre eux (ordre des événements, comportement en panne) déterminent si une PR peut rester bloquée sans recours.
@@ -686,16 +694,17 @@ Ce compteur ne détecte pas à lui seul un désordre de livraison — il est mon
 
 **Le composant B est lui-même indisponible.** Il ne publie rien, par définition, et aucune règle interne ne peut y remédier : la PR reste bloquée. Le seul recours est la procédure du §6.3.3, dont le délai d'exécution est la disponibilité réellement engagée. C'est ce que mesure la NFR du §10, et c'est pourquoi cette procédure doit être écrite et son exécutant désigné **avant** tout passage en `enforce` (§14, P6).
 
-**Stockage.** Le composant B a besoin d'un état persistant pour douze objets :
+**Stockage.** Le composant B a besoin d'un état persistant pour treize objets :
 
 - le **journal des exemptions de PR** (§10) ;
+- l'**exemption active de chaque PR ouverte** — `{by, at}` —, **distincte du journal ci-dessus** : celui-ci est un historique, qui garde aussi les exemptions révoquées ; celle-là dit ce qui vaut maintenant. Elle n'existe que sur le **chemin de repli** du §6.3.2, là où la plateforme n'expose pas la provenance d'une étiquette : le point d'entrée d'administration vérifie l'habilitation, persiste `{by, at}`, puis le composant B pose l'étiquette (`addLabel()`, §9.2.4). Sans elle, le tour suivant ne verrait qu'une étiquette sans auteur ni date et ne reconnaîtrait pas l'exemption qu'il avait lui-même accordée. La remise à zéro du §6.3.2 la supprime en même temps qu'elle retire l'étiquette. Là où la provenance est exposée, cet objet reste vide : l'exemption se relit de la PR à chaque tour ;
 - la **configuration épinglée de chaque PR ouverte** (§8.1.3) ;
 - le **verdict de la première observation de chaque racine bloquante** — au minimum son caractère bloquant et la présence d'un `E-CONFLICT` —, **écrit une fois et jamais réécrit**. Sans lui, l'exception de correction du §6.1 est indécidable : après édition, le corps précédent n'existe plus. Et s'il suivait la *dernière* évaluation au lieu de la première, l'exception se retournerait en chemin d'évasion : il suffirait d'introduire volontairement un `E-CONFLICT`, de laisser une évaluation l'enregistrer, puis de le « corriger » en `non-blocking` pour éteindre le fil. C'est la première observation qui dit si le conflit était là dès l'origine, donc si l'édition est une mise en conformité ;
 - le **dernier plancher valide connu**, sur lequel se replie le §8.1.1 quand `floorVersion` dépasse la version supportée ;
 - la **dernière configuration effective résolue**, par dépôt — ce n'est ni le cache du §8.1.2, qui expire, ni la configuration épinglée du §8.1.3, qui est par PR et jamais réécrite. C'est elle que lisent la fenêtre de coalescence, avant qu'aucun fichier n'ait été relu, et l'appel de fin de délai de grâce, quand plus rien n'est lisible ;
 - le **début de l'incapacité à évaluer** (`degradedSince`), par dépôt — un début d'incident ne se déduit d'aucun état courant, et sans lui le délai de grâce ci-dessus n'a pas d'origine ;
 - le **dernier résultat publié** par PR, sans lequel la règle d'idempotence ci-dessus — « une évaluation dont le résultat est identique au précédent ne republie pas de statut » — n'a rien à comparer ;
-- l'ensemble des **fils déjà observés comme bloquants**, par PR (§6.1) — de ces douze objets, celui qui ne se déduit d'**aucun état courant de la PR** : la monotonie du caractère bloquant porte sur l'historique des éditions d'un commentaire, que les permissions énumérées plus bas ne couvrent pas et que les API ne rendent pas. Sans cette persistance, `CA-36` est intestable et la règle du §6.1 inapplicable ;
+- l'ensemble des **fils déjà observés comme bloquants**, par PR (§6.1) — avec l'exemption active du chemin de repli, l'un des deux objets qui ne se déduisent d'**aucun état courant de la PR** : la monotonie du caractère bloquant porte sur l'historique des éditions d'un commentaire, que les permissions énumérées plus bas ne couvrent pas et que les API ne rendent pas. Sans cette persistance, `CA-36` est intestable et la règle du §6.1 inapplicable ;
 - la **date de bascule `activatedAt`** par dépôt, uniquement lorsqu'elle n'est pas portée par le fichier de configuration — le point d'entrée d'administration du §6.2.4 la pose alors, en même temps qu'il restitue le rapport à blanc qui a servi à la calibrer. Elle est dans ce cas **republiée dans `PublishedSummary`** (§9.2.1), faute de quoi l'extension ne pourrait pas calculer le périmètre que le §6.2.3 lui demande d'appliquer. Tant qu'aucun statut n'est publié sur un tel dépôt, l'extension ne sait pas trancher `inScope` : elle traite la PR comme **hors périmètre**, ce qui relève de la condition 2 du §5.4 et n'ajoute aucune condition nouvelle ;
 - le **fait qu'un dépôt ait déjà été évalué** — c'est-à-dire qu'un statut y a été publié au moins une fois —, avec la date de cette dernière publication. Sans lui, la distinction du §8.1.5 entre un dépôt jamais activé et un fichier de configuration disparu est indécidable. Sur un dépôt **jamais évalué et sans fichier de configuration**, l'étape 8 arrête le cycle : aucun check n'apparaît sur un dépôt qui n'a rien demandé, et aucun état n'est écrit pour une PR d'un dépôt qui n'est pas activé — épingler une configuration issue d'un fichier absent n'aurait aucun sens.
 
@@ -707,7 +716,7 @@ Le choix de la technologie est libre ; l'existence de ce stockage ne l'est pas.
 
 **Sécurité d'ingestion.** Vérification de la signature de chaque événement entrant, protection contre le rejeu, et rejet des charges non signées. Aucun secret n'est stocké côté extension (§10) : la totalité des identifiants de service vit côté B.
 
-**Permissions.** Les autorisations demandées par l'intégration serveur sont énumérées par plateforme dans les annexes, et limitées à : lecture du fichier de configuration ; lecture des commentaires — y compris ceux qui ne relèvent d'aucun fil (§4.1) —, de l'état des fils, des étiquettes de PR et de l'identité de qui les a posées (§6.3.2), de l'état brouillon et de la date de création d'une PR (§6.2.3, §6.2.4) ; écriture du statut ; **retrait de l'étiquette d'exemption** (§6.3.2), seul droit en écriture en dehors du statut ; lecture de l'appartenance aux groupes de `resolverOverrideGroup`.
+**Permissions.** Les autorisations demandées par l'intégration serveur sont énumérées par plateforme dans les annexes, et limitées à : lecture du fichier de configuration ; lecture des commentaires — y compris ceux qui ne relèvent d'aucun fil (§4.1) —, de l'état des fils, des étiquettes de PR et de l'identité de qui les a posées (§6.3.2), de l'état brouillon et de la date de création d'une PR (§6.2.3, §6.2.4) ; écriture du statut ; **pose et retrait de l'étiquette d'exemption** (§6.3.2), seuls droits en écriture en dehors du statut — la pose n'est employée que sur le chemin de repli du §6.3.2 ; lecture de l'appartenance aux groupes de `resolverOverrideGroup`.
 
 **Périmètre d'installation.** Une intégration installée au niveau d'une organisation reçoit les événements de tous ses dépôts. L'activation est **explicite et par dépôt** : en l'absence de fichier `.conventional-comments.json` sur la branche par défaut **et tant que le dépôt n'a jamais été évalué**, le composant B ne publie aucun statut. Sur un dépôt déjà évalué, la disparition du fichier est un incident et non une désactivation, et le composant B le signale quel que soit le mode résiduel (§8.1.5). Sans cette règle, l'installation seule ferait apparaître un check sur des centaines de dépôts qui n'ont rien demandé.
 
@@ -1028,7 +1037,7 @@ Clés introduites par le §6 et le §8.1 :
 | `coreMinVersion` | Version majeure minimale de `core/` requise pour appliquer cette configuration (§8.1.3). En deçà, le repli du §8.1.5 s'applique : mode `assist`, ou le plancher en vigueur s'il est plus strict. |
 | `scope.validateReplies` | Validation des réponses de fil (§4.1). `false` par défaut. |
 | `scope.validateReviewSummary` | Validation du corps d'une revue soumise en lot (§4.1). Sans objet sur les plateformes qui n'ont pas ce concept — voir annexes. |
-| `resolverOverrideGroup` | Groupe ou **liste de groupes** habilités à résoudre un fil bloquant à la place de l'auteur du commentaire (§6.1.1) et à poser l'étiquette d'exemption (§6.3.2). Une liste s'entend en **intersection** : être membre de tous. C'est ce qui rend exprimable la restriction du §8.1.1 — un champ scalaire unique ne le pouvait pas. **La forme de chaque identifiant dépend de la plateforme** et est donnée en annexe (`org/team-slug` sur GitHub, `[Scope]\Nom` sur Azure DevOps) ; l'adaptateur serveur les résout par autant d'appels à `isInGroup` (§9.2.4). Plancher-able. |
+| `resolverOverrideGroup` | Groupe ou **liste de groupes** habilités à résoudre un fil bloquant à la place de l'auteur du commentaire (§6.1.1) et à **obtenir l'exemption d'une PR** (§6.3.2) — en posant l'étiquette là où sa provenance est lisible, en passant par le point d'entrée d'administration ailleurs. Une liste s'entend en **intersection** : être membre de tous. C'est ce qui rend exprimable la restriction du §8.1.1 — un champ scalaire unique ne le pouvait pas. **La forme de chaque identifiant dépend de la plateforme** et est donnée en annexe (`org/team-slug` sur GitHub, `[Scope]\Nom` sur Azure DevOps) ; l'adaptateur serveur les résout par autant d'appels à `isInGroup` (§9.2.4). Plancher-able. |
 | `rules.minDecisionSubjectLength` | Longueur minimale du motif d'une réponse `decision` (§6.1.1). Défaut : 20. Plancher-able. |
 | `server.coalesceWindowSeconds` | Fenêtre de regroupement des événements d'une même PR (§6.4). Défaut : 10 s. Sans objet côté extension. |
 | `docUrl` | Lien vers la documentation de la convention, porté par la sortie du check (§6.3.1). Une organisation qui documente sa propre déclinaison y pointe la sienne. |
@@ -1202,7 +1211,9 @@ interface ComplianceResult {
             warnings: number };                // devrait reparser une phrase en langue naturelle
   actions: { removeLabel?: string };   // §6.3.2 — ce que l'orchestrateur doit **faire** en plus de publier.
                                        // `evaluate()` est pure : elle demande le retrait de l'étiquette,
-                                       // elle ne l'exécute pas (`removeLabel()`, §9.2.4)
+                                       // elle ne l'exécute pas (`removeLabel()`, §9.2.4). Ce retrait
+                                       // emporte la suppression de l'exemption active persistée (§6.4) :
+                                       // une seule demande, parce que les deux ne se dissocient jamais
   blockingThreadIds: string[];         // §6.1 — les fils bloquants observés **à ce tour**, résolus compris.
                                        // `unresolvedBlockingThreads` ne suffirait pas, un fil bloquant
                                        // résolu n'y figurant pas. Voir §6.1 pour la règle d'accumulation
@@ -1304,12 +1315,18 @@ interface EvaluationContext {
                                        // celle du stockage (§6.4), sinon `null`
   isDraft: boolean;                    // §6.2.4
   exemption?: { by: UserInfo; at: string };   // §6.3.2 — telle que **posée**, pas telle qu'admise :
-                                       // c'est `evaluate()` qui vérifie l'habilitation et peut la refuser
+                                       // c'est `evaluate()` qui vérifie l'habilitation et peut la refuser.
+                                       // Sa source dépend de la plateforme : la provenance de l'étiquette
+                                       // là où elle est exposée, l'**exemption active persistée** (§6.4)
+                                       // sur le chemin de repli. `core/` ne fait pas la différence
   isOverrideMember: (u: UserInfo) => boolean;   // §6.1, §6.1.1, §6.3.2 — appartenance à
                                        // `resolverOverrideGroup`, **résolue en amont** par l'orchestrateur
                                        // via `isInGroup()` (§9.2.4) pour **tout auteur apparaissant sur la
                                        // PR** — restreindre aux résolveurs et poseurs d'étiquette omettrait
-                                       // les auteurs de réponses `decision`, et les refuserait toutes.
+                                       // les auteurs de réponses `decision`, et les refuserait toutes —
+                                       // **et pour l'auteur de l'exemption active** (§6.3.2) : venue du
+                                       // chemin de repli, elle a été accordée hors de la PR et son auteur
+                                       // peut n'y apparaître nulle part.
                                        // La décision reste dans `core/` ; seule la lecture en sort
   knownBlockingThreadIds: string[];    // §6.1 — monotonie du caractère bloquant
   firstVerdicts: Record<string, { blocking: boolean; hadConflict: boolean }>;  // §6.1, par racine
@@ -1473,8 +1490,15 @@ interface ServerPlatformAdapter {
   publishStatus(pr: PrRef, result: ComplianceResult): Promise<void>;  // §6.3.1 — format. Appelée seulement
                                        // quand le mode autorise une publication : c'est l'orchestrateur
                                        // qui en décide (§6.2.2), jamais l'adaptateur
-  removeLabel(pr: PrRef, name: string): Promise<void>;   // §6.3.2 — remise à zéro de l'exemption ; seule écriture
-                                                         // du contrat en dehors du statut
+  addLabel(pr: PrRef, name: string): Promise<void>;      // §6.3.2 — marqueur visuel de l'exemption, sur le
+                                       // **seul** chemin de repli : là où la plateforme n'expose pas la
+                                       // provenance d'une étiquette, c'est B qui la pose, après avoir
+                                       // vérifié l'habilitation et persisté l'exemption active (§6.4).
+                                       // Appelée par le point d'entrée d'administration (§6.2.4), jamais
+                                       // par le cycle d'évaluation du §6.4
+  removeLabel(pr: PrRef, name: string): Promise<void>;   // §6.3.2 — remise à zéro de l'exemption. Avec
+                                       // `addLabel()`, les deux seules écritures du contrat en dehors
+                                       // du statut
   isInGroup(user: UserInfo, group: string): Promise<boolean>;  // resolverOverrideGroup (§6.1.1)
 }
 ```
@@ -1577,7 +1601,7 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 - `CA-23` **Le serveur lit le mode.** Un dépôt en mode `warn` avec composant B déployé et check déclaré obligatoire voit ses PR mergeables : le statut est publié au vert avec un résumé informatif.
 - `CA-24` **Plancher hors de portée du dépôt.** Un `{"mode": "off"}` poussé sur la branche par défaut d'un dépôt dont le plancher vaut `enforce` est ignoré pour la clé `mode`, et le fait apparaît dans la sortie du check.
 - `CA-25` **Sortie exploitable.** Un check en échec permet d'identifier, **en un clic au plus** (§6.3.1), chaque fil bloquant non résolu (lien, auteur, label) et chaque diagnostic de format (lien, code, sévérité, correction proposée) — un commentaire pouvant en porter plusieurs (§3.5.1). Vérifié sur les deux plateformes : dans le corps du check sur l'une, derrière la `targetUrl` du statut sur l'autre.
-- `CA-26` **Exemption de PR.** L'étiquette d'exemption posée par un membre habilité fait passer le statut au vert et journalise l'événement ; posée par une personne non habilitée, elle est refusée. Un nouveau commentaire bloquant **fait disparaître l'étiquette** et repasse le statut en échec.
+- `CA-26` **Exemption de PR.** Une exemption obtenue par un membre habilité fait passer le statut au vert et journalise l'événement ; obtenue par une personne non habilitée, elle est refusée et l'étiquette reste en place. Un nouveau commentaire bloquant **fait disparaître l'étiquette** — et l'exemption active persistée s'il y en a une — et repasse le statut en échec. Se teste sur le chemin que la plateforme permet (§6.3.2) : étiquette posée par la personne là où la provenance est lisible, point d'entrée d'administration ailleurs.
 - `CA-27` **Retour arrière.** Le passage de `enforce` à `warn` au niveau de l'organisation débloque les PR sans exiger de modifier la protection de branche de chaque dépôt.
 - `CA-28` **Ordre des événements.** Un événement de création reçu après l'événement d'édition qui le corrige ne réintroduit pas un statut en échec périmé.
 - `CA-29` **Opt-in par dépôt.** Un dépôt **jamais évalué** et sans fichier `.conventional-comments.json` sur sa branche par défaut ne reçoit aucun statut, même si l'intégration est installée au niveau de l'organisation. Contre-épreuve : retirer ce fichier d'un dépôt déjà évalué produit un statut neutre portant `config-vanished`, jamais un silence, y compris si le mode résiduel est `assist` (§8.1.5).
@@ -1641,7 +1665,7 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 
 Sur **Azure DevOps**, deux prérequis s'ajoutent, tous deux tranchés par le spike `P1'` :
 
-4. **La provenance des étiquettes est établie, ou le repli du §6.3.2 est en place** (§B.6) — sans l'un ou l'autre, l'exemption de PR n'a pas de chemin vérifiable, et c'est une des deux soupapes du §6.3.
+4. **La provenance des étiquettes est établie, ou le repli du §6.3.2 est en place** (§B.6) — c'est-à-dire ses trois pièces : point d'entrée d'administration, persistance de l'exemption active (§6.4) et pose de l'étiquette par le composant B. Sans l'un ou l'autre, l'exemption de PR n'a pas de chemin vérifiable, et c'est une des deux soupapes du §6.3.
 5. **La latence de détection respecte la NFR de 60 s** (§B.7) — voie événementielle établie, ou `server.reconcileIntervalSeconds` ≤ 60.
 
 `P4` ne dépend pas de `P3` : la trajectoire du §7 fait de `assist → warn` la première étape d'adoption, et attendre la seconde plateforme pour l'entamer sur la première n'aurait pas de sens. `P3` élargit le périmètre de `P4`, il ne le conditionne pas.
@@ -1779,7 +1803,8 @@ S'il s'avère que la plateforme ne l'expose pas, le cas prévu au §6.1 pour les
 - Boutons « Comment » **et** « Comment & resolve » — les deux doivent passer par la validation.
 - **Pas d'équivalent de revue soumise en lot** : Azure DevOps ne propose pas de corps de revue global comparable à celui de GitHub. La clé `scope.validateReviewSummary` (§8.2) est donc **sans objet** sur cette plateforme et y est ignorée.
 - **Pas de commande slash native.** Les *comment triggers* du type `/azp run` sont une fonctionnalité d'Azure Pipelines réservée aux dépôts **GitHub** ; Azure Repos passe par les policies de branche. L'exemption de commande slash du §4.2 n'a donc pas d'illustration native ici — elle reste disponible pour les commandes d'outils tiers éventuellement installés.
-- **Provenance d'une étiquette : non exposée par l'API documentée.** `GET …/pullRequests/{id}/labels` rend des `WebApiTagDefinition`, dont les seuls champs sont `active`, `id`, `name` et `url` — ni l'auteur de la pose, ni sa date. Le modèle de PR expose les étiquettes sous la même forme. **En l'état, le contrat `fetchLabels()` n'est donc pas implémentable ici**, et le repli du §6.3.2 s'applique : l'étiquette seule n'accorde aucune exemption, qui passe par le point d'entrée d'administration du §6.2.4.
+- **Provenance d'une étiquette : non exposée par l'API documentée.** `GET …/pullRequests/{id}/labels` rend des `WebApiTagDefinition`, dont les seuls champs sont `active`, `id`, `name` et `url` — ni l'auteur de la pose, ni sa date. Le modèle de PR expose les étiquettes sous la même forme. **En l'état, le contrat `fetchLabels()` n'est donc pas implémentable ici** — il rend le nom, jamais `by` ni `at` —, et le repli du §6.3.2 s'applique : l'étiquette seule n'accorde aucune exemption, qui passe par le point d'entrée d'administration du §6.2.4, lequel persiste l'exemption active (§6.4) avant que le composant B ne pose l'étiquette.
+  **Les deux écritures que ce repli demande sont, elles, disponibles** : `POST …/pullRequests/{id}/labels`, corps `{ "name": … }`, sert `addLabel()`, et `DELETE …/pullRequests/{id}/labels/{labelIdOrName}` sert `removeLabel()` — l'une et l'autre sous la portée `vso.code_write`, sur Azure DevOps Services comme sur les versions Server encore supportées. Le repli est donc implémentable de bout en bout ; ce qui manque n'est pas un droit d'écriture, c'est la lecture d'une provenance.
   Le spike `P1'` (§14) tranche : soit il établit une source fiable de provenance — journal d'audit de l'organisation, ou tout autre point d'API non identifié ici —, soit le repli devient définitif sur cette plateforme. **`P5` ne démarre pas côté Azure DevOps sans cette réponse** : c'est le mécanisme d'urgence du §6.3 qui en dépend.
 - **`resolverOverrideGroup`** : le nom d'un groupe de sécurité Azure DevOps, à l'échelle de l'organisation ou du projet, sous la forme `[Scope]\Nom du groupe`. L'appartenance est transitive pour les groupes imbriqués.
 - **Bloc de suggestion** (§4.2, étage 0 du §3.5.1) : Azure DevOps offre la même fonctionnalité — icône d'ampoule sous la zone de commentaire d'une ligne de diff, bouton *Apply changes* côté auteur — et la rend elle aussi sous forme de **bloc de code délimité**. L'*info string* exact n'est pas documenté et reste **à établir par le spike `P1'`** (§14), qui ouvre déjà cet éditeur (§B.2) : c'est une lecture, pas un développement. Tant qu'il ne l'est pas, l'adaptateur Azure DevOps ne reconnaît aucun bloc de suggestion et ces commentaires relèvent du cas général — un `suggestion:` explicite y reste toujours accepté.

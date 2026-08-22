@@ -431,15 +431,74 @@ Le blocage d'envoi du mode `enforce` est donc un **garde-fou, pas un mur** : il 
 
 Un fil de discussion est **bloquant** si son **commentaire racine** est bloquant au sens du §3.3.
 
-Un fil bloquant est considéré **résolu** selon la plateforme :
+Un fil bloquant est considéré **résolu** selon des états propres à chaque plateforme — voir annexes A et B pour le détail des statuts pris en compte.
 
-| Plateforme | États considérés comme résolus |
-|------------|-------------------------------|
-| GitHub | Conversation marquée *Resolved* |
-| Azure DevOps | Statut de thread `Fixed`, `WontFix`, `Closed` ou `ByDesign` (`Active` et `Pending` = non résolu) |
+**Règle de gouvernance.** Une résolution n'est retenue que dans **deux cas, et deux seulement** :
 
-**Règle de gouvernance :** un fil bloquant ne peut être résolu que par **l'auteur du commentaire** ou par un membre du groupe `resolverOverrideGroup`. L'auteur de la PR ne peut pas clore lui-même un fil bloquant ouvert par un relecteur.
-*Note : GitHub autorise nativement l'auteur de la PR à résoudre les conversations. Cette règle est donc vérifiée et signalée par le composant B, non empêchée à la source.*
+1. elle est le fait de **l'auteur du commentaire racine** — c'est lui qui juge si son point a été traité ;
+2. elle est le fait d'un membre de `resolverOverrideGroup` **et** le fil contient une réponse `decision` valide au sens du §6.1.1.
+
+Dans tout autre cas, la résolution est refusée : le fil reste compté comme non résolu au titre du critère 2 (§6.2.1), et la sortie du check en donne la cause (§6.3.1).
+
+Le refus n'est pas un cul-de-sac. Le chemin de retour est celui que la règle décrit : rouvrir le fil et le faire résoudre par l'auteur du commentaire racine, ou y poster une réponse `decision` valide et le faire résoudre par un membre habilité. Rien n'est perdu, et aucune PR ne reste rouge sans recours — c'est la propriété que tout le §6.3 cherche à préserver.
+
+**Quand la plateforme n'expose pas l'auteur d'une résolution.** Cette règle de gouvernance repose entièrement sur `ThreadInfo.resolvedBy` (§9.2.1). Sa disponibilité est une **capacité de plateforme, à déclarer en annexe** — elle l'est sur GitHub (§A.6), elle reste à établir sur Azure DevOps (§B.5).
+
+Là où elle manque, la résolution est **acceptée** et un `notice` de type `resolution-unattributed` est émis **à chaque évaluation**. Refuser serait pire : tous les fils bloquants d'une plateforme entière deviendraient non résolvables, sans recours et sans que personne ait rien fait de mal, ce que le §6.3 existe précisément pour éviter. Mais l'acceptation ne doit pas être silencieuse : la règle de gouvernance **n'est alors pas appliquée sur cette plateforme**, et l'organisation doit le lire dans le statut plutôt que le découvrir. `CA-13` ne se teste que là où la capacité existe.
+
+Il en découle que **l'auteur de la PR ne peut pas clore lui-même un fil ouvert par un relecteur** — et que s'il appartient par ailleurs à `resolverOverrideGroup`, il ne le peut qu'en passant par le cas 2, c'est-à-dire en écrivant une `decision` motivée qui restera visible dans le fil. Le groupe donne un pouvoir de déblocage, jamais un pouvoir de contournement silencieux.
+
+*Note : certaines plateformes autorisent nativement l'auteur de la PR à résoudre les conversations. Cette règle est donc vérifiée et signalée par le composant B, non empêchée à la source — voir les annexes pour le détail par plateforme.*
+
+**Le caractère bloquant d'un fil est monotone.** Une fois qu'un fil a été observé comme bloquant par le composant B, l'**édition de son commentaire racine ne peut plus le rendre non bloquant** : seule la résolution (§6.1.1) l'éteint. Une édition qui renforce le caractère bloquant (`note:` → `issue:`) prend effet normalement ; une édition qui l'affaiblit (`issue:` → `note:`) est enregistrée mais sans effet sur le décompte, et signalée dans la sortie du check avec son auteur.
+
+Sans cette règle, toute la règle de gouvernance ci-dessus se contourne par un chemin plus direct qu'elle : l'auteur de la PR, s'il dispose des droits d'écriture, édite le commentaire du relecteur, remplace `issue:` par `note:` — qui est `alwaysNonBlocking` — et le fil cesse d'être bloquant sans que personne ne l'ait résolu. On verrouille la porte en laissant la fenêtre ouverte.
+
+C'est le même principe qu'au §8.1.1 : **durcir est toujours permis, assouplir passe par la gouvernance.**
+
+**Un verdict imposé ne dérive aucun fait.** Lorsque `forceState` est armé (§9.2.2), `evaluate()` ne produit **ni `weakening-edit` ni `root-deleted`** : les listes vides qu'on lui passe alors traduisent une lecture impossible, pas une disparition. Sans cette réserve, l'expiration du délai de grâce signalerait la suppression de **toutes** les racines bloquantes de la PR — un faux signalement, dans la situation précise où l'équipe cherche à comprendre ce qui se passe.
+
+**Signaler « avec son auteur » suppose que la plateforme le dise.** L'auteur d'une édition se lit dans `CommentInfo.lastEditedBy` (§9.2.1), celui d'une suppression n'est lisible nulle part une fois le commentaire disparu. Quand l'information manque — champ non exposé, ou fait découvert par la réconciliation périodique plutôt que par un événement —, le `notice` est émis **sans acteur**, et jamais avec l'auteur du dernier événement reçu : le §6.4 exige de relire l'état courant plutôt que de se fier au contenu de l'événement, et attribuer une édition à qui a déclenché un recalcul serait une accusation fausse. `CA-36` se teste sur une plateforme qui expose l'auteur de l'édition.
+
+**Une correction n'est pas un affaiblissement — sous deux conditions.** Éditer une racine pour **lever un `E-CONFLICT`** — remplacer `issue (blocking, non-blocking):` par `issue (non-blocking):` — n'est pas une édition affaiblissante, alors même qu'elle retire le caractère bloquant que le départage du §3.3 avait attribué. Mais l'exception ne vaut que si :
+
+1. la racine portait **déjà `E-CONFLICT` lors de sa première observation** par le composant B ;
+2. l'édition est le fait de **l'auteur du commentaire racine**.
+
+Sans ces deux conditions, l'exception rouvrirait en deux gestes la porte que toute cette règle ferme : sur une racine `issue: x` observée bloquante, l'auteur de la PR l'édite en `issue (blocking, non-blocking): x` — le départage la garde bloquante, donc aucun affaiblissement signalé — puis en `issue (non-blocking): x`, qui « lève un `E-CONFLICT` », donc pas davantage. Le fil cesserait d'être bloquant sans que personne l'ait résolu, et sous le défaut `formatSeverity: warn` l'étape intermédiaire ne coûterait même pas un check rouge.
+
+Ainsi bornée, l'exception fait ce pour quoi elle existe et rien de plus : elle évite de punir la personne qui corrige l'erreur qu'on lui a demandé de corriger. La monotonie protège d'un contournement, pas d'une mise en conformité.
+
+**Comment l'ensemble des fils bloquants s'accumule.** Le composant B persiste, à chaque tour, `déjà observés ∪ blockingThreadIds` **moins** `correctedThreadIds` (§9.2.1). Les deux membres sont nécessaires : une union pure rendrait l'exception de correction inopérante — le fil resterait dans l'ensemble et la monotonie le re-bloquerait au tour suivant —, tandis qu'un simple remplacement par le tour courant supprimerait la monotonie elle-même, une racine affaiblie sortant de l'ensemble et cessant d'être bloquante. Le retrait est définitif ; si une édition ultérieure rend la racine à nouveau bloquante, le fil rentre par le premier membre. Lorsque `lastEditedBy` est absent, la seconde condition de l'exception n'est pas vérifiable et l'exception ne s'applique pas.
+
+**Suppression du commentaire racine.** La monotonie porte sur l'édition, pas sur la suppression : un commentaire supprimé n'existe plus, et le fil qu'il portait cesse d'être compté. C'est assumé — maintenir un fil bloquant dont la racine a disparu laisserait un check rouge que plus personne ne peut résoudre (§6.4). La suppression est en revanche **signalée** dans la sortie du check : c'est le seul chemin restant pour éteindre un fil sans le résoudre, et il doit rester visible. Elle l'est **sans auteur**, contrairement à l'édition affaiblissante : une fois le commentaire disparu, aucune plateforme n'expose qui l'a supprimé, et `evaluate()` ne le déduit que par différence entre les fils déjà observés et ceux qui subsistent (§9.2.2). Le document préfère un signalement anonyme à une attribution fausse.
+
+#### 6.1.1 Clore un fil bloquant sans faire le changement demandé
+
+Un fil bloquant se referme normalement parce que le point soulevé a été traité, et c'est son auteur qui en juge. Reste le cas où l'équipe décide **délibérément de ne pas le traiter** : le point est hors périmètre, la dette est assumée, l'arbitrage a été rendu ailleurs, ou un correctif urgent doit partir maintenant et son auteur est indisponible.
+
+Ce cas ne relève pas d'un contournement de l'outil : c'est une **décision de revue**, et elle se prend dans la convention.
+
+**Règle.** Un membre de `resolverOverrideGroup` peut résoudre un fil bloquant à la place de l'auteur du commentaire, à la condition que le fil contienne une réponse portant le label `decision`, qui énonce le motif du choix :
+
+```
+decision: hors périmètre de cette PR, dette suivie en PROJ-142
+
+L'auteur du commentaire est en congé et le correctif doit partir
+aujourd'hui. Le point est réel, il sera traité dans la PR de suivi.
+```
+
+Conditions de validité, toutes vérifiées par le composant B :
+
+- la réponse `decision` est postée par un membre de `resolverOverrideGroup` ;
+- son sujet est renseigné et d'au moins 20 caractères (`rules.minDecisionSubjectLength`) — un motif tel que « ok » ne documente rien et rendrait la règle décorative. En deçà, `E-DECISION-SUBJECT` (§3.5.2) : la réponse est refusée et ne vaut pas décision ;
+- elle se trouve **dans le fil** qu'elle clôt, jamais ailleurs.
+
+C'est le cas 2 de la règle de gouvernance du §6.1. Une résolution qui n'entre dans aucun des deux cas est refusée, et la cause figure dans la sortie du check.
+
+**Pourquoi ce mécanisme plutôt qu'un bouton de contournement.** Il produit exactement ce qu'un contournement détruit : une trace **lisible par des humains**, **à l'endroit de la discussion**, **conservée avec la PR**, et **attribuée**. Une personne qui relit la PR six mois plus tard voit la décision et son motif ; un journal externe, elle ne l'ouvrira jamais. `decision` est par ailleurs `alwaysNonBlocking` (§3.2) : une décision ne peut pas elle-même bloquer une PR.
+
+**Ce que ce n'est pas.** `decision` ne dispense pas du format, ne s'applique pas aux commentaires non conformes, et ne débloque pas une PR entière — pour ce dernier cas, l'exemption au niveau PR du §6.3.2 reste le mécanisme prévu.
 
 ### 6.2 Mise en œuvre serveur (composant B — source de vérité)
 

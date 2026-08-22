@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Spike P1' — éditeur contrôlé par état applicatif</title>
+  </head>
+  <body>
+    <!-- Reproduction fidèle d'un éditeur piloté par un état applicatif (vues React de
+         GitHub, §A.2 ; hypothèse Azure DevOps, §B.2). La "valeur soumise" vit dans un
+         état séparé du DOM et n'est mise à jour QUE par un événement `input` de confiance
+         appliqué au nœud — exactement ce que l'affectation directe de `value` n'émet pas. -->
+    <textarea id="editor"></textarea>
+    <script>
+      const editor = document.getElementById('editor');
+      // L'état applicatif : ce que l'application soumettrait réellement.
+      window.appState = { submittedValue: '' };
+
+      // Le framework ne se synchronise que sur un événement `input` de confiance
+      // (isTrusted) OU émis par du code qui est passé par le setter natif — modélisé ici
+      // par un drapeau posé juste avant le dispatch programmatique légitime. Un
+      // `element.value = …` n'émet aucun événement : l'état ne bouge pas.
+      editor.addEventListener('input', (e) => {
+        // Un vrai framework lit e.target.value au moment de l'événement. Comme le setter
+        // natif a bien écrit dans le nœud, la lecture reflète le nouveau texte.
+        window.appState.submittedValue = e.target.value;
+      });
+
+      // Expose une lecture indépendante du DOM pour le test.
+      window.readSubmitted = () => window.appState.submittedValue;
+      window.readDom = () => editor.value;
+    </script>
+  </body>
+</html>

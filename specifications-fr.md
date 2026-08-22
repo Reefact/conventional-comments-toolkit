@@ -60,75 +60,248 @@ L'exigence O3 (blocage de la complétion de PR) est **techniquement portée par 
 ### 3.1 Grammaire
 
 ```
-<label> [(<decoration>[, <decoration>]*)]: <subject>
+[<emoji> ]<label> [(<decoration>[, <decoration>]*)]: <subject>
 
 [<discussion>]
 ```
 
-- `label` — obligatoire, un seul, issu de la liste configurée (§3.2).
-- `decoration` — optionnelle, entre parenthèses, séparées par des virgules.
-- `:` — séparateur obligatoire, suivi d'au moins une espace.
-- `subject` — obligatoire, résumé sur une ligne.
-- `discussion` — optionnelle, séparée du sujet par une ligne vide, format Markdown libre.
+- `emoji` — optionnel, toléré en entrée et ignoré pour l'analyse (§3.4.2).
+- `label` — obligatoire, un seul, issu de la liste configurée (§3.2) ou l'un de ses alias (§8.2).
+- `decoration` — optionnelle, entre parenthèses, séparées par des virgules. Chaque décoration est un identifiant `[A-Za-z][A-Za-z0-9-]*` (§3.3), dont la forme canonique est en minuscules : un écart de casse est normalisé par un avertissement, jamais rejeté. Une espace sépare le label de la parenthèse ouvrante ; l'intérieur des parenthèses ne comporte pas d'espace superflue.
+- `:` — séparateur obligatoire, **collé au label ou à la parenthèse fermante**, et suivi d'au moins une espace **ou de la fin de ligne** — auquel cas le sujet est absent et `E-EMPTY-SUBJECT` (§3.5.2) s'applique.
+- `subject` — obligatoire, résumé sur une ligne. Seules sa **présence** et sa **longueur** sont contrôlées (§3.5.2) ; sa forme rédactionnelle — casse, ponctuation, nombre de phrases — relève du contenu, que le §1 place hors champ.
+- `discussion` — optionnelle : **tout contenu du corps situé en dehors de la ligne de préfixe** (§3.4.1) — après elle dans le cas courant, mais aussi avant, un extrait de code cité en tête étant de la discussion. La présence d'une ligne vide de séparation n'entre pas en compte. Format Markdown libre.
+
+*Précision volontaire.* La ligne vide entre le sujet et la discussion est un usage de présentation — elle rend le Markdown plus lisible — et **non une exigence structurelle**. Exiger sa présence, et pénaliser son absence, relèverait de la mise en forme rédactionnelle que le §1 place hors périmètre. `W-NO-DISCUSSION` (§3.5.2) se déclenche donc lorsqu'un commentaire **bloquant au sens du §3.3** — label et décorations résolus, et non le seul label — ne comporte **aucun contenu non blanc en dehors de sa ligne de préfixe** (§3.4.1), et jamais sur un défaut de séparation. C'est le sens de « discussion » posé ci-dessus : les lignes écartées à l'étape 2 du prétraitement en font partie, sans quoi la forme même que cette étape existe pour sauver — citer du code, puis écrire `issue: …` en dessous — recevrait systématiquement cet avertissement. Un `issue (non-blocking): …` sans discussion ne le déclenche pas : c'est le caractère bloquant effectif qui rend la justification nécessaire, pas le mot employé.
+
+**Plus strict que l'amont, sur un point précis.** [conventionalcomments.org](https://conventionalcomments.org/) ne pose comme normatif que la forme générale et le fait que les décorations sont « entre parenthèses et séparées par des virgules ». Il ne dit rien de la casse, des espaces ni des caractères autorisés, et invite explicitement à diverger de sa liste de labels.
+
+Nous durcissons donc **la forme du préfixe** — casse du label, position du deux-points, syntaxe des décorations (§3.3) — parce que c'est ce qui rend le commentaire analysable par une machine des deux côtés de l'architecture. En revanche nous ne touchons **pas au sujet** : sa rédaction relève du contenu, que le §1 place explicitement hors périmètre.
+
+Deux tolérances assumées : l'amont écrit ses décorations sans espace après la virgule (`(ux,non-blocking)`), nous acceptons les deux formes ; et les écarts de **style** sur les décorations — casse, espaces de bordure, doublon — sont des avertissements corrigeables en un clic. Les défauts de **syntaxe**, eux, restent des erreurs : la frontière exacte est posée au §3.3.
 
 ### 3.2 Labels
 
 Liste par défaut (configurable — voir §8). La colonne « Bloquant par défaut » détermine le comportement décrit au §6.
 
-| Label | Description | Bloquant par défaut |
-|-------|-------------|:---:|
-| `praise` | Souligne un point positif. À utiliser au moins une fois par revue. | Non |
-| `nitpick` | Préférence triviale, sans enjeu réel. Toujours non bloquant. | Non |
-| `suggestion` | Proposition d'amélioration argumentée. | Non |
-| `issue` | Problème identifié. Idéalement accompagné d'une suggestion. | **Oui** |
-| `todo` | Changement petit mais nécessaire. | **Oui** |
-| `question` | Demande de clarification sur un point incertain. | Non |
-| `thought` | Idée surgie pendant la revue, sans demande d'action. | Non |
-| `chore` | Tâche annexe à réaliser avant acceptation (relancer un job, MAJ d'un doc...). | **Oui** |
-| `note` | Information à porter à connaissance. Toujours non bloquant. | Non |
+| Label | Description | Bloquant par défaut | Toujours non bloquant |
+|-------|-------------|:---:|:---:|
+| `praise` | Souligne un point positif. | Non | Non |
+| `nitpick` | Préférence triviale, sans enjeu réel. | Non | **Oui** |
+| `suggestion` | Proposition d'amélioration argumentée. | Non | Non |
+| `issue` | Problème identifié. Idéalement accompagné d'une suggestion. | **Oui** | Non |
+| `todo` | Changement petit mais nécessaire. | **Oui** | Non |
+| `question` | Demande de clarification sur un point incertain. | Non | Non |
+| `thought` | Idée surgie pendant la revue, sans demande d'action. | Non | **Oui** |
+| `chore` | Tâche annexe à réaliser avant acceptation (relancer un job, MAJ d'un doc...). | **Oui** | Non |
+| `note` | Information à porter à connaissance. | Non | **Oui** |
+| `decision` | Acte le choix de **ne pas** traiter un point soulevé, en énonçant pourquoi. Employé en réponse dans un fil bloquant — voir §6.1.1. | Non | **Oui** |
 
 Labels optionnels activables par configuration : `typo`, `polish`, `quibble`.
 
+*Nota — `praise` :* la recommandation « à utiliser au moins une fois par revue » relève d'une bonne pratique culturelle, non d'une règle de validation outillée. Elle n'a pas de code d'erreur associé et n'affecte jamais la conformité d'un commentaire.
+
 ### 3.3 Décorations
 
-| Décoration | Effet |
-|------------|-------|
-| `(blocking)` | Force le caractère bloquant, quel que soit le label. |
-| `(non-blocking)` | Force le caractère non bloquant, quel que soit le label. |
-| `(if-minor)` | À traiter uniquement si l'effort est faible. Non bloquant. |
+| Décoration | Effet sur le caractère bloquant | Porteuse |
+|------------|--------------------------------|:---:|
+| `(blocking)` | Force le caractère **bloquant**, quel que soit le label. | Oui |
+| `(non-blocking)` | Force le caractère **non bloquant**, quel que soit le label. | Oui |
+| `(if-minor)` | Force le caractère **non bloquant** — le point n'est à traiter que si l'effort est faible. | Oui |
+| Décoration libre (`(security)`, `(perf)`, `(a11y)`…) | Aucun — purement descriptive. Autorisée si `decorations.allowFree` vaut `true`. | Non |
 
-Décorations libres additionnelles (ex. `(security)`, `(perf)`, `(a11y)`) : autorisées si `allowFreeDecorations: true`, sans incidence sur le caractère bloquant.
+**Précédence pour déterminer si un commentaire est bloquant.** Les règles sont évaluées dans l'ordre ; la première qui s'applique l'emporte.
 
-**Précédence pour déterminer si un commentaire est bloquant :**
+1. **Conflit avec un label toujours non bloquant.** Un label marqué `alwaysNonBlocking` (`nitpick`, `note`, `thought`, `decision`) portant la décoration `(blocking)` produit `E-CONFLICT`. Le commentaire est en erreur ; la question du caractère bloquant ne se pose pas.
+2. **Décorations contradictoires.** La présence simultanée de plusieurs décorations **porteuses** aux effets opposés — `(blocking)` avec `(non-blocking)`, ou `(blocking)` avec `(if-minor)` — produit également `E-CONFLICT`. Aucune règle de « la première gagne » n'est définie, précisément parce qu'un tel commentaire traduit une intention ambiguë qu'il vaut mieux faire corriger.
+3. **`(blocking)` seul** → bloquant.
+4. **`(non-blocking)` ou `(if-minor)`** → non bloquant.
+5. **Aucune décoration porteuse** → valeur `blockingByDefault` du label (§3.2).
 
-1. Décoration explicite `(blocking)` ou `(non-blocking)` → l'emporte toujours.
-2. Sinon, valeur `blockingByDefault` du label.
-3. Les labels marqués `alwaysNonBlocking` (`nitpick`, `note`, `thought`) rejettent la décoration `(blocking)` — erreur de validation `E-CONFLICT`.
+Cette liste doit rester exhaustive : le tableau ci-dessus seul ne suffit pas. `(if-minor)` y est déclaré non bloquant, mais une liste de précédence qui ne le mentionnerait pas rendrait `issue (if-minor):` **bloquant** par le jeu de la règle 5 — en contradiction directe avec le tableau.
+
+**Un commentaire en `E-CONFLICT` reste évaluable comme racine de fil.** Les règles 1 et 2 disent que la question du caractère bloquant « ne se pose pas » **du point de vue de la personne qui écrit** : cette personne doit corriger, aucune interprétation ne lui sera prêtée. La question se pose en revanche pour le composant B, à qui le §6.1 demande une réponse booléenne sur chaque racine de fil. La règle est donc : **une racine en `E-CONFLICT` est bloquante si son label l'est par `blockingByDefault`** (§3.2), les décorations contradictoires étant ignorées. C'est un **départage**, et il vaut partout où le caractère bloquant est en jeu : décompte du critère 2, bandeau du §5.5, `W-NO-DISCUSSION`, `W-NOT-BLOCKABLE`. Une notion qui n'aurait de valeur que « pour ce calcul-ci » laisserait les autres sans réponse.
+
+Sans elle, rendre son propre commentaire indécidable serait un chemin d'évasion à un caractère près : sous `formatSeverity: warn`, qui est le défaut, `issue (blocking, non-blocking): …` sortirait du décompte des fils bloquants au prix d'un simple avertissement de forme. La règle place l'ambiguïté du côté sûr — `issue` reste bloquant, `nitpick (blocking)` ne le devient pas.
+
+**Forme d'une décoration.** Chaque élément, une fois les espaces de bordure retirés, doit être un identifiant : une lettre suivie de lettres, de chiffres ou de traits d'union — `[A-Za-z][A-Za-z0-9-]*`. Cette contrainte est **structurelle et toujours appliquée** ; elle est indépendante de `decorations.allowFree`, qui gouverne l'appartenance à la liste connue, pas la forme. Sont donc rejetés par `E-DECORATION-SYNTAX` :
+
+- un caractère hors identifiant — `(perf*)`, `($$$)`, un emoji ;
+- une espace interne — `(non blocking)`, coquille probable pour `(non-blocking)` ;
+- un élément vide — `(blocking,,)` ;
+- des parenthèses vides — `()`.
+
+**Casse, espaces et doublons.** La comparaison à la liste connue ignore la casse et les espaces de bordure, mais l'écart est **signalé** par `W-DECORATION-STYLE`, avertissement corrigeable en un clic :
+
+- une casse non canonique — `(BLOCKING)` ;
+- des espaces de bordure — `( blocking )` ;
+- une espace manquante avant la parenthèse — `issue(blocking):` ;
+- un doublon exact — `(blocking, blocking)`.
+
+Dans tous ces cas le commentaire reste valide ; seule sa forme est normalisée.
 
 ### 3.4 Expression régulière de référence
 
-```regex
-^(?<emoji>\p{Extended_Pictographic}\uFE0F?\s+)?(?<label>[a-z]+)(?:\s*\((?<decorations>[^)]*)\))?\s*:\s+(?<subject>\S.*)$
+#### 3.4.1 Prétraitement (normatif)
+
+**Cette étape est obligatoire et fait partie de la règle.** Elle répond à une question — *quelle ligne porte le préfixe ?* — distincte de celle du §4.2 — *ce commentaire dit-il quelque chose ?*. Les deux écartent des blocs de code, mais n'en tirent pas la même conclusion : un commentaire réduit à un bloc de suggestion n'a pas de ligne de préfixe **et** n'est pas exempté.
+
+ L'extension lit un champ de saisie vivant, où les fins de ligne sont des `LF` ; le composant serveur relit le corps stocké, où la spécification HTML impose la normalisation des fins de ligne d'un `<textarea>` en `CRLF` à la soumission. Sans prétraitement identique des deux côtés, **le même commentaire reçoit deux verdicts opposés** — ce que la règle de conception du §2 interdit.
+
+L'algorithme, appliqué à l'identique par les composants A et B, est :
+
+```
+1. Découper le corps sur /\r?\n/          (jamais sur '\n' seul : un '\r' résiduel casse le match)
+2. Écarter les lignes de bloc de code délimité et de citation Markdown ('>')
+3. Prendre la première ligne restante dont le trim() est non vide  → « ligne de préfixe »
+4. Retirer en tête et en queue tout \p{White_Space} ainsi que U+FEFF      (voir ci-dessous)
+5. Remplacer tout \p{White_Space} restant, hors ' ' et '\t', par une espace ordinaire
+6. Supprimer tout U+FEFF restant                       (supprimé, jamais remplacé — voir ci-dessous)
+7. Appliquer la regex de référence au résultat
 ```
 
-Appliquée à la **première ligne non vide** du commentaire, en mode Unicode. Le préfixe emoji est toléré en entrée mais ignoré pour l'analyse.
+La ligne retenue à l'étape 3 est appelée **ligne de préfixe** dans tout le document ; la **discussion** (§3.1) est tout ce qui l'entoure dans le corps d'origine — ce qui la suit comme ce qui la précède.
+
+**Pourquoi l'étape 2.** Citer trois lignes de code puis écrire `issue: …` en dessous est une forme courante en revue. Sans ce retrait, la ligne analysée serait une accolade et le commentaire recevrait `E-NO-LABEL` alors qu'il porte un préfixe correct. Le retrait ne porte que sur les blocs **délimités** (``` ou ~~~) et les citations : l'indentation de tête reste tolérée par l'étape 4, sans quoi `CA-18` — qui l'exige — serait contradictoire avec la présente étape.
+
+**Pourquoi les jeux de caractères sont énoncés en toutes lettres.** « Appliquer `trim()` » n'est pas une règle : le `trim()` de JavaScript retire U+FEFF, celui de Python ne le retire pas. Deux implémentations conformes, deux verdicts — sur un BOM, que `CA-06` teste explicitement. Les deux jeux sont donc clos et identiques des deux côtés : `\p{White_Space}` ∪ {U+FEFF} pour l'étape 4 ; `\p{White_Space}` privé de l'espace et de la tabulation pour l'étape 5 ; U+FEFF seul pour l'étape 6.
+
+**Pourquoi U+FEFF est supprimé et non remplacé.** Il **n'a pas** la propriété `White_Space` — c'est une marque d'ordre d'octets, pas un blanc —, il doit donc être traité à part. Et le traiter comme un blanc produirait un message faux dans l'autre sens : `issue` suivi d'un BOM puis du deux-points deviendrait `issue : x`, qui reçoit le motif 4, « espace avant le deux-points », en désignant une espace que personne n'a tapée. Supprimé, le cas retombe sur `issue: x`, qui est conforme — ce qui est exact, un BOM invisible n'étant pas une faute de forme. Placé *après* le deux-points, il disparaît de même et laisse `issue:sujet`, qui reçoit le motif 5, « espace manquante après le deux-points » : exact également, puisque aucune espace n'a été saisie. Un caractère de largeur nulle n'est pas un blanc — le remplacer par une espace inventerait une saisie que personne n'a faite. Le point est de la même nature que le `CRLF` traité plus haut : une commodité de bibliothèque qui diverge silencieusement d'un langage à l'autre.
+
+**Pourquoi l'étape 5.** Une espace insécable est invisible à l'écran et fréquente en français, où claviers et traitements de texte l'insèrent d'eux-mêmes devant un deux-points. La regex n'accepte que `[ \t]` : sans normalisation, `issue:` suivi d'une insécable puis du sujet échouerait à l'étage 1a du §3.5.1, puis serait diagnostiqué par le motif 6 — « caractère inattendu » — dont le message serait faux. Cette substitution ne produit **aucun diagnostic** : on ne signale pas à quelqu'un un caractère qu'il ne voit pas. Elle rend en revanche exact le diagnostic **suivant** : une insécable placée *avant* le deux-points donne, après normalisation, `issue : x`, qui reçoit le motif 4 — « espace avant le deux-points » — qui est le bon message.
+
+Un corps vide, constitué uniquement de blancs, ou dont il ne reste rien après l'étape 2, ne produit **aucune** ligne de préfixe : ce cas relève de l'exemption du §4.2 (contenu non rédigé), pas d'une erreur de format.
+
+#### 3.4.2 Expression régulière de référence
+
+```regex
+^(?:(?:\p{RI}\p{RI}|\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier}|‍\p{Extended_Pictographic}️?)*)[ \t]*)?(?<label>[A-Za-z]+)(?:[ \t]*\((?<decorations>[^)\r\n]*)\))?:(?:[ \t]+(?<subject>.*?)[ \t]*)?$
+```
+
+**Drapeau `u` obligatoire, drapeau `v` interdit.** Ce point doit être vérifié par un test : sans drapeau, la regex **compile malgré tout** et `\p{...}` dégénère en séquence littérale — elle matche alors le texte `p{Extended_Pictographic}` sans jamais lever d'exception, et le défaut passe inaperçu. Le drapeau `v` (« Unicode sets »), lui, lève une `SyntaxError` sur `[^)\r\n]`.
+
+Notes de conception :
+
+- **Classes de blancs explicites.** `[ \t]` partout plutôt que `\s`. Le prétraitement du §3.4.1 garantit déjà qu'une seule ligne est soumise à la regex ; ce choix est une défense en profondeur, qui garde le motif correct même si un outil tiers l'applique à un corps entier — avec `\s`, `issue:\n\nsujet` matcherait en capturant un sujet situé en troisième ligne.
+- **Casse du label.** `[A-Za-z]+` (plutôt que `[a-z]+`) capture un label saisi avec une casse différente (`Issue:`) afin de déclencher `W-CASE` (§3.5) au lieu d'un `E-NO-LABEL` inexploitable. La comparaison à la liste des labels connus (§3.2) est ensuite insensible à la casse.
+- **Sujet optionnel.** La branche `(?:[ \t]+(?<subject>…))?` rend `subject` **absent** pour `issue:`, ce qui rend `E-EMPTY-SUBJECT` (§3.5) **atteignable** — un sujet obligatoire dans la regex renverrait ce cas sur `E-NO-LABEL`, dont le message ne correspond pas au défaut réel. `issue: ` — avec une espace de fin — arrive ici sous la forme `issue:`, l'étape 4 du prétraitement ayant retiré les blancs de queue : les deux saisies produisent le même diagnostic, par le même chemin.
+- **Aucune espace avant le deux-points, une espace au moins après.** Les deux contraintes sont normatives. L'espace exigée *après* écarte `http://example.com` et les URL en général. L'absence d'espace *avant* est ce qui distingue un préfixe technique d'une phrase en typographie française (`Attention : le build casse`), et c'est le premier étage du diagnostic décrit au §3.5.1.
+- **Emoji.** Le préfixe couvre les emoji réels : drapeaux (paires de Regional Indicators), modificateurs de teint, et séquences ZWJ. Il est toléré en entrée et ignoré pour l'analyse.
+- **Décorations vides.** Le groupe `decorations` présent mais vide (`issue (): sujet`) est capturé par la regex, puis **rejeté par le validateur** avec `E-DECORATION-SYNTAX` (§3.3) : des parenthèses ouvertes et refermées à vide sont une coquille, pas une absence de décoration. La regex reconnaît, le validateur tranche.
+- **Complexité linéaire, vérifiée.** Les blancs restent *à l'intérieur* du groupe optionnel de préfixe ; les sortir rend le motif quadratique. Mesuré : ~0,0005 ms sur un commentaire nominal — soit quatre ordres de grandeur sous le seuil de 5 ms du §10 — et ≤ 1,2 ms au pire, sur des formes pathologiques de 300 000 caractères (blancs répétés, parenthèse jamais fermée, emoji consécutifs) qu'aucun commentaire réel n'atteint.
+
+**Faux positif connu, assumé.** Une phrase ordinaire dont le premier mot est un label existant suivi immédiatement d'un deux-points (`note: le build casse`) est reconnue comme conforme. C'est inhérent à la convention, dont c'est exactement la syntaxe ; aucun traitement n'est prévu, et la personne obtient de toute façon un commentaire correctement labellisé.
 
 ### 3.5 Règles de validation
 
+#### 3.5.1 Déroulement de la validation
+
+La validation d'un commentaire se fait en **deux temps** :
+
+1. **La reconnaissance du préfixe** — décrite ci-dessous. Elle est *séquentielle et exclusive* : elle produit **au plus un diagnostic**, et s'arrête au premier étage qui échoue, parce qu'un préfixe qu'on n'a pas su lire ne permet pas de dire autre chose d'utile.
+2. **Les contrôles de contenu** — décorations (§3.3), sujet, discussion. Ils ne sont atteints que si le préfixe est reconnu, et ils sont *cumulatifs* : un même commentaire peut en produire plusieurs.
+
+Cette distinction est structurante. Sans elle, on ne saurait ni si `issue:` sans sujet doit ressortir conforme, ni combien de diagnostics comparer dans le test de parité `CA-06`.
+
+**Temps 1 — reconnaissance du préfixe.** Une même ligne peut échouer pour des raisons de nature très différente, et un message unique serait faux dans la majorité des cas.
+
+| Étage | Question | Si **oui** | Si **non** |
+|:---:|---|---|---|
+| **−2** | La **zone** est-elle exclue par configuration — une réponse de fil alors que `scope.validateReplies` vaut `false`, ou un corps de revue alors que `scope.validateReviewSummary` vaut `false` (§4.1) ? | Analyser le préfixe malgré tout, puis : s'il s'agit d'une **réponse de fil** dont le label résolu est `decision`, reprendre à l'étage **−1** et poursuivre normalement (§4.1, « Analyser n'est pas exiger ») ; dans tous les autres cas **aucun diagnostic**, validation terminée | passer à l'étage **−1** |
+| **−1** | Le commentaire est-il **exempté** au sens du §4.2 — corps vide, aucun contenu propre, auteur exempté, message de plateforme, commande slash, motif de `allowlistPatterns` ? | **Aucun diagnostic**, validation terminée | passer à l'étage **0** |
+| **0** | Le **corps brut** contient-il un **bloc de suggestion natif** de la plateforme (§4.2, marqueur en annexe) ? | voir les trois cas énoncés sous le tableau | passer à l'étage **1a** |
+| **1a** | La ligne a-t-elle la **forme** `label: sujet` (§3.4.2) ? | passer à l'étage **2** | passer à l'étage **1b** |
+| **1b** | Le premier mot de la ligne est-il un **label connu** ou l'un de ses alias — autrement dit, s'agissait-il d'une tentative ? | **`E-MALFORMED-PREFIX`** : énoncer le motif exact (tableau ci-dessous) et proposer la correction | **`E-NO-LABEL`** : énoncer le format attendu et proposer l'insertion d'un label. Ne **jamais** parler de label inconnu — la personne n'a pas tenté d'en écrire un |
+| **2** | Le label capturé figure-t-il dans la liste configurée (§3.2) ou ses alias (§8.2) ? | passer à l'étage **3** | **`E-UNKNOWN-LABEL`** : lister les labels disponibles et proposer le plus proche (`isue:` → `issue:`) |
+| **3** | Est-il dans la **bonne casse** ? | préfixe reconnu → **temps 2** | **`W-CASE`** : avertissement, correction en un clic, puis **temps 2** |
+
+**L'étage −2 est le seul qui analyse sans valider.** Une réponse de fil n'est pas validée par défaut, mais une réponse `decision` l'est **toujours** (§4.1) : il faut donc lire le préfixe pour savoir s'il faut le juger. La reprise se fait à l'étage **−1**, et non plus loin : une `decision` écrite par un compte exempté reste exemptée, et `W-CASE` sur `Decision:` reste évalué à l'étage 3. L'analyse du préfixe faite ici sert à décider, pas à consommer un étage. L'exception ne vaut que pour les **réponses de fil** : une `decision` écrite dans un corps de revue n'a aucun effet — le §6.1.1 exige qu'elle se trouve dans le fil qu'elle clôt, jamais ailleurs —, et la valider reviendrait à imposer un seuil de 20 caractères sur une zone que la configuration vient d'éteindre. L'ordre compte, et il est contre-intuitif — d'où ce barreau explicite. Corollaire : une réponse dont le préfixe est **mal formé** ne porte aucun label, donc pas le label `decision`, donc n'est pas validée. Elle ne vaut pas non plus décision au sens du §6.1.1, ce qui est le comportement recherché : une décision illisible n'en est pas une.
+
+**L'étage −1 rend le §3.5 lisible seul.** Sans lui, une approbation sans texte ou un message de plateforme n'a aucune branche : le tableau demande « la ligne a-t-elle la forme… » alors qu'il n'y a pas de ligne. C'est aussi ce qui rattache `CA-19` et `CA-20` à une règle du validateur, et non à la seule prose du §4.2.
+
+**Les trois cas de l'étage 0.** Un bloc de suggestion natif est présent ; reste à savoir si le commentaire porte *aussi* un préfixe. La ligne de préfixe (§3.4.1) est calculée, puis :
+
+1. **Aucune ligne de préfixe ne subsiste**, ou son premier mot **n'est ni un label connu ni un alias** — c'est une phrase libre, ou rien : label `suggestion` **implicite**, préfixe reconnu, passer au temps 2.
+2. **Son premier mot est un label connu ou un alias, et la ligne a la forme `label: sujet`** : ce préfixe explicite l'emporte, passer à l'étage **2**.
+3. **Son premier mot est un label connu ou un alias, mais la forme est mauvaise** : c'est une tentative ratée, passer à l'étage **1b**, qui produira `E-MALFORMED-PREFIX`.
+
+Le discriminant est donc celui de l'étage **1b** — « s'agissait-il d'une tentative ? » — et non celui de l'étage 1a. Discriminer par la forme ferait passer `issue (blocking: x` écrit au-dessus d'un bloc de suggestion pour une phrase libre : le commentaire ressortirait conforme sous label implicite, alors que le §4.2 et `CA-38` exigent `E-MALFORMED-PREFIX`. Un préfixe mal formé échoue toujours à l'étage 1a — c'est sa définition —, et l'étage 1a ne peut donc pas servir à décider s'il y en avait un.
+
+L'étage 1b n'est atteint **que si la forme a échoué**, l'étage 2 **que si elle a réussi** : c'est ce qui explique que deux étages posent une question voisine pour deux codes différents. En 1b, il n'y a pas de capture — le « premier mot » s'entend au sens de `[A-Za-z]+` en tête de la ligne de préfixe (§3.4.1).
+
+`W-CASE` est le seul étage dont l'échec n'interrompt pas la suite : c'est un avertissement, le préfixe reste lisible, et les contrôles de contenu s'appliquent normalement.
+
+La détection de l'étage 0 porte sur le **corps brut**, parce que l'étape 2 du prétraitement écarte les blocs de code — celui-ci compris. C'est ce qui évite qu'un bloc de suggestion ne tombe en `E-NO-LABEL` et ne soit rejeté en mode `enforce`. Sous label implicite, **trois contrôles de contenu ne s'appliquent pas** : ceux du sujet, celui de la discussion, et `W-MISSING-DECORATION`. Le bloc *est* le contenu du commentaire — il n'a ni sujet ni discussion au sens du §3.1 — et `suggestion` étant justement l'un des deux déclencheurs de `W-MISSING-DECORATION`, l'y soumettre reviendrait à avertir sur **tous** les blocs de suggestion.
+
+Le **marqueur** qui identifie un bloc de suggestion est propre à chaque plateforme et donné en annexe (§A.7, §B.6). Une plateforme dont le marqueur n'est pas établi n'a pas d'étage 0 : ses commentaires relèvent du cas général.
+
+**Temps 2 — contrôles de contenu.** Ils sont **tous évalués**, et chacun peut produire son diagnostic :
+
+| Objet | Contrôles |
+|---|---|
+| Décorations | `E-DECORATION-SYNTAX`, `E-UNKNOWN-DECORATION`, `E-CONFLICT`, `W-DECORATION-STYLE` (§3.3) |
+| Sujet | `E-EMPTY-SUBJECT`, `W-SUBJECT-TOO-SHORT`, `W-SUBJECT-TOO-LONG`, `E-DECISION-SUBJECT` (§6.1.1) |
+| Discussion | `W-NO-DISCUSSION` |
+| Contexte | `W-MISSING-DECORATION`, `W-NOT-BLOCKABLE` (§4.1) |
+
+**Multiplicité.** Un contrôle produit **au plus un diagnostic par code**, quel que soit le nombre d'occurrences fautives : `issue (foo, bar): x` produit **un seul** `E-UNKNOWN-DECORATION`, dont le message énumère `foo` et `bar`. Le même commentaire peut en revanche porter plusieurs codes **différents** — c'est le sens de « cumulatifs ». Sans cette règle, la liste comparée par `CA-06` aurait une longueur dépendante de l'implémentation, et deux implémentations également correctes échoueraient au test de parité.
+
+**Exclusion.** Trois contrôles s'effacent devant un autre, faute de quoi un même défaut compterait deux fois et la liste de `CA-06` dépendrait de l'implémentation :
+
+- `W-SUBJECT-TOO-SHORT` et `W-SUBJECT-TOO-LONG` ne sont évalués **que si un sujet est présent** : sur `issue:`, `E-EMPTY-SUBJECT` les remplace. Un sujet vide n'est pas un sujet court.
+- `E-DECISION-SUBJECT` remplace `W-SUBJECT-TOO-SHORT` sur une réponse `decision` : le seuil de `minDecisionSubjectLength` est le seul qui s'y applique. Sur une réponse `decision` **sans aucun sujet**, c'est `E-EMPTY-SUBJECT` qui l'emporte à son tour : les deux codes diraient la même chose, et le §6.1.1 fait de la présence du sujet une condition distincte de sa longueur.
+- Un code dont `severities` fixe la sévérité à `off` **est retiré de la liste restituée** : il n'apparaît ni dans `formatDiagnostics`, ni dans les compteurs du résumé humain du check (§6.3.1), ni dans le verdict comparé par `CA-06`. Désactiver une règle, c'est ne plus l'évaluer, pas l'évaluer en silence.
+
+**Ordre de restitution des diagnostics.** `CA-06` compare une **liste ordonnée** de couples (code, sévérité) : cet ordre doit donc être déterministe. Il est celui du **tableau du §3.5.2, de haut en bas** — dont les lignes sont pour cette raison groupées par temps, le préfixe en tête. Deux implémentations qui appliquent les mêmes règles produisent ainsi la même liste, caractère pour caractère.
+
+L'exemple qui motive ce découpage : `Attention : le build casse` échoue à l'étage 1a, puis à l'étage 1b — `Attention` n'est pas un label, l'espace avant le deux-points prouve qu'il s'agit d'une phrase et non d'un préfixe. La personne reçoit le format attendu. Si elle réessaie avec `attention: le build casse`, la forme est bonne : elle passe l'étage 1a, n'est donc jamais soumise à 1b, et reçoit à l'étage 2 la liste des labels. Chaque message répond exactement à ce qui vient d'être fait.
+
+Ce découpage est ce qui rend l'exigence du §5.3 — « une proposition de correction actionnable en un clic » — réellement applicable : à chaque étage correspond une correction unique et calculable, ce qu'un code de diagnostic unique ne permettrait pas.
+
+**Cas de `E-MALFORMED-PREFIX`**, évalués dans cet ordre et s'arrêtant au premier qui s'applique :
+
+| # | Condition sur la ligne | Motif |
+|:---:|---|---|
+| 1 | `(` présent, `)` absent | parenthèse non fermée — `issue (blocking: x` |
+| 2 | `)` présent, `(` absent | parenthèse non ouverte — `issue blocking): x` |
+| 3 | aucun `:` | deux-points manquant — `issue (blocking) x` |
+| 4 | une espace précède le `:` | espace avant le deux-points — `issue : le nom est ambigu` |
+| 5 | le `:` n'est suivi ni d'une espace ni de la fin de ligne | espace manquante après le deux-points — `issue:pas-d-espace` |
+| 6 | aucun des motifs ci-dessus | caractère inattendu entre le label et le deux-points — `issue2: x`, `issue (ux) (perf): x`. Énoncer le format attendu |
+
+Le motif 4 est celui qui justifie le discriminant de l'étage 1b : `issue : le nom est ambigu` et `Attention : le build casse` ont **exactement la même forme**, et seul le fait que `issue` soit un label permet de dire à l'une « collez le deux-points » et à l'autre « voici le format attendu ».
+
+**Point structurant : cette passe ne durcit pas la regex de référence.** Elle ajoute, en cas d'échec de celle-ci, une **seconde analyse purement textuelle** de la ligne — décrite par le tableau des motifs ci-dessus, et non par une seconde expression régulière. Durcir la regex pour qu'elle rejette ces saisies les ferait au contraire retomber en `E-NO-LABEL` — et y entraînerait aussi les cas aujourd'hui bien diagnostiqués, comme `issue (blocking,,): x` ou `issue (): x`, que la regex capture volontairement pour que le validateur puisse les qualifier précisément (§3.3). La regex reconnaît largement ; le validateur tranche.
+
+#### 3.5.2 Codes de diagnostic
+
 | Code | Règle | Sévérité |
 |------|-------|----------|
-| `E-NO-LABEL` | Aucun label reconnu en tête de commentaire | Erreur |
-| `E-UNKNOWN-LABEL` | Label absent de la liste configurée | Erreur |
-| `E-UNKNOWN-DECORATION` | Décoration inconnue et `allowFreeDecorations: false` | Erreur |
-| `E-CONFLICT` | Décoration incompatible avec le label (§3.3) | Erreur |
-| `E-EMPTY-SUBJECT` | Sujet vide ou réduit à une ponctuation | Erreur |
-| `E-SUBJECT-TOO-SHORT` | Sujet < `minSubjectLength` (défaut : 10 caractères) | Erreur |
+| **Préfixe** — temps 1, au plus un seul (§3.5.1) | | |
+| `E-NO-LABEL` | La ligne de préfixe (§3.4.1) n'a pas la forme `label: sujet` (étage 1b) | Erreur |
+| `E-MALFORMED-PREFIX` | Tentative de commentaire conventionnel dont le préfixe est mal formé — le motif exact figure dans le message (étage 1b) | Erreur |
+| `E-UNKNOWN-LABEL` | Forme correcte, mais le label est absent de la liste configurée (étage 2) | Erreur |
+| `W-CASE` | Label saisi avec une casse différente (`Issue:`) — n'interrompt pas la suite (étage 3) | Avertissement + correction auto |
+| **Décorations** — temps 2, cumulatifs (§3.3) | | |
+| `E-DECORATION-SYNTAX` | Décoration mal formée : caractère hors identifiant, espace interne, élément vide, parenthèses vides | Erreur |
+| `E-UNKNOWN-DECORATION` | Décoration inconnue et `decorations.allowFree` à `false` | Erreur |
+| `E-CONFLICT` | Décoration incompatible avec le label, ou décorations porteuses contradictoires entre elles (§3.3, règles 1 et 2) | Erreur |
+| `W-DECORATION-STYLE` | Décoration en majuscules, espaces superflus, doublon, ou espace manquante avant la parenthèse | Avertissement + correction auto |
+| **Sujet** — temps 2, cumulatifs | | |
+| `E-EMPTY-SUBJECT` | Aucun sujet après le deux-points | Erreur |
+| `E-DECISION-SUBJECT` | Réponse `decision` dont le motif est plus court que `rules.minDecisionSubjectLength` (§6.1.1) | Erreur |
+| `W-SUBJECT-TOO-SHORT` | Sujet < `minSubjectLength` (défaut : 5 caractères) | Avertissement |
 | `W-SUBJECT-TOO-LONG` | Sujet > `maxSubjectLength` (défaut : 120 caractères) | Avertissement |
-| `W-MISSING-DECORATION` | Label `suggestion` ou `question` sans décoration explicite | Avertissement |
-| `W-NO-DISCUSSION` | Label bloquant sans corps de discussion | Avertissement |
-| `W-CASE` | Label saisi avec une majuscule (`Issue:`) | Avertissement + correction auto |
+| **Discussion et contexte** — temps 2, cumulatifs | | |
+| `W-NO-DISCUSSION` | Commentaire **bloquant au sens du §3.3** sans aucun contenu non blanc en dehors de sa ligne de préfixe (§3.1) | Avertissement |
+| `W-MISSING-DECORATION` | Label `suggestion` ou `question` sans décoration **porteuse** (§3.3) — une décoration purement descriptive comme `(perf)` ne l'éteint pas | Avertissement |
+| `W-NOT-BLOCKABLE` | Commentaire **bloquant au sens du §3.3** — label et décorations résolus — dans une zone qui ne peut pas porter d'état bloquant (§4.1) | Avertissement |
 
 Les **avertissements ne bloquent jamais** l'envoi. Seules les erreurs le font, et uniquement en mode `enforce` (§7).
+
+**Définition de « conforme ».** Un commentaire est **conforme** s'il ne produit, après application de `severities` (§8.2), **aucun diagnostic de sévérité `error`**. Un commentaire qui ne porte que des avertissements est donc conforme : c'est ce qui rend simultanément vraies la phrase ci-dessus et la promesse du §3.1. Les avertissements sont comptés **séparément** — ils apparaissent dans le résumé humain du check (§6.3.1) et dans les indicateurs du §12, jamais comme cause d'échec. C'est ce sens, et lui seul, qu'emploient le §2, le critère 1 du §6.2.1 et `CA-37`.
+
+*Calibrage :* `W-SUBJECT-TOO-SHORT` est délibérément un avertissement, et non une erreur, avec un seuil bas de 5 caractères. Un sujet trop court n'est pas un défaut de forme grave — le pénaliser en erreur bloquante pousse à contourner la règle plutôt qu'à l'appliquer (voir la lecture des indicateurs en §12).
 
 ---
 

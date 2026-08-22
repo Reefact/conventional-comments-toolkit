@@ -236,3 +236,42 @@ describe('écart 3 — §8.1.1 : labels.minimum contraint la valeur effective, p
     }
   });
 });
+
+describe('écart 10 — §6.2.4 : un verdict imposé « failure » est rabattu en neutre sur un brouillon', () => {
+  it('configuration invalide sous enforce + PR en brouillon → neutral, jamais failure', () => {
+    const r = evaluate(
+      evalInput({
+        config: config((c) => (c.mode = 'enforce')),
+        configNotices: [{ kind: 'invalid-config', message: 'line 3' }],
+        forceState: { state: 'failure', because: 'invalid-config' },
+        ctx: ctx({ isDraft: true }),
+      })
+    );
+    expect(r.state).toBe('neutral'); // « toujours informatif, jamais en échec » (§6.2.4)
+    expect(r.notices.some((n) => n.kind === 'invalid-config')).toBe(true);
+    // Hors brouillon, l'échec imposé s'applique tel quel.
+    const nonDraft = evaluate(
+      evalInput({
+        config: config((c) => (c.mode = 'enforce')),
+        configNotices: [{ kind: 'invalid-config', message: 'line 3' }],
+        forceState: { state: 'failure', because: 'invalid-config' },
+      })
+    );
+    expect(nonDraft.state).toBe('failure');
+  });
+});
+
+describe('écart 11 — §6.3.1 : le domaine d’`activated` est l’ISO 8601, pas Date.parse', () => {
+  it('rejette les formes non ISO que Date.parse accepterait', async () => {
+    const { decodeSummary } = await import('../src/summary.js');
+    const line = (activated: string) =>
+      `cc/1 state=success draft=0 exempt=0 mode=warn activated=${activated} core=1.0.0 cfg=9f3a1c7e t=0 c=0 w=0`;
+    expect(decodeSummary(line('12/25/2026'))).toBeNull();
+    expect(decodeSummary(line('2026'))).toBeNull();
+    expect(decodeSummary(line('2026-09-01'))).toBeNull(); // la forme écrite porte l'heure
+    expect(decodeSummary(line('2026-09-01T00:00:00Z'))).not.toBeNull();
+    expect(decodeSummary(line('2026-09-01T00:00:00.123Z'))).not.toBeNull();
+    expect(decodeSummary(line('2026-09-01T00:00:00+02:00'))).not.toBeNull();
+    expect(decodeSummary(line('-'))).not.toBeNull();
+  });
+});

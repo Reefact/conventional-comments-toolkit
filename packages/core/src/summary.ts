@@ -53,7 +53,13 @@ export function decodeSummary(line: string): PublishedSummary | null {
   const mode = fields.get('mode')!;
   if (!(MODES as readonly string[]).includes(mode)) return null;
   const activated = fields.get('activated')!;
-  if (activated !== '-' && Number.isNaN(Date.parse(activated))) return null;
+  // Le domaine est l'ISO 8601, pas « ce que Date.parse accepte » : la parsabilité seule
+  // dépend de l'implémentation — la classe de dérive de bibliothèque que le document
+  // proscrit (§3.4.1, §6.3.1). Forme stricte, puis validité calendaire.
+  if (activated !== '-') {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(activated)) return null;
+    if (Number.isNaN(Date.parse(activated))) return null;
+  }
   const core = fields.get('core')!;
   if (!/^\d+\.\d+\.\d+$/.test(core)) return null;
   const cfg = fields.get('cfg')!;

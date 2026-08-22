@@ -23,15 +23,15 @@ export function mixPinnedWithLive(pinned: EffectiveConfig, live: EffectiveConfig
 
   // severities — par code : sévérité plus haute restrictive → la plus basse des deux
   // effectives s'applique. Les codes absents valent la sévérité du tableau §3.5.2 ;
-  // on ne matérialise que les écarts explicites pour garder l'empreinte stable.
+  // une entrée égale à ce défaut n'est PAS matérialisée : elle fabriquerait un écart
+  // d'empreinte permanent avec l'extension après un assouplissement (§8.1.3, règle 2).
   const codes = new Set([...Object.keys(pinned.severities), ...Object.keys(live.severities)]);
   out.severities = {};
   for (const code of codes) {
-    const p = pinned.severities[code];
-    const l = live.severities[code];
-    if (p !== undefined && l !== undefined) out.severities[code] = minSeverity(p, l);
-    else if (p !== undefined) out.severities[code] = minSeverity(p, defaultSeverityOf(code));
-    else if (l !== undefined) out.severities[code] = minSeverity(l, defaultSeverityOf(code));
+    const p = pinned.severities[code] ?? defaultSeverityOf(code);
+    const l = live.severities[code] ?? defaultSeverityOf(code);
+    const mixed = minSeverity(p, l);
+    if (mixed !== defaultSeverityOf(code)) out.severities[code] = mixed;
   }
 
   // labels — par entrée : retrait/désactivation restrictifs, ajout/activation élargissants.
@@ -68,11 +68,27 @@ export function mixPinnedWithLive(pinned: EffectiveConfig, live: EffectiveConfig
   // s'applique (null, qui ne met rien dans le périmètre, est la valeur la plus lâche).
   out.activation = { activatedAt: looserActivation(pinned.activation.activatedAt, live.activation.activatedAt) };
 
-  // resolverOverrideGroup — restriction (ajout d'un groupe à l'intersection) restrictive,
-  // élargissement (retrait) élargissant → intersection des deux listes.
-  out.resolverOverrideGroup = pinned.resolverOverrideGroup.filter((g) =>
-    live.resolverOverrideGroup.includes(g)
-  );
+  // resolverOverrideGroup — restriction de l'habilitation restrictive (épinglée),
+  // élargissement en direct (§8.1.3). L'habilitation est « membre de chacun des groupes
+  // cités », et la liste vide n'habilite personne (§8.2) : trois cas de bord encadrent
+  // l'intersection nue, guidés par « l'erreur sûre est de retarder un assouplissement,
+  // jamais d'infliger un durcissement ».
+  {
+    const p = pinned.resolverOverrideGroup;
+    const l = live.resolverOverrideGroup;
+    if (p.length === 0) {
+      // De « personne » vers une liste : l'habilitation s'élargit → en direct.
+      out.resolverOverrideGroup = [...l];
+    } else if (l.length === 0) {
+      // Vers « personne » : durcissement maximal → épinglé.
+      out.resolverOverrideGroup = [...p];
+    } else {
+      const intersection = p.filter((g) => l.includes(g));
+      // Un remplacement complet rendrait l'intersection vide, donc « personne » — un
+      // durcissement infligé qu'aucune colonne du tableau ne demande : épingler.
+      out.resolverOverrideGroup = intersection.length > 0 ? intersection : [...p];
+    }
+  }
 
   // Clause de fermeture : toute clé du §8.2 non classée est épinglée. Concerne
   // `overrideLabel` — le nom de l'étiquette reste celui du jugement d'origine.
@@ -114,7 +130,9 @@ function mixLabels(pinned: LabelConfig[], live: LabelConfig[]): LabelConfig[] {
       blockingByDefault: p.blockingByDefault && l.blockingByDefault, // false→true restrictif
       alwaysNonBlocking: p.alwaysNonBlocking || l.alwaysNonBlocking, // true→false restrictif
       aliases: union(p.aliases, l.aliases), // retrait d'un alias restrictif
-      ...(l.icon !== undefined ? { icon: l.icon } : p.icon !== undefined ? { icon: p.icon } : {}),
+      // Clause de fermeture (§8.1.3) : `labels[].color` est énuméré en direct ;
+      // `labels[].icon` ne l'est pas → épinglé, comme toute clé non classée.
+      ...(p.icon !== undefined ? { icon: p.icon } : l.icon !== undefined ? { icon: l.icon } : {}),
       ...(l.color !== undefined ? { color: l.color } : p.color !== undefined ? { color: p.color } : {}),
     });
   }

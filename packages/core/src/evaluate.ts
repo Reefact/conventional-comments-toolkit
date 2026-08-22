@@ -253,10 +253,16 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
       notices.push({ kind: forceState.because, message: t(lang, `notice.${forceState.because}`, { detail: '' }) });
     }
   } else {
-    const crit2Failed = appliedExemption === undefined && counts.unresolvedThreads > 0;
+    const crit2Failed = counts.unresolvedThreads > 0;
     const crit1Failed = config.formatSeverity === 'error' && counts.nonCompliantComments > 0;
+    // Exemption admise : « le statut passe au vert » (§6.3.2) — c'est le mécanisme qui
+    // débloque une PR entière (§6.1.1), y compris quand un commentaire non conforme d'un
+    // tiers ne peut pas être corrigé. Les compteurs restent non nuls (§6.5).
     state =
-      config.mode === 'enforce' && !ctx.isDraft && (crit2Failed || crit1Failed)
+      config.mode === 'enforce' &&
+      !ctx.isDraft &&
+      appliedExemption === undefined &&
+      (crit2Failed || crit1Failed)
         ? 'failure'
         : 'success';
   }

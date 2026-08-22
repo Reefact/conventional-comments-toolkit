@@ -157,6 +157,11 @@ export function parseConfigDocument(
               ok = false;
             } else label['aliases'] = e['aliases'];
           }
+          for (const k of Object.keys(e)) {
+            if (!['id', 'enabled', 'blockingByDefault', 'alwaysNonBlocking', 'icon', 'color', 'aliases'].includes(k)) {
+              notices.push(warning(`unknown key "labels[].${k}" ignored`, `labels[].${k}`));
+            }
+          }
           if (ok) labels.push(label);
         }
         out[key] = labels;
@@ -341,6 +346,9 @@ export function parseConfigDocument(
             bad(key, '"abbreviations" must be an object mapping abbreviation to inserted text');
           } else shortcuts['abbreviations'] = a;
         }
+        for (const k of Object.keys(s)) {
+          if (k !== 'abbreviations') notices.push(warning(`unknown key "shortcuts.${k}" ignored`, `shortcuts.${k}`));
+        }
         out[key] = shortcuts;
         break;
       }
@@ -376,6 +384,9 @@ export function parseConfigDocument(
           if (e['endpoint'] !== null && typeof e['endpoint'] !== 'string') bad(key, '"endpoint" must be a string or null');
           else log['endpoint'] = e['endpoint'];
         }
+        for (const k of Object.keys(e)) {
+          if (k !== 'endpoint') notices.push(warning(`unknown key "exemptionLog.${k}" ignored`, `exemptionLog.${k}`));
+        }
         out[key] = log;
         break;
       }
@@ -398,6 +409,9 @@ export function parseConfigDocument(
         if ('endpoint' in tel) {
           if (tel['endpoint'] !== null && typeof tel['endpoint'] !== 'string') bad(key, '"endpoint" must be a string or null');
           else telemetry['endpoint'] = tel['endpoint'];
+        }
+        for (const k of Object.keys(tel)) {
+          if (k !== 'enabled' && k !== 'endpoint') notices.push(warning(`unknown key "telemetry.${k}" ignored`, `telemetry.${k}`));
         }
         out[key] = telemetry;
         break;
@@ -502,6 +516,22 @@ export function hasNestedQuantifier(pattern: string): boolean {
       stack.push(containsQuantifier);
       containsQuantifier = false;
       i++;
+      // Le `?` de syntaxe de groupe — `(?:`, `(?=`, `(?!`, `(?<=`, `(?<!`, `(?<nom>` —
+      // n'est pas un quantificateur : le sauter pour ne pas rejeter `(?:abc)+` à tort.
+      if (pattern[i] === '?') {
+        i++;
+        if (pattern[i] === ':' || pattern[i] === '=' || pattern[i] === '!') {
+          i++;
+        } else if (pattern[i] === '<') {
+          i++;
+          if (pattern[i] === '=' || pattern[i] === '!') {
+            i++;
+          } else {
+            while (i < pattern.length && pattern[i] !== '>') i++;
+            i++;
+          }
+        }
+      }
       continue;
     }
     if (c === ')') {

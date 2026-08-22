@@ -5,33 +5,16 @@ Branche de travail : `claude/implement-specification-fr-2a14q6` (pousser dessus,
 
 ## Phase en cours et prochaine action
 
-**Phase : revue de conformité finale (post-implémentation) et corrections.**
-Toutes les phases de code (P1, P1', P2, P3, P4, P5) sont implémentées et testées ; voir
-le tableau de statut du README.
+**Phase : revue de conformité finale — volet core/ corrigé.**
+Les 9 constats de la revue adversariale de `core/` sont traités : 8 corrigés (dont
+`labels.minimum` réaligné sur la sémantique « valeur effective »), 1 réfuté (limite basse
+E- : le validateur clampait déjà ; clamp ajouté aussi à la résolution, avec notice).
+Tests de non-régression : `packages/core/test/review-fixes.test.ts` (17 tests).
 
-**Prochaine action concrète :** corriger les écarts confirmés par la revue adversariale
-de `core/` contre la spec, puis ajouter un test par écart corrigé. Constats déjà produits
-(9, en attente de contre-vérification au moment de l'interruption éventuelle — si la liste
-des verdicts n'est plus disponible, re-vérifier chaque constat directement contre la spec
-avant de corriger) :
-
-1. **exemption admise n'éteint pas le critère 1** (`core/src/evaluate.ts`, calcul de `state`) —
-   §6.3.2 « le statut passe au vert » : `crit1Failed` doit être neutralisé par `appliedExemption`. RÉEL, à corriger.
-2. **plancher `severities` impose sa valeur même quand aucun niveau n'écrit** et peut ainsi
-   descendre sous le défaut du tableau §3.5.2 (`config/floor.ts`, branche `current === undefined`) — vérifier : le plancher est un minimum, comparer au défaut du code.
-3. **plancher `labels.minimum` n'agit que sur les valeurs écrites** (`floor.ts` + `written`) —
-   relire §8.1.1 : lecture littérale retenue (« passer à false ») ; l'écart signalé porte sur une valeur héritée d'un niveau précédent — à trancher contre la spec.
-4. **`hasNestedQuantifier` compte le `?` de `(?:`/`(?=`/`(?<` comme quantificateur** (`config/schema.ts`) — RÉEL, faux rejets d'allowlist.
-5. limite basse E- non appliquée quand floorVersion non supportée (mineur).
-6. clés inconnues imbriquées sans avertissement dans shortcuts/telemetry/exemptionLog/labels (mineur).
-7. **`resolverOverrideGroup` : intersection épinglée incorrecte** (`config/pinning.ts`) — restriction appliquée en direct au lieu d'épinglée ; relire §8.1.3 tableau (« restriction de l'habilitation : restrictif→épinglé »). RÉEL probable.
-8. **mélange `severities` matérialise des entrées égales au défaut → écart d'empreinte fabriqué** (`config/pinning.ts`) — vérifier avec `fingerprint()`.
-9. `labels[].icon` en direct vs clause de fermeture (mineur — la clause liste `labels[].color` seulement ; décider et documenter).
-
-Le journal de la revue (verdicts refuted/confirmed) vit hors repo :
-`~/.claude/projects/.../workflows/wf_e23cebd6-359/journal.jsonl` — s'il a disparu, re-vérifier à la main.
-
-Ensuite : revue équivalente ciblée serveur/extension (divergences A/B, §6.4), puis pousser.
+**Prochaine action concrète :** lancer la revue adversariale équivalente sur le
+composant serveur (`packages/server/src/compliance/*` vs §6.2-§6.4, §8.1.5) et
+l'extension (`packages/extension/src/*` vs §5, §6.5, §9.2.3), corriger les écarts
+confirmés, puis pousser et clore.
 
 ## Fait
 
@@ -52,7 +35,7 @@ Ensuite : revue équivalente ciblée serveur/extension (divergences A/B, §6.4),
 - Exemption chemin de repli : état `pending|confirmed` en stockage ; une `pending` rencontrée par une évaluation est supprimée.
 - Étage −1 : une `decision` d'un auteur exempté n'est PAS retenue comme decision de gouvernance (choix documenté dans `evaluate.ts` — analyze() rend 'exempt').
 - Décision reply : seuls seuils §6.1.1 ; W-SUBJECT-TOO-LONG non appliqué (« le seul qui s'y applique »).
-- `labels.minimum` du plancher : lecture littérale — n'annule que les écritures org/repo de `false`, ne force pas un défaut produit à true (documenté dans floor.ts).
+- `labels.minimum` du plancher : sémantique « valeur effective » (comme les autres clés du plancher) — enabled/blockingByDefault forcés à true pour les ids du minimum, quel que soit le niveau qui portait false (revue adversariale, écart 3).
 - Slash GitHub : profil avec `['/azp']` (liste extensible) ; AzDO `[]`.
 
 ## Pièges rencontrés
@@ -68,5 +51,4 @@ Ensuite : revue équivalente ciblée serveur/extension (divergences A/B, §6.4),
 
 ## Cassé / en cours
 
-Rien de cassé ; working tree propre au moment de l'écriture. Corrections de la revue non
-commencées. Le repo n'a pas encore été poussé vers origin depuis le début du chantier.
+Rien de cassé. 334 tests verts, build OK. Branche poussée sur origin.

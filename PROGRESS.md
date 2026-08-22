@@ -5,16 +5,20 @@ Branche de travail : `claude/implement-specification-fr-2a14q6` (pousser dessus,
 
 ## Phase en cours et prochaine action
 
-**Phase : revue de conformité finale — volet core/ corrigé.**
-Les 9 constats de la revue adversariale de `core/` sont traités : 8 corrigés (dont
-`labels.minimum` réaligné sur la sémantique « valeur effective »), 1 réfuté (limite basse
-E- : le validateur clampait déjà ; clamp ajouté aussi à la résolution, avec notice).
-Tests de non-régression : `packages/core/test/review-fixes.test.ts` (17 tests).
+**Phase : revue adversariale serveur/extension — corrections en cours.**
+Revue core/ : terminée, 11 écarts corrigés (`packages/core/test/review-fixes.test.ts`).
+Revue serveur/extension (workflow wf_2632819c-5b6) : verify en cours, refute à suivre.
 
-**Prochaine action concrète :** lancer la revue adversariale équivalente sur le
-composant serveur (`packages/server/src/compliance/*` vs §6.2-§6.4, §8.1.5) et
-l'extension (`packages/extension/src/*` vs §5, §6.5, §9.2.3), corriger les écarts
-confirmés, puis pousser et clore.
+**Prochaine action concrète :** appliquer les corrections serveur suivantes (constats
+verify, à croiser avec les verdicts refute du journal
+`~/.claude/projects/.../workflows/wf_2632819c-5b6/journal.jsonl` quand ils tombent) :
+1. admin.ts dryRun : résoudre isOverrideMember réellement (aujourd'hui figé à false → faux échecs au rapport à blanc).
+2. Page de statut (http.ts) : servir la MÊME sortie que le §6.3.1 (headline, fils, diagnostics, notices) — persister la sortie humaine dans PublishedRecord + index chemin→prKey (hôtes en dur à retirer).
+3. orchestrator : échec isInGroup = incapacité à évaluer (délai de grâce), pas « non habilité » ; échec fetchHeadSha porte 14.c = abandon de publication ; étape 12 sans condition forceState.
+4. scheduler.Reconciler : relire reconcileIntervalSeconds à chaque tour (setTimeout chaîné).
+5. adaptateur GitHub : parseEvent rejette un commentaire d'issue hors PR (http.ts ignore proprement) ; pagination REST (labels timeline, issue comments, reviews, listOpenPrs) et réponses GraphQL >100 ; slashPrefixes += '/rebase' (§A.7) côté client et serveur.
+6. Constat « invalidation cache §6.3.3 inopérante » : attendre le verdict refute — le mécanisme normatif implémenté est l'endpoint admin (documenté operations.md) + détection défensive.
+Puis re-tester, committer, pousser ; enfin synthèse finale.
 
 ## Fait
 

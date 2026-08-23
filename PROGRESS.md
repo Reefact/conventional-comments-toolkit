@@ -15,9 +15,27 @@ racines en édition), puis dernier écart §6.3.3 : sonde `OrgModeWatch` +
 observé en ≤ 60 s et invalide tout le cache, sans attendre le TTL (CA-27,
 `server/test/review-fixes-server.test.ts`).
 
-**Prochaine action concrète :** aucune. Sur toute reprise : relire ce fichier,
-`git log`, et n'ouvrir un chantier que sur demande explicite — une phase
-terminée, testée et conforme reste terminée.
+**Prochaine action concrète :** appliquer les 10 résidus confirmés par le rejeu
+des 19 refutes (workflow wf_341acd57-803, verdicts dans son journal.jsonl ;
+extraits : scratchpad/residuals.md). Lots prévus, chacun avec tests :
+A. computePrefixInsertion/toggle : reconnaître le préfixe existant via les
+   étapes 4-6 du §3.4.1 + tolérance emoji (ligne indentée/BOM/emoji → double
+   préfixe aujourd'hui) ; sélection restaurée dans editor-controller quand
+   l'insertion tombe après elle.
+B. config-resolver : lecture unreachable → repli NIVEAU INFÉRIEUR (§8.1.5,
+   §9.2.3 l.1476), plus jamais la valeur expirée du même niveau ; écrire
+   degradedState pour la page d'options.
+C. §5.2 : raccourcis directs réellement configurables (storage.sync + options).
+D. §5.5 : filtre par label agissant sur les fils RENDUS de la page ; bandeau
+   rendu dès qu'il y a des fils ; retirer filterThreadsByLabel inutilisé.
+E. GitHub client : ancre de fil + form centralisés (§9.4) ; commentId/threadId
+   sur édition (§9.2.3) ; détection racine par candidat cohérent + log §9.4.
+F. AzDO client : editForm sans collision « comment-editor » ; closest ordonné ;
+   firstCommentOf centralisé hors conteneurs d'édition ; URL getRepoConfig sur
+   *.visualstudio.com (org du sous-domaine, pas du chemin) ; DefaultCollection ;
+   forme /tfs/ on-prem ; commentId/threadId.
+G. Serveur AzDO : pagination listOpenPrs ($top/$skip) + tests pagination.
+Puis suite complète, build, PROGRESS, commit, push.
 
 ## Fait
 

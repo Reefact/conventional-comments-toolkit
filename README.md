@@ -35,6 +35,10 @@ npm run spike       # P1' spike: programmatic-write assumption in Chromium (§9.
 npm run build:extension   # MV3 bundle into packages/extension/dist-ext (+ Firefox variant)
 ```
 
+Starting from a machine with none of this installed? See the step-by-step Windows/PowerShell
+guide: [`docs/extension-setup.en.md`](./docs/extension-setup.en.md) (French:
+[`docs/extension-setup.md`](./docs/extension-setup.md)).
+
 ## Configuration
 
 A repository is configured by a `.conventional-comments.json` file on its default branch —

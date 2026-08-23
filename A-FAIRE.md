@@ -38,8 +38,14 @@ composant A est contournable par construction, c'est B qui porte la contrainte r
 
 ## 2. Installer l'extension pour l'essayer
 
-Le bundle **n'est pas committé** (`dist-ext/` est dans `.gitignore` — c'est un artefact
-de build) : sur un clone frais, il faut le générer une fois, Node ≥ 20 requis :
+**Poste vierge (aucun Node.js/npm/Git installé) ?** Suivez plutôt le guide dédié, pas à
+pas, avec les messages d'erreur exacts et leur solution :
+[`docs/extension-setup.md`](./docs/extension-setup.md) (anglais :
+[`docs/extension-setup.en.md`](./docs/extension-setup.en.md)).
+
+Si Node.js et npm sont déjà installés, la version courte suffit. Le bundle **n'est pas
+committé** (`dist-ext/` est dans `.gitignore` — c'est un artefact de build) : sur un clone
+frais, il faut le générer une fois, Node ≥ 20 requis :
 
 ```sh
 npm install

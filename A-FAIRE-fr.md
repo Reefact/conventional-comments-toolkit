@@ -28,7 +28,7 @@ Le service auto-hébergeable existe : `packages/server/src/main.ts` (configurati
 variables d'environnement `CCT_*`), une image Docker (`Dockerfile`, validée par le job
 CI « Image Docker du composant B »), et trois stockages au choix — mémoire, fichier
 JSON, SQLite — derrière l'interface `Storage`, point d'extension documenté pour une
-base externe. Tout est dans **`docs/deployment.md`** : variables, `docker run`,
+base externe. Tout est dans **`docs/deployment-fr.md`** : variables, `docker run`,
 branchement des webhooks, volume `/data`.
 
 Ce qui manque encore est **chez le client** : une machine où le faire tourner en
@@ -40,8 +40,8 @@ composant A est contournable par construction, c'est B qui porte la contrainte r
 
 **Poste vierge (aucun Node.js/npm/Git installé) ?** Suivez plutôt le guide dédié, pas à
 pas, avec les messages d'erreur exacts et leur solution :
-[`docs/extension-setup.md`](./docs/extension-setup.md) (anglais :
-[`docs/extension-setup.en.md`](./docs/extension-setup.en.md)).
+[`docs/extension-setup-fr.md`](./docs/extension-setup-fr.md) (anglais :
+[`docs/extension-setup-en.md`](./docs/extension-setup-en.md)).
 
 Si Node.js et npm sont déjà installés, la version courte suffit. Le bundle **n'est pas
 committé** (`dist-ext/` est dans `.gitignore` — c'est un artefact de build) : sur un clone
@@ -104,7 +104,7 @@ Chromium sans interface. Un passage humain reste donc utile, dans cet ordre :
    tester ici tant que le serveur n'est pas en place.
 
 Deux critères d'acceptation de la spec (§11) ne sont *que partiellement* automatisés et
-attendent ce genre de passage manuel — voir `docs/ca-matrix.md`, section « Critères
+attendent ce genre de passage manuel — voir `docs/ca-matrix-fr.md`, section « Critères
 vérifiés partiellement » : le parcours clavier complet (`CA-12`) et le rendu exact du
 corps du check GitHub (`CA-25`).
 
@@ -113,14 +113,14 @@ corps du check GitHub (`CA-25`).
 | # | Tâche | Qui | Bloquant pour merger #2 ? |
 |---|-------|-----|---------------------------|
 | 1 | Essayer l'extension en vrai (§3 ci-dessus) | Vous | Non |
-| 2 | ~~Programme de déploiement du composant B~~ — **fait** : `docs/deployment.md`, image Docker | — | — |
+| 2 | ~~Programme de déploiement du composant B~~ — **fait** : `docs/deployment-fr.md`, image Docker | — | — |
 | 3 | Choisir un hébergement pour le serveur (conteneur toujours actif, VM — pas de « sans serveur » qui endort le processus) et l'y déployer | Vous | Non — mais bloquant pour tout blocage réel de PR |
 | 4 | Créer une app GitHub / un service hook Azure DevOps (jetons, secret de webhook) | Vous | Non |
-| 5 | **Mesure de référence P0** (temps de revue, taux de conformité *avant* l'outil) | Vous | Non, mais **irrattrapable** si l'outil est déployé avant — §14, `docs/operations.md` |
+| 5 | **Mesure de référence P0** (temps de revue, taux de conformité *avant* l'outil) | Vous | Non, mais **irrattrapable** si l'outil est déployé avant — §14, `docs/operations-fr.md` |
 | 6 | Choisir un dépôt pilote et suivre la trajoire `assist → warn → enforce` | Vous | Non |
 | 7 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) si diffusion au-delà de vous | Vous | Non |
 | 8 | Fournir des captures DOM réelles pour le smoke test de sélecteurs (§9.4) | Vous (ou moi, avec un accès) | Non |
-| 9 | Vérifier les deux hypothèses AzDO non tranchées par le spike (type d'éditeur, lisibilité du fichier de config) sur un vrai tenant Azure DevOps | Vous (ou moi, avec un accès) | Non — replis dégradés déjà en place, documentés dans `spikes/p1-prime/README.md` |
+| 9 | Vérifier les deux hypothèses AzDO non tranchées par le spike (type d'éditeur, lisibilité du fichier de config) sur un vrai tenant Azure DevOps | Vous (ou moi, avec un accès) | Non — replis dégradés déjà en place, documentés dans `spikes/p1-prime/README-fr.md` |
 
 Rien dans cette liste ne bloque le merge de la PR #2 : le code est complet, testé, et la
 CI est verte. Ces tâches sont des étapes d'**exploitation**, pas de développement
@@ -129,10 +129,10 @@ inachevé.
 ## 5. Où trouver le reste
 
 - `README.md` — vue d'ensemble, commandes, statut par phase (§14).
-- `docs/architecture.md` — comment A et B partagent les règles sans jamais diverger.
-- `docs/operations.md` — procédure de retour arrière, prérequis avant `enforce`, rapport
+- `docs/architecture-fr.md` — comment A et B partagent les règles sans jamais diverger.
+- `docs/operations-fr.md` — procédure de retour arrière, prérequis avant `enforce`, rapport
   à blanc.
-- `docs/ca-matrix.md` — chaque critère d'acceptation → le test qui le vérifie.
+- `docs/ca-matrix-fr.md` — chaque critère d'acceptation → le test qui le vérifie.
 - `specifications-fr.md` — la référence normative complète (ne se modifie jamais pour
   suivre le code).
 - `PROGRESS.md` — état de reprise technique, pour une session de développement future ;

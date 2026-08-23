@@ -156,5 +156,5 @@ sans bouton rouge « Erreurs ».
    le champ.
 
 Si tout ça fonctionne, l'extension est opérationnelle. Elle tourne en mode `assist` par
-défaut — elle aide et signale, mais ne bloque jamais l'envoi (voir `A-FAIRE.md` à la
+défaut — elle aide et signale, mais ne bloque jamais l'envoi (voir `A-FAIRE-fr.md` à la
 racine du dépôt pour la suite : composant serveur, autres plateformes, etc.).

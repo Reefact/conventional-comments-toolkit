@@ -84,4 +84,4 @@ choix de la technologie est libre ; l'existence de ce stockage ne l'est pas.
 
 `PlatformOperationalFacts` (dans `compliance/adapter.ts`) porte les hypothèses de
 plateforme que le spike doit établir, chacune avec son repli normatif déjà codé — voir
-`spikes/p1-prime/README.md`. `githubFacts` et `azdoFacts` en donnent les valeurs connues.
+`spikes/p1-prime/README-fr.md`. `githubFacts` et `azdoFacts` en donnent les valeurs connues.

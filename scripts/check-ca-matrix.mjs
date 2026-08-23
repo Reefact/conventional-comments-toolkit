@@ -1,6 +1,6 @@
 // Garde-fou de la règle du chantier (CLAUDE.md, §11) : « tout critère d'acceptation
 // raisonnablement automatisable est couvert par un test qui cite son identifiant ; la
-// correspondance vit dans docs/ca-matrix.md ». Trois vérifications, dans cet ordre :
+// correspondance vit dans docs/ca-matrix-fr.md ». Trois vérifications, dans cet ordre :
 //
 //   1. la matrice couvre tous les CA de la spécification (§11) ;
 //   2. chaque identifiant listé apparaît littéralement dans au moins un test — c'est ce
@@ -14,7 +14,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const MATRIX = join(ROOT, 'docs/ca-matrix.md');
+const MATRIX = join(ROOT, 'docs/ca-matrix-fr.md');
 const SPEC = join(ROOT, 'specifications-fr.md');
 const SKIPPED_DIRS = new Set(['node_modules', 'dist', 'dist-ext', '.git', 'coverage']);
 
@@ -39,7 +39,7 @@ const rowIds = new Set([...matrix.matchAll(/^\|\s*(CA-\d{2})\s*\|/gm)].map((m) =
 const problems = [];
 
 for (const id of specIds) {
-  if (!rowIds.has(id)) problems.push(`${id} : énoncé au §11 de la spécification, absent de docs/ca-matrix.md`);
+  if (!rowIds.has(id)) problems.push(`${id} : énoncé au §11 de la spécification, absent de docs/ca-matrix-fr.md`);
 }
 
 for (const id of [...rowIds].sort()) {

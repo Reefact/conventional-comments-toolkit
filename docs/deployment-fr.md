@@ -118,7 +118,7 @@ résolvent des configurations différentes et l'empreinte publiée (§8.1.3, rè
 désarme le blocage d'envoi côté extension.
 
 La suite (protection de branche, check obligatoire, trajectoire `assist → warn →
-enforce`, retour arrière) : voir `docs/operations.md`.
+enforce`, retour arrière) : voir `docs/operations-fr.md`.
 
 ## Stockage : de l'essai à la base réelle
 

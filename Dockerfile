@@ -49,7 +49,7 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/packages/core/dist packages/core/dist
 COPY --from=build /app/packages/server/dist packages/server/dist
 
-# Processus non root à UID FIGÉ (publié dans docs/deployment.md : un bind mount se
+# Processus non root à UID FIGÉ (publié dans docs/deployment-fr.md : un bind mount se
 # prépare avec `chown -R 10001` côté hôte) ; /data est le seul chemin d'écriture.
 RUN addgroup -S -g 10001 cct && adduser -S -u 10001 -G cct cct \
   && mkdir -p /data && chown cct:cct /data

@@ -38,9 +38,17 @@ composant A est contournable par construction, c'est B qui porte la contrainte r
 
 ## 2. Installer l'extension pour l'essayer
 
-Le bundle est déjà construit dans `packages/extension/dist-ext/` (Chromium) et
-`packages/extension/dist-ext/firefox/` (Firefox). Si vous voulez le reconstruire depuis
-les sources : `npm install && npm run build && npm run build:extension`.
+Le bundle **n'est pas committé** (`dist-ext/` est dans `.gitignore` — c'est un artefact
+de build) : sur un clone frais, il faut le générer une fois, Node ≥ 20 requis :
+
+```sh
+npm install
+npm run build            # compile core/ + adaptateurs + extension
+npm run build:extension  # génère packages/extension/dist-ext/ (Chromium + variante Firefox)
+```
+
+Ça produit `packages/extension/dist-ext/` (Chromium) et
+`packages/extension/dist-ext/firefox/` (Firefox).
 
 ### Chrome / Edge
 

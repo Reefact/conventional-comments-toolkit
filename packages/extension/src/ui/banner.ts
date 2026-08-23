@@ -141,24 +141,22 @@ export function renderBanner(
   return root;
 }
 
-/** Filtre local par label dans la liste des fils (§5.5). */
-export function filterThreadsByLabel(
-  threads: ThreadInfo[],
-  labelId: string,
-  config: EffectiveConfig,
-  platformId: string
-): ThreadInfo[] {
-  return threads.filter((t) => {
-    const a = analyze(
-      {
-        body: t.root.body,
-        platform: { id: platformId, suggestionInfoString: null, slashPrefixes: [] },
-        isSystemGenerated: false,
-        zone: 'thread-root',
-        canCarryBlockingState: t.canCarryBlockingState,
-      },
-      config
-    );
-    return a.resolved?.label.id === labelId;
-  });
+/** §5.5 — filtre local par label « dans la liste des fils de discussion » : masque les
+ * ancres du bandeau ET les fils rendus de la page. `labelId` null = tous. Purement
+ * visuel — le contenu stocké et le DOM des fils restent intacts. */
+export function applyLabelFilter(
+  banner: HTMLElement,
+  renderedThreads: { id: string; element: Element }[],
+  labelOfThread: Map<string, string | null>,
+  labelId: string | null
+): void {
+  for (const li of banner.querySelectorAll('li[data-thread-id]')) {
+    const threadId = (li as HTMLElement).dataset['threadId']!;
+    const visible = labelId === null || labelOfThread.get(threadId) === labelId;
+    (li as HTMLElement).style.display = visible ? '' : 'none';
+  }
+  for (const { id, element } of renderedThreads) {
+    const visible = labelId === null || labelOfThread.get(id) === labelId;
+    (element as HTMLElement).style.display = visible ? '' : 'none';
+  }
 }

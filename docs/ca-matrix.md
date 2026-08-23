@@ -12,7 +12,7 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 | CA | Objet | Couvert par |
 |----|-------|-------------|
 | CA-01 | Commentaire sans label non publiable en `enforce`, bouton et clavier ; un écart de `core/` ne lève pas le blocage | `extension/test/guard.test.ts` |
-| CA-02 | Insertion de préfixe : décoration et sujet conservés, curseur en fin de préfixe, sélection restaurée décalée | `extension/test/insertion.test.ts`, `extension/test/editor-controller.test.ts` |
+| CA-02 | Insertion de préfixe : décoration et sujet conservés, curseur en fin de préfixe, sélection restaurée décalée | `extension/test/insertion.test.ts`, `extension/test/editor-controller.test.ts`, `extension/test/review-fixes-extension.test.ts` (§3.4.1 étapes 4-6, changedAt) |
 | CA-03 | `issue (non-blocking)` non compté au critère 2 ni au bandeau ni aux indicateurs — décomptes concordants, décompte publié au bandeau | `core/test/evaluate.test.ts`, `extension/test/banner.test.ts`, `core/test/validator.test.ts` |
 | CA-04 | `nitpick (blocking)` → `E-CONFLICT`, pas de fil bloquant ; `issue (blocking, non-blocking)` → `E-CONFLICT` + fil bloquant | `core/test/validator.test.ts`, `core/test/evaluate.test.ts` |
 | CA-05 | Complétion refusée **par le serveur**, extension désinstallée | `core/test/evaluate.test.ts`, `server/test/orchestrator.test.ts` |
@@ -21,14 +21,14 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 | CA-08 | Bots de pipeline exemptés (`exemptUsers`, casse insensible) | `core/test/validator.test.ts` |
 | CA-09 | Le passage en `warn` n'empêche aucune publication | `core/test/evaluate.test.ts`, `extension/test/editor-controller.test.ts` |
 | CA-10 | Exemption journalisée avec auteur et horodatage | `server/test/admin.test.ts`, `server/test/http.test.ts` |
-| CA-11 | Dégradation silencieuse : aucun dialogue, aucune exception, contrôles natifs intacts, échec tracé (télémétrie opt-in) | `extension/test/degradation.test.ts` |
+| CA-11 | Dégradation silencieuse : aucun dialogue, aucune exception, contrôles natifs intacts, échec tracé (télémétrie opt-in) | `extension/test/degradation.test.ts`, `extension/test/replay-residuals.test.ts` (ancre de fil, commentaire édité non reconnu) |
 | CA-12 | Parcours clavier : `aria-disabled` et non `disabled` natif — le bouton reste atteignable ; interception du raccourci | `extension/test/editor-controller.test.ts` |
 | CA-13 | Résolution par un tiers sans `decision` refusée avec sa cause ; avec `decision` conforme, acceptée | `core/test/evaluate.test.ts` |
 | CA-14 | Un dépôt ne peut pas assouplir le mode sous le plancher | `core/test/config.test.ts` |
 | CA-15 | PR antérieure à `activatedAt` : aucun statut en échec, extension ne bloque pas même en `enforce` | `core/test/evaluate.test.ts`, `extension/test/guard.test.ts`, `server/test/orchestrator.test.ts` |
 | CA-16 | Décoration mal formée → `E-DECORATION-SYNTAX` ; style → un seul `W-DECORATION-STYLE` énumérant ses écarts, publiable | `core/test/validator.test.ts` |
 | CA-17 | Trois messages non interchangeables (`E-NO-LABEL` / `E-UNKNOWN-LABEL` / `W-CASE`) | `core/test/validator.test.ts` |
-| CA-18 | Parité sur les fins de ligne (`LF` vs `CRLF`), indentation, blancs de fin | `core/test/preprocess.test.ts`, `core/test/corpus.test.ts` |
+| CA-18 | Parité sur les fins de ligne (`LF` vs `CRLF`), indentation, blancs de fin | `core/test/preprocess.test.ts`, `core/test/corpus.test.ts`, `extension/test/review-fixes-extension.test.ts` (chemin d'écriture : ligne indentée/BOM) |
 | CA-19 | Approbation sans texte : aucun diagnostic, check non en échec | `core/test/validator.test.ts` |
 | CA-20 | Message de plateforme exempté sans dépendre de `exemptUsers` | `core/test/validator.test.ts`, `server/test/adapters.test.ts` |
 | CA-21 | `issue:` en zone non bloquante : validé, `W-NOT-BLOCKABLE`, ne bloque jamais ; `issue (non-blocking)` ne déclenche pas l'avertissement | `core/test/validator.test.ts` |

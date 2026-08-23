@@ -14,6 +14,7 @@ import {
   type UserInfo,
 } from '@cct/core';
 import {
+  closestChain,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -114,7 +115,7 @@ export class GithubClientAdapter implements PlatformAdapter {
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {
-    const form = editor.element.closest('form') ?? editor.element.parentElement;
+    const form = closestChain(editor.element, selectors.submitContainer).element ?? editor.element.parentElement;
     if (!form) return [];
     // Jamais de contrôle `complete-pr` ici : seul getCompletionControl() l'expose, et il
     // n'est jamais intercepté (§9.2.3).
@@ -145,7 +146,9 @@ export class GithubClientAdapter implements PlatformAdapter {
       const resolvedOutcome = queryChain(el, selectors.resolvedMarker);
       const bodyEl = queryChain(el, selectors.commentBody).element;
       const author = queryChain(el, selectors.commentAuthor).element?.textContent?.trim() ?? '';
-      const anchor = el.querySelector('a[href*="#"]')?.getAttribute('href') ?? `#${id}`;
+      const anchorOutcome = queryChain(el, selectors.threadAnchor);
+      if (!anchorOutcome.element) this.log.degraded(selectors.threadAnchor); // §9.4
+      const anchor = anchorOutcome.element?.getAttribute('href') ?? `#${id}`;
       return {
         id,
         pr,
@@ -203,6 +206,15 @@ export class GithubClientAdapter implements PlatformAdapter {
     }));
   }
 
+  /** Conteneurs de fils rendus, pour le filtre local du §5.5 — même dérivation
+   * d'identifiant que getThreads(), même surface d'affichage hors contrat. */
+  getRenderedThreadElements(): { id: string; element: Element }[] {
+    return queryChainAll(this.#doc, selectors.renderedThreads).map((el, i) => ({
+      id: el.id || el.getAttribute('data-thread-id') || `dom-thread-${i}`,
+      element: el,
+    }));
+  }
+
   /** PrRef depuis l'URL et la page — la date de création est lisible dans le DOM (§6.2.3). */
   currentPr(): PrRef | null {
     const loc = this.#doc.location;
@@ -228,29 +240,60 @@ export class GithubClientAdapter implements PlatformAdapter {
   }
 
   /** Zone de l'éditeur (§4.1) : réponse dans un fil, corps de revue, conversation
-   * générale, ou racine de fil (diff). */
+   * générale, ou racine de fil (diff). Sur une édition, `commentId` et `threadId` sont
+   * renseignés (§9.2.3 : commentId « renseigné pour 'edit' », threadId « pour toute
+   * action: 'edit' »). */
   #contextOf(el: Element, pr: PrRef): EditorContext {
-    const action: 'compose' | 'edit' = el.closest(selectors.editForm.candidates.join(', '))
-      ? 'edit'
-      : 'compose';
-    const thread = el.closest(selectors.threadContainer.candidates.join(', '));
+    const action: 'compose' | 'edit' = closestChain(el, selectors.editForm).element ? 'edit' : 'compose';
+    // Identifiant du commentaire édité, lu dans le DOM (#issuecomment-…, #discussion_r…).
+    const editedId =
+      action === 'edit' ? closestChain(el, selectors.renderedComment).element?.id || undefined : undefined;
+    const thread = closestChain(el, selectors.threadContainer).element;
     if (thread) {
       // L'ÉDITION du commentaire RACINE d'un fil reste zone 'thread-root' (§4.1, §4.3) :
       // la classer 'reply' la soustrairait à la validation par défaut et à la monotonie.
       if (action === 'edit') {
-        const comments = queryChainAll(thread, selectors.renderedComment);
-        const editedComment = el.closest(selectors.renderedComment.candidates.join(', '));
+        // MÊME candidat pour la liste des commentaires et pour l'ancêtre du champ édité :
+        // deux stratégies divergentes (premier candidat qui matche contre union des
+        // candidats) peuvent désigner des générations différentes et reclasseraient
+        // silencieusement une racine en réponse.
+        let comments: Element[] = [];
+        let editedComment: Element | null = null;
+        for (const candidate of selectors.renderedComment.candidates) {
+          const found = [...thread.querySelectorAll(candidate)];
+          if (found.length > 0) {
+            comments = found;
+            editedComment = el.closest(candidate);
+            break;
+          }
+        }
+        if (comments.length > 0 && editedComment === null) {
+          // Le fil rend des commentaires mais l'éditeur n'est dans aucun : dégradation de
+          // sélecteur, journalisée (§9.4) — le repli 'reply' désactive la validation
+          // localement, jamais silencieusement.
+          this.log.degraded(selectors.renderedComment);
+        }
         const isRootEdit = comments.length > 0 && editedComment === comments[0];
         if (isRootEdit) {
           return {
             zone: 'thread-root',
             action,
             pr,
-            threadId: thread.id || undefined,
+            threadId: thread.id || editedId,
+            commentId: editedId,
             canCarryBlockingState: true,
             inScope: true,
           };
         }
+        return {
+          zone: 'reply',
+          action,
+          pr,
+          threadId: thread.id || editedId,
+          commentId: editedId,
+          canCarryBlockingState: false,
+          inScope: true,
+        };
       }
       return {
         zone: 'reply',
@@ -261,14 +304,17 @@ export class GithubClientAdapter implements PlatformAdapter {
         inScope: true, // recalculé par l'extension avec activatedAt (§6.2.3)
       };
     }
-    if (el.closest(selectors.reviewSummaryForm.candidates.join(', '))) {
-      return { zone: 'review-body', action, pr, canCarryBlockingState: false, inScope: true };
+    // Hors conteneur de fil : sur une édition, le commentaire édité est son propre fil —
+    // threadId et commentId portent son identifiant (§9.2.3).
+    const editIds = action === 'edit' ? { threadId: editedId, commentId: editedId } : {};
+    if (closestChain(el, selectors.reviewSummaryForm).element) {
+      return { zone: 'review-body', action, pr, ...editIds, canCarryBlockingState: false, inScope: true };
     }
-    if (el.closest(selectors.conversationForm.candidates.join(', '))) {
-      return { zone: 'conversation', action, pr, canCarryBlockingState: false, inScope: true };
+    if (closestChain(el, selectors.conversationForm).element) {
+      return { zone: 'conversation', action, pr, ...editIds, canCarryBlockingState: false, inScope: true };
     }
     // Commentaire inline sur une ligne de diff, ou racine de fil : porte un état de
     // résolution (§4.1).
-    return { zone: 'thread-root', action, pr, canCarryBlockingState: true, inScope: true };
+    return { zone: 'thread-root', action, pr, ...editIds, canCarryBlockingState: true, inScope: true };
   }
 }

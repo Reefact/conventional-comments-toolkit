@@ -40,6 +40,14 @@
           <option value="en">english</option>
         </select>
       </label>
+      <label>
+        Raccourcis directs (§5.2) — une ligne par raccourci, <code>Alt+I=issue</code> ;
+        une ligne <code>Alt+I=</code> (sans label) désactive le raccourci par défaut :
+        <textarea id="direct-shortcuts" rows="4" spellcheck="false"
+          placeholder="Alt+I=issue&#10;Alt+S=suggestion"></textarea>
+        <button id="direct-shortcuts-save" type="button">Enregistrer</button>
+        <span id="direct-shortcuts-state" aria-live="polite"></span>
+      </label>
     </fieldset>
 
     <fieldset>

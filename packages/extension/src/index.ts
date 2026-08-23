@@ -18,9 +18,9 @@ export {
   buildBannerModel,
   renderBanner,
   localBlockingUnresolved,
-  filterThreadsByLabel,
+  applyLabelFilter,
   type BannerModel,
 } from './ui/banner.js';
 export { decorateComment } from './ui/badges.js';
-export { bootstrap, applyCompletionState } from './content.js';
+export { bootstrap, applyCompletionState, writeDegradedState, mergeDirectShortcuts } from './content.js';
 export { ui } from './ui/strings.js';

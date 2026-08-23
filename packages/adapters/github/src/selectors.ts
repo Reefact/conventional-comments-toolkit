@@ -69,6 +69,25 @@ export const selectors = {
     candidates: ['[data-testid="review-thread"]', '.js-resolvable-timeline-thread-container'],
   } satisfies SelectorChain,
 
+  /** Permalien d'ancrage d'un fil rendu — l'ancre du bandeau (§5.5). Le repli large
+   * `a[href*="#"]` vient en dernier : un lien d'avatar le satisferait aussi. */
+  threadAnchor: {
+    name: 'thread-anchor',
+    candidates: [
+      '[data-testid="permalink"]',
+      'a[href*="#discussion_r"]',
+      'a[href*="#issuecomment"]',
+      'a[href*="#"]',
+    ],
+  } satisfies SelectorChain,
+
+  /** Conteneur des contrôles d'envoi d'un éditeur (§4.3) — générique, mais centralisé et
+   * nommé (§9.4). */
+  submitContainer: {
+    name: 'submit-container',
+    candidates: ['form'],
+  } satisfies SelectorChain,
+
   /** Marqueur « résolu » d'un fil rendu. */
   resolvedMarker: {
     name: 'resolved-marker',

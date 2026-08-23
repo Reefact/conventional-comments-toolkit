@@ -6,6 +6,7 @@ import { Orchestrator } from '../src/compliance/orchestrator.js';
 import { MemoryStorage } from '../src/compliance/storage.js';
 import { ConfigCache } from '../src/compliance/cache.js';
 import { AdminEntryPoint } from '../src/compliance/admin.js';
+import { OrgModeWatch } from '../src/compliance/scheduler.js';
 import { GithubServerAdapter } from '../src/adapters/github/index.js';
 import { FakeAdapter, fakeState } from './fake-adapter.js';
 
@@ -138,6 +139,86 @@ describe('écart serveur — rapport à blanc : l’habilitation est réellement
       '2026-09-01T00:00:00Z'
     );
     expect(report[0]!.unresolvedBlockingThreads).toHaveLength(0); // résolution retenue (§6.1 cas 2)
+  });
+});
+
+describe('écart serveur — §6.3.3 : l’assouplissement du mode est observé sans attendre le TTL (CA-27)', () => {
+  const orgDoc = (mode: string) =>
+    ({
+      status: 'found',
+      text: JSON.stringify({
+        mode,
+        activation: { activatedAt: '2026-09-01T00:00:00Z' },
+        resolverOverrideGroup: ['acme/leads'],
+      }),
+    }) as const;
+
+  it('org enforce → warn : la sonde invalide le cache, l’évaluation suivante débloque la PR en ~2 minutes', async () => {
+    const adapter = new FakeAdapter(
+      fakeState({
+        repoConfig: { status: 'found', text: '{}' },
+        orgConfig: orgDoc('enforce'),
+        threads: [thread(comment('issue: fuite mémoire\n\nd', 'c1'))],
+      })
+    );
+    const storage = new MemoryStorage();
+    const clock = { now: new Date('2026-10-05T12:00:00Z') };
+    const orchestrator = new Orchestrator({
+      adapter,
+      storage,
+      cache: new ConfigCache(() => clock.now.getTime()),
+      floorProvider: async () => ({ configUrl: 'https://config.example/org.json' }),
+      facts: { threadStatusEmitsPrUpdated: true, labelProvenanceExposed: true, requiresStatusTargetUrl: false },
+      now: () => clock.now,
+    });
+    const watch = new OrgModeWatch(orchestrator);
+    const advance = (s: number) => (clock.now = new Date(clock.now.getTime() + s * 1000));
+
+    // T0 : org en enforce, fil bloquant non résolu → échec publié.
+    await orchestrator.evaluatePr(PR, ++seq);
+    expect(adapter.published[0]!.state).toBe('failure');
+
+    // T0+30 s : première sonde — elle enregistre le mode courant du document d'org.
+    advance(30);
+    expect((await watch.runOnce()).observed).toBe('enforce');
+
+    // T0+60 s : retour arrière — l'organisation repasse le mode à warn (§6.3.3).
+    advance(30);
+    adapter.state.orgConfig = orgDoc('warn');
+
+    // T0+90 s : la sonde observe l'assouplissement et invalide TOUT le cache —
+    // sans elle, l'entrée org resterait servie jusqu'à configCacheTtlSeconds (3600 s).
+    advance(30);
+    expect(await watch.runOnce()).toEqual({ observed: 'warn', invalidated: true });
+
+    // T0+120 s : l'évaluation suivante juge en warn — statut jamais en échec (§6.2.2),
+    // la PR est débloquée « en quelques minutes », pas au terme du TTL.
+    advance(30);
+    adapter.state.headSha = 'sha-2';
+    await orchestrator.evaluatePr(PR, ++seq);
+    expect(adapter.published.at(-1)!.state).toBe('success');
+  });
+
+  it('la sonde ne conclut rien d’une panne ou d’un document invalide (§8.1.5)', async () => {
+    const adapter = new FakeAdapter(fakeState({ orgConfig: orgDoc('enforce') }));
+    const clock = { now: new Date('2026-10-05T12:00:00Z') };
+    const cache = new ConfigCache(() => clock.now.getTime());
+    const orchestrator = new Orchestrator({
+      adapter,
+      storage: new MemoryStorage(),
+      cache,
+      floorProvider: async () => ({ configUrl: 'https://config.example/org.json' }),
+      facts: { threadStatusEmitsPrUpdated: true, labelProvenanceExposed: true, requiresStatusTargetUrl: false },
+      now: () => clock.now,
+    });
+    expect((await orchestrator.probeOrgModeSoftening()).observed).toBe('enforce');
+
+    adapter.state.unreachable = true;
+    expect(await orchestrator.probeOrgModeSoftening()).toEqual({ observed: null, invalidated: false });
+
+    adapter.state.unreachable = false;
+    adapter.state.orgConfig = { status: 'found', text: '{"mode": "nonsense"}' };
+    expect(await orchestrator.probeOrgModeSoftening()).toEqual({ observed: null, invalidated: false });
   });
 });
 

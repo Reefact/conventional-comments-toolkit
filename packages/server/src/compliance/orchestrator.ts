@@ -6,6 +6,7 @@ import {
   analyze,
   encodeSummary,
   evaluate,
+  parseConfigDocument,
   resolveConfig,
   SUPPORTED_FLOOR_VERSION,
   type ComplianceResult,
@@ -13,6 +14,7 @@ import {
   type EffectiveConfig,
   type EvaluationContext,
   type Floor,
+  type Mode,
   type Notice,
   type PrRef,
   type ThreadInfo,
@@ -58,6 +60,47 @@ export class Orchestrator {
 
   constructor(deps: OrchestratorDeps) {
     this.deps = { now: () => new Date(), log: () => {}, ...deps };
+  }
+
+  /** Dernier `mode` observé sur le document d'organisation, par URL — mémoire de la
+   * sonde ci-dessous. En mémoire seulement : au redémarrage le cache est vide, la
+   * première évaluation lit donc frais et rien de périmé ne peut être servi. */
+  #lastOrgMode = new Map<string, Mode>();
+
+  /** §6.3.3 — observation AUTOMATIQUE de l'assouplissement du mode. Le document
+   * d'organisation est le point de bascule du retour arrière ; il est sondé ici en
+   * contournant le cache — c'est la première des « deux situations, et deux seulement »
+   * du §8.1.3, règle 3 — à une cadence en minutes (OrgModeWatch), pour que « invalide
+   * immédiatement le cache » ne dépende jamais de l'expiration naturelle d'une entrée
+   * (`configCacheTtlSeconds`, une heure par défaut). La lecture fraîche est stockée par
+   * le cache : les évaluations voient le document au plus vieux d'un tour de sonde. */
+  async probeOrgModeSoftening(): Promise<{ observed: Mode | null; invalidated: boolean }> {
+    const { adapter, cache } = this.deps;
+    const floor = await this.deps.floorProvider().catch(() => null);
+    const configUrl = floor?.configUrl ?? null;
+    if (configUrl === null) return { observed: null, invalidated: false };
+    const read = await cache.read(`org:${configUrl}`, 3600, true, () =>
+      adapter.fetchOrgConfig(configUrl, { bypassCache: true })
+    );
+    // Une panne, une disparition ou un document invalide ne sont jamais un
+    // assouplissement : ce sont les incidents du §8.1.5, traités à l'évaluation.
+    if (read.status !== 'found') return { observed: null, invalidated: false };
+    const parsed = parseConfigDocument(read.text, { level: 'org' });
+    if (parsed.invalid || parsed.values === null) return { observed: null, invalidated: false };
+    // Clé absente d'un document valide : l'organisation ne contraint plus le mode, les
+    // dépôts retombent sur le défaut — c'est un assouplissement observable.
+    const observed = (parsed.values['mode'] as Mode | undefined) ?? 'assist';
+    const previous = this.#lastOrgMode.get(configUrl);
+    let invalidated = false;
+    if (previous !== undefined && softer(observed, previous)) {
+      cache.invalidateAll();
+      invalidated = true;
+      this.deps.log(
+        `org mode softened (${previous} -> ${observed}): configuration cache invalidated (§6.3.3)`
+      );
+    }
+    this.#lastOrgMode.set(configUrl, observed);
+    return { observed, invalidated };
   }
 
   /** Étapes 5 à 16 du §6.4. `sequence` a été attribuée à la réception du déclenchement

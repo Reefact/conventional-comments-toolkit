@@ -37,7 +37,7 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 | CA-24 | `{"mode": "off"}` sous plancher `enforce` ignoré, fait signalé | `core/test/config.test.ts` |
 | CA-25 | Sortie exploitable : cause identifiable en un clic, dans le corps ou derrière la `targetUrl` | `server/test/http.test.ts` (targetUrl) ; corps humain : `adapters/github` `renderHumanOutput` |
 | CA-26 | Exemption habilitée → vert et journalisée ; non habilitée → refusée, étiquette en place ; nouveau fil bloquant → étiquette retirée, échec | `core/test/evaluate.test.ts`, `server/test/orchestrator.test.ts` |
-| CA-27 | Retour arrière : `enforce` → `warn` au niveau org débloque sans modifier la protection de branche | `core/test/pinning.test.ts`, `server/test/http.test.ts` (invalidation cache) |
+| CA-27 | Retour arrière : `enforce` → `warn` au niveau org débloque sans modifier la protection de branche | `core/test/pinning.test.ts`, `server/test/review-fixes-server.test.ts` (sonde §6.3.3, invalidation automatique), `server/test/http.test.ts` (invalidation manuelle) |
 | CA-28 | Ordre des événements : un événement de création reçu après l'édition qui le corrige ne réintroduit pas un statut périmé | `server/test/orchestrator.test.ts` |
 | CA-29 | Opt-in par dépôt : jamais évalué + sans fichier → aucun statut ; contre-épreuve : fichier retiré d'un dépôt évalué → neutre `config-vanished` | `core/test/config.test.ts`, `server/test/orchestrator.test.ts` |
 | CA-30 | Épinglage : retrait d'un label ne bascule au rouge aucune PR ouverte ; une PR ouverte après applique la nouvelle configuration | `core/test/pinning.test.ts`, `server/test/orchestrator.test.ts` |

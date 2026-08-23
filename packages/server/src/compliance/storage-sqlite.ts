@@ -10,6 +10,8 @@
 // une fois, jamais réécrit » (configuration épinglée §8.1.3, verdicts de première
 // observation §6.4) sont tenus par le stockage lui-même, comme dans MemoryStorage.
 
+import { mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import type { EffectiveConfig, Floor } from '@cct/core';
 import type {
   ActiveExemption,
@@ -64,7 +66,9 @@ export class SqliteStorage implements Storage {
     return (await loadSqlite()) !== null;
   }
 
-  /** Ouvre (et initialise au besoin) la base au chemin donné — `:memory:` accepté. */
+  /** Ouvre (et initialise au besoin) la base au chemin donné — `:memory:` accepté.
+   * Le répertoire parent est créé, comme le fait FileStorage : le chemin par défaut
+   * documenté (`data/storage.sqlite`) doit fonctionner sur un hôte neuf. */
   static async open(path: string): Promise<SqliteStorage> {
     const mod = await loadSqlite();
     if (!mod) {
@@ -72,7 +76,17 @@ export class SqliteStorage implements Storage {
         'node:sqlite is not available in this Node.js runtime (needs >= 22.13); use CCT_STORAGE=file instead'
       );
     }
-    const db = new mod.DatabaseSync(path);
+    if (path !== ':memory:') {
+      await mkdir(dirname(path), { recursive: true });
+    }
+    let db: SqliteDatabase;
+    try {
+      db = new mod.DatabaseSync(path);
+    } catch (e) {
+      // Nommer chemin et cause : « unable to open database file » nu ne dit ni où ni
+      // pourquoi — et un fichier JSON préexistant au même chemin est l'erreur classique.
+      throw new Error(`cannot open SQLite database at ${path}: ${String(e)}`);
+    }
     db.exec(`
       CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS exemption_log (id INTEGER PRIMARY KEY AUTOINCREMENT, v TEXT NOT NULL);
@@ -124,6 +138,9 @@ export class SqliteStorage implements Storage {
       .all()
       .map((r) => JSON.parse((r as { v: string }).v) as ExemptionLogEntry);
   }
+  async purgeExemptionLog(olderThanIso: string): Promise<void> {
+    this.#db.prepare("DELETE FROM exemption_log WHERE json_extract(v, '$.at') < ?").run(olderThanIso);
+  }
 
   // 2. Exemption active par PR (§6.3.2, §6.4).
   async getActiveExemption(prKey: string): Promise<ActiveExemption | null> {
@@ -144,12 +161,17 @@ export class SqliteStorage implements Storage {
     this.#setOnce('pinned', prKey, config);
   }
 
-  // 4. Verdicts de première observation — jamais réécrits (§6.4).
+  // 4. Verdicts de première observation — jamais réécrits (§6.4). Lecture et écriture
+  // via les helpers SYNCHRONES, sans le moindre `await` entre les deux : un `await`
+  // rendrait la main à la boucle d'événements et deux appels entrelacés liraient le même
+  // instantané — le second écraserait le premier (perte de verdict, CA-36). C'est la
+  // sémantique de MemoryStorage, dont le cycle lecture-modification-écriture est
+  // atomique vis-à-vis de la boucle d'événements.
   async getFirstVerdicts(prKey: string): Promise<Record<string, FirstVerdict>> {
     return this.#get<Record<string, FirstVerdict>>('firstVerdicts', prKey) ?? {};
   }
   async addFirstVerdicts(prKey: string, verdicts: Record<string, FirstVerdict>): Promise<void> {
-    const existing = await this.getFirstVerdicts(prKey);
+    const existing = this.#get<Record<string, FirstVerdict>>('firstVerdicts', prKey) ?? {};
     for (const [id, v] of Object.entries(verdicts)) {
       if (existing[id] === undefined) existing[id] = v;
     }

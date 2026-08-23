@@ -17,6 +17,7 @@ export { SqliteStorage } from './compliance/storage-sqlite.js';
 export { ConfigCache } from './compliance/cache.js';
 export {
   assembleFromEnv,
+  resolvePort,
   BootstrapError,
   type AssembledServer,
   type AssembledPlatform,
@@ -26,6 +27,6 @@ export { AdminEntryPoint, AdminError, type DryRunReportEntry } from './complianc
 export { computeIndicators, type Indicators } from './compliance/indicators.js';
 export { prKey, repoKey } from './compliance/keys.js';
 export type { ServerPlatformAdapter, PlatformOperationalFacts } from './compliance/adapter.js';
-export { GithubServerAdapter, githubFacts, renderHumanOutput } from './adapters/github/index.js';
+export { GithubServerAdapter, githubFacts, webHostFromApiBase, renderHumanOutput } from './adapters/github/index.js';
 export { AzdoServerAdapter, azdoFacts } from './adapters/azdo/index.js';
 export { createHttpServer, type HttpDeps, type PlatformRegistration } from './http.js';

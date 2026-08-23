@@ -49,14 +49,16 @@ jobs:
       - name: Construire l'image
         run: docker build -t cct-server .
 
-      # L'image doit démarrer, répondre sur /healthz et refuser l'admin sans jeton —
-      # le même contrat que docs/deployment.md promet au client qui la déploie.
-      - name: Démarrer et sonder le conteneur
+      # L'image est sondée dans SA configuration livrée : stockage fichier sur /data
+      # avec un volume — pas une configuration de test qui neutraliserait FileStorage,
+      # les droits de l'utilisateur non-root sur /data et la sonde HEALTHCHECK.
+      - name: Démarrer et sonder le conteneur (configuration livrée)
         run: |
+          docker volume create cct-ci-data
           docker run -d --name cct \
             -p 18080:8080 \
+            -v cct-ci-data:/data \
             -e CCT_ADMIN_TOKEN=ci-token \
-            -e CCT_STORAGE=memory \
             -e CCT_GITHUB_TOKEN=x \
             -e CCT_GITHUB_WEBHOOK_SECRET=y \
             cct-server
@@ -67,10 +69,28 @@ jobs:
           curl -fsS http://127.0.0.1:18080/healthz
           code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/admin/exemption-log)
           [ "$code" = "401" ] || { echo "admin sans jeton devrait rendre 401, a rendu $code"; exit 1; }
-          docker logs cct
+          # Avec le jeton : 200 — la route lit le stockage, donc /data est réellement
+          # inscriptible et lisible par l'utilisateur non-root.
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer ci-token' http://127.0.0.1:18080/admin/exemption-log)
+          [ "$code" = "200" ] || { echo "admin avec jeton devrait rendre 200, a rendu $code"; exit 1; }
+          # L'état du fichier a bien été écrit sur le volume (sonde d'écriture au boot).
+          docker run --rm -v cct-ci-data:/data alpine test -s /data/storage.json
+
+      - name: Verdict du HEALTHCHECK embarqué
+        run: |
+          for i in $(seq 1 12); do
+            status=$(docker inspect cct --format '{{.State.Health.Status}}')
+            [ "$status" = "healthy" ] && break
+            sleep 5
+          done
+          [ "$status" = "healthy" ] || { echo "HEALTHCHECK: $status"; exit 1; }
 
       - name: Arrêt propre (SIGTERM → exit 0)
         run: |
           docker stop cct
           exit_code=$(docker inspect cct --format '{{.State.ExitCode}}')
           [ "$exit_code" = "0" ] || { echo "arrêt non propre: exit $exit_code"; exit 1; }
+
+      - name: Journaux du conteneur (toujours — c'est le diagnostic en cas d'échec)
+        if: always()
+        run: docker logs cct || true

@@ -1,0 +1,10 @@
+### startup log:
+2026-08-23T11:17:18.035Z conventional-comments companion listening on :8792 — platforms: github (0 repo(s) reconciled)
+### POST /webhook/azdo :
+{
+  "error": "unknown platform"
+}  <<HTTP=404>>
+### POST /webhook/github :
+{
+  "ignored": true
+}  <<HTTP=202>>

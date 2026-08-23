@@ -1,9 +1,11 @@
 .git
-node_modules
+.github
+**/node_modules
 **/dist
 **/dist-ext
 **/*.tsbuildinfo
-data
+**/data
+**/*.sqlite
+**/*.log
+.env*
 *.md
-!specifications-fr.md
-.github

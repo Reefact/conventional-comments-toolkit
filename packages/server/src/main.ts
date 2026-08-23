@@ -2,35 +2,57 @@
 // Toute la configuration vient des variables d'environnement CCT_* (voir
 // docs/deployment.md) ; l'assemblage vit dans bootstrap.ts, testé sans écouter de port.
 
-import { assembleFromEnv, BootstrapError } from './bootstrap.js';
+import { assembleFromEnv, resolvePort, BootstrapError, type AssembledServer } from './bootstrap.js';
 
 const log = (m: string): void => console.log(`${new Date().toISOString()} ${m}`);
 
+// Les gestionnaires de signaux s'installent AVANT tout travail : en conteneur, node est
+// PID 1 et le noyau IGNORE les signaux d'un PID 1 sans gestionnaire — un arrêt demandé
+// pendant le démarrage (lecture du stockage, premier balayage) finirait sinon en
+// SIGKILL au bout du délai de l'orchestrateur d'infrastructure.
+let assembled: AssembledServer | null = null;
+let stopping = false;
+function shutdown(signal: string): void {
+  if (stopping) {
+    // Second signal : sortie forcée — l'opérateur insiste, il ne faut plus attendre.
+    log(`${signal} received again: forcing exit`);
+    process.exit(130);
+  }
+  stopping = true;
+  if (assembled === null) {
+    log(`${signal} received during startup: exiting`);
+    process.exit(0);
+  }
+  log(`${signal} received: draining evaluations and closing`);
+  void assembled.stop().then(
+    () => process.exit(0),
+    (e) => {
+      log(`shutdown error: ${String(e)}`);
+      process.exit(1);
+    }
+  );
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('uncaughtException', (e) => {
+  log(`uncaught exception: ${String(e)}`);
+  process.exit(1);
+});
+process.on('unhandledRejection', (e) => {
+  log(`unhandled rejection: ${String(e)}`);
+  process.exit(1);
+});
+
 async function main(): Promise<void> {
-  const assembled = await assembleFromEnv(process.env, { log });
-  const port = Number(process.env['CCT_PORT'] ?? '8080');
+  const port = resolvePort(process.env); // validé AVANT l'assemblage : échec net
+  assembled = await assembleFromEnv(process.env, { log });
+  if (stopping) return; // signal reçu pendant l'assemblage
   const bound = await assembled.start(port);
   log(
     `conventional-comments companion listening on :${bound} — platforms: ${assembled.platforms
       .map((p) => `${p.id} (${p.repos.length} repo(s) reconciled)`)
       .join(', ')}`
   );
-
-  let stopping = false;
-  const shutdown = (signal: string): void => {
-    if (stopping) return;
-    stopping = true;
-    log(`${signal} received: draining evaluations and closing`);
-    void assembled.stop().then(
-      () => process.exit(0),
-      (e) => {
-        log(`shutdown error: ${String(e)}`);
-        process.exit(1);
-      }
-    );
-  };
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 main().catch((e) => {

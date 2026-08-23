@@ -3,6 +3,7 @@
 // et réévaluation manuelle (§6.4, source 3). Node natif, aucune dépendance.
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { PrRef, UserInfo } from '@cct/core';
 import type { ServerPlatformAdapter } from './compliance/adapter.js';
 import type { EvaluationScheduler } from './compliance/scheduler.js';
@@ -31,17 +32,53 @@ export interface HttpDeps {
   log?: (m: string) => void;
 }
 
+const WEBHOOK_BODY_LIMIT = 5 * 1024 * 1024; // 5 Mio — GitHub borne ses livraisons à 25 Mo
+
+class BodyTooLargeError extends Error {}
+
+/** Livraisons déjà vues (protection contre le rejeu, §6.4) : TTL glissant, taille
+ * bornée. En mémoire : un redémarrage rouvre la fenêtre, mais une évaluation rejouée
+ * relit l'état courant et republie l'identique (porte 14.d) — le rejeu ne peut altérer
+ * aucun verdict, la protection vise le coût, pas l'intégrité. */
+class ReplayCache {
+  #seen = new Map<string, number>();
+  constructor(
+    private readonly ttlMs = 15 * 60 * 1000,
+    private readonly maxEntries = 10_000
+  ) {}
+  seen(id: string): boolean {
+    const now = Date.now();
+    const at = this.#seen.get(id);
+    if (at !== undefined && now - at < this.ttlMs) return true;
+    this.#seen.set(id, now);
+    if (this.#seen.size > this.maxEntries) {
+      for (const [k, v] of this.#seen) {
+        if (this.#seen.size <= this.maxEntries && now - v < this.ttlMs) break;
+        this.#seen.delete(k);
+      }
+    }
+    return false;
+  }
+}
+
+function hashBody(raw: Buffer): string {
+  return createHash('sha256').update(raw).digest('hex');
+}
+
+type RouteDeps = HttpDeps & { seenDeliveries: ReplayCache };
+
 export function createHttpServer(deps: HttpDeps): Server {
   const log = deps.log ?? (() => {});
+  const routeDeps: RouteDeps = { ...deps, seenDeliveries: new ReplayCache() };
   return createServer((req, res) => {
-    void route(deps, req, res).catch((e) => {
+    void route(routeDeps, req, res).catch((e) => {
       log(`http error: ${String(e)}`);
       if (!res.headersSent) send(res, 500, { error: 'internal error' });
     });
   });
 }
 
-async function route(deps: HttpDeps, req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function route(deps: RouteDeps, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost');
   const path = url.pathname;
 
@@ -56,7 +93,17 @@ async function route(deps: HttpDeps, req: IncomingMessage, res: ServerResponse):
     const platformId = path.slice('/webhook/'.length);
     const registration = deps.platforms.find((p) => p.id === platformId);
     if (!registration) return send(res, 404, { error: 'unknown platform' });
-    const raw = await readBody(req);
+    // Le corps DOIT être lu avant la vérification (HMAC sur le corps brut), mais jamais
+    // sans borne : cette route est la seule à lire un corps non authentifié, et une
+    // charge arbitraire ferait tuer le processus par l'OOM killer. GitHub borne ses
+    // livraisons à 25 Mo ; la limite couvre large.
+    let raw: Buffer;
+    try {
+      raw = await readBody(req, WEBHOOK_BODY_LIMIT);
+    } catch (e) {
+      if (e instanceof BodyTooLargeError) return send(res, 413, { error: 'payload too large' });
+      throw e;
+    }
     let payload: unknown;
     try {
       payload = JSON.parse(raw.toString('utf8'));
@@ -68,6 +115,14 @@ async function route(deps: HttpDeps, req: IncomingMessage, res: ServerResponse):
     // Sécurité d'ingestion (§6.4) : rejet des charges non signées.
     if (!registration.adapter.verifySignature(payload, headers)) {
       return send(res, 401, { error: 'invalid signature' });
+    }
+    // Sécurité d'ingestion (§6.4) : protection contre le REJEU — une livraison déjà vue
+    // (identifiant de livraison quand la plateforme en émet un, empreinte du corps
+    // sinon) est acquittée sans déclencher d'évaluation. Rejouer une charge signée
+    // capturée ne coûte alors plus rien au service.
+    const deliveryId = headers['x-github-delivery'] || hashBody(raw);
+    if (deps.seenDeliveries.seen(`${platformId}:${deliveryId}`)) {
+      return send(res, 202, { ignored: true, reason: 'replay' });
     }
     let event;
     try {
@@ -91,10 +146,18 @@ async function route(deps: HttpDeps, req: IncomingMessage, res: ServerResponse):
   // ————— Administration (§6.2.4) —————
   if (path.startsWith('/admin/')) {
     const auth = req.headers.authorization ?? '';
-    if (deps.adminToken === '' || auth !== `Bearer ${deps.adminToken}`) {
+    // Comparaison à temps constant — la même exigence que pour la signature de webhook :
+    // c'est la seule barrière devant l'octroi d'exemption et le journal nominatif.
+    const presented = Buffer.from(auth);
+    const expected = Buffer.from(`Bearer ${deps.adminToken}`);
+    const authorized =
+      deps.adminToken !== '' &&
+      presented.length === expected.length &&
+      timingSafeEqual(presented, expected);
+    if (!authorized) {
       return send(res, 401, { error: 'admin token required' });
     }
-    const body = req.method === 'POST' ? parseJson(await readBody(req)) : {};
+    const body = req.method === 'POST' ? parseJson(await readBody(req, WEBHOOK_BODY_LIMIT)) : {};
     try {
       return await adminRoute(deps, path, body, res);
     } catch (e) {
@@ -186,13 +249,36 @@ async function statusPage(deps: HttpDeps, path: string, res: ServerResponse): Pr
   if (!key) return send(res, 404, { error: 'no published result for this PR' });
   const record = await deps.storage.getLastPublished(key);
   if (!record) return send(res, 404, { error: 'no published result for this PR' });
-  return send(res, 200, {
-    prKey: key,
-    machineLine: record.machineLine ?? null,
-    headline: record.headline ?? null,
-    humanOutput: record.humanOutput ?? null,
-    lastPublished: record,
-  });
+  // Une PAGE lisible, pas un document JSON : sur une plateforme sans corps de statut
+  // (Azure DevOps, §B.7), cette page est la SEULE explication d'un check rouge — un
+  // littéral JSON aux sauts de ligne échappés n'explique rien. Le JSON reste servi sur
+  // demande (Accept: application/json), pour l'outillage.
+  const wantsJson = (String(res.req?.headers.accept ?? '')).includes('application/json');
+  if (wantsJson) {
+    return send(res, 200, {
+      prKey: key,
+      machineLine: record.machineLine ?? null,
+      headline: record.headline ?? null,
+      humanOutput: record.humanOutput ?? null,
+      lastPublished: record,
+    });
+  }
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>conventional-comments — ${esc(alias)}</title>
+<style>body{font:15px/1.5 system-ui,sans-serif;max-width:52em;margin:2em auto;padding:0 1em}
+h1{font-size:1.2em}code,pre{background:#f4f4f4;padding:.15em .3em;border-radius:3px}
+pre{padding:.8em;overflow-x:auto;white-space:pre-wrap}
+.state-failure{color:#b3261e}.state-success{color:#1e7f37}.state-neutral{color:#555}</style></head>
+<body>
+<h1>conventional-comments — <code>${esc(alias)}</code></h1>
+<p class="state-${esc(record.state)}"><strong>${esc(record.headline ?? record.state)}</strong></p>
+<pre>${esc(record.humanOutput ?? '')}</pre>
+<p><small><code>${esc(record.machineLine ?? '')}</code><br>published ${esc(record.at)} — head <code>${esc(record.headSha)}</code></small></p>
+</body></html>`;
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+  res.end(html);
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {
@@ -219,10 +305,19 @@ function flattenHeaders(req: IncomingMessage, raw: Buffer): Record<string, strin
   return out;
 }
 
-function readBody(req: IncomingMessage): Promise<Buffer> {
+function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => chunks.push(c));
+    let size = 0;
+    req.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > limit) {
+        req.destroy();
+        reject(new BodyTooLargeError(`body exceeds ${limit} bytes`));
+        return;
+      }
+      chunks.push(c);
+    });
     req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });

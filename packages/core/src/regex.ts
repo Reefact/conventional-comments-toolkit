@@ -5,8 +5,14 @@
 // ‍ pour le ZWJ) : ce sont les mêmes points de code que dans la spécification,
 // rendus visibles pour la relecture.
 
+/** Motif d'un emoji de tête toléré (§3.4.2) — exporté seul pour que le chemin
+ * d'écriture du composant A (§5.1) localise le préfixe dans la ligne BRUTE sans
+ * dupliquer la règle. */
+export const EMOJI_TOKEN_SOURCE =
+  '(?:\\p{RI}\\p{RI}|\\p{Extended_Pictographic}(?:\\uFE0F|\\p{Emoji_Modifier}|\\u200D\\p{Extended_Pictographic}\\uFE0F?)*)';
+
 export const REFERENCE_REGEX_SOURCE =
-  '^(?:(?:\\p{RI}\\p{RI}|\\p{Extended_Pictographic}(?:\\uFE0F|\\p{Emoji_Modifier}|\\u200D\\p{Extended_Pictographic}\\uFE0F?)*)[ \\t]*)?' +
+  `^(?:${EMOJI_TOKEN_SOURCE}[ \\t]*)?` +
   '(?<label>[A-Za-z]+)' +
   '(?:[ \\t]*\\((?<decorations>[^)\\r\\n]*)\\))?' +
   ':(?:[ \\t]+(?<subject>.*?)[ \\t]*)?$';

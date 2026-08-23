@@ -26,6 +26,7 @@ export {
   REFERENCE_REGEX,
   REFERENCE_REGEX_SOURCE,
   REFERENCE_REGEX_FLAGS,
+  EMOJI_TOKEN_SOURCE,
   matchPrefix,
   type PrefixMatch,
 } from './regex.js';

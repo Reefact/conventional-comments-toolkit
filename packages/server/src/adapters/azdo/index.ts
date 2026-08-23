@@ -120,10 +120,20 @@ export class AzdoServerAdapter implements ServerPlatformAdapter {
 
   async listOpenPrs(repo: { host: string; scope: string[] }): Promise<PrRef[]> {
     const repoName = repo.scope[repo.scope.length - 1]!;
-    const prs = await this.#rest<{ value: AzdoPullRequest[] }>(
-      `/git/repositories/${encodeURIComponent(repoName)}/pullrequests?searchCriteria.status=active&api-version=7.1`
-    );
-    return prs.value.map((p) => ({
+    // Pagination $top/$skip : le service borne la réponse (~100 éléments) même sans $top.
+    // Tronquer ici tronquerait la réconciliation (§6.4, source 2) et le rapport à blanc
+    // (§6.2.4) — et sur cette plateforme la réconciliation est la SEULE voie de détection
+    // des changements de statut de fil (§B.7).
+    const all: AzdoPullRequest[] = [];
+    const page = 100;
+    for (let skip = 0; ; skip += page) {
+      const prs = await this.#rest<{ value: AzdoPullRequest[] }>(
+        `/git/repositories/${encodeURIComponent(repoName)}/pullrequests?searchCriteria.status=active&$top=${page}&$skip=${skip}&api-version=7.1`
+      );
+      all.push(...prs.value);
+      if (prs.value.length < page) break;
+    }
+    return all.map((p) => ({
       platform: 'azdo',
       createdAt: p.creationDate,
       host: repo.host,

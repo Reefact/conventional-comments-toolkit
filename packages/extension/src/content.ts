@@ -8,8 +8,8 @@ import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage } from './config-resolver.js';
-import { EditorController } from './editor-controller.js';
-import { buildBannerModel, renderBanner } from './ui/banner.js';
+import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
+import { applyLabelFilter, buildBannerModel, renderBanner } from './ui/banner.js';
 import { decorateComment } from './ui/badges.js';
 import { ui } from './ui/strings.js';
 
@@ -17,9 +17,21 @@ declare const chrome: {
   storage?: {
     managed?: { get: (cb: (items: Record<string, unknown>) => void) => void };
     sync?: { get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void };
+    local?: { set?: (items: Record<string, unknown>) => void };
   };
   runtime?: { sendMessage?: (msg: unknown) => Promise<unknown> };
 } | undefined;
+
+/** §9.2.3 — l'état dégradé se signale « dans les options ET dans son indicateur » : la
+ * page d'options lit `degradedState` dans chrome.storage.local ; c'est ici qu'il s'écrit,
+ * à chaque résolution de configuration. */
+export function writeDegradedState(degraded: boolean): void {
+  try {
+    chrome?.storage?.local?.set?.({ degradedState: degraded ? 'unreachable' : false });
+  } catch {
+    // Hors contexte d'extension (tests) : sans conséquence.
+  }
+}
 
 /** Plancher côté A : politique d'entreprise poussée par le navigateur —
  * chrome.storage.managed, nœud 3rdparty (§8.1.1). Canal muet → plancher par défaut. */
@@ -50,6 +62,36 @@ async function readUserLanguage(): Promise<string | null> {
   });
 }
 
+/** §5.2 — valide la préférence stockée des raccourcis directs et la fusionne avec la
+ * table par défaut : une entrée « Alt+X » → label surcharge ou étend, une entrée à
+ * valeur vide DÉSACTIVE le raccourci par défaut. Copie sans prototype (§5.2). */
+export function mergeDirectShortcuts(stored: unknown): Record<string, string> {
+  const merged: Record<string, string> = Object.assign(Object.create(null), DEFAULT_DIRECT_SHORTCUTS);
+  if (stored !== null && typeof stored === 'object' && !Array.isArray(stored)) {
+    for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
+      const m = /^alt\+([a-z])$/i.exec(key);
+      if (!m || typeof value !== 'string') continue;
+      const combo = `Alt+${m[1]!.toUpperCase()}`;
+      if (value === '') delete merged[combo];
+      else merged[combo] = value;
+    }
+  }
+  return merged;
+}
+
+async function readDirectShortcuts(): Promise<Record<string, string>> {
+  return new Promise((resolve) => {
+    try {
+      if (!chrome?.storage?.sync) return resolve(mergeDirectShortcuts(null));
+      chrome.storage.sync.get(['directShortcuts'], (items) => {
+        resolve(mergeDirectShortcuts(items?.['directShortcuts']));
+      });
+    } catch {
+      resolve(mergeDirectShortcuts(null));
+    }
+  });
+}
+
 export async function bootstrap(doc: Document = document): Promise<void> {
   const url = new URL(doc.location.href);
   // Un seul produit, un adaptateur par plateforme, activé sur les hôtes autorisés (§2).
@@ -66,6 +108,7 @@ export async function bootstrap(doc: Document = document): Promise<void> {
   const attach = async (editor: Parameters<Parameters<PlatformAdapter['observeEditors']>[0]>[0]) => {
     // Résolution hors chemin critique : la NFR d'injection porte sur l'appel du cb (§10).
     const resolved = await resolver.resolve(adapter, editor.context.pr);
+    writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
     if (resolved.config.mode === 'off') return; // §7 — extension inactive
     const published = adapter.readPublishedResult();
     const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
@@ -76,6 +119,7 @@ export async function bootstrap(doc: Document = document): Promise<void> {
       published,
       lang,
       currentUserLogin: currentUser.login,
+      directShortcuts: await readDirectShortcuts(), // §5.2 — préférence locale (§8.1.2)
     });
     controller.attach();
   };
@@ -94,6 +138,7 @@ async function renderPrChrome(
   const pr = (adapter as GithubClientAdapter | AzdoClientAdapter).currentPr?.();
   if (!pr) return;
   const resolved = await resolver.resolve(adapter, pr);
+  writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
   if (resolved.config.mode === 'off') return;
   const published = adapter.readPublishedResult();
   const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
@@ -108,8 +153,11 @@ async function renderPrChrome(
     profile.suggestionInfoString,
     profile.slashPrefixes
   );
-  if (model.count > 0 || published !== null) {
-    // Filtre local par label (§5.5) : masque les ancres du bandeau ET les fils rendus.
+  // Le bandeau se rend dès qu'il y a quelque chose à montrer OU à filtrer : le filtre
+  // par label du §5.5 porte sur la liste des fils, pas sur les seuls fils bloquants —
+  // une page sans fil bloquant mais avec des fils reste filtrable (composant B non
+  // déployé compris, §10).
+  if (model.count > 0 || published !== null || threads.length > 0) {
     const labelOfThread = new Map<string, string | null>();
     for (const t of threads) {
       const a = analyze(
@@ -125,15 +173,20 @@ async function renderPrChrome(
       );
       labelOfThread.set(t.id, a.resolved?.label.id ?? null);
     }
+    // Fils rendus sur la page — surface d'affichage, hors contrat §9.2.3 : le filtre les
+    // masque AUSSI, pas seulement les ancres du bandeau (§5.5).
+    const withRenderedThreads = adapter as PlatformAdapter & {
+      getRenderedThreadElements?: () => { id: string; element: Element }[];
+    };
     const banner = renderBanner(model, published, lang, {
       filterLabels: enabledLabels(resolved.config).map((l) => l.id),
-      onFilter: (labelId) => {
-        for (const li of banner.querySelectorAll('li[data-thread-id]')) {
-          const threadId = (li as HTMLElement).dataset['threadId']!;
-          const visible = labelId === null || labelOfThread.get(threadId) === labelId;
-          (li as HTMLElement).style.display = visible ? '' : 'none';
-        }
-      },
+      onFilter: (labelId) =>
+        applyLabelFilter(
+          banner,
+          withRenderedThreads.getRenderedThreadElements?.() ?? [],
+          labelOfThread,
+          labelId
+        ),
     });
     doc.body.insertAdjacentElement('afterbegin', banner);
   }

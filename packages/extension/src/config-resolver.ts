@@ -55,9 +55,8 @@ export class ClientConfigResolver {
 
     const { config, notices } = resolveConfig(floor, org.read, repo.read, null, false);
     this.#lastTtl = config.configCacheTtlSeconds;
-    // §5.4, condition 4 : une lecture qui a rendu `unreachable` met en état dégradé MÊME
-    // si une valeur en cache permet de continuer à assister — masquer la dégradation
-    // laisserait le blocage d'envoi armé sur des règles qu'on ne sait plus fraîches.
+    // §5.4, condition 4 : une lecture qui a rendu `unreachable` met en état dégradé —
+    // jamais masqué par une entrée de cache expirée.
     const degraded = repo.degraded || org.degraded;
     return { config, notices, fingerprint: fingerprint(config), degraded };
   }
@@ -75,9 +74,13 @@ export class ClientConfigResolver {
       this.#cache.set(key, { value, fetchedAt: this.#now() });
       return { read: value, degraded: false };
     }
-    // Lecture impossible : l'assistance continue avec la dernière valeur connue (même
-    // expirée), mais l'état dégradé est signalé — jamais masqué (§5.4, §9.2.3).
-    return { read: entry ? entry.value : value, degraded: true };
+    // Lecture impossible : le repli normatif est le NIVEAU INFÉRIEUR, en état dégradé
+    // (§8.1.5 « Lecture impossible », §9.2.3 : « se rabat sur le niveau inférieur, en
+    // signalant son état dégradé »). La lecture `unreachable` est donc rendue telle
+    // quelle — resolveConfig() saute ce niveau — et jamais remplacée par la valeur
+    // expirée du même niveau : l'extension n'énonce aucun diagnostic au nom d'une règle
+    // qu'elle n'a pas pu relire. La valeur en cache ne sert que pendant son TTL.
+    return { read: value, degraded: true };
   }
 
   invalidate(): void {

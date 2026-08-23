@@ -48,6 +48,39 @@ language?.addEventListener('change', () => {
   chrome?.storage?.sync?.set({ language: language.value || null });
 });
 
+// Raccourcis directs (§5.2) — préférence locale (§8.1.2), format « Alt+I=issue » par
+// ligne ; « Alt+I= » sans label désactive le raccourci par défaut. La clé stockée est
+// celle que le script de contenu lit (`directShortcuts`).
+const shortcutsArea = document.getElementById('direct-shortcuts') as HTMLTextAreaElement | null;
+const shortcutsState = document.getElementById('direct-shortcuts-state');
+chrome?.storage?.sync?.get(['directShortcuts'], (items) => {
+  const stored = items['directShortcuts'];
+  if (shortcutsArea && stored && typeof stored === 'object' && !Array.isArray(stored)) {
+    shortcutsArea.value = Object.entries(stored as Record<string, unknown>)
+      .map(([combo, label]) => `${combo}=${String(label)}`)
+      .join('\n');
+  }
+});
+document.getElementById('direct-shortcuts-save')?.addEventListener('click', () => {
+  if (!shortcutsArea) return;
+  const table: Record<string, string> = {};
+  const rejected: string[] = [];
+  for (const rawLine of shortcutsArea.value.split('\n')) {
+    const line = rawLine.trim();
+    if (line === '') continue;
+    const m = /^alt\+([a-z])\s*=\s*([a-z-]*)$/i.exec(line);
+    if (m) table[`Alt+${m[1]!.toUpperCase()}`] = m[2]!.toLowerCase();
+    else rejected.push(line);
+  }
+  chrome?.storage?.sync?.set({ directShortcuts: table });
+  if (shortcutsState) {
+    shortcutsState.textContent =
+      rejected.length === 0
+        ? 'Enregistré.'
+        : `Enregistré — lignes ignorées : ${rejected.join(' ; ')}`;
+  }
+});
+
 // État dégradé (§5.4, §9.2.3) et journal de dégradation de sélecteurs (§9.4).
 chrome?.storage?.local?.get(['degradedState', 'selectorFailures'], (items) => {
   const degraded = document.getElementById('degraded-state');

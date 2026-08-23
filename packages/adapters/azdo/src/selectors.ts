@@ -58,10 +58,28 @@ export const selectors = {
     candidates: ['.repos-pr-header time', 'time[datetime]'],
   } satisfies SelectorChain,
 
-  /** Formulaire d'édition d'un commentaire existant — décide d'action: 'edit' (§4.3). */
+  /** Formulaire d'édition d'un commentaire existant — décide d'action: 'edit' (§4.3).
+   * PIÈGE : `[class*="comment-edit"]` matcherait `.repos-discussion-comment-editor` — le
+   * conteneur de COMPOSITION nominal — par sous-chaîne, et TOUT éditeur deviendrait
+   * 'edit'. Les candidats sont donc fermés sur la forme d'édition. */
   editForm: {
     name: 'edit-form',
-    candidates: ['.repos-discussion-comment--editing', '[class*="comment-edit"]'],
+    candidates: ['.repos-discussion-comment--editing', '[class*="comment-editing"]', '[class*="edit-comment"]'],
+  } satisfies SelectorChain,
+
+  /** Un commentaire rendu dans un fil — distingue l'édition d'une RACINE de celle d'une
+   * réponse (§4.1). Le candidat par sous-chaîne exclut les conteneurs d'édition, qui
+   * portent aussi « discussion-comment » dans leur classe. */
+  renderedComment: {
+    name: 'rendered-comment',
+    candidates: ['.repos-discussion-comment', '[class*="discussion-comment"]:not([class*="editor"])'],
+  } satisfies SelectorChain,
+
+  /** Conteneur des contrôles d'envoi d'un éditeur (§4.3) — en chaîne ordonnée : la
+   * génération « repos- », la génération héritée « vc- », puis un formulaire (§9.4). */
+  submitContainer: {
+    name: 'submit-container',
+    candidates: ['.repos-discussion-comment-editor', '.vc-discussion-comment-editor', 'form'],
   } satisfies SelectorChain,
 
   /** Corps d'un commentaire rendu — badges du §5.5. */

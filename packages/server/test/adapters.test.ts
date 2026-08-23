@@ -300,3 +300,77 @@ function c(content: string) {
     author: { id: `u-${cid}`, displayName: `User ${cid}`, uniqueName: `user${cid}@example.test` },
   };
 }
+
+describe('résidu serveur — pagination de listOpenPrs (§6.4 source 2, §6.2.4)', () => {
+  it('GitHub : 250 PR ouvertes → 250 PrRef, en pages de 100', async () => {
+    const { impl, calls } = mockFetch((url) => {
+      const page = Number(/[?&]page=(\d+)/.exec(url)?.[1] ?? '1');
+      const start = (page - 1) * 100;
+      const count = Math.max(0, Math.min(100, 250 - start));
+      return {
+        status: 200,
+        body: Array.from({ length: count }, (_, i) => ({
+          number: start + i + 1,
+          created_at: '2026-10-01T00:00:00Z',
+        })),
+      };
+    });
+    const adapter = new GithubServerAdapter({ token: async () => 't', webhookSecret: 's', fetchImpl: impl });
+    const prs = await adapter.listOpenPrs({ host: 'github.com', scope: ['acme', 'demo'] });
+    expect(prs).toHaveLength(250);
+    expect(prs.at(-1)!.number).toBe(250);
+    expect(calls.filter((cl) => cl.url.includes('/pulls?state=open')).length).toBe(3);
+  });
+
+  it('Azure DevOps : 250 PR actives → 250 PrRef via $top/$skip — la réconciliation est la seule voie de détection (§B.7)', async () => {
+    const { impl, calls } = mockFetch((url) => {
+      const skip = Number(/\$skip=(\d+)/.exec(url)?.[1] ?? '0');
+      const count = Math.max(0, Math.min(100, 250 - skip));
+      return {
+        status: 200,
+        body: {
+          value: Array.from({ length: count }, (_, i) => ({
+            pullRequestId: skip + i + 1,
+            creationDate: '2026-10-01T00:00:00Z',
+          })),
+        },
+      };
+    });
+    const adapter = new AzdoServerAdapter({
+      organizationUrl: 'https://dev.azure.com/org',
+      project: 'proj',
+      token: async () => 't',
+      webhookSecret: 's',
+      fetchImpl: impl,
+    });
+    const prs = await adapter.listOpenPrs({ host: 'dev.azure.com', scope: ['org', 'proj', 'repo'] });
+    expect(prs).toHaveLength(250);
+    expect(prs.at(-1)!.number).toBe(250);
+    expect(calls.filter((cl) => cl.url.includes('searchCriteria.status=active')).length).toBe(3);
+  });
+
+  it('Azure DevOps : exactement 100 PR → une page pleine puis une page vide, terminaison saine', async () => {
+    const { impl } = mockFetch((url) => {
+      const skip = Number(/\$skip=(\d+)/.exec(url)?.[1] ?? '0');
+      const count = Math.max(0, Math.min(100, 100 - skip));
+      return {
+        status: 200,
+        body: {
+          value: Array.from({ length: count }, (_, i) => ({
+            pullRequestId: skip + i + 1,
+            creationDate: '2026-10-01T00:00:00Z',
+          })),
+        },
+      };
+    });
+    const adapter = new AzdoServerAdapter({
+      organizationUrl: 'https://dev.azure.com/org',
+      project: 'proj',
+      token: async () => 't',
+      webhookSecret: 's',
+      fetchImpl: impl,
+    });
+    const prs = await adapter.listOpenPrs({ host: 'dev.azure.com', scope: ['org', 'proj', 'repo'] });
+    expect(prs).toHaveLength(100);
+  });
+});

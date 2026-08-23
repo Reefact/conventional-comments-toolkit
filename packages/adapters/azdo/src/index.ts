@@ -19,6 +19,7 @@ import {
   type UserInfo,
 } from '@cct/core';
 import {
+  closestChain,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -37,16 +38,16 @@ export interface AzdoClientOptions {
   log?: SelectorLog;
 }
 
-function firstCommentOf(thread: Element): Element | null {
-  return thread.querySelector('.repos-discussion-comment, [class*="discussion-comment"]');
-}
-
 export class AzdoClientAdapter implements PlatformAdapter {
   #hosts: string[];
   #fetch: typeof fetch;
   #doc: Document;
   readonly log: SelectorLog;
   #editorSeq = 0;
+  /** Préfixe de chemin devant l'organisation/collection pour les routes d'API, établi par
+   * currentPr() : '' sur dev.azure.com, '/DefaultCollection' éventuel sur
+   * *.visualstudio.com, '/tfs' sur un Azure DevOps Server d'installation par défaut. */
+  #apiPrefix = '';
 
   constructor(opts: AzdoClientOptions = {}) {
     this.#hosts = ['dev.azure.com', ...(opts.extraHosts ?? [])];
@@ -68,10 +69,17 @@ export class AzdoClientAdapter implements PlatformAdapter {
   }
 
   /** §B.4 — pas de route de fichier brut : tentative sur le point d'API `items`, sur la
-   * session de l'utilisateur. En échec, `unreachable` → état dégradé (§5.4). */
+   * session de l'utilisateur. En échec, `unreachable` → état dégradé (§5.4).
+   * Sur *.visualstudio.com, l'organisation vit dans le SOUS-DOMAINE : la répéter comme
+   * segment de chemin produit une URL 404 — et un 404 sur une URL fausse se lirait
+   * `absent`, jamais `unreachable` (§8.1.5). Sur Azure DevOps Server, le répertoire
+   * virtuel (`/tfs`) précède la collection ; `#apiPrefix` vient de currentPr(). */
   async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
     const [org, project, repo] = pr.scope;
-    const url = `https://${pr.host}/${org}/${project}/_apis/git/repositories/${repo}/items?path=${encodeURIComponent('/.conventional-comments.json')}&api-version=7.1`;
+    const base = pr.host.endsWith('.visualstudio.com')
+      ? `https://${pr.host}${this.#apiPrefix}/${project}`
+      : `https://${pr.host}${this.#apiPrefix}/${org}/${project}`;
+    const url = `${base}/_apis/git/repositories/${repo}/items?path=${encodeURIComponent('/.conventional-comments.json')}&api-version=7.1`;
     try {
       const res = await this.#fetch(url, { credentials: 'include' });
       if (res.status === 404) return { status: 'absent' };
@@ -116,7 +124,11 @@ export class AzdoClientAdapter implements PlatformAdapter {
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {
-    const container = editor.element.closest('.repos-discussion-comment-editor, form') ?? editor.element.parentElement;
+    // Chaîne centralisée, parcourue dans l'ordre (§9.4) : la génération héritée « vc- »
+    // doit trouver son conteneur au même titre que « repos- » — sans quoi aucun bouton
+    // n'est intercepté et le blocage du §5.4 est désarmé sur cette génération.
+    const container =
+      closestChain(editor.element, selectors.submitContainer).element ?? editor.element.parentElement;
     if (!container) return [];
     return queryChainAll(container, selectors.submitButtons).map((element) => {
       const label = (element.textContent ?? '').toLowerCase();
@@ -202,37 +214,52 @@ export class AzdoClientAdapter implements PlatformAdapter {
     }));
   }
 
+  /** Conteneurs de fils rendus, pour le filtre local du §5.5 — même dérivation
+   * d'identifiant que getThreads(). */
+  getRenderedThreadElements(): { id: string; element: Element }[] {
+    return queryChainAll(this.#doc, selectors.renderedThreads).map((el, i) => ({
+      id: el.id || `dom-thread-${i}`,
+      element: el,
+    }));
+  }
+
   currentPr(): PrRef | null {
     const loc = this.#doc.location;
     if (!loc) return null;
     const path = loc.pathname;
     const { element } = queryChain(this.#doc, selectors.prCreatedAt);
     const createdAt = element?.getAttribute('datetime') ?? '';
-    // Forme moderne : dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}
-    let m = /^\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
-    if (m) {
-      return {
-        platform: 'azdo',
-        createdAt,
-        host: loc.hostname,
-        scope: [m[1]!, m[2]!, m[3]!],
-        number: Number(m[4]),
-      };
-    }
-    // Forme historique : {org}.visualstudio.com/{project}/_git/{repo}/pullrequest/{id}
-    // — l'organisation vit dans le sous-domaine (§B.1).
+    const mk = (scope: [string, string, string], number: string): PrRef => ({
+      platform: 'azdo',
+      createdAt,
+      host: loc.hostname,
+      scope,
+      number: Number(number),
+    });
+    // Forme historique : {org}.visualstudio.com/[DefaultCollection/]{project}/_git/{repo}
+    // /pullrequest/{id} — l'organisation vit dans le SOUS-DOMAINE (§B.1) ; un segment de
+    // collection peut précéder le projet, et la forme moderne ne doit JAMAIS s'y essayer :
+    // elle prendrait la collection pour l'organisation.
     if (loc.hostname.endsWith('.visualstudio.com')) {
-      m = /^\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
+      const m = /^\/(DefaultCollection\/)?([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
       if (m) {
-        const org = loc.hostname.split('.')[0]!;
-        return {
-          platform: 'azdo',
-          createdAt,
-          host: loc.hostname,
-          scope: [org, m[1]!, m[2]!],
-          number: Number(m[3]),
-        };
+        this.#apiPrefix = m[1] ? '/DefaultCollection' : '';
+        return mk([loc.hostname.split('.')[0]!, m[2]!, m[3]!], m[4]!);
       }
+      return null;
+    }
+    // Azure DevOps Server, installation par défaut (§B.1, hôte déclaré dans les options,
+    // §B.4) : /tfs/{collection}/{project}/_git/{repo}/pullrequest/{id}.
+    let m = /^\/tfs\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
+    if (m) {
+      this.#apiPrefix = '/tfs';
+      return mk([m[1]!, m[2]!, m[3]!], m[4]!);
+    }
+    // Forme moderne : dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}
+    m = /^\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
+    if (m) {
+      this.#apiPrefix = '';
+      return mk([m[1]!, m[2]!, m[3]!], m[4]!);
     }
     return null;
   }
@@ -243,30 +270,47 @@ export class AzdoClientAdapter implements PlatformAdapter {
     this.#editorSeq++;
     // L'édition est un point de sortie au même titre que la création (§4.3) ; l'édition
     // d'une RACINE de fil reste zone 'thread-root' — la classer 'reply' la soustrairait
-    // à la validation par défaut (§4.1).
-    const action: 'compose' | 'edit' = el.closest(selectors.editForm.candidates.join(', '))
-      ? 'edit'
-      : 'compose';
-    const inThread = el.closest(selectors.threadContainer.candidates.join(', '));
+    // à la validation par défaut (§4.1). Chaînes parcourues dans l'ordre (§9.4), et la
+    // chaîne editForm ne matche jamais un conteneur de composition (selectors.ts).
+    const action: 'compose' | 'edit' = closestChain(el, selectors.editForm).element ? 'edit' : 'compose';
+    const editedId =
+      action === 'edit' ? closestChain(el, selectors.renderedComment).element?.id || undefined : undefined;
+    const inThread = closestChain(el, selectors.threadContainer).element;
     let context: EditorContext;
     if (inThread) {
-      const isRootEdit =
-        action === 'edit' &&
-        el.closest(selectors.commentBody.candidates.map((c) => `${c}, [class*="comment"]`).join(', ')) !== null &&
-        firstCommentOf(inThread) !== null &&
-        firstCommentOf(inThread)!.contains(el);
+      let isRootEdit = false;
+      if (action === 'edit') {
+        // MÊME candidat pour la liste des commentaires du fil et pour l'ancêtre du champ
+        // édité — deux stratégies divergentes reclasseraient une racine en réponse.
+        let comments: Element[] = [];
+        let editedComment: Element | null = null;
+        for (const candidate of selectors.renderedComment.candidates) {
+          const found = [...inThread.querySelectorAll(candidate)];
+          if (found.length > 0) {
+            comments = found;
+            editedComment = el.closest(candidate);
+            break;
+          }
+        }
+        if (comments.length > 0 && editedComment === null) this.log.degraded(selectors.renderedComment); // §9.4
+        isRootEdit = comments.length > 0 && editedComment === comments[0];
+      }
+      const threadId = inThread.id || editedId;
       context = isRootEdit
-        ? { zone: 'thread-root', action, pr, threadId: inThread.id || undefined, canCarryBlockingState: true, inScope: true }
+        ? { zone: 'thread-root', action, pr, threadId, commentId: editedId, canCarryBlockingState: true, inScope: true }
         : {
             zone: 'reply',
             action,
             pr,
-            threadId: inThread.id || undefined,
+            threadId,
+            ...(action === 'edit' ? { commentId: editedId } : {}),
             canCarryBlockingState: false,
             inScope: true,
           };
     } else {
-      context = { zone: 'thread-root', action, pr, canCarryBlockingState: true, inScope: true };
+      // Hors fil : sur une édition, le commentaire édité est son propre fil (§9.2.3).
+      const editIds = action === 'edit' ? { threadId: editedId, commentId: editedId } : {};
+      context = { zone: 'thread-root', action, pr, ...editIds, canCarryBlockingState: true, inScope: true };
     }
     return { id: `azdo-editor-${this.#editorSeq}`, element: el, context };
   }

@@ -189,7 +189,7 @@ export class EditorController {
     const hasSelection = selEnd > selStart;
 
     const effectiveLabel = label ?? this.#lastAnalysis?.resolved?.label.id ?? 'suggestion';
-    const { nextValue, caret, delta } = computePrefixInsertion(
+    const { nextValue, caret, delta, changedAt } = computePrefixInsertion(
       value,
       { label: effectiveLabel, decorations },
       { toggle }
@@ -197,8 +197,10 @@ export class EditorController {
     this.deps.adapter.writeValue(this.deps.editor, nextValue, hasSelection ? undefined : caret);
     if (hasSelection) {
       // Le texte sélectionné n'est pas remplacé ; la sélection est restaurée, décalée de
-      // la longueur du préfixe inséré (§5.1, CA-02).
-      shiftSelection(element, selStart, selEnd, delta);
+      // la longueur du préfixe inséré (§5.1, CA-02) — mais une sélection située AVANT le
+      // point de modification (dans une citation au-dessus de la ligne de préfixe) reste
+      // en place : le décalage ne s'applique qu'à partir de changedAt.
+      shiftSelection(element, selStart, selEnd, delta, changedAt);
     }
     this.refresh();
   }

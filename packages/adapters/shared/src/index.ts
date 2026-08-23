@@ -1,7 +1,7 @@
 // Socle commun des adaptateurs client (composant A) : contrat §9.2.3, stratégie
 // d'écriture programmatique §9.3, chaînes de sélecteurs avec repli §9.4/§A.5.
 
-import { splitBody } from '@cct/core';
+import { EMOJI_TOKEN_SOURCE, matchPrefix, splitBody } from '@cct/core';
 import type {
   ConfigRead,
   Disposable,
@@ -83,15 +83,19 @@ export function writeToTextField(
 }
 
 /** Restaure une sélection décalée de `delta` (§5.1 — la sélection active est restaurée,
- * décalée de la longueur du préfixe inséré). */
+ * décalée de la longueur du préfixe inséré). Seules les positions situées à partir de
+ * `changedAt` se décalent : le préfixe peut s'insérer sur une ligne située APRÈS la
+ * sélection (brouillon commençant par une citation, §3.4.1), et décaler une position
+ * antérieure ferait dériver la sélection restaurée (CA-02). */
 export function shiftSelection(
   element: HTMLTextAreaElement | HTMLInputElement,
   start: number,
   end: number,
-  delta: number
+  delta: number,
+  changedAt = 0
 ): void {
   try {
-    element.setSelectionRange(start + delta, end + delta);
+    element.setSelectionRange(start < changedAt ? start : start + delta, end < changedAt ? end : end + delta);
   } catch {
     // idem
   }
@@ -129,6 +133,17 @@ export function queryChainAll(root: ParentNode, chain: SelectorChain): Element[]
   return [];
 }
 
+/** closest() sur une chaîne : les candidats s'essaient DANS L'ORDRE, comme queryChain —
+ * les joindre en un seul sélecteur laisserait un candidat de repli large l'emporter sur
+ * le candidat précis d'une génération plus récente (§9.4). */
+export function closestChain(el: Element, chain: SelectorChain): SelectorOutcome {
+  for (const candidate of chain.candidates) {
+    const element = el.closest(candidate);
+    if (element) return { element, matched: candidate };
+  }
+  return { element: null, matched: null };
+}
+
 /** Journal local de dégradation de sélecteurs (§9.4, CA-11) : jamais de dialogue, jamais
  * d'exception remontée — l'échec est tracé, la zone se désactive localement. */
 export class SelectorLog {
@@ -146,15 +161,32 @@ export class SelectorLog {
   }
 }
 
+// Localisation du préfixe dans la ligne BRUTE, pour la réécrire sans perdre sa tête.
+// La DÉCISION « cette ligne porte-t-elle un préfixe » revient à matchPrefix() sur la
+// ligne normalisée (§3.4.1 étapes 4-6, §3.4.2) — ce motif ne fait que retrouver, dans la
+// ligne d'origine, les bornes de ce que la regex de référence a reconnu : tête tolérée
+// (blancs, U+FEFF, emoji), label, décorations, deux-points et blancs suivants.
+const RAW_PREFIX_LOCATOR = new RegExp(
+  `^(?<head>[\\p{White_Space}\\uFEFF]*(?:${EMOJI_TOKEN_SOURCE}[\\p{White_Space}\\uFEFF]*)?)` +
+    '(?<label>[A-Za-z]+)' +
+    '(?:[\\p{White_Space}\\uFEFF]*\\([^)\\r\\n]*\\))?' +
+    ':[\\p{White_Space}\\uFEFF]*',
+  'u'
+);
+
 /** Insertion/remplacement de préfixe (§5.1, CA-02) — pur, testable sans DOM.
  * La ligne visée est la LIGNE DE PRÉFIXE du §3.4.1 (blocs délimités et citations
  * écartés) : citer du code en tête puis cliquer un label ne doit jamais réécrire la
- * citation. Remplace le préfixe existant ou en insère un, sans détruire le texte saisi. */
+ * citation. Le préfixe existant est reconnu comme la validation le reconnaît — ligne
+ * normalisée par les étapes 4-6, regex de référence — et la tête tolérée de la ligne
+ * (indentation, BOM, emoji) est conservée à la réécriture comme au retrait.
+ * `changedAt` : position, dans la valeur d'ENTRÉE, où la modification commence — les
+ * positions antérieures (une citation au-dessus) ne se décalent pas. */
 export function computePrefixInsertion(
   currentValue: string,
   newPrefix: { label: string; decorations: string[] },
   options: { toggle?: boolean } = {}
-): { nextValue: string; caret: number; delta: number; removed: boolean } {
+): { nextValue: string; caret: number; delta: number; removed: boolean; changedAt: number } {
   const decorations = newPrefix.decorations.length > 0 ? ` (${newPrefix.decorations.join(', ')})` : '';
   const prefixText = `${newPrefix.label}${decorations}: `;
 
@@ -162,28 +194,38 @@ export function computePrefixInsertion(
   const split = splitBody(currentValue);
   const target = split.prefixLineIndex ?? -1;
 
-  const existing = target >= 0 ? /^([A-Za-z]+)(\s*\([^)]*\))?:\s*/.exec(lines[target]!) : null;
-  if (existing && target >= 0) {
-    const line = lines[target]!;
-    const rest = line.slice(existing[0].length);
-    const hadLabel = existing[1]!;
-    const sameLabel = hadLabel.toLowerCase() === newPrefix.label.toLowerCase();
+  const recognized = split.prefixLine !== null ? matchPrefix(split.prefixLine) : null;
+  const located = recognized && target >= 0 ? RAW_PREFIX_LOCATOR.exec(lines[target]!) : null;
+  if (recognized && located && target >= 0) {
+    const head = located.groups!['head']!;
+    const rest = lines[target]!.slice(located[0].length);
+    const start = lineStart(lines, target);
+    const changedAt = start + head.length;
+    const sameLabel = recognized.label.toLowerCase() === newPrefix.label.toLowerCase();
     if (options.toggle && sameLabel) {
       // Second clic sur un label déjà actif : retrait (§5.1) — le label seul décide,
       // pas l'état du sélecteur de décoration.
-      lines[target] = rest;
+      lines[target] = head + rest;
       const nextValue = lines.join('\n');
-      return { nextValue, caret: lineStart(lines, target), delta: -existing[0].length, removed: true };
+      return { nextValue, caret: changedAt, delta: -(located[0].length - head.length), removed: true, changedAt };
     }
     // Remplacement : décoration et sujet conservés (CA-02) — la décoration existante est
     // conservée si le nouveau préfixe n'en apporte pas.
     const keptDecorations =
-      newPrefix.decorations.length === 0 && existing[2] ? ` ${existing[2].trim()}` : decorations;
+      newPrefix.decorations.length === 0 && recognized.decorations !== null
+        ? ` (${recognized.decorations})`
+        : decorations;
     const replacement = `${newPrefix.label}${keptDecorations}: `;
-    lines[target] = `${replacement}${rest}`;
+    lines[target] = `${head}${replacement}${rest}`;
     const nextValue = lines.join('\n');
-    const caret = lineStart(lines, target) + replacement.length;
-    return { nextValue, caret, delta: replacement.length - existing[0].length, removed: false };
+    const caret = changedAt + replacement.length;
+    return {
+      nextValue,
+      caret,
+      delta: head.length + replacement.length - located[0].length,
+      removed: false,
+      changedAt,
+    };
   }
 
   if (target >= 0) {
@@ -191,14 +233,16 @@ export function computePrefixInsertion(
     // tête de CETTE ligne — jamais sur une citation ou un bloc situé au-dessus.
     lines[target] = prefixText + lines[target]!;
     const nextValue = lines.join('\n');
-    const caret = lineStart(lines, target) + prefixText.length;
-    return { nextValue, caret, delta: prefixText.length, removed: false };
+    const changedAt = lineStart(lines, target);
+    return { nextValue, caret: changedAt + prefixText.length, delta: prefixText.length, removed: false, changedAt };
   }
 
   // Aucune ligne de préfixe (corps vide, tout cité ou tout en bloc) : nouvelle première
-  // ligne, contenu existant conservé en dessous.
+  // ligne, contenu existant conservé en dessous — le contenu existant se décale donc du
+  // préfixe ET du saut de ligne ajouté.
   const nextValue = currentValue === '' ? prefixText : `${prefixText}\n${currentValue}`;
-  return { nextValue, caret: prefixText.length, delta: prefixText.length, removed: false };
+  const delta = currentValue === '' ? prefixText.length : prefixText.length + 1;
+  return { nextValue, caret: prefixText.length, delta, removed: false, changedAt: 0 };
 }
 
 function lineStart(lines: string[], index: number): number {

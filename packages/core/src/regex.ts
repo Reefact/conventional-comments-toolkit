@@ -1,8 +1,8 @@
 // Expression régulière de référence (§3.4.2).
 // Drapeau `u` obligatoire, drapeau `v` interdit — vérifié par un test dédié (§3.4.2).
 //
-// Le motif est écrit avec des échappements (️ pour le sélecteur de variante,
-// ‍ pour le ZWJ) : ce sont les mêmes points de code que dans la spécification,
+// Le motif est écrit avec des échappements (\uFE0F pour le sélecteur de variante,
+// \u200D pour le ZWJ) : ce sont les mêmes points de code que dans la spécification,
 // rendus visibles pour la relecture.
 
 /** Motif d'un emoji de tête toléré (§3.4.2) — exporté seul pour que le chemin

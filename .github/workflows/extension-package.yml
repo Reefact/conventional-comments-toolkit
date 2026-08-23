@@ -1,0 +1,80 @@
+# Empaquetage du composant A : produit les deux variantes chargeables (Chromium et
+# Firefox) et les publie en artefacts téléchargeables — c'est ce qui permet d'essayer
+# l'extension sur une vraie page sans chaîne de build locale, et de vérifier avant
+# publication que le bundle ne contient AUCUN code distant (§10, CSP).
+name: Extension (bundle MV3)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'packages/**'
+      - '.github/workflows/extension-package.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+concurrency:
+  group: extension-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    name: Construire et vérifier le bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Compiler les paquets
+        run: npm run build
+
+      - name: Empaqueter (esbuild → dist-ext/, variante Firefox comprise)
+        run: npm run build:extension
+
+      # §10 : « aucun code distant, aucune dépendance CDN ». Une URL http(s) restant dans
+      # un bundle serait soit une ressource distante, soit un import oublié : la CSP de
+      # MV3 la rejetterait à l'exécution, silencieusement pour l'utilisateur.
+      - name: Aucun chargement distant dans le bundle (§10)
+        run: |
+          cd packages/extension/dist-ext
+          if grep -rInE '(from|import)[^;]*["'"'"']https?://' content.js background.js options.js; then
+            echo "::error::Import distant détecté dans le bundle : la CSP MV3 l'interdit (§10)."
+            exit 1
+          fi
+          echo "✓ aucun import distant"
+
+      # Le manifeste doit rester chargeable : un JSON cassé ne se voit qu'au chargement
+      # dans le navigateur, c'est-à-dire trop tard.
+      - name: Manifestes valides et cohérents
+        run: |
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const base = JSON.parse(readFileSync('packages/extension/dist-ext/manifest.json', 'utf8'));
+            const ff = JSON.parse(readFileSync('packages/extension/dist-ext/firefox/manifest.json', 'utf8'));
+            if (base.manifest_version !== 3) throw new Error('manifest_version attendu : 3');
+            if (!ff.browser_specific_settings?.gecko?.id) throw new Error('variante Firefox sans identifiant gecko');
+            if (!Array.isArray(ff.background?.scripts)) throw new Error('Firefox attend une event page, pas un service worker');
+            console.log('✓ manifestes MV3 valides (Chromium et Firefox)');
+          "
+
+      - name: Publier le bundle Chromium
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-chromium-${{ github.sha }}
+          path: packages/extension/dist-ext
+          retention-days: 14
+
+      - name: Publier le bundle Firefox
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-firefox-${{ github.sha }}
+          path: packages/extension/dist-ext/firefox
+          retention-days: 14

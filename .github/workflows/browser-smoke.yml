@@ -1,0 +1,60 @@
+# Canari quotidien (§9.4) : ce que seul un vrai navigateur peut dire.
+#
+# La stratégie d'écriture programmatique du §9.3 — setter natif du prototype puis
+# événement `input` — repose sur un comportement de Chromium, pas sur une règle de notre
+# code : une évolution du moteur la casserait sans qu'aucun test happy-dom ne bronche, et
+# la barre d'outils comme la saisie rapide (§5.1, §5.2) deviendraient des boutons inertes.
+# Ce workflow rejoue donc le spike P1' dans un Chromium à jour, tous les jours.
+#
+# Le smoke test de sélecteurs du §9.4 contre les plateformes RÉELLES (github.com, GHE
+# Server, Azure DevOps) demande des sessions authentifiées : il n'est pas exécutable ici.
+# `smoke.mjs` en porte la forme et s'arrête proprement tant qu'aucune capture DOM n'est
+# fournie — il ne donne jamais une assurance qu'il n'a pas.
+name: Canari navigateur
+
+on:
+  schedule:
+    # 04:17 UTC — quotidien, hors des pics de charge des runners.
+    - cron: '17 4 * * *'
+  pull_request:
+    paths:
+      - 'spikes/**'
+      - 'packages/adapters/**'
+      - '.github/workflows/browser-smoke.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: browser-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spike:
+    name: Spike P1' dans Chromium (§9.3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Le dépôt ne dépend que de playwright-core (zéro navigateur embarqué) : le binaire
+      # se télécharge ici, et son chemin est résolu par la bibliothèque elle-même plutôt
+      # que codé en dur — il change à chaque version de Chromium.
+      - name: Installer Chromium
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Résoudre le binaire Chromium
+        run: |
+          path=$(node --input-type=module -e "import { chromium } from 'playwright-core'; console.log(chromium.executablePath());")
+          echo "PLAYWRIGHT_CHROMIUM=$path" >> "$GITHUB_ENV"
+          echo "Chromium : $path"
+
+      - name: Spike P1' — la stratégie d'écriture du §9.3 tient toujours
+        run: npm run spike
+
+      - name: Smoke test de sélecteurs (§9.4)
+        run: node spikes/p1-prime/smoke.mjs

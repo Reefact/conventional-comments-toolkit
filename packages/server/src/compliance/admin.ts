@@ -128,14 +128,7 @@ export class AdminEntryPoint {
 
     // Atteindre le point d'entrée ne suffit pas : les deux habilitations sont distinctes
     // (§6.2.4). Le demandeur doit appartenir à chacun des groupes cités (§8.1.1).
-    const groups = config.resolverOverrideGroup;
-    let habilitated = groups.length > 0;
-    for (const group of groups) {
-      if (!(await adapter.isInGroup(requester, group).catch(() => false))) {
-        habilitated = false;
-        break;
-      }
-    }
+    const habilitated = await this.isHabilitated(requester, config.resolverOverrideGroup);
     if (!habilitated) {
       await storage.appendExemptionLog({
         prKey: key,
@@ -173,14 +166,7 @@ export class AdminEntryPoint {
     const { adapter, storage, now } = this.deps;
     const key = prKey(pr);
     const config = await this.effectiveConfig(pr);
-    const groups = config.resolverOverrideGroup;
-    let habilitated = groups.length > 0;
-    for (const group of groups) {
-      if (!(await adapter.isInGroup(requester, group).catch(() => false))) {
-        habilitated = false;
-        break;
-      }
-    }
+    const habilitated = await this.isHabilitated(requester, config.resolverOverrideGroup);
     if (!habilitated) throw new AdminError(403, 'requester is not a member of resolverOverrideGroup');
     await storage.deleteActiveExemption(key);
     await adapter.removeLabel(pr, config.overrideLabel);
@@ -191,6 +177,23 @@ export class AdminEntryPoint {
       at: now().toISOString(),
       ...(reason ? { reason } : {}),
     });
+  }
+
+  /** Une panne de l'API des groupes est une INDISPONIBILITÉ (503), jamais un « non
+   * habilité » : convertir l'échec en refus rejetterait une exemption légitime sur une
+   * panne — la même règle que côté évaluation (§6.4, incapacité à évaluer). */
+  private async isHabilitated(requester: UserInfo, groups: string[]): Promise<boolean> {
+    if (groups.length === 0) return false;
+    for (const group of groups) {
+      let member: boolean;
+      try {
+        member = await this.deps.adapter.isInGroup(requester, group);
+      } catch (e) {
+        throw new AdminError(503, `membership check unavailable (${group}): ${String(e)}`);
+      }
+      if (!member) return false;
+    }
+    return true;
   }
 
   private async effectiveConfig(pr: PrRef) {

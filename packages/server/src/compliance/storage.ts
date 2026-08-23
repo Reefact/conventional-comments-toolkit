@@ -67,8 +67,12 @@ export interface IndicatorSample {
 
 export interface Storage {
   // 1. Journal des exemptions de PR (§10) — un historique, jamais la source de vérité.
+  // Nominatif par construction : le §10 lui impose une durée de conservation (12 mois
+  // par défaut, configurable) — la purge SUPPRIME réellement, filtrer à la lecture ne
+  // suffirait pas.
   appendExemptionLog(entry: ExemptionLogEntry): Promise<void>;
   readExemptionLog(): Promise<ExemptionLogEntry[]>;
+  purgeExemptionLog(olderThanIso: string): Promise<void>;
   // 2. Exemption active par PR ouverte (chemin de repli, §6.3.2, §6.4).
   getActiveExemption(prKey: string): Promise<ActiveExemption | null>;
   setActiveExemption(prKey: string, exemption: ActiveExemption): Promise<void>;
@@ -151,6 +155,14 @@ function emptyState(): State {
   };
 }
 
+/** Copie profonde : les getters rendent des copies et les setters en stockent — un
+ * appelant qui mute l'objet rendu ne doit jamais modifier l'état persistant, et la
+ * sémantique doit être IDENTIQUE entre les trois implémentations (SqliteStorage copie
+ * par construction, via son aller-retour JSON). */
+function clone<T>(value: T): T {
+  return structuredClone(value);
+}
+
 export class MemoryStorage implements Storage {
   protected state: State = emptyState();
 
@@ -159,17 +171,22 @@ export class MemoryStorage implements Storage {
   }
 
   async appendExemptionLog(entry: ExemptionLogEntry): Promise<void> {
-    this.state.exemptionLog.push(entry);
+    this.state.exemptionLog.push(clone(entry));
     await this.persist();
   }
   async readExemptionLog(): Promise<ExemptionLogEntry[]> {
-    return [...this.state.exemptionLog];
+    return clone(this.state.exemptionLog);
+  }
+  async purgeExemptionLog(olderThanIso: string): Promise<void> {
+    this.state.exemptionLog = this.state.exemptionLog.filter((e) => e.at >= olderThanIso);
+    await this.persist();
   }
   async getActiveExemption(key: string): Promise<ActiveExemption | null> {
-    return this.state.activeExemptions[key] ?? null;
+    const v = this.state.activeExemptions[key];
+    return v === undefined ? null : clone(v);
   }
   async setActiveExemption(key: string, exemption: ActiveExemption): Promise<void> {
-    this.state.activeExemptions[key] = exemption;
+    this.state.activeExemptions[key] = clone(exemption);
     await this.persist();
   }
   async deleteActiveExemption(key: string): Promise<void> {
@@ -177,38 +194,40 @@ export class MemoryStorage implements Storage {
     await this.persist();
   }
   async getPinnedConfig(key: string): Promise<EffectiveConfig | null> {
-    return this.state.pinnedConfigs[key] ?? null;
+    const v = this.state.pinnedConfigs[key];
+    return v === undefined ? null : clone(v);
   }
   async setPinnedConfig(key: string, config: EffectiveConfig): Promise<void> {
     // Écrite une fois, jamais réécrite (§8.1.3) — le stockage lui-même tient la règle.
     if (this.state.pinnedConfigs[key] !== undefined) return;
-    this.state.pinnedConfigs[key] = config;
+    this.state.pinnedConfigs[key] = clone(config);
     await this.persist();
   }
   async getFirstVerdicts(key: string): Promise<Record<string, FirstVerdict>> {
-    return { ...(this.state.firstVerdicts[key] ?? {}) };
+    return clone(this.state.firstVerdicts[key] ?? {});
   }
   async addFirstVerdicts(key: string, verdicts: Record<string, FirstVerdict>): Promise<void> {
     const existing = this.state.firstVerdicts[key] ?? {};
     // Jamais réécrit : la première observation fait foi (§6.4).
     for (const [id, v] of Object.entries(verdicts)) {
-      if (existing[id] === undefined) existing[id] = v;
+      if (existing[id] === undefined) existing[id] = clone(v);
     }
     this.state.firstVerdicts[key] = existing;
     await this.persist();
   }
   async getLastValidFloor(): Promise<Floor | null> {
-    return this.state.lastValidFloor;
+    return this.state.lastValidFloor === null ? null : clone(this.state.lastValidFloor);
   }
   async setLastValidFloor(floor: Floor): Promise<void> {
-    this.state.lastValidFloor = floor;
+    this.state.lastValidFloor = clone(floor);
     await this.persist();
   }
   async getLastEffectiveConfig(key: string): Promise<EffectiveConfig | null> {
-    return this.state.lastEffectiveConfigs[key] ?? null;
+    const v = this.state.lastEffectiveConfigs[key];
+    return v === undefined ? null : clone(v);
   }
   async setLastEffectiveConfig(key: string, config: EffectiveConfig): Promise<void> {
-    this.state.lastEffectiveConfigs[key] = config;
+    this.state.lastEffectiveConfigs[key] = clone(config);
     await this.persist();
   }
   async getDegradedSince(key: string): Promise<string | null> {
@@ -223,10 +242,11 @@ export class MemoryStorage implements Storage {
     await this.persist();
   }
   async getLastPublished(key: string): Promise<PublishedRecord | null> {
-    return this.state.lastPublished[key] ?? null;
+    const v = this.state.lastPublished[key];
+    return v === undefined ? null : clone(v);
   }
   async setLastPublished(key: string, record: PublishedRecord): Promise<void> {
-    this.state.lastPublished[key] = record;
+    this.state.lastPublished[key] = clone(record);
     await this.persist();
   }
   async getKnownBlockingThreads(key: string): Promise<string[]> {
@@ -244,18 +264,19 @@ export class MemoryStorage implements Storage {
     await this.persist();
   }
   async getRepoEvaluated(key: string): Promise<RepoEvaluationFlag> {
-    return this.state.repoEvaluated[key] ?? { evaluated: false };
+    const v = this.state.repoEvaluated[key];
+    return v === undefined ? { evaluated: false } : clone(v);
   }
   async markRepoEvaluated(key: string, at: string): Promise<void> {
     this.state.repoEvaluated[key] = { evaluated: true, lastPublishedAt: at };
     await this.persist();
   }
   async recordIndicatorSample(sample: IndicatorSample): Promise<void> {
-    this.state.indicatorSamples.push(sample);
+    this.state.indicatorSamples.push(clone(sample));
     await this.persist();
   }
   async readIndicatorSamples(key: string): Promise<IndicatorSample[]> {
-    return this.state.indicatorSamples.filter((s) => s.repoKey === key);
+    return clone(this.state.indicatorSamples.filter((s) => s.repoKey === key));
   }
   async nextSequence(key: string): Promise<number> {
     const next = (this.state.sequences[key] ?? 0) + 1;
@@ -295,16 +316,44 @@ export class FileStorage extends MemoryStorage {
   async load(): Promise<void> {
     if (this.#loaded) return;
     this.#loaded = true;
+    let text: string;
     try {
-      const text = await readFile(this.#path, 'utf8');
+      text = await readFile(this.#path, 'utf8');
+    } catch (e) {
+      // Seule l'ABSENCE du fichier est un premier démarrage. Toute autre erreur (droits,
+      // E/S) doit refuser de démarrer : repartir d'un état vide puis persister écraserait
+      // le vrai fichier — perte des épinglages, exemptions et verdicts « jamais
+      // réécrits » du §6.4.
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+        this.state = emptyState();
+        return;
+      }
+      throw new Error(`storage file ${this.#path} is not readable: ${String(e)}`);
+    }
+    try {
       this.state = { ...emptyState(), ...(JSON.parse(text) as State) };
-    } catch {
-      this.state = emptyState();
+    } catch (e) {
+      // Un JSON corrompu (écriture partielle, mauvais fichier) n'est JAMAIS traité comme
+      // un état vide — même raison.
+      throw new Error(`storage file ${this.#path} contains invalid JSON: ${String(e)}`);
+    }
+  }
+
+  /** Sonde d'écriture au démarrage : un /data non inscriptible (bind mount root:root,
+   * chemin invalide) doit refuser de démarrer — pas tourner en publiant des statuts sans
+   * jamais rien persister. */
+  async verifyWritable(): Promise<void> {
+    try {
+      await this.persist();
+    } catch (e) {
+      throw new Error(`storage path ${this.#path} is not writable: ${String(e)}`);
     }
   }
 
   protected override async persist(): Promise<void> {
-    this.#writing = this.#writing.then(async () => {
+    // Un échec précédent ne doit pas empoisonner la chaîne : chaque écriture repart
+    // saine (l'échec COURANT, lui, remonte bien à l'appelant via l'await).
+    this.#writing = this.#writing.catch(() => {}).then(async () => {
       await mkdir(dirname(this.#path), { recursive: true });
       const tmp = `${this.#path}.tmp`;
       await writeFile(tmp, JSON.stringify(this.state), 'utf8');

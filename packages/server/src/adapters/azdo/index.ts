@@ -18,6 +18,7 @@ import {
   type UserInfo,
   type Zone,
 } from '@cct/core';
+import { timingSafeEqual } from 'node:crypto';
 import type { ServerPlatformAdapter, PlatformOperationalFacts } from '../../compliance/adapter.js';
 
 /** Faits d'exploitation Azure DevOps, en l'état du spike P1' (§B.5, §B.6, §B.7). */
@@ -73,9 +74,25 @@ export class AzdoServerAdapter implements ServerPlatformAdapter {
   }
 
   verifySignature(_payload: unknown, headers: Record<string, string>): boolean {
-    // Les service hooks portent une authentification basique configurée à la souscription.
+    // Les service hooks portent une authentification basique configurée à la
+    // souscription. L'écran d'Azure DevOps offre deux champs (utilisateur, mot de
+    // passe) : seul le MOT DE PASSE porte le secret — exiger un nom d'utilisateur
+    // précis serait un piège de configuration indétectable (401 silencieux sur tous
+    // les événements). Comparaison à temps constant : le secret voyage en clair dans
+    // l'en-tête, sa fuite donnerait la forge de tout événement entrant.
     const auth = headers['authorization'] ?? '';
-    return auth !== '' && auth === `Basic ${Buffer.from(`cc:${this.#opts.webhookSecret}`).toString('base64')}`;
+    if (!auth.startsWith('Basic ')) return false;
+    let decoded: string;
+    try {
+      decoded = Buffer.from(auth.slice('Basic '.length), 'base64').toString('utf8');
+    } catch {
+      return false;
+    }
+    const colon = decoded.indexOf(':');
+    if (colon === -1) return false;
+    const password = Buffer.from(decoded.slice(colon + 1));
+    const expected = Buffer.from(this.#opts.webhookSecret);
+    return password.length === expected.length && timingSafeEqual(password, expected);
   }
 
   parseEvent(payload: unknown): Omit<ReviewEvent, 'sequence'> {
@@ -262,15 +279,17 @@ export class AzdoServerAdapter implements ServerPlatformAdapter {
   }
 
   /** `[Scope]\Nom du groupe` (§B.6) — appartenance transitive via l'API d'identités.
-   * L'URL est construite sur l'organisation SANS segment `/..` : la normalisation d'URL
-   * ferait sinon perdre l'organisation (`https://dev.azure.com/org/../_apis` →
-   * `https://dev.azure.com/_apis`) et l'appartenance serait toujours fausse. Une panne
+   * Sur Azure DevOps SERVICES, cette API n'est pas servie par l'hôte de l'organisation :
+   * elle vit sous `vssps.dev.azure.com/{org}` — l'interroger sur `dev.azure.com`
+   * échouerait et refuserait toute exemption sur une panne qui n'en est pas une. Sur un
+   * Server on-premise, elle reste sur l'hôte de la collection. L'URL est construite
+   * SANS segment `/..` (la normalisation ferait perdre l'organisation). Une panne
    * remonte en exception : c'est une incapacité à évaluer (§6.4), pas un refus. */
   async isInGroup(user: UserInfo, group: string): Promise<boolean> {
     const res = await this.#raw(
       `/_apis/identities?searchFilter=General&filterValue=${encodeURIComponent(group)}&queryMembership=Expanded&api-version=7.1`,
       {},
-      true
+      'identity'
     );
     if (!res.ok) throw new Error(`identities API: HTTP ${res.status}`);
     const data = (await res.json()) as {
@@ -331,12 +350,20 @@ export class AzdoServerAdapter implements ServerPlatformAdapter {
   async #raw(
     path: string,
     opts: { method?: string; body?: unknown; accept?: string } = {},
-    orgLevel = false
+    level: 'project' | 'org' | 'identity' = 'project'
   ): Promise<Response> {
     const token = await this.#opts.token();
-    const base = orgLevel
-      ? `${this.#opts.organizationUrl}`
-      : `${this.#opts.organizationUrl}/${encodeURIComponent(this.#opts.project)}/_apis`;
+    const orgUrl = new URL(this.#opts.organizationUrl);
+    const identityBase =
+      orgUrl.hostname === 'dev.azure.com'
+        ? `https://vssps.dev.azure.com${orgUrl.pathname.replace(/\/$/, '')}`
+        : this.#opts.organizationUrl;
+    const base =
+      level === 'identity'
+        ? identityBase
+        : level === 'org'
+          ? `${this.#opts.organizationUrl}`
+          : `${this.#opts.organizationUrl}/${encodeURIComponent(this.#opts.project)}/_apis`;
     return this.#opts.fetchImpl(`${base}${path}`, {
       method: opts.method ?? 'GET',
       headers: {

@@ -37,6 +37,22 @@ conteneur, `docs/deployment.md`. Choix utilisateur consignés : auto-hébergé p
 client (jamais de service central multi-clients), stockage sélectionnable
 derrière l'interface `Storage` (point d'extension documenté).
 
+Revue adversariale du chantier (43 constats → 38 confirmés) : tous corrigés —
+identité d'hôte GHES unique (webHostFromApiBase, adaptateur + bootstrap), arrêt
+qui draine les évaluations EN VOL (scheduler.#inFlight) puis ferme le stockage
+en dernier, addFirstVerdicts SQLite sans await entre lecture et écriture,
+FileStorage strict (corrompu/EACCES = refus, sonde verifyWritable), plateformes
+à moitié configurées refusées, CCT_PORT/paths/floor validés (plancher : dernier
+contenu valide sur corruption), balayage de réconciliation immédiat, rejeu de
+webhooks acquitté (ReplayCache), corps borné 5 Mio, comparaisons à temps
+constant (admin + AzDO Basic à utilisateur libre), identités AzDO sur vssps,
+panne isInGroup = 503 côté admin, rétention du journal §10 (12 mois, env),
+page de statut HTML lisible (JSON sur Accept), clones défensifs MemoryStorage,
+Dockerfile uid 10001 + CCT_DATA_DIR + HEALTHCHECK sur CCT_PORT + COPY en
+couches, job CI en configuration livrée (volume, verdict HEALTHCHECK, logs
+if:always), deployment.md corrigé (portées de jetons, Basic AzDO, VOLUME,
+deux canaux du plancher, limite admin/requester documentée).
+
 **Prochaine action concrète :** aucune — déploiement chez le client (A-FAIRE.md).
 Sur toute reprise : relire ce fichier, `git log`, et n'ouvrir un chantier que
 sur demande explicite.

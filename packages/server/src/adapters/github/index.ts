@@ -29,11 +29,25 @@ export const githubFacts: PlatformOperationalFacts = {
 export interface GithubAdapterOptions {
   /** Hôte d'API — https://api.github.com, ou https://{ghes}/api/v3 pour GHE Server. */
   apiBase?: string;
+  /** Hôte WEB des PrRef (identité des clés de stockage, §6.4). Dérivé d'`apiBase` par
+   * défaut — le poser explicitement n'a de sens que si l'hôte web diffère de l'hôte
+   * d'API d'une manière que la dérivation (`api.` retiré, `/api/v3` ignoré) ne couvre
+   * pas. Toute autre source d'hôte DOIT dériver de la même valeur : deux dérivations
+   * divergentes scinderaient l'état persistant d'une même PR en deux identités. */
+  webHost?: string;
   /** Jeton d'installation (GitHub App, §A.8), fourni par appel pour suivre sa rotation. */
   token: () => Promise<string>;
   webhookSecret: string;
   checkName?: string;
   fetchImpl?: typeof fetch;
+}
+
+/** L'hôte web dérivé d'un hôte d'API : `api.github.com` → `github.com`,
+ * `ghe.corp/api/v3` → `ghe.corp`. Fonction UNIQUE, partagée entre l'adaptateur et
+ * l'assemblage (bootstrap) — c'est elle qui garantit qu'un webhook et une
+ * réconciliation produisent la même clé de PR (§6.4). */
+export function webHostFromApiBase(apiBase: string): string {
+  return new URL(apiBase).hostname.replace(/^api\./, '');
 }
 
 const CHECK_NAME = 'conventional-comments';
@@ -49,13 +63,21 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
   #opts: Required<Omit<GithubAdapterOptions, 'fetchImpl'>> & { fetchImpl: typeof fetch };
 
   constructor(opts: GithubAdapterOptions) {
+    const apiBase = opts.apiBase ?? 'https://api.github.com';
     this.#opts = {
-      apiBase: opts.apiBase ?? 'https://api.github.com',
+      apiBase,
+      webHost: opts.webHost ?? webHostFromApiBase(apiBase),
       token: opts.token,
       webhookSecret: opts.webhookSecret,
       checkName: opts.checkName ?? CHECK_NAME,
       fetchImpl: opts.fetchImpl ?? fetch,
     };
+  }
+
+  /** Hôte web effectif des PrRef — exposé pour que l'assemblage identifie les dépôts
+   * réconciliés avec la MÊME valeur que parseEvent (§6.4). */
+  get webHost(): string {
+    return this.#opts.webHost;
   }
 
   platformProfile(): PlatformProfile {
@@ -98,7 +120,7 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
     const issueIsPr = p.issue !== undefined && p.issue.pull_request !== undefined;
     const prData = p.pull_request ?? (issueIsPr ? p.issue : undefined);
     if (!prData) throw new Error('payload does not reference a pull request');
-    const host = new URL(this.#opts.apiBase).hostname.replace(/^api\./, '');
+    const host = this.#opts.webHost;
     const pr: PrRef = {
       platform: 'github',
       createdAt: prData.created_at,

@@ -160,7 +160,20 @@ describe('couche HTTP — page de statut (targetUrl, §6.3.1)', () => {
     // L'alias chemin → clé est écrit par l'orchestrateur à la publication ; l'URL de la
     // page ne porte pas l'hôte (§6.3.1).
     await storage.setPrPathAlias('github/acme/demo#42', 'github:github.com:acme/demo#42');
-    const res = await fetch(`${base}/status/pr/github/acme/demo/42`);
+    // Par défaut : une PAGE lisible — sur une plateforme sans corps de statut (§B.7),
+    // c'est la seule explication d'un check rouge (CA-25).
+    const page = await fetch(`${base}/status/pr/github/acme/demo/42`);
+    expect(page.status).toBe(200);
+    expect(page.headers.get('content-type')).toContain('text/html');
+    const html = await page.text();
+    expect(html).toContain('1 fil bloquant non résolu.');
+    expect(html).toContain('https://example.test/c1');
+    expect(html).toContain('cc/1 ');
+
+    // Et le JSON reste servi sur demande, pour l'outillage.
+    const res = await fetch(`${base}/status/pr/github/acme/demo/42`, {
+      headers: { accept: 'application/json' },
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       lastPublished: { state: string };

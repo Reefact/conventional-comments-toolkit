@@ -173,5 +173,90 @@ for (const h of harnesses) {
         if (s instanceof SqliteStorage) s.close();
       }
     });
+
+    it('concurrence : les invariants « écrit une fois » tiennent sous des écritures entrelacées', async () => {
+      const s = await h.make!();
+
+      // addFirstVerdicts en parallèle : AUCUN verdict perdu, aucun réécrit (§6.4, CA-36).
+      await Promise.all([
+        s.addFirstVerdicts('cc-p', { rootA: { blocking: true, hadConflict: false } }),
+        s.addFirstVerdicts('cc-p', { rootB: { blocking: false, hadConflict: true } }),
+      ]);
+      await Promise.all([
+        s.addFirstVerdicts('cc-p', { rootA: { blocking: false, hadConflict: true } }), // tentative de réécriture
+      ]);
+      const verdicts = await s.getFirstVerdicts('cc-p');
+      expect(verdicts['rootA']).toEqual({ blocking: true, hadConflict: false });
+      expect(verdicts['rootB']).toEqual({ blocking: false, hadConflict: true });
+
+      // nextSequence en parallèle : 1..5, sans doublon (§6.4).
+      const seqs = await Promise.all(Array.from({ length: 5 }, () => s.nextSequence('cc-seq')));
+      expect([...seqs].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
+
+      // setPinnedConfig en parallèle : une seule écriture gagne, jamais la suivante.
+      const cfgA = defaultConfig();
+      const cfgB = { ...defaultConfig(), mode: 'enforce' as const };
+      await Promise.all([s.setPinnedConfig('cc-pin', cfgA), s.setPinnedConfig('cc-pin', cfgB)]);
+      const pinned = await s.getPinnedConfig('cc-pin');
+      expect(pinned?.mode === cfgA.mode || pinned?.mode === cfgB.mode).toBe(true);
+      await s.setPinnedConfig('cc-pin', { ...defaultConfig(), mode: 'off' as const });
+      expect((await s.getPinnedConfig('cc-pin'))?.mode).toBe(pinned?.mode);
+      if (s instanceof SqliteStorage) s.close();
+    });
+
+    it('fidélité : aller-retour complet des objets, caractères difficiles compris', async () => {
+      const s = await h.make!();
+      const record = {
+        headSha: 'sha-éè"\'\\',
+        state: 'failure',
+        counts: { unresolvedThreads: 2, nonCompliantComments: 1, warnings: 3 },
+        configFingerprint: 'abcd1234',
+        noticeKinds: ['invalid-config'],
+        threadIds: ['fil "guillemets"', 'ligne\nsaut'],
+        commentIds: ['c-—tiret', 'c-\uFEFFbom'],
+        at: '2026-10-05T00:00:00Z',
+        machineLine: 'cc/1 state=failure t=2 c=1 w=3',
+        headline: 'résumé — accentué',
+        humanOutput: '## Sortie\n- [issue: x](https://ex.test/c?a=1&b=2) — @alice\n```\ncode\n```',
+      };
+      await s.setLastPublished('cc-fid', record);
+      expect(await s.getLastPublished('cc-fid')).toStrictEqual(record);
+
+      const exemption = {
+        by: { id: 'aad:GUID-1', login: 'ué@ex.test', displayName: 'U É', isServiceAccount: false },
+        at: '2026-10-05T00:00:00Z',
+        state: 'confirmed' as const,
+      };
+      await s.setActiveExemption('cc-fid', exemption);
+      expect(await s.getActiveExemption('cc-fid')).toStrictEqual(exemption);
+      if (s instanceof SqliteStorage) s.close();
+    });
+
+    it('isolation : muter un objet rendu ou fourni ne modifie jamais l’état stocké', async () => {
+      const s = await h.make!();
+      const exemption = {
+        by: { id: 'u1', login: 'a', isServiceAccount: false },
+        at: 't1',
+        state: 'pending' as const,
+      };
+      await s.setActiveExemption('cc-iso', exemption);
+      exemption.state = 'confirmed'; // mutation de l'objet FOURNI
+      expect((await s.getActiveExemption('cc-iso'))?.state).toBe('pending');
+      const read = await s.getActiveExemption('cc-iso');
+      read!.state = 'confirmed'; // mutation de l'objet RENDU
+      expect((await s.getActiveExemption('cc-iso'))?.state).toBe('pending');
+      if (s instanceof SqliteStorage) s.close();
+    });
+
+    it('purge du journal d’exemptions (§10) : suppression réelle sous la date de coupure', async () => {
+      const s = await h.make!();
+      await s.appendExemptionLog({ prKey: 'old', action: 'granted', by: { id: 'u', login: 'a' }, at: '2020-01-01T00:00:00Z' });
+      await s.appendExemptionLog({ prKey: 'new', action: 'granted', by: { id: 'u', login: 'a' }, at: '2026-06-01T00:00:00Z' });
+      await s.purgeExemptionLog('2025-01-01T00:00:00Z');
+      const entries = await s.readExemptionLog();
+      expect(entries.some((e) => e.prKey === 'old')).toBe(false);
+      expect(entries.some((e) => e.prKey === 'new')).toBe(true);
+      if (s instanceof SqliteStorage) s.close();
+    });
   });
 }

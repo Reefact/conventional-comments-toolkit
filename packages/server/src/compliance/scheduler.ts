@@ -22,6 +22,10 @@ export type TriggerSource = 'webhook' | 'reconcile' | 'manual';
 
 export class EvaluationScheduler {
   #pending = new Map<string, PendingEvaluation>();
+  /** Évaluations DÉJÀ lancées (fenêtre expirée) : flush() doit les attendre aussi —
+   * arrêter le service sous une évaluation en vol laisserait un statut publié à
+   * l'étape 15 sans la persistance de l'étape 16 (§6.4). */
+  #inFlight = new Set<Promise<void>>();
   #storage: Storage;
   #orchestrator: Orchestrator;
   #log: (m: string) => void;
@@ -65,22 +69,32 @@ export class EvaluationScheduler {
     const entry = this.#pending.get(key);
     if (!entry) return;
     this.#pending.delete(key);
-    try {
-      const outcome = await this.#orchestrator.evaluatePr(entry.pr, entry.maxSequence);
-      for (const w of entry.waiters) w.resolve(outcome);
-    } catch (e) {
-      this.#log(`evaluation failed for ${key}: ${String(e)}`);
-      for (const w of entry.waiters) w.reject(e);
-    }
+    const evaluation = (async () => {
+      try {
+        const outcome = await this.#orchestrator.evaluatePr(entry.pr, entry.maxSequence);
+        for (const w of entry.waiters) w.resolve(outcome);
+      } catch (e) {
+        this.#log(`evaluation failed for ${key}: ${String(e)}`);
+        for (const w of entry.waiters) w.reject(e);
+      }
+    })();
+    this.#inFlight.add(evaluation);
+    void evaluation.finally(() => this.#inFlight.delete(evaluation));
+    await evaluation;
   }
 
-  /** Vide les fenêtres en attente (tests, arrêt propre). */
+  /** Vide les fenêtres en attente PUIS attend les évaluations en vol (arrêt propre) :
+   * une évaluation lancée n'est plus dans #pending — l'oublier fermerait le stockage
+   * sous elle. */
   async flush(): Promise<void> {
     const keys = [...this.#pending.keys()];
     for (const key of keys) {
       const entry = this.#pending.get(key);
       if (entry) clearTimeout(entry.timer);
       await this.#run(key);
+    }
+    while (this.#inFlight.size > 0) {
+      await Promise.allSettled([...this.#inFlight]);
     }
   }
 }
@@ -130,12 +144,11 @@ export class Reconciler {
       this.#timer = setTimeout(() => void tick(), interval * 1000);
       if (typeof this.#timer === 'object' && 'unref' in this.#timer) this.#timer.unref();
     };
-    let interval = 900;
-    for (const repo of this.repos) {
-      const cfg = await this.storage.getLastEffectiveConfig(repoKey(repo));
-      if (cfg) interval = Math.min(interval, cfg.server.reconcileIntervalSeconds);
-    }
-    this.#timer = setTimeout(() => void tick(), interval * 1000);
+    // Premier balayage IMMÉDIAT (asynchrone, sans bloquer le démarrage) : le redémarrage
+    // est précisément le moment où les événements manqués pendant l'indisponibilité
+    // attendent d'être rattrapés (§6.4, source 2) — un filet qui ne se déploie qu'après
+    // un intervalle complet manquerait sa raison d'être.
+    this.#timer = setTimeout(() => void tick(), 0);
     if (typeof this.#timer === 'object' && 'unref' in this.#timer) this.#timer.unref();
   }
 

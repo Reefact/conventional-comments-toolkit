@@ -69,11 +69,13 @@ Ordre des opérations pour un retour arrière d'urgence :
 1. Passer le `mode` à `warn` dans la **configuration d'organisation** (point de bascule,
    §8.1). Un assouplissement du `mode` est une modification élargissante : il s'applique
    aux PR déjà ouvertes sans attendre leur fermeture (§8.1.3, règle 1).
-2. **Invalider le cache** immédiatement — `POST /admin/cache/invalidate` — au lieu
-   d'attendre `configCacheTtlSeconds` (une heure par défaut). Sans cette invalidation,
-   « quelques minutes » deviendrait « jusqu'au TTL » et le retour arrière cesserait d'être
-   une soupape (§6.3.3). L'orchestrateur invalide aussi le cache de lui-même dès qu'il
-   observe un assouplissement du mode.
+2. **L'invalidation du cache est automatique** : la sonde du document d'organisation
+   (`OrgModeWatch`, toutes les 60 s par défaut, à démarrer avec le `Reconciler`) relit le
+   document en contournant le cache et invalide **tout** le cache de configuration dès que
+   le `mode` observé est plus doux que le précédent (§6.3.3 ; §8.1.3, règle 3, première
+   situation). Sans elle, « quelques minutes » deviendrait « jusqu'à
+   `configCacheTtlSeconds` », une heure par défaut. `POST /admin/cache/invalidate` reste
+   disponible pour forcer l'effet à la seconde, sans attendre le prochain tour de sonde.
 3. Vérifier qu'un statut vert `warn` réapparaît sur une PR témoin.
 
 Pour revenir plus bas que `warn` (`assist`/`off`), retirer **d'abord** la protection de

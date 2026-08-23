@@ -145,3 +145,47 @@ export class Reconciler {
     this.#timer = null;
   }
 }
+
+/** §6.3.3 — sonde du document d'organisation, indépendante du TTL du cache : le retour
+ * arrière (`enforce` → `warn`) doit être observé « en quelques minutes sur l'ensemble
+ * des dépôts », jamais au terme de `configCacheTtlSeconds`. La cadence par défaut
+ * reprend la borne de 60 s du §10 — se greffer sur le seul tour de réconciliation
+ * (900 s par défaut) ne la tiendrait pas. La logique vit dans l'orchestrateur
+ * (`probeOrgModeSoftening`) ; cette classe n'est que son horloge. */
+export class OrgModeWatch {
+  #timer: ReturnType<typeof setTimeout> | null = null;
+  #stopped = false;
+
+  constructor(
+    private readonly orchestrator: Pick<Orchestrator, 'probeOrgModeSoftening'>,
+    private readonly intervalSeconds: number = 60,
+    private readonly log: (m: string) => void = () => {}
+  ) {}
+
+  async runOnce(): Promise<{ observed: string | null; invalidated: boolean }> {
+    try {
+      return await this.orchestrator.probeOrgModeSoftening();
+    } catch (e) {
+      this.log(`org mode probe failed: ${String(e)}`);
+      return { observed: null, invalidated: false };
+    }
+  }
+
+  start(): void {
+    this.#stopped = false;
+    const tick = async (): Promise<void> => {
+      if (this.#stopped) return;
+      await this.runOnce();
+      if (this.#stopped) return;
+      this.#timer = setTimeout(() => void tick(), this.intervalSeconds * 1000);
+      if (typeof this.#timer === 'object' && 'unref' in this.#timer) this.#timer.unref();
+    };
+    void tick();
+  }
+
+  stop(): void {
+    this.#stopped = true;
+    if (this.#timer) clearTimeout(this.#timer);
+    this.#timer = null;
+  }
+}

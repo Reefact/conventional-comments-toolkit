@@ -2,7 +2,7 @@
 // adaptateur par plateforme (§9.1).
 
 export { Orchestrator, type OrchestratorDeps, type EvaluationOutcome } from './compliance/orchestrator.js';
-export { EvaluationScheduler, Reconciler, type TriggerSource } from './compliance/scheduler.js';
+export { EvaluationScheduler, OrgModeWatch, Reconciler, type TriggerSource } from './compliance/scheduler.js';
 export {
   MemoryStorage,
   FileStorage,

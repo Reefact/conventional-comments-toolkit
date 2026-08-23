@@ -22,21 +22,19 @@ Elle fonctionne **seule**, sans le composant serveur : en mode `assist` (celui l
 défaut), elle aide à écrire un commentaire conforme et affiche des diagnostics, mais ne
 bloque jamais rien. C'est ce que vous pouvez tester tout de suite.
 
-### Composant B — le serveur : **du code de bibliothèque, pas encore un service qui tourne**
+### Composant B — le serveur : **déployable, pas encore déployé**
 
-`@cct/server` expose l'orchestrateur, le stockage, les adaptateurs GitHub/Azure DevOps et
-un serveur HTTP (`createHttpServer`) — tout est testé unitairement contre des adaptateurs
-factices. Mais **personne ne l'a encore branché sur un vrai dépôt** : il manque un petit
-programme qui l'assemble (jetons d'API, secret de webhook, choix du stockage, port
-d'écoute) et un endroit où le faire tourner en continu, avec une URL publique pour
-recevoir les webhooks GitHub. Sans lui, aucune PR n'est réellement bloquée — c'est
-attendu et documenté (§2 : le composant A est contournable par construction, c'est le
-composant B qui porte la contrainte réelle).
+Le service auto-hébergeable existe : `packages/server/src/main.ts` (configuration par
+variables d'environnement `CCT_*`), une image Docker (`Dockerfile`, validée par le job
+CI « Image Docker du composant B »), et trois stockages au choix — mémoire, fichier
+JSON, SQLite — derrière l'interface `Storage`, point d'extension documenté pour une
+base externe. Tout est dans **`docs/deployment.md`** : variables, `docker run`,
+branchement des webhooks, volume `/data`.
 
-**Si vous voulez que j'écrive ce programme d'assemblage** (à la manière d'un petit
-`packages/server/src/main.ts` + instructions de déploiement), dites-le-moi : ce n'est pas
-sorti tout seul de la spécification, qui ne prescrit délibérément aucune plateforme
-d'hébergement (§9, choix technique laissé à l'implémentation).
+Ce qui manque encore est **chez le client** : une machine où le faire tourner en
+continu, une URL HTTPS publique pour les webhooks, et de vrais jetons d'API. Tant que
+personne ne l'a déployé, aucune PR n'est réellement bloquée — c'est attendu (§2 : le
+composant A est contournable par construction, c'est B qui porte la contrainte réelle).
 
 ## 2. Installer l'extension pour l'essayer
 
@@ -101,8 +99,8 @@ corps du check GitHub (`CA-25`).
 | # | Tâche | Qui | Bloquant pour merger #2 ? |
 |---|-------|-----|---------------------------|
 | 1 | Essayer l'extension en vrai (§3 ci-dessus) | Vous | Non |
-| 2 | Décider si je rédige le programme de déploiement du composant B | Vous puis moi | Non — mais bloquant pour tout blocage réel de PR |
-| 3 | Choisir un hébergement pour le serveur (conteneur, VM, fonction managée) | Vous | Non |
+| 2 | ~~Programme de déploiement du composant B~~ — **fait** : `docs/deployment.md`, image Docker | — | — |
+| 3 | Choisir un hébergement pour le serveur (conteneur toujours actif, VM — pas de « sans serveur » qui endort le processus) et l'y déployer | Vous | Non — mais bloquant pour tout blocage réel de PR |
 | 4 | Créer une app GitHub / un service hook Azure DevOps (jetons, secret de webhook) | Vous | Non |
 | 5 | **Mesure de référence P0** (temps de revue, taux de conformité *avant* l'outil) | Vous | Non, mais **irrattrapable** si l'outil est déployé avant — §14, `docs/operations.md` |
 | 6 | Choisir un dépôt pilote et suivre la trajoire `assist → warn → enforce` | Vous | Non |

@@ -39,3 +39,38 @@ jobs:
 
       - name: Suite de tests (vitest)
         run: npm test
+
+  docker-image:
+    name: Image Docker du composant B
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construire l'image
+        run: docker build -t cct-server .
+
+      # L'image doit démarrer, répondre sur /healthz et refuser l'admin sans jeton —
+      # le même contrat que docs/deployment.md promet au client qui la déploie.
+      - name: Démarrer et sonder le conteneur
+        run: |
+          docker run -d --name cct \
+            -p 18080:8080 \
+            -e CCT_ADMIN_TOKEN=ci-token \
+            -e CCT_STORAGE=memory \
+            -e CCT_GITHUB_TOKEN=x \
+            -e CCT_GITHUB_WEBHOOK_SECRET=y \
+            cct-server
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/healthz
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/admin/exemption-log)
+          [ "$code" = "401" ] || { echo "admin sans jeton devrait rendre 401, a rendu $code"; exit 1; }
+          docker logs cct
+
+      - name: Arrêt propre (SIGTERM → exit 0)
+        run: |
+          docker stop cct
+          exit_code=$(docker inspect cct --format '{{.State.ExitCode}}')
+          [ "$exit_code" = "0" ] || { echo "arrêt non propre: exit $exit_code"; exit 1; }

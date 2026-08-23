@@ -7,7 +7,7 @@ import { SelectorLog, type EditorHandle } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { applyLabelFilter } from '../src/ui/banner.js';
-import { mergeDirectShortcuts, writeDegradedState } from '../src/content.js';
+import { mergeDirectShortcuts, writeDegradedState } from '../src/content-internal.js';
 
 function setLocation(url: string): void {
   Object.defineProperty(document, 'location', { value: new URL(url), configurable: true });

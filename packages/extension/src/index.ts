@@ -22,5 +22,5 @@ export {
   type BannerModel,
 } from './ui/banner.js';
 export { decorateComment } from './ui/badges.js';
-export { bootstrap, applyCompletionState, writeDegradedState, mergeDirectShortcuts } from './content.js';
+export { bootstrap, applyCompletionState, writeDegradedState, mergeDirectShortcuts } from './content-internal.js';
 export { ui } from './ui/strings.js';

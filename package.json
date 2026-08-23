@@ -17,7 +17,10 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b --force packages/core packages/adapters/shared packages/adapters/github packages/adapters/azdo packages/server packages/extension",
     "spike": "node spikes/p1-prime/run.mjs",
-    "build:extension": "node packages/extension/build.mjs"
+    "build:extension": "node packages/extension/build.mjs",
+    "check:ca-matrix": "node scripts/check-ca-matrix.mjs",
+    "check:invisible": "node scripts/check-invisible-chars.mjs",
+    "checks": "npm run check:ca-matrix && npm run check:invisible"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

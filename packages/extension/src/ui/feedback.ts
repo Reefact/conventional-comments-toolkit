@@ -8,10 +8,10 @@ import { ui } from './strings.js';
 
 const STATE_ICONS: Record<FeedbackState, string> = {
   compliant: '✅',
-  'compliant-with-warnings': '⚠️',
+  'compliant-with-warnings': '⚠\uFE0F',
   'non-compliant': '❌',
-  degraded: '⚠️',
-  'fingerprint-mismatch': '⚠️',
+  degraded: '⚠\uFE0F',
+  'fingerprint-mismatch': '⚠\uFE0F',
 };
 
 export interface FeedbackRender {

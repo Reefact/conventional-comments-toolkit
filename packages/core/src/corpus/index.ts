@@ -44,7 +44,7 @@ export const corpus: CorpusCase[] = [
   { id: 'emoji-simple', body: '🔥 issue: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'emoji-flag', body: '🇫🇷 issue: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'emoji-skin-tone', body: '👍🏽 issue: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
-  { id: 'emoji-zwj', body: '👨‍👩‍👧 issue: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
+  { id: 'emoji-zwj', body: '👨\u200D👩\u200D👧 issue: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'code-block-at-head', body: '```\nconst a = 1;\n{\n```\nissue: accolade citée au-dessus\n', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'quote-at-head', body: '> extrait cité\nissue: sous la citation\n', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
 

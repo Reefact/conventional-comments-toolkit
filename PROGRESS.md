@@ -23,6 +23,10 @@ threadId/candidat cohérent ; AzDO editForm sans collision, *.visualstudio.com,
 DefaultCollection, /tfs/ ; pagination listOpenPrs AzDO). Non-régression :
 `extension/test/replay-residuals.test.ts` + ajouts dans review-fixes-*.
 
+PR ouverte : #2 (`claude/implement-specification-fr-2a14q6` → `main`), sous
+surveillance (événements GitHub + check-in horaire). CI ajoutée sur la branche :
+`ci.yml`, `conformance.yml`, `extension-package.yml`, `browser-smoke.yml`.
+
 **Prochaine action concrète :** aucune. Sur toute reprise : relire ce fichier,
 `git log`, et n'ouvrir un chantier que sur demande explicite — une phase
 terminée, testée et conforme reste terminée.

@@ -53,8 +53,8 @@ describe('§3.4.2 — expression régulière de référence', () => {
     expect(matchPrefix('🔥 issue: x')!.label).toBe('issue');
     expect(matchPrefix('🇫🇷 issue: x')!.label).toBe('issue');
     expect(matchPrefix('👍🏽 issue: x')!.label).toBe('issue');
-    expect(matchPrefix('👨‍👩‍👧 issue: x')!.label).toBe('issue');
-    expect(matchPrefix('❤️ issue: x')!.label).toBe('issue');
+    expect(matchPrefix('👨\u200D👩\u200D👧 issue: x')!.label).toBe('issue');
+    expect(matchPrefix('❤\uFE0F issue: x')!.label).toBe('issue');
   });
 
   it('espace manquante avant la parenthèse détectée pour W-DECORATION-STYLE', () => {

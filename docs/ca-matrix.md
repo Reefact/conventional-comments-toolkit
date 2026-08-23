@@ -70,7 +70,12 @@ composante visuelle relève du smoke test Playwright (§9.4) et d'une vérificat
 ## Comment exécuter
 
 ```
-npm test              # 312 tests unitaires et d'intégration
-npm run spike         # spike P1' dans Chromium (§9.3)
-npm run build         # build TypeScript de tous les paquets
+npm test                 # suite complète (vitest)
+npm run check:ca-matrix  # cette matrice est-elle encore vraie ? (CI : conformance.yml)
+npm run spike            # spike P1' dans Chromium (§9.3)
+npm run build            # build TypeScript de tous les paquets
 ```
+
+`check:ca-matrix` échoue si un critère du §11 n'apparaît plus dans aucun test, si une
+ligne manque, ou si un fichier nommé ici a été renommé — la matrice ne peut donc pas
+devenir déclarative sans que la CI le dise.

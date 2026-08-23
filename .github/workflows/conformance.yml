@@ -1,0 +1,58 @@
+# Garde de discipline du chantier : ce que la spécification et CLAUDE.md exigent du
+# repository lui-même, et qu'aucun test unitaire ne peut constater.
+#   - la matrice des CA reste vraie (chaque critère du §11 cité par un test réel) ;
+#   - aucun caractère invisible littéral dans les sources ni les tests ;
+#   - la spécification normative n'est jamais modifiée pour suivre l'implémentation.
+name: Conformité
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: conformance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guards:
+    name: Garde-fous du chantier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Le diff contre la base a besoin de l'historique, pas d'un clone superficiel.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Matrice des CA ↔ tests (§11)
+        run: npm run check:ca-matrix
+
+      - name: Caractères invisibles écrits en échappements
+        run: npm run check:invisible
+
+      # `specifications-fr.md` est la référence NORMATIVE : elle ne se modifie pas pour
+      # correspondre au code. Un changement délibéré de la spécification reste possible —
+      # il se fait alors sur une PR qui ne touche qu'elle, et cette garde le signale.
+      - name: La spécification normative n'est pas modifiée par une PR de code
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          spec_touched=$(printf '%s\n' "$changed" | grep -c '^specifications-fr\.md$' || true)
+          other_touched=$(printf '%s\n' "$changed" | grep -vc '^specifications-fr\.md$' || true)
+          if [ "$spec_touched" -gt 0 ] && [ "$other_touched" -gt 0 ]; then
+            echo "::error file=specifications-fr.md::La spécification normative est modifiée dans une PR qui touche aussi du code."
+            echo "Une évolution de la spécification se fait dans une PR dédiée (règle du chantier, CLAUDE.md)."
+            exit 1
+          fi
+          echo "✓ la spécification normative n'est pas modifiée par cette PR de code"

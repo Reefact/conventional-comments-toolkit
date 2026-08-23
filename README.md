@@ -30,7 +30,9 @@ for how the A/B parity holds by construction.
 npm install
 npm test            # unit + integration tests (mapped to the acceptance criteria)
 npm run build       # TypeScript build of every package
+npm run checks      # repository guards: CA matrix ↔ tests, invisible-character escapes
 npm run spike       # P1' spike: programmatic-write assumption in Chromium (§9.3)
+npm run build:extension   # MV3 bundle into packages/extension/dist-ext (+ Firefox variant)
 ```
 
 ## Configuration
@@ -52,7 +54,23 @@ prerequisites for `enforce`, activation and the dry-run report — are in
 Every acceptance criterion `CA-01`…`CA-39` (§11) is covered by at least one automated test.
 The mapping from each criterion to its test files is in
 [`docs/ca-matrix.md`](./docs/ca-matrix.md); the `CA-NN` identifiers appear literally in the
-tests.
+tests, and CI fails if that stops being true.
+
+## Continuous integration
+
+Four workflows, each answering a different question. Only **CI** is meant to be a required
+check on `main`; the others report without gating.
+
+| Workflow | Question it answers | When |
+|----------|--------------------|------|
+| [`ci.yml`](./.github/workflows/ci.yml) | Does everything compile and does every test pass, on both supported Node versions? | push to `main`, every PR |
+| [`conformance.yml`](./.github/workflows/conformance.yml) | Do the repository's own rules still hold — CA matrix in step with the tests, invisible characters written as escapes, normative spec untouched by a code PR? | push to `main`, every PR |
+| [`extension-package.yml`](./.github/workflows/extension-package.yml) | Does the MV3 bundle build, stay free of remote code (§10), and keep both manifests loadable? Publishes the Chromium and Firefox bundles as artifacts. | push to `main`, PRs touching `packages/` |
+| [`browser-smoke.yml`](./.github/workflows/browser-smoke.yml) | Does the §9.3 programmatic-write strategy still hold in a current Chromium — the one thing happy-dom cannot tell us? | daily (04:17 UTC), PRs touching adapters or the spike |
+
+The selector smoke test of §9.4 against the *real* platforms needs authenticated sessions
+and is therefore not run in CI: `spikes/p1-prime/smoke.mjs` carries its shape and exits
+cleanly while no DOM captures are supplied, rather than giving assurance it does not have.
 
 ## Status against the specification phases (§14)
 

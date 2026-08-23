@@ -50,8 +50,14 @@
 npm install     # une fois
 npm test        # suite complète (vitest)
 npm run build   # tsc -b sur tous les paquets
+npm run checks  # gardes du repo : matrice CA ↔ tests, caractères invisibles
 npm run spike   # spike P1' dans Chromium (§9.3)
 ```
+
+La CI rejoue ces commandes (`.github/workflows/`) : `ci.yml` (build + tests, Node 20 et
+22), `conformance.yml` (les gardes ci-dessus + spécification non modifiée par une PR de
+code), `extension-package.yml` (bundle MV3, aucun code distant), `browser-smoke.yml`
+(spike quotidien dans Chromium). Les faire passer en local avant de pousser.
 
 Piège récurrent : les caractères invisibles (BOM, NBSP, U+202F, U+FE0F, ZWJ)
 s'écrivent TOUJOURS en échappements `\uXXXX` dans les sources et les tests.

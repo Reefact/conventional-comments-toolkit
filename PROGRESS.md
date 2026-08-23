@@ -101,11 +101,21 @@ sur demande explicite.
 - Le cache de configuration (TTL 3600 s, §8.1.2) retarde l'observation d'un fichier
   disparu/cassé : les tests doivent faire avancer l'horloge injectée (`env.clock`).
 - `tsc` composite : erreurs TS7022 sur variables booléennes auto-référencées → annoter.
+- Bug réel trouvé en test navigateur (extension chargée, PR GitHub réelle) : `content.ts`
+  exportait des fonctions pour les tests ; esbuild (format esm) les préservait en
+  `export {...}` en fin de bundle. Chrome injecte les `content_scripts` du manifest comme
+  scripts CLASSIQUES (pas de `"type": "module"` possible, contrairement au service
+  worker) → `SyntaxError: Unexpected token 'export'`, tout le script mort avant
+  `bootstrap()`. Corrigé en séparant la logique testable dans `content-internal.ts`
+  (exports permis) et en gardant `content.ts` comme point d'entrée bundlé sans aucun
+  export. Vérification : `node --check dist-ext/content.js` + grep `^export|^import` sur
+  le bundle.
 
 ## Build / tests
 
-`npm install` puis : `npm test` (436 verts), `npm run build` (OK),
-`npm run build:extension` (OK), `npm run spike` (6/6). Node 22.
+`npm install` puis : `npm test` (489 verts), `npm run build` (OK),
+`npm run build:extension` (OK, bundle vérifié sans export/import résiduel), `npm run spike`
+(6/6). Node 22.
 
 ## Cassé / en cours
 

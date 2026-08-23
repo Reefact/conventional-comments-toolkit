@@ -45,6 +45,12 @@ async function route(deps: HttpDeps, req: IncomingMessage, res: ServerResponse):
   const url = new URL(req.url ?? '/', 'http://localhost');
   const path = url.pathname;
 
+  // ————— Vitalité — pour l'orchestrateur d'infrastructure du client (liveness probe) ;
+  // ne dit rien de la conformité, ne touche ni stockage ni plateforme —————
+  if (req.method === 'GET' && path === '/healthz') {
+    return send(res, 200, { ok: true });
+  }
+
   // ————— Webhooks (§6.4, source 1) : matchesWebhook → verifySignature → parseEvent —————
   if (req.method === 'POST' && path.startsWith('/webhook/')) {
     const platformId = path.slice('/webhook/'.length);

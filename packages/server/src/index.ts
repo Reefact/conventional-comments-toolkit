@@ -13,7 +13,15 @@ export {
   type PublishedRecord,
   type IndicatorSample,
 } from './compliance/storage.js';
+export { SqliteStorage } from './compliance/storage-sqlite.js';
 export { ConfigCache } from './compliance/cache.js';
+export {
+  assembleFromEnv,
+  BootstrapError,
+  type AssembledServer,
+  type AssembledPlatform,
+  type Env,
+} from './bootstrap.js';
 export { AdminEntryPoint, AdminError, type DryRunReportEntry } from './compliance/admin.js';
 export { computeIndicators, type Indicators } from './compliance/indicators.js';
 export { prKey, repoKey } from './compliance/keys.js';

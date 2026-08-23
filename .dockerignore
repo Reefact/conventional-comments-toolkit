@@ -1,0 +1,9 @@
+.git
+node_modules
+**/dist
+**/dist-ext
+**/*.tsbuildinfo
+data
+*.md
+!specifications-fr.md
+.github

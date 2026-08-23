@@ -27,9 +27,19 @@ PR ouverte : #2 (`claude/implement-specification-fr-2a14q6` → `main`), sous
 surveillance (événements GitHub + check-in horaire). CI ajoutée sur la branche :
 `ci.yml`, `conformance.yml`, `extension-package.yml`, `browser-smoke.yml`.
 
-**Prochaine action concrète :** aucune. Sur toute reprise : relire ce fichier,
-`git log`, et n'ouvrir un chantier que sur demande explicite — une phase
-terminée, testée et conforme reste terminée.
+Chantier « B déployable » livré : `bootstrap.ts` (`assembleFromEnv`, variables
+CCT_*, multi-plateformes dans une instance) + `main.ts` (SIGTERM propre),
+`SqliteStorage` (`node:sqlite` via `process.getBuiltinModule` — les bundlers ne
+résolvent pas ce builtin ; tests skip sur Node 20), suite de conformité Storage
+commune aux trois implémentations, `/healthz`, Dockerfile multi-étages non-root
+(runtime = liens de workspaces seuls, zéro paquet tiers) + job CI de sonde du
+conteneur, `docs/deployment.md`. Choix utilisateur consignés : auto-hébergé par
+client (jamais de service central multi-clients), stockage sélectionnable
+derrière l'interface `Storage` (point d'extension documenté).
+
+**Prochaine action concrète :** aucune — déploiement chez le client (A-FAIRE.md).
+Sur toute reprise : relire ce fichier, `git log`, et n'ouvrir un chantier que
+sur demande explicite.
 
 ## Fait
 

@@ -3,3 +3,10 @@ dist/
 *.tsbuildinfo
 .vitest-cache/
 dist-ext/
+
+# Artefacts d'exécution locale du composant B (smoke tests, dumps FileStorage, journaux) —
+# jamais destinés au dépôt.
+*.log
+*.tmp
+result.txt
+data/

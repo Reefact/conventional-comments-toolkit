@@ -9,7 +9,7 @@ No comment, code, or diff content ever leaves the browser. The full specificatio
 
 ## Layout
 
-A TypeScript monorepo (npm workspaces). The full breakdown is in [`docs/architecture.md`](./docs/architecture.md).
+A TypeScript monorepo (npm workspaces). The full breakdown is in [`docs/architecture-fr.md`](./docs/architecture-fr.md).
 
 ```
 packages/core           @cct/core            parser, validator, config, evaluation — shared verbatim by A and B
@@ -21,7 +21,7 @@ spikes/p1-prime         P1' spike             programmatic-write assumption, val
 
 `packages/core/` holds every validation rule; it is consumed identically by both
 components so that a comment judged compliant by the extension is always judged compliant
-by the server, and conversely (§2). See [`docs/architecture.md`](./docs/architecture.md)
+by the server, and conversely (§2). See [`docs/architecture-fr.md`](./docs/architecture-fr.md)
 for how the A/B parity holds by construction.
 
 ## Getting started
@@ -36,8 +36,8 @@ npm run build:extension   # MV3 bundle into packages/extension/dist-ext (+ Firef
 ```
 
 Starting from a machine with none of this installed? See the step-by-step Windows/PowerShell
-guide: [`docs/extension-setup.en.md`](./docs/extension-setup.en.md) (French:
-[`docs/extension-setup.md`](./docs/extension-setup.md)).
+guide: [`docs/extension-setup-en.md`](./docs/extension-setup-en.md) (French:
+[`docs/extension-setup-fr.md`](./docs/extension-setup-fr.md)).
 
 ## Configuration
 
@@ -51,13 +51,13 @@ pinning are specified in §8 and implemented in `packages/core/src/config/`.
 
 `assist` (default) → `warn` → `enforce`. Operational procedures — rollback, the
 prerequisites for `enforce`, activation and the dry-run report — are in
-[`docs/operations.md`](./docs/operations.md).
+[`docs/operations-fr.md`](./docs/operations-fr.md).
 
 ## Acceptance criteria
 
 Every acceptance criterion `CA-01`…`CA-39` (§11) is covered by at least one automated test.
 The mapping from each criterion to its test files is in
-[`docs/ca-matrix.md`](./docs/ca-matrix.md); the `CA-NN` identifiers appear literally in the
+[`docs/ca-matrix-fr.md`](./docs/ca-matrix-fr.md); the `CA-NN` identifiers appear literally in the
 tests, and CI fails if that stops being true.
 
 ## Continuous integration
@@ -80,13 +80,13 @@ cleanly while no DOM captures are supplied, rather than giving assurance it does
 
 | Phase | Content | State |
 |-------|---------|-------|
-| P0 | Baseline measurement (review time, compliance) | Operational task, not code — see `docs/operations.md` |
+| P0 | Baseline measurement (review time, compliance) | Operational task, not code — see `docs/operations-fr.md` |
 | P1 | `core/` (parser, validator, config) + unit tests | Implemented |
-| P1' | Programmatic-write spike (GitHub React + Azure DevOps) | Assumption validated in Chromium; remaining platform assumptions documented with their fallbacks (`spikes/p1-prime/README.md`) |
+| P1' | Programmatic-write spike (GitHub React + Azure DevOps) | Assumption validated in Chromium; remaining platform assumptions documented with their fallbacks (`spikes/p1-prime/README-fr.md`) |
 | P2 | Extension `assist` on GitHub | Implemented |
 | P3 | Azure DevOps adapter | Implemented, with the P1' fallbacks in place |
 | P4 | `warn` mode + indicators (§12) | Implemented (`computeIndicators`, admin endpoint) |
 | P5 | Server companion + status checks | Implemented |
-| P6 | `enforce` on a pilot repo, then rollout | Prerequisites and rollback documented (`docs/operations.md`); the org-admin steps are deployment-time |
+| P6 | `enforce` on a pilot repo, then rollout | Prerequisites and rollback documented (`docs/operations-fr.md`); the org-admin steps are deployment-time |
 
 License: Apache-2.0.

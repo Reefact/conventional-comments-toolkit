@@ -1,6 +1,6 @@
 // Point d'entrée exécutable du composant B : `node packages/server/dist/main.js`.
 // Toute la configuration vient des variables d'environnement CCT_* (voir
-// docs/deployment.md) ; l'assemblage vit dans bootstrap.ts, testé sans écouter de port.
+// docs/deployment-fr.md) ; l'assemblage vit dans bootstrap.ts, testé sans écouter de port.
 
 import { assembleFromEnv, resolvePort, BootstrapError, type AssembledServer } from './bootstrap.js';
 

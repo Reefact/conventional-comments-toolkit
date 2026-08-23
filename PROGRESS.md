@@ -33,7 +33,7 @@ CCT_*, multi-plateformes dans une instance) + `main.ts` (SIGTERM propre),
 résolvent pas ce builtin ; tests skip sur Node 20), suite de conformité Storage
 commune aux trois implémentations, `/healthz`, Dockerfile multi-étages non-root
 (runtime = liens de workspaces seuls, zéro paquet tiers) + job CI de sonde du
-conteneur, `docs/deployment.md`. Choix utilisateur consignés : auto-hébergé par
+conteneur, `docs/deployment-fr.md`. Choix utilisateur consignés : auto-hébergé par
 client (jamais de service central multi-clients), stockage sélectionnable
 derrière l'interface `Storage` (point d'extension documenté).
 
@@ -53,7 +53,7 @@ couches, job CI en configuration livrée (volume, verdict HEALTHCHECK, logs
 if:always), deployment.md corrigé (portées de jetons, Basic AzDO, VOLUME,
 deux canaux du plancher, limite admin/requester documentée).
 
-**Prochaine action concrète :** aucune — déploiement chez le client (A-FAIRE.md).
+**Prochaine action concrète :** aucune — déploiement chez le client (A-FAIRE-fr.md).
 Sur toute reprise : relire ce fichier, `git log`, et n'ouvrir un chantier que
 sur demande explicite.
 
@@ -64,9 +64,9 @@ sur demande explicite.
   §6.3.2, sonde §6.3.3, adaptateurs GitHub/AzDO) + tests.
 - P2/P3 extension MV3 + adaptateurs client + garde §5.4 + tests ; P4 indicateurs §12.
 - P1' spike réel dans Chromium (`npm run spike`) ; hypothèses restantes et replis :
-  `spikes/p1-prime/README.md`.
-- Matrice CA-01..CA-39 → tests : `docs/ca-matrix.md` (grep "CA-NN" dans les tests).
-- Docs : `docs/architecture.md`, `docs/operations.md`.
+  `spikes/p1-prime/README-fr.md`.
+- Matrice CA-01..CA-39 → tests : `docs/ca-matrix-fr.md` (grep "CA-NN" dans les tests).
+- Docs : `docs/architecture-fr.md`, `docs/operations-fr.md`.
 
 ## Décisions structurantes (et pourquoi)
 

@@ -23,7 +23,7 @@
   ambiguïté à remonter.
 - Tout critère d'acceptation (`CA-NN`, §11) raisonnablement automatisable est
   couvert par un test qui cite son identifiant ; la correspondance vit dans
-  `docs/ca-matrix.md`.
+  `docs/ca-matrix-fr.md`.
 - Privilégier la solution la plus simple satisfaisant complètement la spec ;
   pas de sur-ingénierie ni de refactoring sans bénéfice concret. Une phase
   terminée, testée et conforme reste terminée.

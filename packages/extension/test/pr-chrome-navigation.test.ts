@@ -1004,6 +1004,66 @@ describe('Codex round 4 — le filtre par label survit à un rendu répété sur
   });
 });
 
+describe('Codex round 5 — le filtre repart à zéro quand son label n’est plus activé (§5.5)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('une reconfiguration qui désactive le label choisi ne continue pas à filtrer sur un label fantôme', async () => {
+    const doc = document;
+    const current = pr(30);
+    const thread: ThreadInfo = {
+      id: 't1',
+      pr: current,
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'praise: bien joué',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution: 'unknown',
+      canCarryBlockingState: true,
+    };
+    const renderedThreadEl = doc.createElement('div');
+    let configText = '{}'; // défauts : 'praise' activé
+    let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
+    const adapter = makeAdapter(() => current, () => currentPublished, {
+      getThreads: async () => [thread],
+      getRenderedThreadElements: () => [{ id: 't1', element: renderedThreadEl }],
+    });
+    adapter.getRepoConfig = async () => ({ status: 'found', text: configText });
+    let resolverNow = 0;
+    const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+
+    const select = doc.querySelector('.cct-banner select') as HTMLSelectElement;
+    select.value = 'praise';
+    select.dispatchEvent(new Event('change'));
+    expect(renderedThreadEl.style.display).toBe(''); // le fil EST 'praise' : filtre actif, mais visible
+
+    // La configuration du dépôt désactive 'praise' ; le compteur bloquant change aussi
+    // (dernier fil résolu ailleurs) pour déclencher la relecture.
+    configText = JSON.stringify({ labels: [{ id: 'praise', enabled: false }] });
+    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    resolverNow += 3601 * 1000; // dépasse le TTL du cache de configuration (§8.1.2)
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    // Sans le correctif : le `<select>` retombe visuellement sur « tous » (aucune option
+    // 'praise' ne correspond) mais le filtre appliqué reste 'praise' — un label que plus
+    // aucun fil ne porte (analyze() ne résout plus un label désactivé) — masquant tout.
+    const selectAfterDisable = doc.querySelector('.cct-banner select') as HTMLSelectElement;
+    expect(selectAfterDisable.value).toBe('');
+    expect(renderedThreadEl.style.display).toBe('');
+  });
+});
+
 describe('Codex round 4 — la signature de reprise sonde le COMPTE de commentaires, jamais leur corps (§9.4)', () => {
   afterEach(() => {
     document.body.innerHTML = '';

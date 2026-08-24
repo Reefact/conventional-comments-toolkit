@@ -439,9 +439,18 @@ async function renderPrChrome(
     }
     // Fils rendus sur la page — surface d'affichage, hors contrat §9.2.3 : le filtre les
     // masque AUSSI, pas seulement les ancres du bandeau (§5.5).
-    const selectedLabel = filterState.get();
+    const enabledLabelIds = enabledLabels(resolved.config).map((l) => l.id);
+    let selectedLabel = filterState.get();
+    if (selectedLabel !== null && !enabledLabelIds.includes(selectedLabel)) {
+      // Une configuration rafraîchie sur la MÊME PR (§5.5, revue Codex round 5) a désactivé
+      // le label sélectionné : le `<select>` reconstruit retombe sur « tous » (aucune
+      // `<option>` ne correspond) — la sélection mémorisée doit suivre, sous peine de
+      // continuer à filtrer sur un label fantôme pendant que l'affichage dit « tous ».
+      selectedLabel = null;
+      filterState.set(null);
+    }
     const banner = renderBanner(model, published, lang, {
-      filterLabels: enabledLabels(resolved.config).map((l) => l.id),
+      filterLabels: enabledLabelIds,
       selectedLabel,
       onFilter: (labelId) => {
         filterState.set(labelId);

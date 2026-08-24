@@ -4,7 +4,7 @@
 
 import type { EffectiveConfig, Floor, Mode, Notice, Severity } from '../types.js';
 import { SUPPORTED_FLOOR_VERSION } from '../version.js';
-import { filterAllowlistPatterns, filterToolCommands } from './schema.js';
+import { filterAllowlistPatterns, filterToolCommands, MODES, SEVERITIES } from './schema.js';
 
 export const MODE_SCALE: Record<Mode, number> = { off: 0, assist: 1, warn: 2, enforce: 3 };
 const SEVERITY_SCALE: Record<Severity, number> = { off: 0, warn: 1, error: 2 };
@@ -89,15 +89,58 @@ function asClosed(value: unknown, ref: string, notices: Notice[]): boolean {
   return true;
 }
 
+/** Les clés que le §8.1.1 définit. Une clé hors liste est ignorée par tout le reste du
+ * code ; sans avertissement, `{"minimumMood": "enforce"}` laisserait l'administration
+ * croire son plancher posé alors qu'il ne l'est pas. */
+const FLOOR_KEYS = new Set([
+  'floorVersion', 'configUrl', 'minimumMode', 'formatSeverity', 'severities', 'labels',
+  'rules', 'activation', 'exemptUsers', 'allowlistPatterns', 'toolCommands',
+  'resolverOverrideGroup', 'configCacheTtlSeconds',
+]);
+
+/** Entier positif ou nul — la même exigence que `parseConfigDocument()` pose au document
+ * de dépôt sur `configCacheTtlSeconds` et sur les seuils de `rules`. */
+function asNonNegativeInt(value: unknown, ref: string, notices: Notice[]): number | undefined {
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return value;
+  notices.push(floorWarning('floor key ignored: must be a non-negative integer', ref));
+  return undefined;
+}
+
+function asOneOf(value: unknown, allowed: string[], ref: string, notices: Notice[]): string | undefined {
+  if (typeof value === 'string' && allowed.includes(value)) return value;
+  notices.push(floorWarning(`floor key ignored: must be one of ${allowed.join(', ')}`, ref));
+  return undefined;
+}
+
+/** Un objet, ou rien. Évite d'aller lire une sous-clé sur un scalaire. */
+function asObject(value: unknown, ref: string, notices: Notice[]): Record<string, unknown> | undefined {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  notices.push(floorWarning('floor key ignored: must be an object', ref));
+  return undefined;
+}
+
 export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   if (!floor) return { floor: defaultFloor(), notices: [], unsupported: false };
-  if (floor.floorVersion !== undefined && floor.floorVersion > SUPPORTED_FLOOR_VERSION) {
+
+  // Le TYPE de `floorVersion` se vérifie avant sa VALEUR : `"99" > 1` est vrai en
+  // JavaScript, si bien qu'une version écrite entre guillemets déclencherait le repli du
+  // §8.1.5 par coercition plutôt que par décision. Une valeur non entière est écartée et
+  // signalée, et le plancher est alors lu comme s'il ne portait pas de version — ce que
+  // le §8.1.1 permet, la clé étant optionnelle.
+  const versionNotices: Notice[] = [];
+  const version =
+    floor.floorVersion === undefined
+      ? undefined
+      : asNonNegativeInt(floor.floorVersion, 'floorVersion', versionNotices);
+  if (version !== undefined && version > SUPPORTED_FLOOR_VERSION) {
     return {
       floor: defaultFloor(),
       notices: [
         {
           kind: 'unsupported-version',
-          message: `floor version ${floor.floorVersion} exceeds supported version ${SUPPORTED_FLOOR_VERSION}: the floor is not applied and the component falls back to assist mode (§8.1.1)`,
+          message: `floor version ${version} exceeds supported version ${SUPPORTED_FLOOR_VERSION}: the floor is not applied and the component falls back to assist mode (§8.1.1)`,
           ref: 'floorVersion',
         },
       ],
@@ -118,8 +161,10 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   // politique d'entreprise ne doit pas désactiver la contrainte sur tout un parc. Écarter
   // ne va d'ailleurs jamais que dans le sens durcissant — une exemption ou un motif
   // d'allowlist en moins protège davantage.
-  const notices: Notice[] = [];
+  const notices: Notice[] = [...versionNotices];
   const out: Floor = { ...floor };
+  if (version === undefined) delete out.floorVersion;
+  else out.floorVersion = version;
 
   for (const key of FLOOR_LIST_KEYS) {
     const rule = out[key] as { minimum?: unknown; closed?: unknown } | undefined | null;
@@ -144,6 +189,92 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   }
   if (out.labels !== undefined) {
     out.labels = { minimum: asStringArray(out.labels?.minimum, 'labels.minimum', notices) };
+  }
+
+  // ————— Les clés scalaires, et les clés inconnues —————
+  //
+  // Une valeur fautive est ÉCARTÉE : le plancher ne contraint alors tout simplement pas
+  // cette clé-là, et l'avertissement est la seule sauvegarde — il n'existe aucune valeur
+  // sûre à inventer à la place. Poser `enforce` sur une coquille de `minimumMode`
+  // bloquerait les merges de toute une organisation ; poser une date sur une coquille
+  // d'`activatedAt` ferait entrer un historique arbitraire dans le périmètre. Écarter est
+  // le seul geste qui ne décide rien à la place de qui a écrit la politique.
+  //
+  // C'est la nuance que la règle des listes ci-dessus n'a pas : y retirer une entrée
+  // fautive durcit toujours. Ici, non — d'où l'avertissement, qui n'est pas décoratif.
+  for (const key of Object.keys(out)) {
+    if (!FLOOR_KEYS.has(key)) {
+      notices.push(floorWarning(`unknown floor key "${key}" ignored`, key));
+      delete (out as Record<string, unknown>)[key];
+    }
+  }
+  const drop = (k: keyof Floor) => { delete out[k]; };
+
+  if (out.configUrl !== undefined && out.configUrl !== null && typeof out.configUrl !== 'string') {
+    notices.push(floorWarning('floor key ignored: must be a string or null', 'configUrl'));
+    drop('configUrl');
+  }
+  if (out.minimumMode !== undefined) {
+    const v = asOneOf(out.minimumMode, MODES, 'minimumMode', notices);
+    if (v === undefined) drop('minimumMode');
+    else out.minimumMode = v as Mode;
+  }
+  if (out.formatSeverity !== undefined) {
+    const v = asOneOf(out.formatSeverity, ['warn', 'error'], 'formatSeverity', notices);
+    if (v === undefined) drop('formatSeverity');
+    else out.formatSeverity = v as 'warn' | 'error';
+  }
+  if (out.severities !== undefined) {
+    const obj = asObject(out.severities, 'severities', notices);
+    if (obj === undefined) drop('severities');
+    else {
+      const kept: Record<string, Severity> = {};
+      for (const [code, sev] of Object.entries(obj)) {
+        if (typeof sev === 'string' && SEVERITIES.includes(sev)) kept[code] = sev as Severity;
+        else notices.push(floorWarning(`floor severity of "${code}" ignored: must be one of ${SEVERITIES.join(', ')}`, `severities.${code}`));
+      }
+      out.severities = kept;
+    }
+  }
+  if (out.rules !== undefined) {
+    const obj = asObject(out.rules, 'rules', notices);
+    if (obj === undefined) drop('rules');
+    else {
+      const rules: { minDecisionSubjectLength?: number } = {};
+      for (const [k, v] of Object.entries(obj)) {
+        if (k !== 'minDecisionSubjectLength') {
+          notices.push(floorWarning(`unknown floor key "rules.${k}" ignored`, `rules.${k}`));
+          continue;
+        }
+        const n = asNonNegativeInt(v, 'rules.minDecisionSubjectLength', notices);
+        if (n !== undefined) rules.minDecisionSubjectLength = n;
+      }
+      out.rules = rules;
+    }
+  }
+  if (out.activation !== undefined) {
+    const obj = asObject(out.activation, 'activation', notices);
+    if (obj === undefined) drop('activation');
+    else {
+      const activation: { activatedAt?: string } = {};
+      for (const [k, v] of Object.entries(obj)) {
+        if (k !== 'activatedAt') {
+          notices.push(floorWarning(`unknown floor key "activation.${k}" ignored`, `activation.${k}`));
+          continue;
+        }
+        // La date NON VÉRIFIÉE était le pire défaut de cette famille : `Date.parse()`
+        // rend NaN, la comparaison de périmètre du §6.2.3 est alors fausse pour TOUTE
+        // PR, et `evaluate()` publie `success` partout — l'enforcement d'une organisation
+        // entière annulé par une coquille, sans que rien ne le signale.
+        if (typeof v === 'string' && !Number.isNaN(Date.parse(v))) activation.activatedAt = v;
+        else notices.push(floorWarning('floor key ignored: must be an ISO 8601 date', 'activation.activatedAt'));
+      }
+      out.activation = activation;
+    }
+  }
+  if (out.configCacheTtlSeconds !== undefined
+      && asNonNegativeInt(out.configCacheTtlSeconds, 'configCacheTtlSeconds', notices) === undefined) {
+    drop('configCacheTtlSeconds');
   }
 
   return { floor: out, notices, unsupported: false };

@@ -68,6 +68,40 @@ export class EditorController {
     const host = this.deps.editor.element.parentElement;
     if (!host) return;
 
+    // Retrait intérieur de la boîte de commentaire (styles.css). Posé par une classe, et
+    // non par un sélecteur visant directement le conteneur de la plateforme, pour deux
+    // raisons : le nom de ce conteneur est propre à chaque plateforme, et surtout le
+    // retrait ne doit s'appliquer QU'AUX boîtes où l'extension injecte réellement quelque
+    // chose — un sélecteur global restylerait aussi celles qu'elle ne touche pas. Retiré
+    // à dispose(), comme tout ce que cette méthode pose.
+    //
+    // Réservé à la génération React du CommentBox GitHub (« Files changed réécrite » dans
+    // selectors.ts) — reconnue via les deux mêmes indices que ses deux sélecteurs candidats
+    // pour cette génération : la classe `CommentBox` et le composeur `data-testid`. C'est
+    // cette génération dont le conteneur est borderless et sans padding propre (§ci-dessus).
+    // Sur le DOM hérité de GitHub et sur Azure DevOps, la zone de saisie porte sa propre
+    // bordure et son propre padding ; y poser ce retrait décalerait le conteneur sans
+    // corriger l'alignement visé, et effacerait à tort le padding qui donne sa forme au champ.
+    //
+    // Le composeur `data-testid` est un sélecteur DESCENDANT (`div[...] textarea`, sans
+    // combinateur d'enfant direct) : la zone de saisie peut y être nichée sous un wrapper
+    // intermédiaire, distinct de `host`. Le conteneur à padder est donc l'ancêtre réellement
+    // trouvé par ce sélecteur — pas `host` — pour que l'en-tête et les onglets natifs, situés
+    // au même niveau que ce wrapper, reçoivent eux aussi le retrait.
+    const commentBoxContainer = this.deps.editor.element.closest('[data-testid*="comment-composer"]');
+    const paddedContainer = commentBoxContainer ?? (this.deps.editor.element.className.includes('CommentBox') ? host : null);
+    if (paddedContainer) {
+      paddedContainer.classList.add('cct-host');
+      this.#disposers.push(() => paddedContainer.classList.remove('cct-host'));
+      // La zone de saisie se donne souvent son propre retrait horizontal (sur GitHub,
+      // `.CommentBox-input` porte `padding: var(--base-size-8)`), qui ferait double emploi
+      // avec celui du conteneur et désalignerait son texte du reste. Neutralisé en CSS ; la
+      // règle correspondante (styles.css) cible un descendant, pas seulement un enfant
+      // direct, pour couvrir aussi ce wrapper intermédiaire.
+      this.deps.editor.element.classList.add('cct-editor');
+      this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-editor'));
+    }
+
     // §5.1 — barre d'outils au-dessus de la zone de saisie.
     const toolbar = buildToolbar({
       config: this.config,

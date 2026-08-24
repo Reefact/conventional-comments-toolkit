@@ -19,6 +19,30 @@
    d'avant le renommage (specifications-fr.md §A.5). Le canari n'exige que le nom actuel
    (premier niveau) — l'ancien est un filet non vérifiable depuis github.com. */
 
+/* Retrait intérieur de la boîte de commentaire : plus rien ne touche la bordure.
+   Le conteneur de la plateforme n'en a aucun — sur GitHub, `.CommentBox-container` porte
+   `margin: var(--base-size-8)` et c'est tout —, si bien que son en-tête et nos éléments
+   injectés étaient collés au bord, et que seul le texte du champ s'en écartait, par son
+   propre padding. On égalise en donnant au conteneur un retrait égal à sa marge.
+
+   Classe posée par editor-controller.ts, jamais un sélecteur visant le conteneur de la
+   plateforme : le retrait ne doit s'appliquer QU'AUX boîtes où l'extension injecte
+   quelque chose. Sélecteur doublé pour passer devant la règle de la plateforme sans
+   `!important` — GitHub emploie le même procédé sur ce conteneur. */
+.cct-host.cct-host {
+  padding: var(--base-size-8, 8px);
+}
+
+/* Le retrait du conteneur remplace celui que la zone de saisie se donnait : les deux
+   cumulés porteraient son texte deux fois plus loin que la barre d'outils. Combinateur
+   descendant, et non enfant direct : sur le composeur React reconnu par data-testid
+   (editor-controller.ts), la zone de saisie peut être nichée sous un wrapper intermédiaire
+   entre elle et le conteneur qui porte `cct-host`. */
+.cct-host .cct-editor {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .cct-toolbar {
   display: flex;
   flex-wrap: wrap;

@@ -16,6 +16,10 @@ const pr: PrRef = {
 function setup(mode: 'enforce' | 'warn' = 'enforce') {
   const host = document.createElement('div');
   const textarea = document.createElement('textarea');
+  // Génération React du CommentBox GitHub (cf. selectors.ts, `class*="CommentBox"`) : c'est
+  // le cas par défaut que la plupart des tests exercent ; voir plus bas pour le cas où cette
+  // classe est absente (DOM hérité, Azure DevOps).
+  textarea.className = 'CommentBox-input';
   const submit = document.createElement('button');
   submit.type = 'submit';
   host.append(textarea, submit);
@@ -73,6 +77,64 @@ describe('§5 — contrôleur d’éditeur', () => {
     expect(toolbar).not.toBeNull();
     expect(toolbar!.querySelectorAll('.cct-label-button')).toHaveLength(10);
     controller.dispose();
+  });
+
+  it('marque le conteneur et la zone pour le retrait intérieur, et les démarque à dispose()', () => {
+    const { controller, textarea, host } = setup();
+    controller.attach();
+    // Le retrait n'est posé que sur les boîtes réellement instrumentées : un sélecteur
+    // visant le conteneur de la plateforme restylerait aussi celles qu'on ne touche pas.
+    expect(host.classList.contains('cct-host')).toBe(true);
+    expect(textarea.classList.contains('cct-editor')).toBe(true);
+    controller.dispose();
+    // Rien de ce que attach() pose ne doit survivre au détachement.
+    expect(host.classList.contains('cct-host')).toBe(false);
+    expect(textarea.classList.contains('cct-editor')).toBe(false);
+  });
+
+  it('ne pose pas le retrait hors du CommentBox GitHub moderne (DOM hérité, Azure DevOps)', () => {
+    const { controller, textarea, host } = setup();
+    // Aucun conteneur borderless ni padding propre à neutraliser sur ces éditeurs (§ci-dessus
+    // dans editor-controller.ts) : la zone de saisie porte sa propre bordure et son propre
+    // padding, que ce retrait effacerait à tort.
+    textarea.className = 'comment-textarea';
+    controller.attach();
+    expect(host.classList.contains('cct-host')).toBe(false);
+    expect(textarea.classList.contains('cct-editor')).toBe(false);
+    controller.dispose();
+  });
+
+  it('pose le retrait sur le composeur React reconnu par data-testid, sans classe CommentBox', () => {
+    const { controller, textarea, host } = setup();
+    // Second sélecteur candidat de la même génération React dans selectors.ts
+    // (`div[data-testid*="comment-composer"] textarea`) : le composeur, et non la classe
+    // du textarea, porte l'indice de reconnaissance.
+    textarea.className = '';
+    host.setAttribute('data-testid', 'comment-composer-foo');
+    controller.attach();
+    expect(host.classList.contains('cct-host')).toBe(true);
+    expect(textarea.classList.contains('cct-editor')).toBe(true);
+    controller.dispose();
+  });
+
+  it('pose le retrait sur le composeur lui-même, pas sur un wrapper intermédiaire, quand la zone de saisie y est nichée', () => {
+    const { controller, textarea, host } = setup();
+    // Le sélecteur `div[data-testid*="comment-composer"] textarea` est un sélecteur
+    // descendant : la zone de saisie peut être nichée sous un wrapper intermédiaire (ici
+    // `host`, qui reste le parent direct utilisé pour insérer la barre d'outils) distinct
+    // du composeur qui doit recevoir le retrait — en-tête et onglets natifs sont à son
+    // niveau, pas à celui du wrapper.
+    textarea.className = '';
+    const composer = document.createElement('div');
+    composer.setAttribute('data-testid', 'comment-composer-foo');
+    host.replaceWith(composer);
+    composer.appendChild(host);
+    controller.attach();
+    expect(composer.classList.contains('cct-host')).toBe(true);
+    expect(host.classList.contains('cct-host')).toBe(false);
+    expect(textarea.classList.contains('cct-editor')).toBe(true);
+    controller.dispose();
+    expect(composer.classList.contains('cct-host')).toBe(false);
   });
 
   it('§5.3 : rend une pastille et les diagnostics sous la zone', async () => {

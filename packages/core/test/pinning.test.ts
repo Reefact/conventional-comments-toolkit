@@ -140,6 +140,34 @@ describe('§8.1.3 règle 1 — épinglage monotone', () => {
   });
 });
 
+describe('§8.1.3 — document épinglé écrit par une version antérieure de core/', () => {
+  it('CA-40 : une clé absente du document persisté est complétée, pas lue undefined', () => {
+    // Reproduit une PR épinglée AVANT l'ajout de `toolCommands` : le stockage relit le
+    // JSON tel quel (§6.4), sans normalisation, sur les deux backends. Sans complétion,
+    // l'union du §8.1.4 lèverait et la PR cesserait d'être évaluée après mise à jour.
+    const legacy = pin({ mode: 'enforce' }) as EffectiveConfig & { toolCommands?: string[] };
+    delete legacy.toolCommands;
+
+    const { config } = resolveConfig(
+      null,
+      absent,
+      found({ mode: 'enforce', toolCommands: ['@codex'] }),
+      legacy as EffectiveConfig,
+      true
+    );
+    // L'ajout est élargissant : il s'applique en direct, sur la valeur par défaut (vide)
+    // que la PR portait implicitement jusque-là.
+    expect(config.toolCommands).toEqual(['@codex']);
+  });
+
+  it('CA-40 : le cas symétrique — clé absente des deux côtés — reste la liste vide', () => {
+    const legacy = pin({ mode: 'enforce' }) as EffectiveConfig & { toolCommands?: string[] };
+    delete legacy.toolCommands;
+    const { config } = resolveConfig(null, absent, found({ mode: 'enforce' }), legacy as EffectiveConfig, true);
+    expect(config.toolCommands).toEqual([]);
+  });
+});
+
 describe('§8.1.3 — bornes d’entreprise en direct dans les deux sens (CA-31)', () => {
   it('durcir le plancher sur mode prend effet sur les PR déjà ouvertes, malgré l’épinglage', () => {
     const pinned = pin({ mode: 'warn' });

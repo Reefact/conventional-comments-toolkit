@@ -26,25 +26,42 @@ const css = readFileSync(cssPath, 'utf8');
  * `[aria-pressed='true']` en `[aria-pressed="true"]`, ce qui n'est pas un écart. */
 const normalize = (selector) => selector.replace(/\s+/g, '').replace(/'/g, '"').toLowerCase();
 
-// Sélecteurs ÉCRITS : une règle de premier niveau commence en début de ligne par « . » ou
-// « @ » et court jusqu'à son accolade ouvrante, liste de sélecteurs multi-lignes comprise.
-// Les règles imbriquées (indentées dans un @media) sont hors du champ de ce contrôle.
-const declared = [...css.matchAll(/^([.@][^{}]*?)\s*\{/gm)].map((m) => normalize(m[1]));
+/** Les commentaires peuvent citer un sélecteur en prose (« emportant la règle
+ * .cct-toolbar { … } ») : les laisser dans le texte analysé ferait exiger du garde une
+ * règle qui n'en est pas une. Cette expression s'arrête exactement là où le parseur CSS
+ * s'arrête — à la première séquence de fermeture —, si bien qu'un commentaire fermé trop
+ * tôt laisse malgré tout apparaître la règle qui suit, et reste donc détecté. */
+const stripComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, ' ');
 
-// Sélecteurs RETENUS par le parseur.
+// Sélecteurs ÉCRITS : une règle commence par « . » ou « @ » — en début de ligne, ou après
+// une simple indentation pour les règles imbriquées dans un @media — et court jusqu'à son
+// accolade ouvrante, liste de sélecteurs multi-lignes comprise.
+const declared = [...stripComments(css).matchAll(/^[ \t]*([.@][^{}]*?)\s*\{/gm)].map((m) =>
+  normalize(m[1])
+);
+
+// Sélecteurs RETENUS par le parseur, règles groupantes (@media, @supports) parcourues
+// récursivement : sans cette descente, une règle détruite À L'INTÉRIEUR d'un @media
+// laisserait le garde vert, puisque seul le @media survivant serait constaté.
+const collect = (rules, into) => {
+  for (const rule of rules) {
+    into.add(
+      normalize(
+        rule.selectorText !== undefined
+          ? rule.selectorText
+          : rule.cssText.slice(0, rule.cssText.indexOf('{'))
+      )
+    );
+    if (rule.cssRules?.length) collect(rule.cssRules, into);
+  }
+  return into;
+};
+
 const window = new Window();
 const style = window.document.createElement('style');
 style.textContent = css;
 window.document.head.appendChild(style);
-const parsed = new Set(
-  [...style.sheet.cssRules].map((rule) =>
-    normalize(
-      rule.selectorText !== undefined
-        ? rule.selectorText
-        : rule.cssText.slice(0, rule.cssText.indexOf('{'))
-    )
-  )
-);
+const parsed = collect(style.sheet.cssRules, new Set());
 
 const lost = declared.filter((selector) => !parsed.has(selector));
 

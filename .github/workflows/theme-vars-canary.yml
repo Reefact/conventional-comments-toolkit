@@ -96,12 +96,18 @@ jobs:
               if (err.status !== 422) throw err; // 422 = le label existe déjà
             }
 
-            const { data: existing } = await github.rest.issues.listForRepo({
+            const { data: labelled } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
               labels: 'theme-vars-canary',
             });
+
+            // L'API issues renvoie AUSSI les pull requests : une PR portant ce label (la
+            // PR qui corrige justement une dérive détectée, typiquement) pourrait être
+            // choisie comme « issue existante » et recevoir le commentaire de statut à la
+            // place de l'issue de suivi. On ne garde donc que les vraies issues.
+            const existing = labelled.filter((item) => !item.pull_request);
 
             if (existing.length > 0) {
               await github.rest.issues.createComment({

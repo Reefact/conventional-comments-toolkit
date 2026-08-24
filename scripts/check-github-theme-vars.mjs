@@ -38,7 +38,16 @@ const TARGET_URL =
 
 const PRIMER_PREFIXES = ['--color-', '--border', '--bgColor-', '--fgColor-', '--overlay-'];
 
-function extractPrimerVarNames(css) {
+// Les commentaires CSS documentent parfois des noms de variables (« préférer
+// var(--fgColor-muted) ici ») que la feuille n'utilise pas réellement : les laisser dans
+// le texte analysé ferait exiger du canari une variable dont l'extension ne dépend pas,
+// et ouvrirait une issue de dérive pour rien. On les retire donc avant l'extraction.
+function stripCssComments(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+}
+
+function extractPrimerVarNames(source) {
+  const css = stripCssComments(source);
   const names = new Set();
   // Marche caractère par caractère en empilant une entrée par parenthèse ouvrante,
   // portant `true` quand cette parenthèse appartient à un var(--primer-...) — un nom

@@ -23,6 +23,7 @@
   "formatSeverity": "warn",
   "exemptUsers": ["dependabot[bot]", "github-actions[bot]"],
   "allowlistPatterns": ["^LGTM$"],
+  "toolCommands": ["/*", "@dependabot", "@copilot", "@coderabbitai", "@codex", "@claude", "@mergifyio", "@renovate", "@rustbot", "@bors"],
   "resolverOverrideGroup": ["acme/tech-leads"],
   "overrideLabel": "cc-override",
   "activation": { "activatedAt": "2026-09-01T00:00:00Z" },

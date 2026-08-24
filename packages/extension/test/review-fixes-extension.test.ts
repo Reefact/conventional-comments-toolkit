@@ -117,7 +117,7 @@ describe('écart A — §5.4 cond. 4 : une lecture unreachable n’est jamais ma
   function makeAdapter(read: () => Promise<ConfigRead>): PlatformAdapter {
     return {
       matches: () => true,
-      platformProfile: () => ({ id: 'github', suggestionInfoString: null, slashCommands: false, commandPrefixes: [] }),
+      platformProfile: () => ({ id: 'github', suggestionInfoString: null }),
       getRepoConfig: read,
       getOrgConfig: async () => ({ status: 'absent' }),
       observeEditors: () => ({ dispose: () => {} }),

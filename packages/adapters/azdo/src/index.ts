@@ -72,7 +72,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
   platformProfile(): PlatformProfile {
     // Pas d'étage 0 tant que l'info string du bloc de suggestion n'est pas établie
     // (§B.6) ; aucune commande native, ni slash ni mention (§B.6).
-    return { id: 'azdo', suggestionInfoString: null, slashCommands: false, commandPrefixes: [] };
+    return { id: 'azdo', suggestionInfoString: null };
   }
 
   /** §B.4 — pas de route de fichier brut : tentative sur le point d'API `items`, sur la

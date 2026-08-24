@@ -33,7 +33,7 @@ function enforceConfig() {
   return c;
 }
 
-const errorDiags = () => validate({ body: 'pas de label', platform: { id: 'github', suggestionInfoString: null, slashCommands: false, commandPrefixes: [] }, isSystemGenerated: false, zone: 'thread-root', canCarryBlockingState: true }, defaultConfig());
+const errorDiags = () => validate({ body: 'pas de label', platform: { id: 'github', suggestionInfoString: null }, isSystemGenerated: false, zone: 'thread-root', canCarryBlockingState: true }, defaultConfig());
 
 describe('§5.4 — les quatre conditions du blocage d’envoi', () => {
   const base = () => ({
@@ -110,7 +110,7 @@ describe('§5.4 — les quatre conditions du blocage d’envoi', () => {
     input.diagnostics = validate(
       {
         body: 'Issue: le nom est ambigu\n\nd',
-        platform: { id: 'github', suggestionInfoString: null, slashCommands: false, commandPrefixes: [] },
+        platform: { id: 'github', suggestionInfoString: null },
         isSystemGenerated: false,
         zone: 'thread-root',
         canCarryBlockingState: true,

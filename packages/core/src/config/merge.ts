@@ -57,7 +57,8 @@ export function mergeLevel(base: EffectiveConfig, values: Record<string, unknown
         break;
       }
       case 'exemptUsers':
-      case 'allowlistPatterns': {
+      case 'allowlistPatterns':
+      case 'toolCommands': {
         // Concaténation (union), sans suppression possible depuis un niveau inférieur.
         const merged = [...out[key]];
         for (const v of value as string[]) if (!merged.includes(v)) merged.push(v);

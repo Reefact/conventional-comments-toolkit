@@ -50,20 +50,6 @@ export function webHostFromApiBase(apiBase: string): string {
   return new URL(apiBase).hostname.replace(/^api\./, '');
 }
 
-// Handles de robot dont l'interpellation exempte (§4.2, §A.7) — liste fermée, portée par
-// l'adaptateur, jamais par la configuration d'un dépôt.
-export const GITHUB_COMMAND_PREFIXES = [
-  '@dependabot',
-  '@copilot',
-  '@coderabbitai',
-  '@codex',
-  '@claude',
-  '@mergifyio',
-  '@renovate',
-  '@rustbot',
-  '@bors',
-];
-
 const CHECK_NAME = 'conventional-comments';
 const WEBHOOK_EVENTS = new Set([
   'pull_request',
@@ -96,14 +82,9 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
 
   platformProfile(): PlatformProfile {
     // Même profil que côté client, même source (§9.2.4) : bloc de suggestion identifié
-    // par l'info string `suggestion` (§A.7). Commande slash reconnue génériquement
-    // (§4.2) ; handles de robot nommés un par un (§A.7).
-    return {
-      id: 'github',
-      suggestionInfoString: 'suggestion',
-      slashCommands: true,
-      commandPrefixes: GITHUB_COMMAND_PREFIXES,
-    };
+    // par l'info string `suggestion` (§A.7). Les commandes adressées à un outil ne sont
+    // pas ici — elles relèvent de `EffectiveConfig.toolCommands` (§4.2, §8.2).
+    return { id: 'github', suggestionInfoString: 'suggestion' };
   }
 
   matchesWebhook(payload: unknown): boolean {

@@ -20,6 +20,7 @@ interface FingerprintDomain {
   scope: { validateReplies: boolean; validateReviewSummary: boolean };
   exemptUsers: string[];
   allowlistPatterns: string[];
+  toolCommands: string[];
   activatedAt: string | null;
 }
 
@@ -60,6 +61,9 @@ export function fingerprintDomain(config: EffectiveConfig): FingerprintDomain {
     },
     exemptUsers: [...config.exemptUsers].map((u) => u.toLowerCase()).sort(),
     allowlistPatterns: [...config.allowlistPatterns].sort(),
+    // Insensible à la casse, comme la comparaison des mentions (§4.2) : `@Codex` et
+    // `@codex` ne doivent jamais produire deux empreintes différentes.
+    toolCommands: [...config.toolCommands].map((c) => c.toLowerCase()).sort(),
     activatedAt: config.activation.activatedAt,
   };
 }

@@ -43,9 +43,10 @@ export function mixPinnedWithLive(pinned: EffectiveConfig, live: EffectiveConfig
     known: mixDecorations(pinned.decorations.known, live.decorations.known),
   };
 
-  // exemptUsers, allowlistPatterns — retrait restrictif, ajout élargissant → union.
+  // exemptUsers, allowlistPatterns, toolCommands — retrait restrictif, ajout élargissant → union.
   out.exemptUsers = union(pinned.exemptUsers, live.exemptUsers);
   out.allowlistPatterns = union(pinned.allowlistPatterns, live.allowlistPatterns);
+  out.toolCommands = union(pinned.toolCommands, live.toolCommands);
 
   // rules — augmentation d'un minimum restrictive, diminution élargissante (et
   // symétriquement pour le maximum).

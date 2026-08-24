@@ -45,6 +45,7 @@ export function defaultConfig(): EffectiveConfig {
     formatSeverity: 'warn',
     exemptUsers: [],
     allowlistPatterns: [],
+    toolCommands: [], // vide par défaut — recommandation en annexe, jamais un défaut produit (§4.2)
     resolverOverrideGroup: [], // repli terminal — n'habilite personne (§8.2)
     overrideLabel: 'cc-override',
     activation: { activatedAt: null },

@@ -56,6 +56,20 @@ shape of every key (it is **not** the product defaults, which live in
 `packages/core/src/config/defaults.ts`). Resolution, floor bounds, merge semantics and
 pinning are specified in §8 and implemented in `packages/core/src/config/`.
 
+**Upgrading from a version without `toolCommands`.** Slash commands used to be exempted
+through a list built into the GitHub adapter (`/azp`, `/rebase`). That list is gone, and
+`toolCommands` is **empty by default**, so those commands now need a label like any other
+comment until the repository declares them — in `enforce` mode a `/rebase` is rejected
+where it previously passed. A repository that relied on the built-in exemption restores it,
+and widens it to every slash command, by adding `"/*"` to `toolCommands`. The example file
+above carries the full recommended GitHub list, mentions included.
+
+Note that this behaviour lives in `core/`, not in the configuration, so `fingerprint()`
+(§9.2.2) cannot see it: while the extension and the server run different `core/` versions,
+they apply different rules on GitHub while still reporting that they agree. The lever for
+requiring a `core/` version across an organization is `coreMinVersion` (§8.2), not the
+fingerprint.
+
 ## Modes and adoption (§7)
 
 `assist` (default) → `warn` → `enforce`. Operational procedures — rollback, the

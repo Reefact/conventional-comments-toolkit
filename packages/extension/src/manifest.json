@@ -18,9 +18,8 @@
     },
     "default_title": "Conventional Comments Toolkit — réglages"
   },
-  "permissions": ["storage", "scripting", "activeTab"],
+  "permissions": ["storage", "scripting"],
   "optional_host_permissions": ["https://*/*"],
-  "host_permissions": ["https://github.com/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

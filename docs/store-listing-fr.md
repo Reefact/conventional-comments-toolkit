@@ -33,13 +33,16 @@ contenu, qui elle tient sans condition.
 > **Conventional Comments Toolkit** aide les équipes à écrire des
 > commentaires de revue de code clairs et conformes à la convention
 > [Conventional Comments](https://conventionalcomments.org/), directement
-> dans l'éditeur natif de GitHub (github.com) — et, en option, Azure
-> DevOps Services.
+> dans l'éditeur natif de GitHub (github.com, GitHub Enterprise Server,
+> GitHub Enterprise Cloud) — et, en option, Azure DevOps (Services et
+> Server auto-hébergé).
 >
-> **⚠️ Pas encore vrai du build actuel — voir la note en fin de fichier :**
-> le support de GitHub Enterprise Server et d'Azure DevOps Server
-> (auto-hébergé) est conçu mais pas câblé de bout en bout. Ne pas les
-> lister à la soumission tant que ce n'est pas corrigé.
+> **⚠️ Une limite reste vraie du build actuel — voir la note en fin de
+> fichier :** quand une organisation référence un fichier de
+> configuration hébergé sur un domaine distinct de la plateforme
+> (`configUrl`), sa lecture échoue encore. La reconnaissance de
+> l'interface elle-même sur un domaine auto-hébergé, en revanche, est
+> corrigée et testée.
 >
 > **Ce que l'extension apporte**
 > - Une barre d'outils pour insérer les labels standards
@@ -69,17 +72,26 @@ contenu, qui elle tient sans condition.
 > Code source public sous licence Apache-2.0 :
 > https://github.com/reefact/conventional-comments-toolkit
 
-## Écart connu qui bloque la mention « Enterprise Server »
+## Écart résolu — reconnaissance de l'interface sur un domaine auto-hébergé
 
-Vérifié dans le code (`content-internal.ts`, `bootstrap()`) : accorder la
-permission d'hôte optionnelle sur un domaine GitHub Enterprise Server ou
-Azure DevOps Server auto-hébergé injecte bien le script de contenu, mais
-`bootstrap()` ne transmet jamais les `extraHosts` accordés à
-`GithubClientAdapter` / `AzdoClientAdapter` : `matchesHost()` ne reconnaît
-donc toujours que `github.com` / `dev.azure.com`, et aucune interface
-n'apparaît sur ces domaines auto-hébergés. Corriger ce câblage (ou
-restreindre la fiche à github.com + Azure DevOps Services) avant de
-soumettre avec une mention self-hosted.
+Corrigé et testé (`content-internal.ts`, `packages/extension/test/extra-hosts.test.ts`) :
+accorder la permission d'hôte optionnelle sur un domaine GitHub
+Enterprise Server ou Azure DevOps Server auto-hébergé, puis lui
+associer une plateforme dans la page d'options, active désormais
+correctement l'interface — `bootstrap()` transmet les `extraHosts`
+accordés au bon adaptateur. La mention « GitHub Enterprise Server /
+Azure DevOps Server » peut rester dans la fiche.
+
+## Écart restant, plus étroit : `configUrl` sur un domaine tiers
+
+`getRepoConfig()`/`getOrgConfig()` des deux adaptateurs appellent
+`fetch` directement depuis le script de contenu, soumis au CORS de la
+page hôte. Cela ne bloque pas la lecture du fichier `.conventional-comments.json`
+du dépôt affiché (même origine que la page) : seule la lecture d'un
+`configUrl` d'organisation hébergé sur un **domaine distinct** de la
+plateforme échoue encore. Le message `cct-fetch-config`, que
+`background.ts` sait déjà traiter pour ce cas, n'est envoyé par aucun
+adaptateur.
 
 ## Notes de version pour la première soumission
 

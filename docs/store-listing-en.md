@@ -27,13 +27,15 @@ guarantee, which does hold unconditionally.
 > **Conventional Comments Toolkit** helps teams write clear code review
 > comments that follow the
 > [Conventional Comments](https://conventionalcomments.org/) convention,
-> right inside GitHub's native editor on github.com — and, optionally,
-> Azure DevOps Services.
+> right inside GitHub's native editor (github.com, GitHub Enterprise
+> Server, GitHub Enterprise Cloud) — and, optionally, Azure DevOps
+> (Services and self-hosted Server).
 >
-> **⚠️ Not yet true of the shipped build — see the note at the end of this
-> file:** support for GitHub Enterprise Server and Azure DevOps Server
-> (self-hosted) is designed for but not wired end to end. Do not list
-> them in the store submission until that's fixed.
+> **⚠️ One limitation still holds for the shipped build — see the note
+> at the end of this file:** when an organization references a
+> configuration file hosted on a domain distinct from the platform
+> (`configUrl`), reading it still fails. Recognizing the UI itself on a
+> self-hosted domain, however, is fixed and tested.
 >
 > **What the extension brings**
 > - A toolbar to insert standard labels
@@ -64,17 +66,26 @@ guarantee, which does hold unconditionally.
 > Public source code under the Apache-2.0 license:
 > https://github.com/reefact/conventional-comments-toolkit
 
-## Known gap blocking the "Enterprise Server" claim
+## Gap fixed — UI recognition on a self-hosted domain
 
-Verified against the code (`content-internal.ts`, `bootstrap()`):
-granting the optional host permission on a GitHub Enterprise Server or
-self-hosted Azure DevOps Server domain injects the content script, but
-`bootstrap()` never passes the granted `extraHosts` into
-`GithubClientAdapter` / `AzdoClientAdapter`, so `matchesHost()` still only
-recognizes `github.com` / `dev.azure.com` — no UI ever appears on those
-self-hosted domains. Fix that wiring (or scope this listing down to
-github.com + Azure DevOps Services) before submitting with any
-self-hosted claim.
+Fixed and tested (`content-internal.ts`,
+`packages/extension/test/extra-hosts.test.ts`): granting the optional
+host permission on a GitHub Enterprise Server or self-hosted Azure
+DevOps Server domain, then tagging it with a platform on the options
+page, now correctly activates the UI — `bootstrap()` passes the granted
+`extraHosts` into the matching adapter. The "GitHub Enterprise Server /
+Azure DevOps Server" claim can stay in the listing.
+
+## Remaining gap, narrower: `configUrl` on a third-party domain
+
+Both adapters' `getRepoConfig()`/`getOrgConfig()` call `fetch` directly
+from the content script, subject to the host page's CORS. That doesn't
+block reading the displayed repository's own
+`.conventional-comments.json` (same origin as the page): only reading
+an organization `configUrl` hosted on a domain **distinct** from the
+platform still fails. The `cct-fetch-config` message that
+`background.ts` already knows how to handle for this case is never
+sent by either adapter.
 
 ## Release notes for the first submission
 

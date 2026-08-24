@@ -142,31 +142,35 @@ large que celui demandé ici. L'utilisateur reste maître de l'octroi :
 aucun domaine n'est activé sans son geste explicite dans les options de
 l'extension.
 
-**⚠️ Deux écarts d'implémentation confirmés dans le code actuel, à régler
-avant de s'appuyer sur cette permission en soumission :**
-1. **Le domaine accordé ne suffit pas à activer l'adaptateur.** Le
-   script de contenu est bien injecté sur l'hôte autorisé
-   (`background.ts`, `registerContentScriptForOrigin`), mais
-   `bootstrap()` (`content-internal.ts`) instancie
-   `GithubClientAdapter`/`AzdoClientAdapter` sans leur passer les hôtes
-   accordés (`extraHosts`, que les deux adaptateurs acceptent déjà) : sur
-   un GitHub Enterprise Server ou un Azure DevOps Server auto-hébergé,
-   `matchesHost()` échoue et **aucune interface n'apparaît**, malgré la
-   permission accordée.
-2. **`configUrl` sur un domaine tiers ne se lit pas depuis un script de
-   contenu.** `getRepoConfig()`/`getOrgConfig()` des deux adaptateurs
-   appellent `fetch` directement dans le contexte du script de contenu ;
-   ces requêtes restent soumises à la politique CORS de la page hôte. Le
-   message `cct-fetch-config` que `background.ts` sait traiter existe
-   déjà pour ce cas précis, mais rien dans les adaptateurs ne l'envoie —
-   la lecture d'un `configUrl` distinct du domaine de plateforme échoue
-   donc en pratique et bascule l'extension en état dégradé.
+**✅ Le domaine accordé active désormais l'adaptateur.** Corrigé : le
+script de contenu était bien injecté sur l'hôte autorisé
+(`background.ts`, `registerContentScriptForOrigin`), mais `bootstrap()`
+(`content-internal.ts`) instanciait `GithubClientAdapter`/
+`AzdoClientAdapter` sans leur passer les hôtes accordés. La page
+d'options associe maintenant chaque hôte à une plateforme
+(`hostPlatforms`, `chrome.storage.local`) — un hôte accordé mais non
+associé n'active toujours aucun adaptateur plutôt que d'être deviné —
+et `bootstrap()` transmet la liste correspondante en `extraHosts` au
+bon constructeur. Testé (`packages/extension/test/extra-hosts.test.ts`).
 
-Tant que ces deux points ne sont pas corrigés, ne pas décrire dans le
-formulaire de soumission un support Azure DevOps Server / GitHub
-Enterprise Server pleinement fonctionnel : cette permission optionnelle
-reste correctement scoping-justifiée, mais la fonctionnalité qu'elle
-promet n'est pas encore livrée de bout en bout.
+**⚠️ Un écart reste confirmé dans le code actuel, à régler avant de
+s'appuyer sur cette permission en soumission :**
+**`configUrl` sur un domaine tiers ne se lit pas depuis un script de
+contenu.** `getRepoConfig()`/`getOrgConfig()` des deux adaptateurs
+appellent `fetch` directement dans le contexte du script de contenu ;
+ces requêtes restent soumises à la politique CORS de la page hôte. Le
+message `cct-fetch-config` que `background.ts` sait traiter existe
+déjà pour ce cas précis, mais rien dans les adaptateurs ne l'envoie —
+la lecture d'un `configUrl` distinct du domaine de plateforme échoue
+donc en pratique et bascule l'extension en état dégradé.
+
+Tant que ce point n'est pas corrigé, ne pas décrire dans le formulaire
+de soumission une résolution complète de la configuration
+d'organisation sur un domaine distinct de la plateforme : cette
+permission optionnelle reste correctement scoping-justifiée, et
+l'activation de l'interface sur un domaine auto-hébergé fonctionne
+désormais de bout en bout, mais la lecture du `configUrl` d'entreprise
+ne l'est pas encore.
 
 ## Ce que l'extension ne fait pas (à rappeler en cas de question du reviewer)
 

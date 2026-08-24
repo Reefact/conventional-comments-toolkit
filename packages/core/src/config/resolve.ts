@@ -6,7 +6,7 @@ import type { ConfigRead, EffectiveConfig, Floor, Notice } from '../types.js';
 import { defaultConfig } from './defaults.js';
 import { parseConfigDocument } from './schema.js';
 import { mergeLevel } from './merge.js';
-import { applyFloor, maxMode, vetFloor } from './floor.js';
+import { applyFloor, maxMode, vetFloor, vettedConfigUrl } from './floor.js';
 import { mixPinnedWithLive } from './pinning.js';
 
 export interface ResolvedConfig {
@@ -100,7 +100,7 @@ export function resolveConfig(
   }
 
   // configUrl provient exclusivement du canal de plancher (§8.1.2).
-  config.configUrl = vetted.unsupported ? null : vetted.floor.configUrl ?? null;
+  config.configUrl = vettedConfigUrl(vetted);
 
   // Limite basse de sévérité (§8.2), appliquée quel que soit le chemin — y compris quand
   // le plancher n'a pas pu être appliqué : un code E- ne descend jamais sous warn.

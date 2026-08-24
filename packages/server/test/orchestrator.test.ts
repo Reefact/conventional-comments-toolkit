@@ -230,6 +230,42 @@ describe('§6.4 — cycle d’évaluation', () => {
     expect(pinned!.labels.some((l) => l.id === 'perfo')).toBe(true);
   });
 
+  it('P1 : un plancher non supporté ne déclenche AUCUNE lecture d’organisation (§8.1.1)', async () => {
+    // L'orchestrateur dérivait `configUrl` du plancher BRUT, avant toute vérification.
+    // Un plancher que le §8.1.1 déclare non appliqué désignait donc quand même le
+    // document d'organisation ET lançait sa lecture : un échec de celle-ci dégradait le
+    // dépôt, un succès faisait entrer une configuration choisie par un plancher illisible.
+    const env = makeEnv(
+      { repoConfig: enforceConfig() },
+      { floor: { floorVersion: 99, configUrl: 'https://interne.example/cc.json' } as Floor }
+    );
+    let orgReads = 0;
+    const adapterAny = env.adapter;
+    const originalOrg = adapterAny.fetchOrgConfig.bind(adapterAny);
+    adapterAny.fetchOrgConfig = async (url, opts) => {
+      if (url !== null) orgReads += 1;
+      return originalOrg(url, opts);
+    };
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(orgReads).toBe(0);
+  });
+
+  it('contre-épreuve : un plancher lisible fait bien lire son organisation', async () => {
+    const env = makeEnv(
+      { repoConfig: enforceConfig() },
+      { floor: { floorVersion: 1, configUrl: 'https://interne.example/cc.json' } as Floor }
+    );
+    let orgReads = 0;
+    const adapterAny = env.adapter;
+    const originalOrg = adapterAny.fetchOrgConfig.bind(adapterAny);
+    adapterAny.fetchOrgConfig = async (url, opts) => {
+      if (url !== null) orgReads += 1;
+      return originalOrg(url, opts);
+    };
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(orgReads).toBeGreaterThan(0);
+  });
+
   it('CA-30 : l’épinglage se fait à la première évaluation et n’est jamais réécrit', async () => {
     const env = makeEnv({ repoConfig: enforceConfig() });
     await env.orchestrator.evaluatePr(PR, nextSeq());

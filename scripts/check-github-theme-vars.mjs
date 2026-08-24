@@ -5,10 +5,10 @@
 // que personne ne le remarque.
 //
 // La liste des variables à vérifier est EXTRAITE de styles.css (pas recopiée à la
-// main) : tout nouveau var(--color-... , repli) ajouté au fichier est couvert
-// automatiquement. Seuls les préfixes Primer connus (--color-, --border) sont retenus —
-// les propriétés propres à l'extension (--cct-label-color, posée par toolbar.ts) ne
-// viennent pas de GitHub et ne doivent pas être vérifiées ici.
+// main) : tout nouveau var(--fgColor-... , repli) ajouté au fichier est couvert
+// automatiquement. Seuls les préfixes Primer connus sont retenus — les propriétés
+// propres à l'extension (--cct-label-color, posée par toolbar.ts) ne viennent pas de
+// GitHub et ne doivent pas être vérifiées ici.
 
 import { chromium } from 'playwright-core';
 import { readFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ const EXECUTABLE =
 const TARGET_URL =
   process.env.GITHUB_THEME_CHECK_URL ?? 'https://github.com/Reefact/conventional-comments-toolkit';
 
-const PRIMER_PREFIXES = ['--color-', '--border'];
+const PRIMER_PREFIXES = ['--color-', '--border', '--bgColor-', '--fgColor-', '--overlay-'];
 
 function extractPrimerVarNames(css) {
   const names = new Set();

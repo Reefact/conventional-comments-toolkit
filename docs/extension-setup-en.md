@@ -32,6 +32,11 @@ published alongside lets you check the download:
 Get-FileHash conventional-comments-toolkit-<version>-chromium.zip -Algorithm SHA256
 ```
 
+An extension loaded from a zip **never auto-updates**: every new version means
+downloading and re-loading it by hand. This is a path for trying it out and for
+troubleshooting; deploying component A goes through the public stores and, in an
+organization, through policy-forced installation (§10).
+
 The rest of this guide remains the way to **build the extension yourself** from source:
 needed to modify it, or to install a state that has not been released yet.
 

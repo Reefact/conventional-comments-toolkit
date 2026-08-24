@@ -188,21 +188,6 @@ export function analyze(input: ValidationInput, config: EffectiveConfig): Commen
   };
 }
 
-/** §8.1.3 règle 3 — le discriminant du troisième déclencheur de contournement du cache.
- * Vrai lorsque le premier jeton du corps a la **forme** d'une commande adressée à un outil,
- * qu'une entrée de `toolCommands` l'ait reconnu ou non.
- *
- * Il existe parce que le symptôme d'une entrée `toolCommands` manquante n'est pas un code
- * propre, mais `E-NO-LABEL` — le diagnostic le plus courant de tous. Rafraîchir la
- * configuration sur chaque `E-NO-LABEL` contournerait le cache sur la quasi-totalité des
- * commentaires non conformes ; ne le faire que sur un corps qui *ressemble* à une commande
- * borne le coût à ce qu'il doit être. La règle du jeton est la même qu'en `isExempt()`,
- * et elle vit ici pour que les deux ne puissent pas diverger. */
-export function looksLikeToolCommand(body: string): boolean {
-  const first = /^(\S+)/.exec(body.trimStart())?.[1] ?? null;
-  return first !== null && (first.startsWith('/') || first.startsWith('@'));
-}
-
 // ————————————————————————————————————————————————————————————————————————————
 
 function isExempt(

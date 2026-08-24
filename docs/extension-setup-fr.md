@@ -14,7 +14,8 @@ Si une release est publiée, l'installation ne demande **ni Node, ni npm, ni Git
 tout le reste de ce guide devient inutile :
 
 1. Ouvrez la page des releases :
-   <https://github.com/reefact/conventional-comments-toolkit/releases/latest>.
+   <https://github.com/reefact/conventional-comments-toolkit/releases> (la liste, et non
+   `/releases/latest`, qui saute les pré-versions).
 2. Téléchargez `conventional-comments-toolkit-<version>-chromium.zip` (Chrome, Edge, ou
    tout navigateur Chromium) ou `conventional-comments-toolkit-<version>-firefox.zip`
    (Firefox).

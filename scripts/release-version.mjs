@@ -13,8 +13,9 @@
 // l'étiquette de pré-version vivre là où elle est sans danger — nom des archives, titre
 // de la Release, drapeau `--prerelease`.
 //
-// Usage : node scripts/release-version.mjs [<nom-de-ref>]
-//   Avec un tag (`v1.2.3`) : la correspondance avec le manifeste est exigée.
+// Usage : node scripts/release-version.mjs [<tag>]
+//   Avec un tag (`v1.2.3`) : la correspondance avec le manifeste est exigée. La commande
+//   se lance telle quelle en local, avant de poser le tag, pour vérifier qu'il passera.
 //   Sans argument : répétition à blanc — la version du manifeste sert au nommage.
 //   Sort les paires `clé=valeur` attendues par $GITHUB_OUTPUT, ou 1 avec un message.
 
@@ -22,11 +23,16 @@ import { readFileSync } from 'node:fs';
 
 const MANIFEST = 'packages/extension/src/manifest.json';
 
-/** La forme que Chromium exige de `manifest.json` — et que Firefox accepte aussi. */
+/**
+ * La forme que Chromium exige de `manifest.json` — et que Firefox accepte aussi :
+ * un à quatre entiers séparés par des points, de 0 à 65535, sans zéro non significatif,
+ * et **pas tous nuls** (`0.0.0` est refusé au chargement, `0.1.0` accepté).
+ */
 export function isChromiumVersion(value) {
   const parts = String(value).split('.');
   if (parts.length < 1 || parts.length > 4) return false;
-  return parts.every((part) => /^(?:0|[1-9]\d*)$/.test(part) && Number(part) <= 65535);
+  if (!parts.every((part) => /^(?:0|[1-9]\d*)$/.test(part) && Number(part) <= 65535)) return false;
+  return parts.some((part) => Number(part) > 0);
 }
 
 /** `v1.1.0-rc.1` → noyau `1.1.0`, étiquette `rc.1`. Rend null si la forme n'y est pas. */
@@ -87,10 +93,12 @@ function describe({ tag, version, core, prerelease }) {
   };
 }
 
-// Exécution directe : le workflow redirige la sortie vers $GITHUB_OUTPUT.
+// Exécution directe : le workflow redirige la sortie vers $GITHUB_OUTPUT. Le tag vient de
+// la ligne de commande — c'est l'appelant qui sait s'il publie ou s'il répète à blanc, et
+// la même commande vérifie donc un tag en local avant de le poser.
 if (process.argv[1] !== undefined && process.argv[1].endsWith('release-version.mjs')) {
   const manifestVersion = JSON.parse(readFileSync(MANIFEST, 'utf8')).version;
-  const tag = process.env.GITHUB_REF_TYPE === 'tag' ? (process.argv[2] ?? '') : '';
+  const tag = process.argv[2] ?? '';
   try {
     const resolved = resolveRelease({ manifestVersion, tag });
     for (const [key, value] of Object.entries(resolved)) console.log(`${key}=${value}`);

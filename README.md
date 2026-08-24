@@ -41,7 +41,7 @@ guide: [`docs/extension-setup-en.md`](./docs/extension-setup-en.md) (French:
 
 **Can't run `npm` at all?** Every tagged release carries the extension as a ready-to-load
 zip — one for Chromium, one for Firefox. Download it from the
-[releases page](https://github.com/reefact/conventional-comments-toolkit/releases/latest),
+[releases page](https://github.com/reefact/conventional-comments-toolkit/releases),
 unzip it, and load the folder (`chrome://extensions` → Developer mode → Load unpacked).
 No Node, no npm, no Git. That path is for **trying the extension** and for machines where
 the build chain can't be installed — it is not a deployment channel: an extension loaded

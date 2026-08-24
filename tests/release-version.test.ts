@@ -22,6 +22,13 @@ describe("forme de version acceptée par un manifeste d'extension", () => {
     expect(isChromiumVersion('01.0')).toBe(false); // zéro non significatif
     expect(isChromiumVersion('')).toBe(false);
   });
+
+  it('refuse une version entièrement nulle, que Chromium ne charge pas', () => {
+    expect(isChromiumVersion('0')).toBe(false);
+    expect(isChromiumVersion('0.0.0')).toBe(false);
+    expect(isChromiumVersion('0.0.0.0')).toBe(false);
+    expect(isChromiumVersion('0.1.0')).toBe(true); // un seul composant non nul suffit
+  });
 });
 
 describe('résolution de la version publiée', () => {
@@ -53,6 +60,10 @@ describe('résolution de la version publiée', () => {
   it("refuse un tag qui n'a pas la forme attendue", () => {
     expect(() => resolveRelease({ manifestVersion: '1.0.0', tag: 'release-1.0.0' })).toThrow(/forme attendue/);
     expect(() => resolveRelease({ manifestVersion: '1.0.0', tag: 'v1.0.0-' })).toThrow(/forme attendue/);
+  });
+
+  it('refuse un manifeste entièrement nul avant même de regarder le tag', () => {
+    expect(() => resolveRelease({ manifestVersion: '0.0.0', tag: 'v0.0.0' })).toThrow(/version d'extension valide/);
   });
 
   it('sans tag, la répétition à blanc se nomme depuis le manifeste et ne publie rien', () => {

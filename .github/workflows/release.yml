@@ -45,7 +45,9 @@ jobs:
         run: |
           # pipefail : sans lui, l'échec de la garde serait masqué par le succès de `tee`.
           set -o pipefail
-          node scripts/release-version.mjs "$GITHUB_REF_NAME" | tee -a "$GITHUB_OUTPUT"
+          tag=''
+          if [ "$GITHUB_REF_TYPE" = 'tag' ]; then tag="$GITHUB_REF_NAME"; fi
+          node scripts/release-version.mjs "$tag" | tee -a "$GITHUB_OUTPUT"
 
       - name: Compiler les paquets
         run: npm run build

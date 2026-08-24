@@ -8,6 +8,36 @@ installation n'est pas couverte ici.
 Toutes les commandes s'exécutent dans **PowerShell**. Ouvrez-le (menu Démarrer → tapez
 « PowerShell » → Entrée).
 
+## Raccourci : installer depuis une release, sans rien construire
+
+Si une release est publiée, l'installation ne demande **ni Node, ni npm, ni Git** — et
+tout le reste de ce guide devient inutile :
+
+1. Ouvrez la page des releases :
+   <https://github.com/reefact/conventional-comments-toolkit/releases/latest>.
+2. Téléchargez `conventional-comments-toolkit-<version>-chromium.zip` (Chrome, Edge, ou
+   tout navigateur Chromium) ou `conventional-comments-toolkit-<version>-firefox.zip`
+   (Firefox).
+3. Décompressez l'archive **ailleurs que dans le dossier des téléchargements** : le
+   navigateur relit ce dossier à chaque démarrage, le supprimer désactive l'extension.
+4. Chrome / Edge : `chrome://extensions` → **Mode développeur** → **Charger l'extension
+   non empaquetée** → le dossier décompressé, celui qui contient directement
+   `manifest.json`.
+   Firefox : `about:debugging#/runtime/this-firefox` → **Charger un module temporaire** →
+   le `manifest.json` du dossier décompressé (un module temporaire est retiré à la
+   fermeture de Firefox).
+5. Vérifiez que ça marche avec l'étape 9 ci-dessous.
+
+Chaque archive embarque un `INSTALLATION.txt` qui reprend ces étapes. Le fichier
+`SHA256SUMS.txt` publié à côté permet de contrôler le téléchargement :
+
+```powershell
+Get-FileHash conventional-comments-toolkit-<version>-chromium.zip -Algorithm SHA256
+```
+
+La suite du guide reste la voie à suivre pour **construire l'extension soi-même** depuis
+les sources : nécessaire pour la modifier, ou pour installer un état non encore publié.
+
 ## 1. Installer Node.js
 
 ```powershell

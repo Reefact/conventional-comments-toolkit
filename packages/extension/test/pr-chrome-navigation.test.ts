@@ -48,7 +48,7 @@ import { commentBodyText, type PlatformAdapter, type SubmitControl } from '@cct/
 import { defaultConfig, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver } from '../src/config-resolver.js';
 import { decorateComment } from '../src/ui/badges.js';
-import { applyLabelFilter, clearLabelFilter } from '../src/ui/banner.js';
+import { applyLabelFilter, clearLabelFilter } from '../src/ui/thread-filter.js';
 import {
   applyCompletionState,
   bootstrap,
@@ -99,11 +99,13 @@ function makeAdapter(
     getCompletionControl?: () => SubmitControl | null;
     getRenderedThreadElements?: () => { id: string; element: Element }[];
     getRenderedComments?: () => { element: Element; bodyText: string }[];
+    getBannerMount?: () => Element | null;
   } = {}
 ): PlatformAdapter & {
   currentPr(): PrRef | null;
   getRenderedThreadElements?: () => { id: string; element: Element }[];
   getRenderedComments?: () => { element: Element; bodyText: string }[];
+  getBannerMount?: () => Element | null;
 } {
   return {
     matches: () => true,
@@ -121,6 +123,7 @@ function makeAdapter(
     currentPr: getCurrent,
     getRenderedThreadElements: opts.getRenderedThreadElements,
     getRenderedComments: opts.getRenderedComments,
+    getBannerMount: opts.getBannerMount,
   };
 }
 
@@ -141,6 +144,17 @@ async function flushAll(times = 5): Promise<void> {
 
 function bannerTitles(doc: Document): string[] {
   return [...doc.querySelectorAll('.cct-banner strong')].map((el) => el.textContent ?? '');
+}
+
+/** Puce du filtre par label (§5.5) — en tête des fils rendus, plus dans le bandeau. */
+function filterChip(doc: Document, labelId: string | null): HTMLElement | null {
+  return doc.querySelector(`.cct-thread-filter .cct-filter-chip[data-label="${labelId ?? ''}"]`);
+}
+
+/** Label actuellement filtré d'après l'état LU des puces (`aria-pressed`), null pour « tous ». */
+function activeFilter(doc: Document): string | null {
+  const pressed = doc.querySelector('.cct-thread-filter .cct-filter-chip[aria-pressed="true"]') as HTMLElement | null;
+  return pressed?.dataset['label'] || null;
 }
 
 describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5)', () => {
@@ -486,13 +500,26 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
       resolution: 'unknown',
       canCarryBlockingState: true,
     };
+    // Un second fil, non bloquant, pour que 'praise' soit proposé par le filtre : celui-ci
+    // ne propose que les labels PRÉSENTS sur la page (§5.5).
+    const praised: ThreadInfo = {
+      ...thread,
+      id: 't2',
+      root: { ...thread.root, id: 't2-root', body: 'praise: joliment fait', permalink: '#t2' },
+    };
+    // Les fils rendus vivent dans la page : le filtre s'insère juste avant le premier.
     const renderedThreadEl = doc.createElement('div');
+    const praisedThreadEl = doc.createElement('div');
+    doc.body.append(renderedThreadEl, praisedThreadEl);
     let currentPublished: PublishedSummary | null = null;
     const control: SubmitControl = { element: doc.createElement('button'), kind: 'complete-pr' };
     const adapter = makeAdapter(() => current, () => currentPublished, {
-      getThreads: async () => [thread],
+      getThreads: async () => [thread, praised],
       getCompletionControl: () => control,
-      getRenderedThreadElements: () => [{ id: 't1', element: renderedThreadEl }],
+      getRenderedThreadElements: () => [
+        { id: 't1', element: renderedThreadEl },
+        { id: 't2', element: praisedThreadEl },
+      ],
     });
     const resolver = new ClientConfigResolver(async () => null);
 
@@ -504,12 +531,12 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
     expect(control.element.hasAttribute('aria-disabled')).toBe(false);
 
-    // Filtre actif sur un label différent de celui du fil : le fil est masqué.
-    const select = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(select).not.toBeNull();
-    select.value = 'praise';
-    select.dispatchEvent(new Event('change'));
+    // Filtre actif sur un label différent de celui du fil bloquant : ce fil est masqué.
+    const chip = filterChip(doc, 'praise');
+    expect(chip).not.toBeNull();
+    chip!.dispatchEvent(new Event('click'));
     expect(renderedThreadEl.style.display).toBe('none');
+    expect(praisedThreadEl.style.display).toBe('');
 
     // Le check se termine APRÈS ce premier rendu, en échec : sans D3, `showedSomething`
     // resterait bloqué sur le premier constat (la vue locale) et cette lecture n'aurait
@@ -522,11 +549,10 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     expect(control.element.getAttribute('aria-disabled')).toBe('true');
     expect(control.element.classList.contains('cct-merge-blocked')).toBe(true);
     expect(control.element.hasAttribute('title')).toBe(true);
-    // Le nouveau bandeau reconstruit un nouveau `<select>`, mais la SÉLECTION elle-même
-    // (§5.5, revue Codex round 4) survit à un rendu répété sur la MÊME PR — jamais
-    // réinitialisée à « tous » tant que le contexte de PR ne change pas.
-    const selectAfterRerender = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(selectAfterRerender.value).toBe('praise');
+    // La barre de puces est reconstruite, mais la SÉLECTION elle-même (§5.5, revue Codex
+    // round 4) survit à un rendu répété sur la MÊME PR — jamais réinitialisée à « tous »
+    // tant que le contexte de PR ne change pas.
+    expect(activeFilter(doc)).toBe('praise');
     expect(renderedThreadEl.style.display).toBe('none');
 
     // Le check redevient vert (dernier fil résolu, nouveau commit) : le grisage se
@@ -575,19 +601,20 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     expect(getThreadsCalls).toBe(2);
 
     // Second changement, PENDANT que ce rendu est encore en vol : coalescé (missedMutation),
-    // pas un rendu concurrent.
-    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    // pas un rendu concurrent. Décompte non nul de part et d'autre : ce test porte sur la
+    // FRAÎCHEUR de la valeur écrite, pas sur le silence du bandeau à zéro (testé ailleurs).
+    currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 });
     doc.body.appendChild(doc.createElement('span'));
     await flush();
 
     // Le rendu en vol se termine : sans le correctif, il écrirait « 3 » (valeur lue tout en
-    // haut de la fonction, au début de SON exécution) au lieu de « 0 » (valeur réelle au
+    // haut de la fonction, au début de SON exécution) au lieu de « 2 » (valeur réelle au
     // moment où il écrit effectivement dans le DOM).
     releaseSecondRender!();
     await flushAll();
 
     expect(bannerTitles(doc)[0]).not.toContain('3'); // jamais la valeur périmée
-    expect(bannerTitles(doc)[0]).toContain('0'); // la valeur réelle au moment de l'écriture
+    expect(bannerTitles(doc)[0]).toContain('2'); // la valeur réelle au moment de l'écriture
   });
 });
 
@@ -644,7 +671,7 @@ describe('Codex #2 — retente tant que tout le contexte de la barre n’a pas �
       canCarryBlockingState: true,
     };
     let loaded = false; // le fil n'existe pas encore dans le DOM au premier rendu
-    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
       getThreads: async () => (loaded ? [thread] : []),
       getRenderedThreadElements: () => (loaded ? [{ id: 't1', element: doc.createElement('div') }] : []),
     });
@@ -845,10 +872,10 @@ describe('Codex round 2 #2 — le display d’origine est restauré, jamais une 
     el.style.display = 'flex'; // posé par la plateforme, pour SA mise en page
     const labelOfThread = new Map([['t1', 'issue']]);
 
-    applyLabelFilter(document.createElement('div'), [{ id: 't1', element: el }], labelOfThread, 'praise');
+    applyLabelFilter([{ id: 't1', element: el }], labelOfThread, 'praise');
     expect(el.style.display).toBe('none'); // masqué par le filtre
 
-    applyLabelFilter(document.createElement('div'), [{ id: 't1', element: el }], labelOfThread, null); // « tous »
+    applyLabelFilter([{ id: 't1', element: el }], labelOfThread, null); // « tous »
     expect(el.style.display).toBe('flex'); // restauré tel quel, jamais une chaîne vide
   });
 
@@ -856,7 +883,7 @@ describe('Codex round 2 #2 — le display d’origine est restauré, jamais une 
     const el = document.createElement('div');
     el.style.display = 'grid';
     const labelOfThread = new Map([['t1', 'issue']]);
-    applyLabelFilter(document.createElement('div'), [{ id: 't1', element: el }], labelOfThread, 'praise');
+    applyLabelFilter([{ id: 't1', element: el }], labelOfThread, 'praise');
     expect(el.style.display).toBe('none');
     clearLabelFilter([{ id: 't1', element: el }]);
     expect(el.style.display).toBe('grid');
@@ -881,7 +908,7 @@ describe('Codex round 2 #6 — cesse de sonder le bouton de complétion après l
     const doc = document;
     const current = pr(25);
     let completionCalls = 0;
-    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
       getCompletionControl: () => {
         completionCalls++;
         return null; // jamais de bouton sur cette PR
@@ -969,38 +996,45 @@ describe('Codex round 4 — le filtre par label survit à un rendu répété sur
       resolution: 'unknown',
       canCarryBlockingState: true,
     };
+    // Un second fil, non bloquant : le filtre ne propose que les labels PRÉSENTS (§5.5).
+    const praised: ThreadInfo = {
+      ...thread,
+      id: 't2',
+      root: { ...thread.root, id: 't2-root', body: 'praise: joliment fait', permalink: '#t2' },
+    };
     const renderedThreadEl = doc.createElement('div');
+    const praisedThreadEl = doc.createElement('div');
+    doc.body.append(renderedThreadEl, praisedThreadEl);
     let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
     const adapter = makeAdapter(() => current, () => currentPublished, {
-      getThreads: async () => [thread],
-      getRenderedThreadElements: () => [{ id: 't1', element: renderedThreadEl }],
+      getThreads: async () => [thread, praised],
+      getRenderedThreadElements: () => [
+        { id: 't1', element: renderedThreadEl },
+        { id: 't2', element: praisedThreadEl },
+      ],
     });
     const resolver = new ClientConfigResolver(async () => null);
 
     observePrChromeNavigation(adapter, resolver, doc);
     await flushAll();
 
-    const select = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    select.value = 'praise';
-    select.dispatchEvent(new Event('change'));
+    filterChip(doc, 'praise')!.dispatchEvent(new Event('click'));
     expect(renderedThreadEl.style.display).toBe('none');
 
-    // Rendu répété sur la MÊME PR (résumé publié changé, §5.5, D3) : avant ce correctif, le
-    // nouveau `<select>` reconstruit repartait toujours sur « tous », perdant la sélection.
+    // Rendu répété sur la MÊME PR (résumé publié changé, §5.5, D3) : avant ce correctif, la
+    // barre reconstruite repartait toujours sur « tous », perdant la sélection.
     currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
     doc.body.appendChild(doc.createElement('span'));
     await flushAll();
-    const selectAfterRerender = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(selectAfterRerender.value).toBe('praise');
+    expect(activeFilter(doc)).toBe('praise');
     expect(renderedThreadEl.style.display).toBe('none');
 
     // Navigation vers une AUTRE PR : le filtre, lui, repart bien à zéro.
     current = pr(28);
     doc.body.appendChild(doc.createElement('span'));
     await flushAll();
-    const selectOnNewPr = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(selectOnNewPr).not.toBeNull();
-    expect(selectOnNewPr.value).toBe('');
+    expect(filterChip(doc, null)).not.toBeNull();
+    expect(activeFilter(doc)).toBeNull();
   });
 });
 
@@ -1029,6 +1063,7 @@ describe('Codex round 5 — le filtre repart à zéro quand son label n’est pl
       canCarryBlockingState: true,
     };
     const renderedThreadEl = doc.createElement('div');
+    doc.body.appendChild(renderedThreadEl); // le filtre s'insère juste avant le premier fil rendu
     let configText = '{}'; // défauts : 'praise' activé
     let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
     const adapter = makeAdapter(() => current, () => currentPublished, {
@@ -1042,9 +1077,7 @@ describe('Codex round 5 — le filtre repart à zéro quand son label n’est pl
     observePrChromeNavigation(adapter, resolver, doc);
     await flushAll();
 
-    const select = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    select.value = 'praise';
-    select.dispatchEvent(new Event('change'));
+    filterChip(doc, 'praise')!.dispatchEvent(new Event('click'));
     expect(renderedThreadEl.style.display).toBe(''); // le fil EST 'praise' : filtre actif, mais visible
 
     // La configuration du dépôt désactive 'praise' ; le compteur bloquant change aussi
@@ -1055,12 +1088,115 @@ describe('Codex round 5 — le filtre repart à zéro quand son label n’est pl
     doc.body.appendChild(doc.createElement('span'));
     await flushAll();
 
-    // Sans le correctif : le `<select>` retombe visuellement sur « tous » (aucune option
-    // 'praise' ne correspond) mais le filtre appliqué reste 'praise' — un label que plus
-    // aucun fil ne porte (analyze() ne résout plus un label désactivé) — masquant tout.
-    const selectAfterDisable = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(selectAfterDisable.value).toBe('');
+    // Sans le correctif : la barre retombe visuellement sur « tous » (aucune puce 'praise'
+    // ne subsiste) mais le filtre appliqué reste 'praise' — un label que plus aucun fil ne
+    // porte (analyze() ne résout plus un label désactivé) — masquant tout.
+    expect(filterChip(doc, 'praise')).toBeNull();
+    expect(activeFilter(doc)).toBeNull();
     expect(renderedThreadEl.style.display).toBe('');
+  });
+});
+
+describe('§5.5 — le bandeau se monte en tête de PR, le filtre en tête des fils', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('s’insère après l’en-tête que l’adaptateur désigne, jamais au-dessus du chrome de la page', async () => {
+    // Injecté en tête de <body>, il flotte au-dessus du header de la plateforme et se lit
+    // comme une greffe. « En tête de PR » (§5.5) veut dire dans le flux de la page.
+    const doc = document;
+    const header = doc.createElement('div');
+    header.className = 'gh-header';
+    const after = doc.createElement('div');
+    doc.body.append(header, after);
+
+    const adapter = makeAdapter(() => pr(40), () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
+      getBannerMount: () => header,
+    });
+    observePrChromeNavigation(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const banner = doc.querySelector('.cct-banner');
+    expect(banner).not.toBeNull();
+    expect(banner!.previousElementSibling).toBe(header);
+    expect(doc.body.firstElementChild).not.toBe(banner);
+  });
+
+  it('se replie sur le haut du document quand aucun en-tête n’apparie — jamais rien afficher serait pire', async () => {
+    const doc = document;
+    const adapter = makeAdapter(() => pr(41), () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
+      getBannerMount: () => null,
+    });
+    observePrChromeNavigation(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    expect(doc.body.firstElementChild).toBe(doc.querySelector('.cct-banner'));
+  });
+
+  it('le filtre s’insère avant le premier fil rendu, hors du bandeau', async () => {
+    const doc = document;
+    const first = doc.createElement('div');
+    doc.body.appendChild(first);
+    const thread: ThreadInfo = {
+      id: 't1',
+      pr: pr(42),
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'issue: quelque chose ne va pas',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution: 'unknown',
+      canCarryBlockingState: true,
+    };
+    const adapter = makeAdapter(() => pr(42), () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
+      getThreads: async () => [thread],
+      getRenderedThreadElements: () => [{ id: 't1', element: first }],
+    });
+    observePrChromeNavigation(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const filter = doc.querySelector('.cct-thread-filter');
+    expect(filter).not.toBeNull();
+    expect(filter!.nextElementSibling).toBe(first);
+    expect(doc.querySelector('.cct-banner .cct-thread-filter')).toBeNull(); // plus dans le bandeau
+    expect(doc.querySelector('.cct-banner select')).toBeNull(); // ni le menu déroulant d'avant
+  });
+
+  it('un décompte publié nul n’affiche aucun bandeau, mais laisse le filtre disponible', async () => {
+    const doc = document;
+    const first = doc.createElement('div');
+    doc.body.appendChild(first);
+    const thread: ThreadInfo = {
+      id: 't1',
+      pr: pr(43),
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'praise: joliment fait',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution: 'unknown',
+      canCarryBlockingState: true,
+    };
+    const adapter = makeAdapter(() => pr(43), () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+      getThreads: async () => [thread],
+      getRenderedThreadElements: () => [{ id: 't1', element: first }],
+    });
+    observePrChromeNavigation(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // une PR saine ne se décore pas
+    expect(doc.querySelector('.cct-thread-filter')).not.toBeNull();
   });
 });
 

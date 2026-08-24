@@ -15,10 +15,13 @@ const fr: Record<string, string> = {
   'guard.blocked': 'Envoi bloqué : le commentaire n’est pas conforme. {details}',
   'fix.apply': 'Corriger',
   'alias.rewrite': 'Réécrire « {from} » en « {to} »',
-  'banner.title': '{count} fil(s) bloquant(s) non résolu(s)',
-  'banner.partial': '{located} sur {count} localisés — voir le statut pour le détail',
-  'banner.local':
-    'Vue locale (aucun résultat publié) : {count} fil(s) bloquant(s) non résolu(s) d’après la page',
+  'banner.count': '{count} fil(s) bloquant(s)',
+  'banner.hint': 'à résoudre avant de fusionner',
+  'banner.count.local': '{count} fil(s) bloquant(s) ouvert(s) sur cette page',
+  'banner.hint.local': 'vue locale : la conformité n’est pas vérifiée sur ce dépôt',
+  'banner.unlocated':
+    '{missing} fil(s) compté(s) par la vérification, absent(s) de cette page — voir le détail du check',
+  'banner.untitled': '(sans sujet)',
   'banner.judged': 'jugée en {mode} par core/ {coreVersion}',
   'merge.blocked': 'Complétion bloquée par le statut de conformité — voir le check.',
   'label.praise': 'Souligne un point positif.',
@@ -48,8 +51,8 @@ const fr: Record<string, string> = {
   'example.typo': 'typo: « recieve » → « receive »',
   'example.polish': 'polish: aligner les imports',
   'example.quibble': 'quibble: nom un peu long',
-  'banner.filter': 'Filtrer par label',
-  'banner.filter.all': 'tous',
+  'filter.aria': 'Filtrer les fils par label',
+  'filter.all': 'tous',
 };
 
 const en: Record<string, string> = {
@@ -66,9 +69,13 @@ const en: Record<string, string> = {
   'guard.blocked': 'Sending blocked: the comment is not compliant. {details}',
   'fix.apply': 'Fix',
   'alias.rewrite': 'Rewrite "{from}" as "{to}"',
-  'banner.title': '{count} unresolved blocking thread(s)',
-  'banner.partial': '{located} of {count} located — see the status for details',
-  'banner.local': 'Local view (no published result): {count} unresolved blocking thread(s) from the page',
+  'banner.count': '{count} blocking thread(s)',
+  'banner.hint': 'to resolve before merging',
+  'banner.count.local': '{count} blocking thread(s) open on this page',
+  'banner.hint.local': 'local view: compliance is not checked on this repository',
+  'banner.unlocated':
+    '{missing} thread(s) counted by the check, not found on this page — see the check for details',
+  'banner.untitled': '(no subject)',
   'banner.judged': 'judged in {mode} by core/ {coreVersion}',
   'merge.blocked': 'Completion blocked by the compliance status — see the check.',
   'label.praise': 'Highlights something positive.',
@@ -98,8 +105,8 @@ const en: Record<string, string> = {
   'example.typo': 'typo: "recieve" → "receive"',
   'example.polish': 'polish: align the imports',
   'example.quibble': 'quibble: slightly long name',
-  'banner.filter': 'Filter by label',
-  'banner.filter.all': 'all',
+  'filter.aria': 'Filter threads by label',
+  'filter.all': 'all',
 };
 
 const catalogs: Record<string, Record<string, string>> = { fr, en };

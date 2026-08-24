@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { SelectorLog, type EditorHandle } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
-import { applyLabelFilter } from '../src/ui/banner.js';
+import { applyLabelFilter } from '../src/ui/thread-filter.js';
 import { mergeDirectShortcuts, writeDegradedState } from '../src/content-internal.js';
 
 function setLocation(url: string): void {
@@ -56,11 +56,8 @@ describe('résidu B — §9.2.3 : l’état dégradé se signale dans les OPTION
   });
 });
 
-describe('résidu D — §5.5 : le filtre par label agit sur les fils RENDUS, pas les seules ancres', () => {
-  it('applyLabelFilter masque ancres ET fils, et null rétablit tout', () => {
-    const banner = document.createElement('div');
-    banner.innerHTML =
-      '<ul><li data-thread-id="t1"></li><li data-thread-id="t2"></li></ul>';
+describe('résidu D — §5.5 : le filtre par label agit sur les fils RENDUS de la page', () => {
+  it('applyLabelFilter masque les fils non appariés, et null rétablit tout', () => {
     const el1 = document.createElement('div');
     const el2 = document.createElement('div');
     const rendered = [
@@ -72,16 +69,30 @@ describe('résidu D — §5.5 : le filtre par label agit sur les fils RENDUS, pa
       ['t2', 'nitpick'],
     ]);
 
-    applyLabelFilter(banner, rendered, labels, 'nitpick');
-    const anchors = [...banner.querySelectorAll('li')] as HTMLElement[];
-    expect(anchors[0]!.style.display).toBe('none');
-    expect(anchors[1]!.style.display).toBe('');
+    applyLabelFilter(rendered, labels, 'nitpick');
     expect(el1.style.display).toBe('none'); // le fil rendu non apparié est masqué
     expect(el2.style.display).toBe('');
 
-    applyLabelFilter(banner, rendered, labels, null);
-    expect(anchors[0]!.style.display).toBe('');
+    applyLabelFilter(rendered, labels, null);
     expect(el1.style.display).toBe('');
+    expect(el2.style.display).toBe('');
+  });
+
+  it('ne touche jamais au bandeau : son décompte fait autorité, sa liste ne rétrécit pas (CA-03)', () => {
+    // Le filtre est un outil de LECTURE des fils ; le bandeau, lui, résume ce qui bloque la
+    // complétion. Une liste qui rétrécirait sous le filtre contredirait le nombre affiché
+    // juste au-dessus d'elle — c'est pourquoi le contrôle a quitté le bandeau (§5.5).
+    const banner = document.createElement('div');
+    banner.innerHTML = '<ul><li data-thread-id="t1"></li></ul>';
+    const el1 = document.createElement('div');
+    document.body.append(banner, el1);
+
+    applyLabelFilter([{ id: 't1', element: el1 }], new Map([['t1', 'issue']]), 'nitpick');
+
+    expect(el1.style.display).toBe('none');
+    expect((banner.querySelector('li') as HTMLElement).style.display).toBe('');
+    banner.remove();
+    el1.remove();
   });
 
   it('getRenderedThreadElements (GitHub) : mêmes identifiants que getThreads', async () => {

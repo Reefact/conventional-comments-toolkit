@@ -100,7 +100,10 @@ async function readDirectShortcuts(): Promise<Record<string, string>> {
   });
 }
 
-export async function bootstrap(doc: Document = document): Promise<void> {
+/** Renvoie de quoi révoquer l'observation armée ici. Sans emploi en production — elle vit
+ * le temps de l'onglet — mais un appelant qui n'est pas un onglet doit pouvoir la rendre :
+ * deux observations sur le même document se répondent l'une à l'autre. */
+export async function bootstrap(doc: Document = document): Promise<() => void> {
   const url = new URL(doc.location.href);
   // Un seul produit, un adaptateur par plateforme, activé sur les hôtes autorisés (§2).
   // Sélection par HÔTE (matchesHost), pas par matches() — qui exige en plus une URL de
@@ -114,7 +117,7 @@ export async function bootstrap(doc: Document = document): Promise<void> {
     new AzdoClientAdapter({ documentRef: doc }),
   ];
   const adapter = adapters.find((a) => a.matchesHost(url));
-  if (!adapter) return;
+  if (!adapter) return () => {};
 
   const resolver = new ClientConfigResolver(readManagedFloor);
   const currentUser = await adapter.getCurrentUser();
@@ -145,7 +148,7 @@ export async function bootstrap(doc: Document = document): Promise<void> {
   // du script : Turbo/React ne rechargent pas le document, donc sans ce ré-armement la
   // barre reste absente d'une PR atteinte par un lien interne tant qu'un rechargement
   // complet ne relance pas bootstrap().
-  observePrChromeNavigation(adapter, resolver, doc);
+  return observePrChromeNavigation(adapter, resolver, doc);
 }
 
 function currentPrOf(adapter: PlatformAdapter): PrRef | null {
@@ -216,7 +219,10 @@ export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
  * opt-in, §10) sans borne pour toute la durée de vie de l'onglet — `observePrChromeNavigation`
  * ne sonde donc que dans la fenêtre d'hydratation (`RENDER_RETRY_WINDOW_MS`) ; au-delà, ce
  * champ se fige (`'?'`), et seuls le résumé publié et les fils/commentaires — sans effet de
- * bord, `queryChainAll` ne journalise rien — restent surveillés indéfiniment. */
+ * bord, `queryChainAll` ne journalise rien — restent surveillés indéfiniment.
+ *
+ * Ne porte QUE de l'état appartenant à la plateforme — jamais ce que notre propre rendu
+ * écrit : c'est `ownOutputSignatureOf`, capturée après le rendu, qui couvre ce versant. */
 function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boolean): string {
   const withRendered = adapter as PlatformAdapter & {
     getRenderedCommentCount?: () => number;
@@ -224,16 +230,62 @@ function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boo
   };
   const published = publishedSignatureOf(adapter) ?? '';
   const completion = probeCompletionControl ? (adapter.getCompletionControl() !== null ? '1' : '0') : '?';
-  const threadIds = renderedThreadsOf(adapter)
-    .map((t) => t.id)
-    .join(',');
+  const rendered = renderedThreadsOf(adapter);
+  const threadIds = rendered.map((t) => t.id).join(',');
   // Sonde le COMPTE, jamais getRenderedComments() : cette dernière calcule bodyText (clone
   // du sous-arbre dès qu'un badge est posé) pour chaque commentaire, un coût proportionnel
   // à tout le DOM des commentaires rendus, à chaque mutation, pour la durée de vie de
-  // l'onglet — alors que seul le compte importe ici. Repli sur getRenderedComments().length
-  // pour les adaptateurs (de test) qui n'exposent pas la sonde dédiée.
+  // l'onglet. Repli sur getRenderedComments().length pour les adaptateurs (de test) qui
+  // n'exposent pas la sonde dédiée.
   const commentCount = withRendered.getRenderedCommentCount?.() ?? withRendered.getRenderedComments?.().length ?? 0;
   return `${published}|${completion}|${threadIds}|${commentCount}`;
+}
+
+/** Ce que NOTRE rendu écrit dans la page, et que la plateforme peut défaire : le texte des
+ * fils — nos badges y entrent — et la présence de nos deux surfaces (§5.5). Deux angles
+ * morts que le décompte seul laissait ouverts (revue Codex, PR #26) :
+ *
+ * - une racine éditée SUR PLACE (`issue: a` corrigé en `issue: b`) ne change ni le nombre de
+ *   fils, ni leurs identifiants, ni le nombre de commentaires — la signature de plateforme
+ *   restait identique, `run()` sortait avant de reconstruire, et le bandeau, qui affiche
+ *   désormais le SUJET, gardait un texte périmé ;
+ * - une réhydratation React qui remplace le parent auquel le bandeau est adossé
+ *   (`bannerMount`) emporte notre élément sans rien changer à cet état de plateforme : rien
+ *   ne le faisait revenir.
+ *
+ * **Capturée APRÈS le rendu, jamais avant.** C'est tout l'intérêt de la séparer de
+ * `chromeSignatureOf` : nos badges et nos insertions modifient précisément ce qu'elle
+ * mesure. Comparée à une photo prise AVANT notre écriture, chaque rendu se re-déclencherait
+ * lui-même — un cycle de rendu supplémentaire à chaque passage, qui déstabilise la
+ * coalescence des mutations et retarde d'autant le retrait d'un bandeau périmé. Comparée à
+ * l'état laissé par le rendu précédent, seule une main EXTÉRIEURE la fait bouger. */
+function ownOutputSignatureOf(adapter: PlatformAdapter, doc: Document): string {
+  return `${textDigestOf(renderedThreadsOf(adapter))}|${injectedSurfacesOf(doc)}`;
+}
+
+/** Empreinte 32 bits (FNV-1a) du texte des fils rendus. Le coût est assumé et reste bien
+ * inférieur à celui que `getRenderedComments()` fait rejeter plus haut : une lecture de
+ * `textContent` par conteneur de fil et un passage sur ses caractères, là où l'autre CLONE
+ * le sous-arbre de chaque commentaire. */
+function textDigestOf(renderedThreads: { id: string; element: Element }[]): string {
+  let hash = 0x811c9dc5;
+  for (const { element } of renderedThreads) {
+    const text = element.textContent ?? '';
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/** Présence de nos deux surfaces injectées. Deux requêtes de sélecteur, sans effet de bord
+ * ni journalisation. Une absence LÉGITIME — décompte nul pour le bandeau, aucun fil pour le
+ * filtre — est un état stable d'un rendu au suivant : rien ne bascule, rien ne boucle. */
+function injectedSurfacesOf(doc: Document): string {
+  const banner = doc.querySelector('.cct-banner') !== null ? '1' : '0';
+  const filter = doc.querySelector('.cct-thread-filter') !== null ? '1' : '0';
+  return `${banner}${filter}`;
 }
 
 /** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) — navigation
@@ -265,21 +317,35 @@ export function observePrChromeNavigation(
   // Horloge injectable — même convention que ClientConfigResolver (config-resolver.ts) —
   // pour tester la fenêtre RENDER_RETRY_WINDOW_MS sans dépendre d'une attente réelle.
   now: () => number = Date.now
-): void {
+  /** Révoque l'observation : déconnecte l'observateur et annule un rattrapage en attente.
+   * Sans emploi en production — l'observateur vit le temps de l'onglet — mais nécessaire à
+   * tout appelant qui n'est PAS un onglet : deux observations concurrentes sur le même
+   * document se répondent l'une à l'autre, chacune voyant dans les écritures de l'autre une
+   * page modifiée sous elle. */
+): (() => void) {
   let lastPrKey: string | null = null;
   let lastChromeSig: string | null = null;
+  // État de ce que NOTRE dernier rendu a laissé dans la page (`ownOutputSignatureOf`) —
+  // écrit à la FIN du rendu, jamais au début, pour que nos propres écritures ne se
+  // re-déclenchent pas elles-mêmes.
+  let lastOwnSig: string | null = null;
   let hasRendered = false;
   let showedSomething = false;
   let retryUntil = 0;
   let inFlight = false;
   let missedMutation = false;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  // Révoquée : plus rien ne doit écrire dans la page. Déconnecter l'observateur et annuler
+  // le minuteur ne suffit pas — un rendu EN VOL au moment de la révocation en reprogramme un
+  // à sa fin, qui rendrait ensuite dans un document dont cette observation ne sait plus rien.
+  let disposed = false;
   // Filtre par label choisi par l'utilisateur (§5.5) — vit ICI, pas dans renderPrChrome (qui
   // reconstruit la barre de puces à chaque appel, y compris sur la MÊME PR une fois D3 en
   // jeu) : sans cet état, chaque rendu répété repartirait sur « tous », perdant la sélection.
   let selectedLabel: string | null = null;
 
   const run = (): void => {
+    if (disposed) return;
     if (inFlight) {
       missedMutation = true; // traité en une seule relance temporisée à la fin du rendu en cours
       return;
@@ -291,6 +357,7 @@ export function observePrChromeNavigation(
       hasRendered = true;
       lastPrKey = key;
       showedSomething = false;
+      lastOwnSig = null;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
       selectedLabel = null; // nouveau contexte de PR : le filtre repart à zéro
     }
@@ -300,7 +367,14 @@ export function observePrChromeNavigation(
     const chromeSig = key === null ? null : chromeSignatureOf(adapter, probeCompletionControl);
     if (!navigated) {
       if (showedSomething) {
-        if (chromeSig === lastChromeSig) return; // rien de neuf à montrer
+        // Deux versants, et il faut les deux : l'état de la PLATEFORME a-t-il changé, et ce
+        // que notre dernier rendu a laissé est-il toujours là, intact ? Une racine éditée sur
+        // place ou un bandeau emporté par une réhydratation ne bougent que le second.
+        // Sans PR affichée, ce second versant n'existe pas — nous n'avons rien à protéger sur
+        // une page qui n'est pas une PR, et le mesurer y ferait réagir cette observation à
+        // des écritures qui ne sont pas les siennes.
+        const ownSig = key === null ? null : ownOutputSignatureOf(adapter, doc);
+        if (chromeSig === lastChromeSig && ownSig === lastOwnSig) return; // rien de neuf à montrer
       } else if (nowMs > retryUntil) {
         return; // fenêtre d'hydratation écoulée, rien à montrer et toujours pas plus de contenu
       }
@@ -316,11 +390,16 @@ export function observePrChromeNavigation(
       },
     })
       .then((showed) => {
-        if (key === lastPrKey) showedSomething = showed;
+        if (key !== lastPrKey) return; // supplanté par une navigation : ce rendu ne fait plus foi
+        showedSomething = showed;
+        // Photo prise ICI, une fois nos badges posés et nos surfaces montées : c'est ce que
+        // la page doit encore porter au prochain réveil. Toute différence constatée ensuite
+        // vient d'une main extérieure, jamais de la nôtre.
+        lastOwnSig = key === null ? null : ownOutputSignatureOf(adapter, doc);
       })
       .finally(() => {
         inFlight = false;
-        if (missedMutation && retryTimer === null) {
+        if (missedMutation && retryTimer === null && !disposed) {
           missedMutation = false;
           retryTimer = setTimeout(() => {
             retryTimer = null;
@@ -338,6 +417,14 @@ export function observePrChromeNavigation(
   // qu'il est présent » (§5.5). `run()` reste bon marché sur un déclenchement sans rien de
   // neuf : une comparaison de clé/signature, puis un retour immédiat.
   observer.observe(doc.documentElement, { childList: true, subtree: true, characterData: true });
+  return () => {
+    disposed = true;
+    observer.disconnect();
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  };
 }
 
 /** Rend le bandeau et l'état de complétion pour la PR courante. Renvoie `true` quand

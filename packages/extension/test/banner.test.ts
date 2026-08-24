@@ -149,6 +149,21 @@ describe('§5.5 / §10 — le bandeau accompagne le check, il ne le rejoue pas',
     expect(local.querySelectorAll('li[data-thread-id]')).toHaveLength(1);
   });
 
+  it('l’en-tête est une région live : un décompte arrivé après coup est annoncé (§10)', () => {
+    // Le bandeau s'insère APRÈS le chargement — un résumé publié qui arrive de façon
+    // asynchrone change le décompte sans rien signaler à un lecteur d'écran. Sur l'en-tête et
+    // non sur la racine : le contenu d'un `<details>` replié n'est pas dans l'arbre
+    // d'accessibilité, et une région live sur la racine ferait relire toute la liste à
+    // chaque dépliage. `aria-live` est une propriété : `<summary>` reste un bouton de pliage,
+    // là où `role="status"` écraserait ce rôle (revue Codex, PR #26).
+    const pub = publishedSummary(1);
+    const head = renderBanner(model(pub, threads), pub, 'fr').querySelector('.cct-banner-head')!;
+    expect(head.tagName).toBe('SUMMARY');
+    expect(head.getAttribute('aria-live')).toBe('polite');
+    expect(head.getAttribute('aria-atomic')).toBe('true');
+    expect(head.hasAttribute('role')).toBe(false); // jamais de rôle qui écraserait le pliage
+  });
+
   it('une icône accompagne le texte, l’information ne repose pas sur la couleur seule (§10)', () => {
     const pub = publishedSummary(1);
     const el = renderBanner(model(pub, threads), pub, 'fr');

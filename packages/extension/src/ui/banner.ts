@@ -140,6 +140,17 @@ export function renderBanner(model: BannerModel, published: PublishedSummary | n
 
   const head = doc.createElement('summary');
   head.className = 'cct-banner-head';
+  // Région live (§10) : le bandeau est inséré APRÈS le chargement — un résumé publié qui
+  // arrive de façon asynchrone change le décompte sans que rien ne le signale à un lecteur
+  // d'écran. L'ancien `role="status"` sur la racine assurait cette annonce ; il ne peut pas
+  // y revenir, `<details>` y perdrait sa sémantique de pliage (revue Codex, PR #26).
+  // Ici plutôt que sur la racine, pour deux raisons : le contenu d'un `<details>` replié
+  // n'est pas dans l'arbre d'accessibilité, donc jamais annoncé — et une région live posée
+  // sur la racine ferait relire TOUTE la liste à chaque dépliage, un geste de l'utilisateur
+  // qui n'a rien d'une nouvelle. `aria-live` est une propriété : le `<summary>` reste un
+  // bouton de pliage, là où `role="status"` écraserait ce rôle.
+  head.setAttribute('aria-live', 'polite');
+  head.setAttribute('aria-atomic', 'true'); // la ligne entière, jamais le seul mot qui change
 
   // Icône ET texte, jamais la couleur seule (§10) : le fanion porte l'alerte sans emprunter
   // la sémantique « erreur » d'un rouge que rien ici ne justifie.

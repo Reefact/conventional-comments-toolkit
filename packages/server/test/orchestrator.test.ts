@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CommentInfo, Floor, PrRef, ThreadInfo, UserInfo } from '@cct/core';
+import type { CommentInfo, EffectiveConfig, Floor, PrRef, ThreadInfo, UserInfo } from '@cct/core';
 import { Orchestrator } from '../src/compliance/orchestrator.js';
 import { MemoryStorage } from '../src/compliance/storage.js';
 import { ConfigCache } from '../src/compliance/cache.js';
@@ -295,6 +295,32 @@ describe('§6.4 — cycle d’évaluation', () => {
     expect(status.notices.some((n) => n.kind === 'grace-expired')).toBe(true);
     // Aucun root-deleted malgré les listes vides : un verdict imposé ne dérive aucun fait.
     expect(status.notices.some((n) => n.kind === 'root-deleted')).toBe(false);
+  });
+
+  it('CA-40 : le chemin dégradé survit à une dernière configuration effective héritée (§6.4)', async () => {
+    // Le second document persisté du §6.4 — la dernière configuration effective connue du
+    // dépôt — part DIRECTEMENT dans evaluate() sur ce chemin, sans passer par le mélange
+    // du §8.1.3. Une clé ajoutée depuis son écriture y serait donc lue `undefined`, et
+    // `fingerprint()` lèverait sur son `.map()` : le statut neutre attendu ne serait jamais
+    // publié, et le dépôt resterait bloqué sur un statut périmé.
+    const env = makeEnv({ repoConfig: enforceConfig() });
+    await env.orchestrator.evaluatePr(PR, nextSeq()); // active le dépôt et persiste la config
+
+    // Rétrograde l'enregistrement persisté à ce qu'une version antérieure aurait écrit.
+    const stored = await env.storage.getLastEffectiveConfig(R_KEY);
+    const legacy = stored as EffectiveConfig & { toolCommands?: string[] };
+    delete legacy.toolCommands;
+    await env.storage.setLastEffectiveConfig(R_KEY, legacy as EffectiveConfig);
+
+    env.adapter.state.unreachable = true;
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    env.clock.now = new Date(env.clock.now.getTime() + 901 * 1000);
+    const after = await env.orchestrator.evaluatePr(PR, nextSeq());
+
+    expect(after.published).toBe(true);
+    const status = env.adapter.published[1]!;
+    expect(status.state).toBe('neutral');
+    expect(status.notices.some((n) => n.kind === 'grace-expired')).toBe(true);
   });
 
   it('panne sur un dépôt jamais évalué : le silence continue (§8.1.5)', async () => {

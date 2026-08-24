@@ -82,8 +82,9 @@ export class GithubServerAdapter implements ServerPlatformAdapter {
 
   platformProfile(): PlatformProfile {
     // Même profil que côté client, même source (§9.2.4) : bloc de suggestion identifié
-    // par l'info string `suggestion` (§A.7).
-    return { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: ['/azp', '/rebase'] };
+    // par l'info string `suggestion` (§A.7). Les commandes adressées à un outil ne sont
+    // pas ici — elles relèvent de `EffectiveConfig.toolCommands` (§4.2, §8.2).
+    return { id: 'github', suggestionInfoString: 'suggestion' };
   }
 
   matchesWebhook(payload: unknown): boolean {

@@ -27,8 +27,8 @@ import { GithubClientAdapter } from '@cct/adapter-github';
 import { evaluate } from '@cct/core';
 
 const absent: ConfigRead = { status: 'absent' };
-const githubProfile: PlatformProfile = { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: ['/azp', '/rebase'] };
-const azdoProfile: PlatformProfile = { id: 'azdo', suggestionInfoString: null, slashPrefixes: [] };
+const githubProfile: PlatformProfile = { id: 'github', suggestionInfoString: 'suggestion' };
+const azdoProfile: PlatformProfile = { id: 'azdo', suggestionInfoString: null };
 
 const PR: PrRef = {
   platform: 'github',

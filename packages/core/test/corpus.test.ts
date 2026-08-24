@@ -42,6 +42,19 @@ describe('CA-06 — corpus de parité (verdicts de référence et invariance de 
     }
   });
 
+  it('CA-40 : les deux formes de commande adressée à un outil sont dans le corpus de parité', () => {
+    const ids = new Set(corpus.map((c) => c.id));
+    for (const id of [
+      'slash-command',
+      'slash-command-unconfigured',
+      'mention-command',
+      'mention-command-mixed-case',
+      'mention-of-a-person',
+    ]) {
+      expect(ids, `cas ${id} absent du corpus`).toContain(id);
+    }
+  });
+
   for (const c of corpus) {
     it(`${c.id} : verdict attendu, identique en LF et en CRLF`, () => {
       const repo: ConfigRead = c.configDoc

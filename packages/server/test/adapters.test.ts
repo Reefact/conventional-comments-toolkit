@@ -26,7 +26,7 @@ function sampleResult() {
   config.server.statusTargetUrl = 'https://cc.example/status';
   const result = evaluate({
     pr: GH_PR,
-    platform: { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: [] },
+    platform: { id: 'github', suggestionInfoString: 'suggestion' },
     threads: [],
     loose: [],
     config,
@@ -170,7 +170,7 @@ describe('Annexe B — adaptateur serveur Azure DevOps', () => {
 
   it('profil : pas d’étage 0 (info string non établie), pas de commande slash native (§B.6)', () => {
     const adapter = new AzdoServerAdapter(opts);
-    expect(adapter.platformProfile()).toEqual({ id: 'azdo', suggestionInfoString: null, slashPrefixes: [] });
+    expect(adapter.platformProfile()).toEqual({ id: 'azdo', suggestionInfoString: null });
   });
 
   it('mapping des statuts de fil en camelCase à initiale minuscule (§B.5)', async () => {

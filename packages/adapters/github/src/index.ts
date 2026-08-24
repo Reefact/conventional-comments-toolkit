@@ -68,7 +68,7 @@ export class GithubClientAdapter implements PlatformAdapter {
 
   platformProfile(): PlatformProfile {
     // Même profil que l'adaptateur serveur, même source (§9.2.4).
-    return { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: ['/azp', '/rebase'] };
+    return { id: 'github', suggestionInfoString: 'suggestion' };
   }
 
   /** Route web `raw`, servie sur la session de l'utilisateur, sans jeton (§A.4) —

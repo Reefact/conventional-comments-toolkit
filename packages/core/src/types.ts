@@ -145,7 +145,6 @@ export type Zone = 'thread-root' | 'reply' | 'review-body' | 'conversation';
 export interface PlatformProfile {
   id: string; // jamais une union fermée
   suggestionInfoString: string | null; // §3.5.1 étage 0 ; null = pas d'étage 0
-  slashPrefixes: string[]; // §4.2
 }
 
 export interface ValidationInput {
@@ -213,6 +212,7 @@ export interface EffectiveConfig {
   formatSeverity: 'warn' | 'error';
   exemptUsers: string[];
   allowlistPatterns: string[];
+  toolCommands: string[]; // §4.2, §8.2 — `/*` (slash générique) ou `@handle` (mention exacte)
   resolverOverrideGroup: string[];
   overrideLabel: string;
   activation: { activatedAt: string | null };
@@ -245,6 +245,7 @@ export interface Floor {
   activation?: { activatedAt?: string };
   exemptUsers?: { minimum: string[]; closed?: boolean };
   allowlistPatterns?: { minimum: string[]; closed?: boolean };
+  toolCommands?: { minimum: string[]; closed?: boolean };
   resolverOverrideGroup?: string[];
   configCacheTtlSeconds?: number;
 }

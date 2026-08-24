@@ -5,13 +5,23 @@
 // durcissement.
 
 import type { DecorationConfig, EffectiveConfig, LabelConfig } from '../types.js';
+import { completeStoredConfig } from './defaults.js';
 import { minMode, minSeverity, maxSeverity } from './floor.js';
 
 /** Mélange la configuration épinglée d'une PR et la configuration vivante (hors bornes —
  * les bornes d'entreprise s'appliquent après, en direct dans les deux sens, sauf
  * `activation.activatedAt`). Granularité : une clé à la fois, une entrée à la fois pour
  * les listes (§8.1.3). */
-export function mixPinnedWithLive(pinned: EffectiveConfig, live: EffectiveConfig): EffectiveConfig {
+export function mixPinnedWithLive(pinnedRaw: EffectiveConfig, live: EffectiveConfig): EffectiveConfig {
+  // Défense de bordure. Le stockage complète déjà les documents persistés à leur frontière
+  // de désérialisation (§6.4) — c'est là qu'est le correctif porteur, parce qu'il couvre
+  // TOUS les consommateurs, `unableToEvaluate()` compris, qui passe la dernière
+  // configuration effective directement à `evaluate()` sans jamais passer par ici.
+  // `mixPinnedWithLive()` est néanmoins exportée : rien ne garantit que son appelant ait
+  // franchi cette frontière, et la lire `undefined` ferait lever les unions ci-dessous.
+  // Même règle, une seule définition — jamais une seconde écriture de la même complétion.
+  const pinned: EffectiveConfig = completeStoredConfig(pinnedRaw);
+
   // Point de départ : le vivant — toutes les clés purement opérationnelles ou cosmétiques
   // s'appliquent en direct (server.*, exemptionLog.*, configUrl, configCacheTtlSeconds,
   // coreMinVersion, docUrl, shortcuts.*, telemetry.*, language, badgeStyle, labels[].color).
@@ -43,9 +53,10 @@ export function mixPinnedWithLive(pinned: EffectiveConfig, live: EffectiveConfig
     known: mixDecorations(pinned.decorations.known, live.decorations.known),
   };
 
-  // exemptUsers, allowlistPatterns — retrait restrictif, ajout élargissant → union.
+  // exemptUsers, allowlistPatterns, toolCommands — retrait restrictif, ajout élargissant → union.
   out.exemptUsers = union(pinned.exemptUsers, live.exemptUsers);
   out.allowlistPatterns = union(pinned.allowlistPatterns, live.allowlistPatterns);
+  out.toolCommands = union(pinned.toolCommands, live.toolCommands);
 
   // rules — augmentation d'un minimum restrictive, diminution élargissante (et
   // symétriquement pour le maximum).

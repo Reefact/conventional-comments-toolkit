@@ -205,12 +205,19 @@ function isExempt(
     const login = input.author.login.toLowerCase();
     if (config.exemptUsers.some((u) => u.toLowerCase() === login)) return true;
   }
-  // Commande slash propre à la plateforme.
+  // Commande adressée à un outil (§4.2, §8.2) — premier jeton du corps, suivi d'une espace
+  // ou de la fin de ligne. `toolCommands` : `/*` (slash générique) ou `@handle` (mention
+  // exacte, insensible à la casse — @Codex et @codex désignent le même compte GitHub).
   const trimmed = input.body.trimStart();
-  for (const p of input.platform.slashPrefixes) {
-    if (trimmed.startsWith(p)) {
-      const rest = trimmed.slice(p.length);
-      if (rest === '' || /^\s/.test(rest) || /[^A-Za-z0-9-]$/.test(p)) return true;
+  const firstToken = /^(\S+)/.exec(trimmed)?.[1] ?? null;
+  if (firstToken) {
+    const lowerToken = firstToken.toLowerCase();
+    for (const entry of config.toolCommands) {
+      if (entry === '/*') {
+        if (/^\/[A-Za-z][A-Za-z0-9_-]*$/.test(firstToken)) return true;
+      } else if (entry.toLowerCase() === lowerToken) {
+        return true;
+      }
     }
   }
   // allowlistPatterns — appliquées au corps entier une fois trim() appliqué (§4.2).

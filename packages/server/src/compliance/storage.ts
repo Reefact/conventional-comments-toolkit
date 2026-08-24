@@ -5,7 +5,7 @@
 
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { EffectiveConfig, Floor, UserInfo } from '@cct/core';
+import { completeStoredConfig, type EffectiveConfig, type Floor, type UserInfo } from '@cct/core';
 
 export interface ExemptionLogEntry {
   prKey: string;
@@ -195,7 +195,10 @@ export class MemoryStorage implements Storage {
   }
   async getPinnedConfig(key: string): Promise<EffectiveConfig | null> {
     const v = this.state.pinnedConfigs[key];
-    return v === undefined ? null : clone(v);
+    // Frontière de désérialisation (§6.4) : un document écrit par une version antérieure
+    // de `core/` n'a pas les clés ajoutées depuis. Complété ICI, une fois, plutôt que chez
+    // chaque consommateur.
+    return v === undefined ? null : completeStoredConfig(clone(v));
   }
   async setPinnedConfig(key: string, config: EffectiveConfig): Promise<void> {
     // Écrite une fois, jamais réécrite (§8.1.3) — le stockage lui-même tient la règle.
@@ -224,7 +227,9 @@ export class MemoryStorage implements Storage {
   }
   async getLastEffectiveConfig(key: string): Promise<EffectiveConfig | null> {
     const v = this.state.lastEffectiveConfigs[key];
-    return v === undefined ? null : clone(v);
+    // Même frontière que getPinnedConfig : ce document part directement dans evaluate()
+    // sur le chemin dégradé du §6.4, sans passer par le mélange du §8.1.3.
+    return v === undefined ? null : completeStoredConfig(clone(v));
   }
   async setLastEffectiveConfig(key: string, config: EffectiveConfig): Promise<void> {
     this.state.lastEffectiveConfigs[key] = clone(config);

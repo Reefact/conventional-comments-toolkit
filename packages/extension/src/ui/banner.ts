@@ -121,22 +121,49 @@ export function bannerHasContent(model: BannerModel): boolean {
   return model.count > 0;
 }
 
-export function renderBanner(model: BannerModel, published: PublishedSummary | null, lang: string): HTMLElement {
+/** Seul `state === 'failure'` bloque la complétion (§6.2.2, §6.2.4) — la même autorité que
+ * `applyCompletionState` pour le grisage du bouton. Un résumé publié EXISTE en `warn`
+ * (jamais en échec, décompte informatif) et sur une PR en brouillon (toujours informatif,
+ * jamais en échec) : la seule présence d'un résumé ne dit donc pas si ces fils bloquent. */
+export function bannerBlocksMerge(published: PublishedSummary | null): boolean {
+  return published !== null && published.state === 'failure';
+}
+
+export interface BannerRenderOptions {
+  /** Ouverture à appliquer, quand elle ne doit pas suivre le défaut — typiquement le choix
+   * que l'utilisateur a fait sur cette PR (§5.5). */
+  open?: boolean;
+  /** Notifie chaque changement d'ouverture, pour que ce choix survive au rendu suivant. */
+  onToggle?: (open: boolean) => void;
+}
+
+export function renderBanner(
+  model: BannerModel,
+  published: PublishedSummary | null,
+  lang: string,
+  options: BannerRenderOptions = {}
+): HTMLElement {
   const doc = globalThis.document;
-  // Seul `state === 'failure'` bloque la complétion (§6.2.2, §6.2.4) — la même autorité que
-  // `applyCompletionState` pour le grisage du bouton. Un résumé publié EXISTE en `warn`
-  // (jamais en échec, décompte informatif) et sur une PR en brouillon (toujours informatif,
-  // jamais en échec) : `fromPublished` seul ne dit donc pas si ces fils bloquent le merge.
-  const blocksMerge = published !== null && published.state === 'failure';
+  const blocksMerge = bannerBlocksMerge(published);
 
   // `<details>` natif plutôt qu'un pliage maison : rôle, état et navigation clavier sont
-  // déjà exposés par le navigateur (§10, accessibilité). Déplié quand le merge est
-  // effectivement bloqué — c'est l'instant où l'on cherche lesquels ; replié sinon, qu'il
-  // s'agisse d'un décompte informatif (`warn`, brouillon) ou d'une vue locale.
+  // déjà exposés par le navigateur (§10, accessibilité). Déplié par défaut quand le merge
+  // est effectivement bloqué — c'est l'instant où l'on cherche lesquels ; replié sinon,
+  // qu'il s'agisse d'un décompte informatif (`warn`, brouillon) ou d'une vue locale.
+  //
+  // Un DÉFAUT, pas un verdict : le bandeau est reconstruit à chaque rendu — et depuis que
+  // le texte des fils est surveillé, une simple réponse ou une correction en place en
+  // déclenche un. Réappliquer le défaut à chaque fois rouvrirait un bandeau que
+  // l'utilisateur vient de replier (revue Codex, PR #26). L'appelant garde donc son choix
+  // et nous le repasse ici, tant que la situation qui l'a motivé n'a pas changé.
   const root = doc.createElement('details');
   root.className = 'cct-banner';
   root.dataset['view'] = model.fromPublished ? 'published' : 'local';
-  root.open = blocksMerge;
+  root.open = options.open ?? blocksMerge;
+  if (options.onToggle) {
+    const notify = options.onToggle;
+    root.addEventListener('toggle', () => notify(root.open));
+  }
 
   const head = doc.createElement('summary');
   head.className = 'cct-banner-head';

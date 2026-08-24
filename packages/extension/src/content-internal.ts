@@ -16,7 +16,7 @@ import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage } from './config-resolver.js';
 import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
-import { bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
+import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
 import { decorateComment } from './ui/badges.js';
 import { ui } from './ui/strings.js';
@@ -343,6 +343,10 @@ export function observePrChromeNavigation(
   // reconstruit la barre de puces à chaque appel, y compris sur la MÊME PR une fois D3 en
   // jeu) : sans cet état, chaque rendu répété repartirait sur « tous », perdant la sélection.
   let selectedLabel: string | null = null;
+  // Pliage du bandeau choisi par l'utilisateur, et situation qui l'a motivé (§5.5). Vit ICI
+  // pour la même raison que le filtre : renderPrChrome reconstruit le bandeau à chaque appel.
+  let bannerOpen: boolean | null = null;
+  let bannerBlocked: boolean | null = null;
 
   const run = (): void => {
     if (disposed) return;
@@ -360,6 +364,8 @@ export function observePrChromeNavigation(
       lastOwnSig = null;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
       selectedLabel = null; // nouveau contexte de PR : le filtre repart à zéro
+      bannerOpen = null; // et le pliage aussi : le choix portait sur une autre PR
+      bannerBlocked = null;
     }
     // Sonde le bouton de complétion (chromeSignatureOf) seulement dans la fenêtre
     // d'hydratation de CETTE PR — jamais indéfiniment (§9.4, cf. chromeSignatureOf).
@@ -383,10 +389,28 @@ export function observePrChromeNavigation(
     inFlight = true;
     // Une navigation peut survenir pendant les lectures asynchrones : le rendu vérifie
     // alors qu'il porte toujours sur la PR affichée avant d'écrire quoi que ce soit.
-    void renderPrChrome(adapter, resolver, doc, () => key === prKeyFor(currentPrOf(adapter)), {
+    // `disposed` entre dans la validité du rendu, et pas seulement la clé de PR : révoquée
+    // pendant que `resolver.resolve()` ou `getThreads()` sont en vol, l'observation
+    // déconnecte bien l'observateur, mais CE rendu-là aboutirait quand même et écrirait dans
+    // une page dont elle ne sait plus rien (revue Codex, PR #26).
+    void renderPrChrome(adapter, resolver, doc, () => !disposed && key === prKeyFor(currentPrOf(adapter)), {
       get: () => selectedLabel,
       set: (label) => {
         selectedLabel = label;
+      },
+    }, {
+      // Le défaut ne s'applique qu'au premier montage sur cette PR, ou lorsque le caractère
+      // bloquant a changé — là, la situation n'est plus celle sur laquelle l'utilisateur
+      // s'était prononcé. Entre les deux, son choix tient.
+      resolve: (blocksMerge) => {
+        if (bannerBlocked !== blocksMerge) {
+          bannerBlocked = blocksMerge;
+          bannerOpen = null;
+        }
+        return bannerOpen ?? blocksMerge;
+      },
+      set: (open) => {
+        bannerOpen = open;
       },
     })
       .then((showed) => {
@@ -446,6 +470,13 @@ async function renderPrChrome(
   // puces depuis rien à chaque appel.
   filterState: { get: () => string | null; set: (label: string | null) => void } = {
     get: () => null,
+    set: () => {},
+  },
+  // Pliage du bandeau, même raison et même portée que `filterState` (§5.5) : `resolve` rend
+  // l'ouverture à appliquer pour la situation courante, `set` enregistre un choix de
+  // l'utilisateur.
+  bannerState: { resolve: (blocksMerge: boolean) => boolean; set: (open: boolean) => void } = {
+    resolve: (blocksMerge) => blocksMerge,
     set: () => {},
   }
 ): Promise<boolean> {
@@ -535,7 +566,10 @@ async function renderPrChrome(
     }
 
     if (bannerHasContent(model)) {
-      const banner = renderBanner(model, published, lang);
+      const banner = renderBanner(model, published, lang, {
+        open: bannerState.resolve(bannerBlocksMerge(published)),
+        onToggle: (open) => bannerState.set(open),
+      });
       // « En tête de PR » (§5.5) : après l'en-tête que l'adaptateur désigne, donc dans le
       // flux de la page. Le repli sur le haut du document ne vaut que si rien n'apparie —
       // au-dessus du chrome de la plateforme, un encart flottant se lit comme une greffe,
@@ -582,6 +616,11 @@ async function renderPrChrome(
       if (selectedLabel !== null) applyLabelFilter(rendered, labelOfThread, selectedLabel);
     }
   }
+
+  // Repassé par la porte : la navigation ou la révocation ont pu survenir APRÈS celle du
+  // bandeau, ces deux écritures-ci étant les dernières du rendu. Le décompte reste rendu
+  // (`hasSomethingToShow`), seul l'effet de bord est abandonné.
+  if (!isCurrent()) return hasSomethingToShow;
 
   // Badges des commentaires publiés (§5.5) — rendu visuel, contenu stocké intact.
   const withRendered = adapter as PlatformAdapter & {

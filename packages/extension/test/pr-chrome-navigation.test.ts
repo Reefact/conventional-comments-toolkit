@@ -1345,6 +1345,113 @@ describe('§5.5 — ce que notre rendu a laissé dans la page est surveillé aus
   });
 });
 
+describe('§5.5 — révocation et pliage (revue Codex round 3, PR #26)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('révoquée pendant un rendu EN VOL, l’observation n’écrit plus rien', async () => {
+    // Déconnecter l'observateur ne suffit pas : le rendu déjà parti aboutit et écrirait
+    // bandeau, badges et grisage dans une page dont cette observation ne sait plus rien.
+    const doc = document;
+    const current = pr(60);
+    let releaseThreads: (() => void) | null = null;
+    const gate = new Promise<void>((resolve) => {
+      releaseThreads = resolve;
+    });
+    const control: SubmitControl = { element: doc.createElement('button'), kind: 'complete-pr' };
+    const commentEl = doc.createElement('div');
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
+      getThreads: async () => {
+        await gate; // le rendu se bloque ici, avant toute écriture
+        return [];
+      },
+      getCompletionControl: () => control,
+      getRenderedComments: () => [{ element: commentEl, bodyText: 'issue: x' }],
+    });
+
+    const dispose = observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flush(); // laisse le rendu démarrer et se bloquer
+    dispose();
+    releaseThreads!();
+    await flushAll();
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0);
+    expect(commentEl.querySelector('.cct-badge')).toBeNull(); // ni badge
+    expect(control.element.hasAttribute('aria-disabled')).toBe(false); // ni grisage
+  });
+
+  it('un bandeau replié par l’utilisateur le reste quand un fil est édité', async () => {
+    // Le bandeau est reconstruit à chaque rendu, et depuis que le texte des fils est
+    // surveillé, une correction en place en déclenche un : réappliquer le défaut rouvrirait
+    // ce que l'utilisateur vient de replier.
+    const doc = document;
+    const current = pr(61);
+    const threadEl = doc.createElement('div');
+    threadEl.textContent = 'issue: le retry ne borne pas le backoff';
+    doc.body.appendChild(threadEl);
+    let body = 'issue: le retry ne borne pas le backoff';
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
+      getThreads: async () => [
+        {
+          id: 't1',
+          pr: current,
+          root: {
+            id: 't1-root',
+            author: { id: 'login:alice', login: 'alice', isServiceAccount: false },
+            body,
+            createdAt: '2026-01-01T00:00:00Z',
+            permalink: '#t1',
+            isSystemGenerated: false,
+            canCarryBlockingState: true,
+          },
+          replies: [],
+          resolution: 'unresolved',
+          canCarryBlockingState: true,
+        } as ThreadInfo,
+      ],
+      getRenderedThreadElements: () => [{ id: 't1', element: threadEl }],
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const banner = doc.querySelector('.cct-banner') as HTMLDetailsElement;
+    expect(banner.open).toBe(true); // le merge est bloqué : déplié par défaut
+    banner.open = false; // l'utilisateur le replie
+    banner.dispatchEvent(new Event('toggle'));
+
+    body = 'issue: le backoff doit être plafonné';
+    threadEl.textContent = body; // édition en place → nouveau rendu
+    await flushAll();
+
+    const rebuilt = doc.querySelector('.cct-banner') as HTMLDetailsElement;
+    expect(rebuilt.querySelector('.cct-banner-subject')?.textContent).toBe('le backoff doit être plafonné');
+    expect(rebuilt.open).toBe(false); // toujours replié : son choix a survécu
+  });
+
+  it('mais le défaut revient quand le caractère bloquant change', async () => {
+    // Son choix portait sur une situation qui n'existe plus : un merge qui se met à bloquer
+    // n'est plus celle sur laquelle il s'était prononcé.
+    const doc = document;
+    const current = pr(62);
+    let currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 2, mode: 'warn' });
+    const adapter = makeAdapter(() => current, () => currentPublished);
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const banner = doc.querySelector('.cct-banner') as HTMLDetailsElement;
+    expect(banner.open).toBe(false); // informatif (warn) : replié par défaut
+    banner.open = true; // l'utilisateur le déplie
+    banner.dispatchEvent(new Event('toggle'));
+
+    currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 2, mode: 'enforce' });
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect((doc.querySelector('.cct-banner') as HTMLDetailsElement).open).toBe(true); // le défaut reprend
+  });
+});
+
 describe('Codex round 4 — la signature de reprise sonde le COMPTE de commentaires, jamais leur corps (§9.4)', () => {
   afterEach(() => {
     document.body.innerHTML = '';

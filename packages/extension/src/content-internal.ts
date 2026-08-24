@@ -9,7 +9,7 @@
 // Ce module peut exporter librement pour les tests ; content.ts, lui, ne doit rien
 // exporter.
 
-import type { Floor, PublishedSummary } from '@cct/core';
+import type { Floor, PrRef, PublishedSummary } from '@cct/core';
 import type { PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
@@ -133,25 +133,79 @@ export async function bootstrap(doc: Document = document): Promise<void> {
 
   adapter.observeEditors((editor) => void attach(editor));
 
-  // Bandeau (§5.5) et grisage du bouton de complétion (§6.5).
-  void renderPrChrome(adapter, resolver, doc);
+  // Bandeau (§5.5) et grisage du bouton de complétion (§6.5) — ré-armés à chaque
+  // navigation SPA vers un contexte de PR différent, pas seulement au chargement initial
+  // du script : Turbo/React ne rechargent pas le document, donc sans ce ré-armement la
+  // barre reste absente d'une PR atteinte par un lien interne tant qu'un rechargement
+  // complet ne relance pas bootstrap().
+  observePrChromeNavigation(adapter, resolver, doc);
+}
+
+function currentPrOf(adapter: PlatformAdapter): PrRef | null {
+  return (adapter as GithubClientAdapter | AzdoClientAdapter).currentPr?.() ?? null;
+}
+
+export function prKeyFor(pr: PrRef | null): string | null {
+  return pr ? `${pr.host}/${pr.scope.join('/')}#${pr.number}` : null;
+}
+
+/** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) : une seule
+ * fois au chargement, puis à chaque fois qu'une navigation SPA fait pointer `currentPr()`
+ * vers une PR différente (ou plus aucune). Le déclencheur générique — MutationObserver sur
+ * le document — couvre Turbo comme les vues React qui n'émettent pas d'événement Turbo
+ * (§A.3), et fonctionne à l'identique sur Azure DevOps (§B.3), sans dépendre d'un
+ * mécanisme spécifique à une plateforme. */
+export function observePrChromeNavigation(adapter: PlatformAdapter, resolver: ClientConfigResolver, doc: Document): void {
+  let lastPrKey: string | null = null;
+  let hasRendered = false;
+  let generation = 0;
+  const rerenderIfNavigated = () => {
+    const key = prKeyFor(currentPrOf(adapter));
+    if (hasRendered && key === lastPrKey) return;
+    hasRendered = true;
+    lastPrKey = key;
+    const renderedAt = ++generation;
+    // Une navigation plus récente peut survenir pendant que ce rendu est encore en
+    // cours (résolution de configuration hors cache) : le résultat périmé ne doit
+    // jamais s'insérer après celui, plus récent, qui l'a déjà supplanté.
+    void renderPrChrome(adapter, resolver, doc, () => renderedAt === generation);
+  };
+  rerenderIfNavigated();
+  const observer = new MutationObserver(rerenderIfNavigated);
+  observer.observe(doc.documentElement, { childList: true, subtree: true });
 }
 
 async function renderPrChrome(
   adapter: PlatformAdapter,
   resolver: ClientConfigResolver,
-  doc: Document
+  doc: Document,
+  // Une navigation plus récente peut avoir supplanté celle-ci pendant les résolutions
+  // asynchrones ci-dessous (§ observePrChromeNavigation) : par défaut (appel direct, hors
+  // navigation observée) toujours actuel.
+  isCurrent: () => boolean = () => true
 ): Promise<void> {
-  const pr = (adapter as GithubClientAdapter | AzdoClientAdapter).currentPr?.();
-  if (!pr) return;
+  const clearStaleBanner = () => {
+    for (const stale of doc.querySelectorAll('.cct-banner')) stale.remove();
+  };
+
+  const pr = currentPrOf(adapter);
+  if (!pr) {
+    if (isCurrent()) clearStaleBanner();
+    return;
+  }
   const resolved = await resolver.resolve(adapter, pr);
   writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
-  if (resolved.config.mode === 'off') return;
+  if (resolved.config.mode === 'off') {
+    if (isCurrent()) clearStaleBanner();
+    return;
+  }
   const published = adapter.readPublishedResult();
   const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
   const profile = adapter.platformProfile();
 
   const threads = await adapter.getThreads();
+  if (!isCurrent()) return; // supplanté entre-temps : ne jamais rendre un résultat périmé
+  clearStaleBanner(); // efface le bandeau d'un contexte précédent avant d'insérer le sien
   const model = buildBannerModel(
     published,
     threads,

@@ -20,6 +20,7 @@ import {
 } from '@cct/core';
 import {
   closestChain,
+  commentBodyText,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -56,10 +57,16 @@ export class AzdoClientAdapter implements PlatformAdapter {
     this.log = opts.log ?? new SelectorLog();
   }
 
-  matches(url: URL): boolean {
+  /** Sélection de plateforme par hôte seul (§2) — même raison qu'en annexe A : Azure
+   * DevOps étant entièrement SPA, la navigation vers une PR depuis les vues « Pull
+   * requests » ou « Mes demandes » arrive après l'injection du script, jamais avant. */
+  matchesHost(url: URL): boolean {
     const host = url.hostname;
-    const known = this.#hosts.some((h) => host === h) || host.endsWith('.visualstudio.com');
-    return known && /\/pullrequest\/\d+/i.test(url.pathname);
+    return this.#hosts.some((h) => host === h) || host.endsWith('.visualstudio.com');
+  }
+
+  matches(url: URL): boolean {
+    return this.matchesHost(url) && /\/pullrequest\/\d+/i.test(url.pathname);
   }
 
   platformProfile(): PlatformProfile {
@@ -112,9 +119,13 @@ export class AzdoClientAdapter implements PlatformAdapter {
     const scan = () => {
       for (const el of queryChainAll(this.#doc, selectors.editors)) {
         if (seen.has(el)) continue;
-        seen.add(el);
+        // Marquer « vu » APRÈS #toHandle() : un élément balayé avant que currentPr() ne
+        // trouve de PR (page pas encore navigée) doit rester réexaminable au prochain
+        // balayage, pas définitivement ignoré (§9.2.3).
         const handle = this.#toHandle(el);
-        if (handle) cb(handle);
+        if (!handle) continue;
+        seen.add(el);
+        cb(handle);
       }
     };
     scan();
@@ -159,7 +170,8 @@ export class AzdoClientAdapter implements PlatformAdapter {
         : /active|pending/.test(statusText)
           ? ('unresolved' as const)
           : ('unknown' as const); // non rendu → unknown, compté non résolu (§5.5, §B.5)
-      const body = queryChain(el, selectors.commentBody).element?.textContent ?? '';
+      const bodyEl = queryChain(el, selectors.commentBody).element;
+      const body = bodyEl ? commentBodyText(bodyEl) : '';
       return {
         id,
         pr,
@@ -210,8 +222,14 @@ export class AzdoClientAdapter implements PlatformAdapter {
   getRenderedComments(): { element: Element; bodyText: string }[] {
     return queryChainAll(this.#doc, selectors.commentBody).map((element) => ({
       element,
-      bodyText: element.textContent ?? '',
+      bodyText: commentBodyText(element),
     }));
+  }
+
+  /** Sonde bon marché du nombre de commentaires rendus — voir le même commentaire côté
+   * GithubClientAdapter (content-internal.ts, chromeSignatureOf). */
+  getRenderedCommentCount(): number {
+    return queryChainAll(this.#doc, selectors.commentBody).length;
   }
 
   /** Conteneurs de fils rendus, pour le filtre local du §5.5 — même dérivation
@@ -227,15 +245,20 @@ export class AzdoClientAdapter implements PlatformAdapter {
     const loc = this.#doc.location;
     if (!loc) return null;
     const path = loc.pathname;
-    const { element } = queryChain(this.#doc, selectors.prCreatedAt);
-    const createdAt = element?.getAttribute('datetime') ?? '';
-    const mk = (scope: [string, string, string], number: string): PrRef => ({
-      platform: 'azdo',
-      createdAt,
-      host: loc.hostname,
-      scope,
-      number: Number(number),
-    });
+    // La lecture DOM ne se fait qu'à la construction d'une PrRef effective — jamais sur le
+    // chemin d'échec (page hors PR) : depuis que `matchesHost` (§2) arme les observateurs
+    // sur tout l'hôte, `currentPr()` est appelé à chaque mutation même hors PR (listes,
+    // work items, wiki), et cette route ne doit y coûter qu'un test d'expression régulière.
+    const mk = (scope: [string, string, string], number: string): PrRef => {
+      const { element } = queryChain(this.#doc, selectors.prCreatedAt);
+      return {
+        platform: 'azdo',
+        createdAt: element?.getAttribute('datetime') ?? '',
+        host: loc.hostname,
+        scope,
+        number: Number(number),
+      };
+    };
     // Forme historique : {org}.visualstudio.com/[DefaultCollection/]{project}/_git/{repo}
     // /pullrequest/{id} — l'organisation vit dans le SOUS-DOMAINE (§B.1) ; un segment de
     // collection peut précéder le projet, et la forme moderne ne doit JAMAIS s'y essayer :

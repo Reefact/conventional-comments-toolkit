@@ -15,6 +15,7 @@ import {
 } from '@cct/core';
 import {
   closestChain,
+  commentBodyText,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -51,8 +52,18 @@ export class GithubClientAdapter implements PlatformAdapter {
     this.log = opts.log ?? new SelectorLog();
   }
 
+  /** Sélection de plateforme par hôte seul (§2) — `bootstrap()` choisit l'adaptateur à
+   * l'injection du script, avant même de savoir si la page courante est une PR : la
+   * navigation vers une PR arrive presque toujours ENSUITE, via un lien interne (liste des
+   * PR, notifications, tableau de bord), en SPA (§A.3). Exiger une PR ici laisserait
+   * l'extension intégralement inactive tant qu'un rechargement complet ne la relance pas
+   * directement sur l'URL de la PR. */
+  matchesHost(url: URL): boolean {
+    return this.#hosts.some((h) => url.hostname === h);
+  }
+
   matches(url: URL): boolean {
-    return this.#hosts.some((h) => url.hostname === h) && /\/pull\/\d+/.test(url.pathname);
+    return this.matchesHost(url) && /\/pull\/\d+/.test(url.pathname);
   }
 
   platformProfile(): PlatformProfile {
@@ -94,9 +105,13 @@ export class GithubClientAdapter implements PlatformAdapter {
     const scan = () => {
       for (const el of queryChainAll(this.#doc, selectors.editors)) {
         if (seen.has(el)) continue;
-        seen.add(el);
+        // Marquer « vu » APRÈS #toHandle() : un élément balayé avant que currentPr() ne
+        // trouve de PR (page pas encore navigée) doit rester réexaminable au prochain
+        // balayage, pas définitivement ignoré (§9.2.3).
         const handle = this.#toHandle(el);
-        if (handle) cb(handle);
+        if (!handle) continue;
+        seen.add(el);
+        cb(handle);
       }
     };
     scan();
@@ -155,7 +170,7 @@ export class GithubClientAdapter implements PlatformAdapter {
         root: {
           id: `${id}-root`,
           author: { id: `login:${author.toLowerCase()}`, login: author, isServiceAccount: false },
-          body: bodyEl?.textContent ?? '',
+          body: bodyEl ? commentBodyText(bodyEl) : '',
           createdAt: '',
           permalink: anchor,
           isSystemGenerated: false,
@@ -202,8 +217,17 @@ export class GithubClientAdapter implements PlatformAdapter {
   getRenderedComments(): { element: Element; bodyText: string }[] {
     return queryChainAll(this.#doc, selectors.commentBody).map((element) => ({
       element,
-      bodyText: element.textContent ?? '',
+      bodyText: commentBodyText(element),
     }));
+  }
+
+  /** Sonde bon marché du nombre de commentaires rendus, pour la signature de reprise du
+   * bandeau (content-internal.ts, chromeSignatureOf) — jamais `getRenderedComments()` pour
+   * ça : cette dernière calcule `commentBodyText` (clone du sous-arbre dès qu'un badge est
+   * posé) pour CHAQUE commentaire, alors que seul le compte importe à un observateur qui
+   * tourne à chaque mutation, pour toute la durée de vie de l'onglet. */
+  getRenderedCommentCount(): number {
+    return queryChainAll(this.#doc, selectors.commentBody).length;
   }
 
   /** Conteneurs de fils rendus, pour le filtre local du §5.5 — même dérivation

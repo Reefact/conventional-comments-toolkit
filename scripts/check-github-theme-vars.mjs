@@ -9,6 +9,13 @@
 // automatiquement. Seuls les préfixes Primer connus sont retenus — les propriétés
 // propres à l'extension (--cct-label-color, posée par toolbar.ts) ne viennent pas de
 // GitHub et ne doivent pas être vérifiées ici.
+//
+// styles.css imbrique parfois un ANCIEN nom Primer en repli du nouveau (GitHub
+// Enterprise Server est figé par version et peut encore servir les noms d'avant le
+// renommage — specifications-fr.md §A.5). Seul le PREMIER nom Primer par déclaration
+// (le plus prioritaire) est exigé ici : les suivants sont un filet GHES qu'on ne peut
+// pas vérifier depuis github.com et dont l'absence sur github.com est normale, pas une
+// régression.
 
 import { chromium } from 'playwright-core';
 import { readFileSync } from 'node:fs';
@@ -17,8 +24,12 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const stylesPath = join(here, '..', 'packages', 'extension', 'src', 'styles.css');
-const EXECUTABLE =
-  process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+// PLAYWRIGHT_CHROMIUM permet à la CI de forcer le binaire déjà téléchargé sans repasser
+// par la résolution ci-dessous ; en local (npm run check:github-theme-vars, hors
+// conteneur), chromium.executablePath() retrouve le Chromium installé par
+// `npx playwright-core install chromium` dans le cache Playwright habituel — un chemin
+// codé en dur ici serait spécifique à l'image CI et échouerait partout ailleurs.
+const EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 const TARGET_URL =
   process.env.GITHUB_THEME_CHECK_URL ?? 'https://github.com/Reefact/conventional-comments-toolkit';
 
@@ -26,9 +37,14 @@ const PRIMER_PREFIXES = ['--color-', '--border', '--bgColor-', '--fgColor-', '--
 
 function extractPrimerVarNames(css) {
   const names = new Set();
-  for (const match of css.matchAll(/var\((--[a-zA-Z0-9-]+)/g)) {
-    const name = match[1];
-    if (PRIMER_PREFIXES.some((prefix) => name.startsWith(prefix))) names.add(name);
+  for (const declaration of css.split(';')) {
+    for (const match of declaration.matchAll(/var\((--[a-zA-Z0-9-]+)/g)) {
+      const name = match[1];
+      if (PRIMER_PREFIXES.some((prefix) => name.startsWith(prefix))) {
+        names.add(name);
+        break; // les noms Primer suivants dans la même déclaration sont un repli GHES
+      }
+    }
   }
   return [...names].sort();
 }

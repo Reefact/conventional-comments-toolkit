@@ -3,13 +3,57 @@
   "properties": {
     "floor": {
       "title": "Plancher d'entreprise (§8.1.1)",
-      "description": "Document de plancher : minimumMode, configUrl, bornes. Doit porter la même valeur que le canal du composant serveur.",
+      "description": "Document de plancher. Doit porter EXACTEMENT la même valeur que le canal du composant serveur (CCT_FLOOR_FILE) : une clé qu'un seul des deux canaux transporte fait diverger les deux configurations effectives en permanence, et la règle 2 du §8.1.3 désarme alors le blocage d'envoi de l'extension. Toute clé du type Floor doit donc être déclarée ici — une clé non déclarée n'est pas transportable par la politique de navigateur.",
       "type": "object",
       "properties": {
         "floorVersion": { "type": "integer" },
         "configUrl": { "type": "string" },
         "minimumMode": { "type": "string", "enum": ["off", "assist", "warn", "enforce"] },
         "formatSeverity": { "type": "string", "enum": ["warn", "error"] },
+        "severities": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "enum": ["off", "warn", "error"] }
+        },
+        "labels": {
+          "type": "object",
+          "properties": {
+            "minimum": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "rules": {
+          "type": "object",
+          "properties": {
+            "minDecisionSubjectLength": { "type": "integer" }
+          }
+        },
+        "activation": {
+          "type": "object",
+          "properties": {
+            "activatedAt": { "type": "string" }
+          }
+        },
+        "exemptUsers": {
+          "type": "object",
+          "properties": {
+            "minimum": { "type": "array", "items": { "type": "string" } },
+            "closed": { "type": "boolean" }
+          }
+        },
+        "allowlistPatterns": {
+          "type": "object",
+          "properties": {
+            "minimum": { "type": "array", "items": { "type": "string" } },
+            "closed": { "type": "boolean" }
+          }
+        },
+        "toolCommands": {
+          "type": "object",
+          "properties": {
+            "minimum": { "type": "array", "items": { "type": "string" } },
+            "closed": { "type": "boolean" }
+          }
+        },
+        "resolverOverrideGroup": { "type": "array", "items": { "type": "string" } },
         "configCacheTtlSeconds": { "type": "integer" }
       }
     },

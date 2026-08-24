@@ -19,12 +19,26 @@
    d'avant le renommage (specifications-fr.md §A.5). Le canari n'exige que le nom actuel
    (premier niveau) — l'ancien est un filet non vérifiable depuis github.com. */
 
+/* Retrait horizontal aligné sur celui que la zone de saisie se donne à elle-même.
+   Sur GitHub, le conteneur hôte (`.CommentBox-container`) n'a AUCUN padding : il porte
+   une marge de `--base-size-8` et rien d'autre. C'est `.CommentBox-input` qui s'octroie
+   `padding: var(--base-size-8)`. Nos éléments injectés, eux, étaient collés à la bordure,
+   et le texte du champ commençait 8 px plus loin — trois alignements différents dans une
+   même boîte.
+
+   Le retrait se pose donc ICI, sur nos propres éléments, et jamais en ajoutant un padding
+   au conteneur de GitHub : celui-ci héberge aussi `.CommentBox-header`, dont le fond
+   teinté et les coins arrondis sont faits pour rejoindre la bordure, et dont les onglets
+   se décalent de `-1px` exprès pour la chevaucher. Mesuré : un padding sur le conteneur
+   ramène l'en-tête à 726 px de large dans une boîte de 744, et repousse le texte du champ
+   à 17 px pendant que la barre reste à 9 — l'écart change de place au lieu de
+   disparaître. */
 .cct-toolbar {
   display: flex;
   flex-wrap: wrap;
   column-gap: 6px;
   row-gap: 8px;
-  padding: 4px 0;
+  padding: 4px var(--base-size-8, 8px);
   margin-bottom: 8px;
   align-items: center;
 }
@@ -116,6 +130,7 @@
 .cct-feedback {
   min-height: 1.6em; /* pas de layout shift (§5.3) */
   font-size: 12px;
+  padding: 0 var(--base-size-8, 8px); /* même alignement que la barre (voir plus haut) */
 }
 
 .cct-diagnostics {

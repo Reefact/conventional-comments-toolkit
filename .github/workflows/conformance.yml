@@ -38,6 +38,12 @@ jobs:
       - name: Caractères invisibles écrits en échappements
         run: npm run check:invisible
 
+      # Une règle CSS peut être écrite dans styles.css et perdue par le parseur du
+      # navigateur (commentaire fermé trop tôt) : le fichier se lit correctement, mais la
+      # règle n'existe pas en production. C'est arrivé à `.cct-toolbar`.
+      - name: Chaque règle de styles.css survit au parseur CSS
+        run: npm run check:extension-css
+
       # `specifications-fr.md` est la référence NORMATIVE : elle ne se modifie pas pour
       # correspondre au code. Un changement délibéré de la spécification reste possible —
       # il se fait alors sur une PR qui ne touche qu'elle, et cette garde le signale.

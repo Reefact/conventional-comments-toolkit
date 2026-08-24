@@ -123,14 +123,20 @@ export function bannerHasContent(model: BannerModel): boolean {
 
 export function renderBanner(model: BannerModel, published: PublishedSummary | null, lang: string): HTMLElement {
   const doc = globalThis.document;
+  // Seul `state === 'failure'` bloque la complétion (§6.2.2, §6.2.4) — la même autorité que
+  // `applyCompletionState` pour le grisage du bouton. Un résumé publié EXISTE en `warn`
+  // (jamais en échec, décompte informatif) et sur une PR en brouillon (toujours informatif,
+  // jamais en échec) : `fromPublished` seul ne dit donc pas si ces fils bloquent le merge.
+  const blocksMerge = published !== null && published.state === 'failure';
+
   // `<details>` natif plutôt qu'un pliage maison : rôle, état et navigation clavier sont
-  // déjà exposés par le navigateur (§10, accessibilité). Déplié quand un résultat publié
-  // compte des fils — c'est l'instant où l'on cherche lesquels ; replié en vue locale, où
-  // rien ne bloque et rien ne presse.
+  // déjà exposés par le navigateur (§10, accessibilité). Déplié quand le merge est
+  // effectivement bloqué — c'est l'instant où l'on cherche lesquels ; replié sinon, qu'il
+  // s'agisse d'un décompte informatif (`warn`, brouillon) ou d'une vue locale.
   const root = doc.createElement('details');
   root.className = 'cct-banner';
   root.dataset['view'] = model.fromPublished ? 'published' : 'local';
-  root.open = model.fromPublished;
+  root.open = blocksMerge;
 
   const head = doc.createElement('summary');
   head.className = 'cct-banner-head';
@@ -150,7 +156,14 @@ export function renderBanner(model: BannerModel, published: PublishedSummary | n
 
   const hint = doc.createElement('span');
   hint.className = 'cct-banner-hint';
-  hint.textContent = ui(lang, model.fromPublished ? 'banner.hint' : 'banner.hint.local');
+  // Trois lectures distinctes, jamais confondues (revue Codex, §26) :
+  // - pas de résumé publié DU TOUT : ni serveur déployé, ni première évaluation encore en
+  //   vol ne se distinguent d'ici — le texte ne tranche pas entre les deux ;
+  // - résumé publié, mais qui NE bloque PAS le merge (`warn`, brouillon) : les fils listés
+  //   sont réels mais informatifs, jamais annoncés comme un préalable à la fusion ;
+  // - résumé publié qui bloque effectivement (`enforce`, hors brouillon, `state: failure`).
+  const hintKey = !model.fromPublished ? 'banner.hint.local' : blocksMerge ? 'banner.hint' : 'banner.hint.informative';
+  hint.textContent = ui(lang, hintKey);
   head.appendChild(hint);
 
   root.appendChild(head);

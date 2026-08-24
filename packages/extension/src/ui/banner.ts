@@ -68,6 +68,10 @@ export interface BannerRenderOptions {
   filterLabels?: string[];
   /** Appelé quand le filtre change ; null = tous. */
   onFilter?: (labelId: string | null) => void;
+  /** Sélection à restaurer dans le `<select>` — un rendu répété sur la MÊME PR (§5.5)
+   * reconstruit le bandeau (et son `<select>`) à chaque fois ; sans ce réglage, il
+   * repartirait toujours sur « tous », perdant le filtre choisi par l'utilisateur. */
+  selectedLabel?: string | null;
 }
 
 export function renderBanner(
@@ -110,6 +114,7 @@ export function renderBanner(
       option.textContent = id;
       select.appendChild(option);
     }
+    if (options.selectedLabel) select.value = options.selectedLabel; // ignoré si absent des options
     select.addEventListener('change', () => options.onFilter?.(select.value === '' ? null : select.value));
     filterLabel.appendChild(select);
     root.appendChild(filterLabel);

@@ -226,6 +226,12 @@ export class AzdoClientAdapter implements PlatformAdapter {
     }));
   }
 
+  /** Sonde bon marché du nombre de commentaires rendus — voir le même commentaire côté
+   * GithubClientAdapter (content-internal.ts, chromeSignatureOf). */
+  getRenderedCommentCount(): number {
+    return queryChainAll(this.#doc, selectors.commentBody).length;
+  }
+
   /** Conteneurs de fils rendus, pour le filtre local du §5.5 — même dérivation
    * d'identifiant que getThreads(). */
   getRenderedThreadElements(): { id: string; element: Element }[] {

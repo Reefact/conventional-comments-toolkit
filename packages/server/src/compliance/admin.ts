@@ -5,6 +5,8 @@
 import {
   evaluate,
   resolveConfig,
+  vetFloor,
+  vettedConfigUrl,
   type ComplianceResult,
   type ConfigRead,
   type Floor,
@@ -51,8 +53,9 @@ export class AdminEntryPoint {
     const report: DryRunReportEntry[] = [];
     for (const pr of prs) {
       const repoRead = await adapter.fetchConfigFile(pr);
+      const orgUrl = vettedConfigUrl(vetFloor(floor));
       const orgRead: ConfigRead =
-        floor?.configUrl != null ? await adapter.fetchOrgConfig(floor.configUrl) : { status: 'absent' };
+        orgUrl != null ? await adapter.fetchOrgConfig(orgUrl) : { status: 'absent' };
       // Jamais d'épinglage dans un rapport à blanc : la question posée est « et si on
       // activait aujourd'hui ? », donc la configuration vivante.
       const { config, notices } = resolveConfig(floor, orgRead, repoRead, null, false);
@@ -200,8 +203,9 @@ export class AdminEntryPoint {
     const { adapter, storage, floorProvider } = this.deps;
     const floor = await floorProvider();
     const repoRead = await adapter.fetchConfigFile(pr);
+    const orgUrl = vettedConfigUrl(vetFloor(floor));
     const orgRead: ConfigRead =
-      floor?.configUrl != null ? await adapter.fetchOrgConfig(floor.configUrl) : { status: 'absent' };
+      orgUrl != null ? await adapter.fetchOrgConfig(orgUrl) : { status: 'absent' };
     const flag = await storage.getRepoEvaluated(repoKey(pr));
     return resolveConfig(floor, orgRead, repoRead, null, flag.evaluated).config;
   }

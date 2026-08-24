@@ -39,6 +39,12 @@ Starting from a machine with none of this installed? See the step-by-step Window
 guide: [`docs/extension-setup-en.md`](./docs/extension-setup-en.md) (French:
 [`docs/extension-setup-fr.md`](./docs/extension-setup-fr.md)).
 
+**Can't run `npm` at all?** Every tagged release carries the extension as a ready-to-load
+zip — one for Chromium, one for Firefox. Download it from the
+[releases page](https://github.com/reefact/conventional-comments-toolkit/releases/latest),
+unzip it, and load the folder (`chrome://extensions` → Developer mode → Load unpacked).
+No Node, no npm, no Git. How a release is cut: [`docs/release-fr.md`](./docs/release-fr.md).
+
 ## Configuration
 
 A repository is configured by a `.conventional-comments.json` file on its default branch —
@@ -62,7 +68,7 @@ tests, and CI fails if that stops being true.
 
 ## Continuous integration
 
-Four workflows, each answering a different question. Only **CI** is meant to be a required
+Five workflows, each answering a different question. Only **CI** is meant to be a required
 check on `main`; the others report without gating.
 
 | Workflow | Question it answers | When |
@@ -71,6 +77,7 @@ check on `main`; the others report without gating.
 | [`conformance.yml`](./.github/workflows/conformance.yml) | Do the repository's own rules still hold — CA matrix in step with the tests, invisible characters written as escapes, normative spec untouched by a code PR? | push to `main`, every PR |
 | [`extension-package.yml`](./.github/workflows/extension-package.yml) | Does the MV3 bundle build, stay free of remote code (§10), and keep both manifests loadable? Publishes the Chromium and Firefox bundles as artifacts. | push to `main`, PRs touching `packages/` |
 | [`browser-smoke.yml`](./.github/workflows/browser-smoke.yml) | Does the §9.3 programmatic-write strategy still hold in a current Chromium — the one thing happy-dom cannot tell us? | daily (04:17 UTC), PRs touching adapters or the spike |
+| [`release.yml`](./.github/workflows/release.yml) | Can someone install the extension without any build chain? Builds, verifies and publishes the Chromium and Firefox zips as a GitHub Release. | tag `v*`, manual dry run |
 
 The selector smoke test of §9.4 against the *real* platforms needs authenticated sessions
 and is therefore not run in CI: `spikes/p1-prime/smoke.mjs` carries its shape and exits

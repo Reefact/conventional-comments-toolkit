@@ -42,6 +42,12 @@ pas, avec les messages d'erreur exacts et leur solution :
 [`docs/extension-setup-fr.md`](./docs/extension-setup-fr.md) (anglais :
 [`docs/extension-setup-en.md`](./docs/extension-setup-en.md)).
 
+**Poste où `npm` est impossible** (pas de Node, pas de droits, politique d'entreprise) ?
+Poser un tag `vX.Y.Z` publie une Release GitHub qui porte l'extension déjà construite, en
+zip : un pour Chromium, un pour Firefox. Il ne reste qu'à télécharger, décompresser et
+charger le dossier — rien à installer sur le poste. La procédure de publication est dans
+[`docs/release-fr.md`](./docs/release-fr.md).
+
 Si Node.js et npm sont déjà installés, la version courte suffit. Le bundle **n'est pas
 committé** (`dist-ext/` est dans `.gitignore` — c'est un artefact de build) : sur un clone
 frais, il faut le générer une fois, Node ≥ 20 requis :
@@ -117,7 +123,7 @@ corps du check GitHub (`CA-25`).
 | 4 | Créer une app GitHub / un service hook Azure DevOps (jetons, secret de webhook) | Vous | Non |
 | 5 | **Mesure de référence P0** (temps de revue, taux de conformité *avant* l'outil) | Vous | Non, mais **irrattrapable** si l'outil est déployé avant — §14, `docs/operations-fr.md` |
 | 6 | Choisir un dépôt pilote et suivre la trajoire `assist → warn → enforce` | Vous | Non |
-| 7 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) si diffusion au-delà de vous | Vous | Non |
+| 7 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) si diffusion au-delà de vous — pour une diffusion interne, les zips de release suffisent (`docs/release-fr.md`) | Vous | Non |
 | 8 | Fournir des captures DOM réelles pour le smoke test de sélecteurs (§9.4) | Vous (ou moi, avec un accès) | Non |
 | 9 | Vérifier les deux hypothèses AzDO non tranchées par le spike (type d'éditeur, lisibilité du fichier de config) sur un vrai tenant Azure DevOps | Vous (ou moi, avec un accès) | Non — replis dégradés déjà en place, documentés dans `spikes/p1-prime/README-fr.md` |
 

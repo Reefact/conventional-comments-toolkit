@@ -7,6 +7,34 @@ one is not covered here.
 
 All commands run in **PowerShell**. Open it (Start menu → type "PowerShell" → Enter).
 
+## Shortcut: install from a published release, building nothing
+
+When a release is published, installing takes **no Node, no npm, no Git** — and the rest
+of this guide becomes unnecessary:
+
+1. Open the releases page:
+   <https://github.com/reefact/conventional-comments-toolkit/releases/latest>.
+2. Download `conventional-comments-toolkit-<version>-chromium.zip` (Chrome, Edge, or any
+   Chromium browser) or `conventional-comments-toolkit-<version>-firefox.zip` (Firefox).
+3. Unzip it **somewhere other than your Downloads folder**: the browser re-reads that
+   folder at every start, and deleting it disables the extension.
+4. Chrome / Edge: `chrome://extensions` → **Developer mode** → **Load unpacked** → the
+   unzipped folder, the one that directly contains `manifest.json`.
+   Firefox: `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → the
+   `manifest.json` inside the unzipped folder (a temporary add-on is removed when Firefox
+   closes).
+5. Confirm it works with step 9 below.
+
+Each archive carries an `INSTALLATION.txt` repeating these steps. The `SHA256SUMS.txt`
+published alongside lets you check the download:
+
+```powershell
+Get-FileHash conventional-comments-toolkit-<version>-chromium.zip -Algorithm SHA256
+```
+
+The rest of this guide remains the way to **build the extension yourself** from source:
+needed to modify it, or to install a state that has not been released yet.
+
 ## 1. Install Node.js
 
 ```powershell

@@ -31,7 +31,7 @@ plateforme.
 | Configuration `.conventional-comments.json` du dépôt affiché | lue depuis la page déjà chargée par votre session, mise en cache en mémoire (perdue à chaque redémarrage du navigateur) | Non — lecture seule, via la route web que votre session autorise déjà, jamais par un jeton détenu par l'extension |
 | Contenu des commentaires, du code et des diffs que vous consultez ou rédigez | reste dans la page et dans l'éditeur natif de la plateforme | **Jamais transmis nulle part par l'extension** |
 | Télémétrie d'usage | — | **Aucune actuellement : cette version ne collecte ni n'émet de télémétrie.** |
-| Journal d'exemption de PR (identifiant de PR, auteur, horodatage) — mécanisme de gouvernance distinct de la télémétrie ci-dessus, propre au composant serveur de l'organisation, pas à cette extension | serveur de l'organisation, si le mécanisme est déployé et activé | Uniquement si l'organisation a déployé et configuré ce mécanisme ; destination et durée de conservation sont sous son contrôle |
+| Journal d'exemption de PR (identifiant de PR, action — accordée/refusée/révoquée —, auteur de la demande, horodatage, et **un motif en texte libre si la personne en saisit un**) — mécanisme de gouvernance distinct de la télémétrie ci-dessus, propre au composant serveur de l'organisation, pas à cette extension. **Le motif en texte libre peut contenir des informations personnelles ou sensibles**, saisies par la personne qui accorde, refuse ou révoque l'exemption. | serveur de l'organisation, si le mécanisme est déployé et activé | Uniquement si l'organisation a déployé et configuré ce mécanisme ; destination et durée de conservation sont sous son contrôle |
 
 L'extension ne stocke **aucun jeton d'authentification ni secret**. Elle
 ne s'authentifie auprès d'aucune API à jeton : les seules données qu'elle
@@ -102,7 +102,7 @@ visual feedback inside the platform's native comment editor.
 | The displayed repository's `.conventional-comments.json` configuration | read from the page already loaded by your session, cached in memory (lost on every browser restart) | No — read-only, via the web route your session already authorizes, never via a token held by the extension |
 | Comment, code, and diff content you view or write | stays in the page and the platform's native editor | **Never transmitted anywhere by the extension** |
 | Usage telemetry | — | **None currently: this version collects and emits no telemetry.** |
-| PR exemption log (PR id, author, timestamp) — a governance mechanism distinct from the telemetry above, owned by the organization's server component, not by this extension | your organization's server, if that mechanism is deployed and enabled | Only if the organization has deployed and configured that mechanism; destination and retention are under its control |
+| PR exemption log (PR id, action — granted/refused/revoked —, requester, timestamp, and **a free-text reason if one was entered**) — a governance mechanism distinct from the telemetry above, owned by the organization's server component, not by this extension. **The free-text reason may contain personal or sensitive information**, entered by whoever grants, refuses, or revokes the exemption. | your organization's server, if that mechanism is deployed and enabled | Only if the organization has deployed and configured that mechanism; destination and retention are under its control |
 
 The extension stores **no authentication token or secret**. It does not
 authenticate against any token-based API: the only data it reads outside

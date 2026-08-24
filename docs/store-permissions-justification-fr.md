@@ -43,8 +43,11 @@ cette écriture n'existe pas.
 
 Il n'y a **pas** de liste de « dépôts autorisés » persistée, et le cache
 de lecture de `.conventional-comments.json` (`ClientConfigResolver`) est
-un `Map` en mémoire du service worker, pas une entrée `chrome.storage` —
-il ne survit pas au redémarrage du navigateur.
+un `Map` en mémoire — **du script de contenu, pas du service worker**
+(`bootstrap()` l'instancie dans `content-internal.ts:118`) — pas une
+entrée `chrome.storage`. Sa portée est donc **par onglet** : il est
+perdu à chaque déchargement de ce contexte (navigation, rechargement de
+la page), pas seulement au redémarrage du navigateur.
 
 **Justification :** ces préférences doivent survivre à la fermeture de
 l'onglet ; c'est la seule permission qui le permet en MV3. Aucune donnée

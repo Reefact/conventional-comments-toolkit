@@ -4,9 +4,15 @@
    layout shift pendant la frappe (§5.3).
 
    Noms de variables vérifiés en direct sur github.com (scripts/check-github-theme-vars.mjs,
-   canari hebdomadaire) — GitHub a renommé ses tokens sémantiques --color-fg-*/--color-
-   canvas-*/--color-accent-*/... en --fgColor-*/--bgColor-*/--overlay-bgColor courant 2026 ;
-   seuls les primitifs --borderColor-default et --borderRadius-* ont gardé leur nom.
+   canari hebdomadaire) — GitHub a renommé ses tokens sémantiques « --color-fg- »,
+   « --color-canvas- », « --color-accent- »… en « --fgColor- », « --bgColor- »,
+   « --overlay-bgColor » courant 2026 ; seuls les primitifs --borderColor-default et
+   --borderRadius- ont gardé leur nom.
+
+   AUCUNE étoile suivie d'une barre oblique dans ce commentaire : la séquence de deux
+   caractères qu'elle forme FERME le commentaire, et le parseur CSS avale ensuite tout
+   jusqu'à la première accolade — emportant la règle .cct-toolbar qui suit. Le garde
+   scripts/check-extension-css.mjs vérifie que chaque sélecteur du fichier survit au parseur.
 
    Chaque token renommé imbrique l'ANCIEN nom Primer comme repli avant le mot-clé système
    final : GitHub Enterprise Server est figé par version et peut encore servir les noms
@@ -23,11 +29,19 @@
   align-items: center;
 }
 
+/* Fond plein, et non le fond de la page : sur un écran où 1 px CSS vaut MOINS d'un pixel
+   physique (zoom arrière, mise à l'échelle système), un filet de 1 px ne peut pas être
+   tracé plein — Chromium l'étale sur deux pixels et certains bords apparaissent « fondus »
+   alors que leurs voisins restent nets. Mesuré : 4 à 5 bords sur 20 sous 75 % de
+   l'intensité des autres à facteur 0,667/0,75/0,8, contre 0 avec un fond plein, qui donne
+   sa forme au bouton indépendamment du filet. C'est aussi ce que font les boutons natifs
+   de GitHub, d'où la reprise de leurs tokens. */
 .cct-label-button {
-  border: 1px solid var(--cct-label-color, var(--borderColor-default, currentColor));
+  border: 1px solid
+    var(--cct-label-color, var(--button-default-borderColor-rest, var(--color-btn-border, currentColor)));
   border-radius: var(--borderRadius-medium, 6px);
   padding: 3px 10px;
-  background: var(--bgColor-default, var(--color-canvas-default, transparent));
+  background: var(--button-default-bgColor-rest, var(--color-btn-bg, ButtonFace));
   color: var(--fgColor-default, var(--color-fg-default, currentColor));
   cursor: pointer;
   font-size: 12px;
@@ -46,15 +60,16 @@
 
 .cct-decoration-group {
   display: inline-flex;
-  border: 1px solid var(--borderColor-default, currentColor);
+  border: 1px solid var(--button-default-borderColor-rest, var(--color-btn-border, currentColor));
   border-radius: var(--borderRadius-medium, 6px);
   overflow: hidden;
 }
 
+/* Même fond plein que les boutons de label, et pour la même raison (voir plus haut). */
 .cct-decoration-segment {
   border: none;
   padding: 3px 10px;
-  background: var(--bgColor-default, var(--color-canvas-default, transparent));
+  background: var(--button-default-bgColor-rest, var(--color-btn-bg, ButtonFace));
   color: var(--fgColor-default, var(--color-fg-default, currentColor));
   cursor: pointer;
   font-size: 12px;

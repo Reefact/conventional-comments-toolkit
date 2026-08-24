@@ -21,7 +21,8 @@
     "build:extension": "node packages/extension/build.mjs",
     "check:ca-matrix": "node scripts/check-ca-matrix.mjs",
     "check:invisible": "node scripts/check-invisible-chars.mjs",
-    "checks": "npm run check:ca-matrix && npm run check:invisible",
+    "check:extension-css": "node scripts/check-extension-css.mjs",
+    "checks": "npm run check:ca-matrix && npm run check:invisible && npm run check:extension-css",
     "server": "node packages/server/dist/main.js"
   },
   "devDependencies": {

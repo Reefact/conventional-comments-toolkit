@@ -36,7 +36,14 @@ const EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 const TARGET_URL =
   process.env.GITHUB_THEME_CHECK_URL ?? 'https://github.com/Reefact/conventional-comments-toolkit';
 
-const PRIMER_PREFIXES = ['--color-', '--border', '--bgColor-', '--fgColor-', '--overlay-'];
+const PRIMER_PREFIXES = [
+  '--color-',
+  '--border',
+  '--bgColor-',
+  '--fgColor-',
+  '--overlay-',
+  '--button-', // tokens des boutons natifs, repris par .cct-label-button
+];
 
 // Les commentaires CSS documentent parfois des noms de variables (« préférer
 // var(--fgColor-muted) ici ») que la feuille n'utilise pas réellement : les laisser dans

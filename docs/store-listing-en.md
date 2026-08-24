@@ -13,9 +13,14 @@ tools.
 
 ## Short description (132 characters max)
 
-> Conventional Comments assistant for GitHub code review: labels, validation, nothing leaves your browser.
+> Conventional Comments assistant for GitHub code review: labels, validation, no code or comment content leaves your browser.
 
-(104 characters — within the limit.)
+(123 characters — within the limit.)
+
+**Correction (Codex, second pass):** the previous unconditional "nothing
+leaves your browser" was false — `language`/`directShortcuts` sync via
+`chrome.storage.sync` when Chrome Sync is on. Narrowed to the content
+guarantee, which does hold unconditionally.
 
 ## Detailed description
 
@@ -48,7 +53,8 @@ tools.
 > permissions: no `<all_urls>` access — domains beyond GitHub (Azure
 > DevOps, enterprise configuration hosts) are only requested on demand,
 > with your explicit confirmation.
-> See the [full privacy policy](../PRIVACY.md).
+> See the full privacy policy:
+> https://github.com/reefact/conventional-comments-toolkit/blob/main/PRIVACY.md
 >
 > **For organizations**
 > An optional server component (not required to use the extension) lets

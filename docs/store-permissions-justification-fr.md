@@ -57,15 +57,25 @@ Google de l'utilisateur lui-même, pas un service tiers à l'extension.
 
 ### `scripting`
 
-**Usage :** injecter la barre d'outils Conventional Comments et le script
-de validation dans l'éditeur de commentaire natif de la page (GitHub, ou
-Azure DevOps si l'hôte a été autorisé).
+**Usage réel (vérifié) :** **enregistrer et retirer dynamiquement le
+script de contenu sur les hôtes optionnels** que l'utilisateur a
+lui-même autorisés (Azure DevOps, GitHub Enterprise Server, domaine
+interne) — via `chrome.scripting.registerContentScripts()` et
+`unregisterContentScripts()` dans `background.ts`, seuls appels à cette
+API dans tout le code.
 
-**Justification :** c'est le mécanisme MV3 standard pour ajouter une
-interface dans une page existante sans en réécrire le DOM par un
-`content_script` statique trop large ; il est utilisé uniquement sur les
-pages qui correspondent aux hôtes déjà autorisés (`host_permissions` /
-`optional_host_permissions` ci-dessous), jamais de façon globale.
+Ce n'est **pas** ce qui injecte l'extension sur github.com : cet hôte est
+couvert par l'entrée statique `content_scripts.matches` du manifeste, et
+`registerContentScriptForOrigin()` l'**exclut explicitement** de son
+mécanisme dynamique.
+
+**Justification :** l'entrée `content_scripts` du manifeste est statique
+et ne peut pas énumérer à l'avance les domaines d'entreprise
+auto-hébergés. Sans `scripting`, accorder la permission d'hôte sur
+`dev.azure.com` ou un GHES depuis la page d'options n'injecterait le
+script **nulle part** — la permission serait accordée sans effet. Cette
+API n'est appelée que pour un origin que l'utilisateur vient d'autoriser,
+jamais de façon globale.
 
 ### `activeTab`
 

@@ -34,8 +34,13 @@ function published(unresolvedBlockingCount: number): PublishedSummary {
 
 /** Adaptateur factice : `currentPr()` — non porté par `PlatformAdapter`, lu par cast comme
  * dans content-internal.ts — reflète la PR « affichée » par la page à un instant donné, au
- * gré des mutations simulées ci-dessous. */
-function makeAdapter(getCurrent: () => PrRef | null): PlatformAdapter & { currentPr(): PrRef | null } {
+ * gré des mutations simulées ci-dessous. `isHydrated` simule le contenu que la plateforme
+ * peuple en différé : tant qu'il est faux, le DOM ne porte encore ni statut publié ni fil,
+ * comme au tout début du chargement d'une PR. */
+function makeAdapter(
+  getCurrent: () => PrRef | null,
+  isHydrated: () => boolean = () => true
+): PlatformAdapter & { currentPr(): PrRef | null } {
   return {
     matches: () => true,
     platformProfile: () => ({ id: 'github', suggestionInfoString: null, slashPrefixes: [] }),
@@ -50,7 +55,7 @@ function makeAdapter(getCurrent: () => PrRef | null): PlatformAdapter & { curren
     getCurrentUser: async () => ({ id: 'u', login: 'u', isServiceAccount: false }),
     readPublishedResult: () => {
       const current = getCurrent();
-      return current ? published(current.number) : null;
+      return current && isHydrated() ? published(current.number) : null;
     },
     currentPr: getCurrent,
   };
@@ -148,5 +153,91 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     await flushAll();
 
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0);
+  });
+});
+
+describe('barre — première visite directe d’une PR dont le contenu arrive en différé', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('le contenu peuplé APRÈS la première lecture fait quand même apparaître la barre', async () => {
+    const doc = document;
+    // Cas signalé : arrivée en direct sur la PR (pas de navigation SPA, la PR est là dès le
+    // premier instant), mais le statut publié et les fils ne sont pas encore dans le DOM —
+    // GitHub/AzDO les peuplent en différé. Le premier rendu ne trouve donc rien à montrer.
+    const current = pr(11);
+    let hydrated = false;
+    const adapter = makeAdapter(() => current, () => hydrated);
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // trop tôt : rien à montrer
+
+    // La page finit de se peupler : sans relance, cette lecture-là n'a jamais lieu et la
+    // barre reste absente jusqu'à un rechargement complet (le symptôme signalé).
+    hydrated = true;
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+    expect(bannerTitles(doc)[0]).toContain('11');
+  });
+
+  it('une PR réellement vide n’est pas retentée indéfiniment : le rendu se borne', async () => {
+    const doc = document;
+    const current = pr(12);
+    let getThreadsCalls = 0;
+    const adapter = makeAdapter(() => current, () => false);
+    const counting: PlatformAdapter = {
+      ...adapter,
+      getThreads: async () => {
+        getThreadsCalls++;
+        return [];
+      },
+    };
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(counting, resolver, doc);
+    await flushAll();
+
+    // Une page vivante mute sans cesse (frappe, survol, minuteries de la plateforme) :
+    // la borne doit empêcher que chaque mutation relance une lecture pour toujours.
+    for (let i = 0; i < 60; i++) {
+      doc.body.appendChild(doc.createElement('span'));
+      await flushAll(2);
+    }
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0);
+    expect(getThreadsCalls).toBeLessThanOrEqual(20); // MAX_EMPTY_RENDER_ATTEMPTS
+  });
+
+  it('une fois la barre affichée, les mutations suivantes ne la re-rendent pas', async () => {
+    const doc = document;
+    const current = pr(13);
+    let getThreadsCalls = 0;
+    const adapter = makeAdapter(() => current);
+    const counting: PlatformAdapter = {
+      ...adapter,
+      getThreads: async () => {
+        getThreadsCalls++;
+        return [];
+      },
+    };
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(counting, resolver, doc);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+    const callsOnceShown = getThreadsCalls;
+
+    for (let i = 0; i < 10; i++) {
+      doc.body.appendChild(doc.createElement('span'));
+      await flushAll(2);
+    }
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // toujours un seul
+    expect(getThreadsCalls).toBe(callsOnceShown); // plus aucune relecture
   });
 });

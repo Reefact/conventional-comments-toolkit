@@ -345,6 +345,12 @@ describe('§3.5.1 — étages −2 et −1', () => {
     );
   });
 
+  it('CA-40 : mention insensible à la casse — @Codex désigne le même compte que @codex (§4.2)', () => {
+    expect(validate(vInput('@Codex review'), config())).toEqual([]);
+    expect(validate(vInput('@COPILOT review'), config())).toEqual([]);
+    expect(validate(vInput('@DependaBot rebase'), config())).toEqual([]);
+  });
+
   it('allowlistPatterns appliquées au corps entier après trim() (§4.2)', () => {
     const cfg = config((c) => {
       c.allowlistPatterns = ['^LGTM$'];

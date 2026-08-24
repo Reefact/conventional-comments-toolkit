@@ -211,7 +211,9 @@ function isExempt(
   const firstToken = /^(\S+)/.exec(trimmed)?.[1] ?? null;
   if (firstToken) {
     if (input.platform.slashCommands && /^\/[A-Za-z][A-Za-z0-9_-]*$/.test(firstToken)) return true;
-    if (input.platform.commandPrefixes.includes(firstToken)) return true;
+    // Mentions GitHub insensibles à la casse : @Codex et @codex désignent le même compte.
+    const lowerToken = firstToken.toLowerCase();
+    if (input.platform.commandPrefixes.some((p) => p.toLowerCase() === lowerToken)) return true;
   }
   // allowlistPatterns — appliquées au corps entier une fois trim() appliqué (§4.2).
   const wholeTrimmed = input.body.trim();

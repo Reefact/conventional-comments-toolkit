@@ -77,53 +77,46 @@ script **nulle part** — la permission serait accordée sans effet. Cette
 API n'est appelée que pour un origin que l'utilisateur vient d'autoriser,
 jamais de façon globale.
 
-### `activeTab`
+### `activeTab` — retirée du manifeste
 
-**⚠️ Statut à trancher avant soumission — voir la note de bas de section.**
-Cette permission figure dans le manifeste (§10 de la spécification liste
-`storage`, `scripting`, `activeTab` comme le jeu minimal), mais **aucun
-code actuel ne la consomme** : `background.ts` n'utilise l'action de la
-barre d'outils que pour `chrome.runtime.openOptionsPage()`, qui ne
-requiert pas `activeTab`, et aucun appel à `chrome.tabs` ou
-`chrome.scripting.executeScript` n'existe dans l'extension. La déclarer
-sans usage réel est exactement le type d'écart qu'un reviewer Google
-rejette.
+Cette permission était déclarée mais consommée par aucun code (aucun
+appel à `chrome.tabs` ni `chrome.scripting.executeScript` ; l'action de
+la barre d'outils n'appelle que `chrome.runtime.openOptionsPage()`, qui
+n'en a pas besoin). Une permission déclarée sans usage réel est
+exactement le type d'écart qu'un reviewer Google questionne — elle a été
+retirée du manifeste (voir `packages/extension/src/manifest.json`).
 
-**Deux issues, pas une justification à inventer :**
-1. Retirer `activeTab` de `manifest.json` si aucun usage n'est prévu à
-   court terme.
-2. Implémenter l'usage réel que la spec sous-entend (diagnostics
-   contextuels sur l'onglet actif) avant de la justifier ainsi.
+**Écart assumé avec `specifications-fr.md`.** Le §10 de la spécification
+liste `storage`, `scripting`, `activeTab` comme le jeu minimal — ce texte
+n'est **pas** modifié pour coller à ce retrait, conformément à la règle
+de ce dépôt qui fait de la spec la référence normative, jamais réécrite
+pour suivre l'implémentation. La divergence est donc connue et délibérée,
+pas une réconciliation silencieuse : si un usage réel de `activeTab`
+apparaît plus tard (diagnostics contextuels sur l'onglet actif, par
+exemple), la permission sera réintroduite avec sa justification.
 
-Ce choix n'est pas pris dans ce document : il touche au manifeste et,
-pour l'option 1, s'écarte du jeu de permissions énuméré par
-`specifications-fr.md`, qui reste la référence normative de ce dépôt.
+### `host_permissions` — l'entrée statique `https://github.com/*` a été retirée
 
-### `host_permissions`: `https://github.com/*`
-
-**⚠️ Statut à trancher avant soumission — même famille de problème que
-`activeTab` ci-dessus.** Vérifié dans le code : cette permission statique
-n'est probablement **pas ce qui active** l'injection sur GitHub.
-- L'injection de la barre d'outils est déjà couverte par
+Vérifié dans le code : cette permission statique n'était le déclencheur
+d'aucun chemin identifié.
+- L'injection de la barre d'outils est couverte par
   `content_scripts.matches: ["https://github.com/*"]` du manifeste, qui
-  suffit à lui seul en MV3 — sans avoir besoin d'une entrée
-  correspondante dans `host_permissions`.
+  suffit à lui seul en MV3 — sans entrée correspondante dans
+  `host_permissions`.
 - La lecture de `.conventional-comments.json`
   (`getRepoConfig()`/`getOrgConfig()`) est une requête **same-origin**
   (le script de contenu tourne déjà sur `github.com` et interroge
-  `github.com`) : elle ne franchit aucune frontière CORS et ne dépend
-  donc pas de `host_permissions`.
+  `github.com`) : elle ne franchit aucune frontière CORS.
 - `registerContentScriptForOrigin()` (`background.ts`) **exclut
   explicitement** `https://github.com/*` de son mécanisme d'activation
-  dynamique — cette permission statique n'est le déclencheur d'aucun
-  chemin de code identifié.
+  dynamique.
 
-**Ce qui reste à trancher :** soit un usage réel existe et manque
-d'être documenté ici, soit cette entrée est un legs redondant avec
-`content_scripts.matches` qu'un reviewer Google est en droit de
-questionner. Vérifier avant de soumettre, plutôt que de reconduire la
-justification précédente ("lire et modifier le DOM… injecter la barre
-d'outils") qui décrit un besoin déjà couvert ailleurs.
+`specifications-fr.md` (§2, ligne 1780) cadre github.com comme le seul
+hôte « pré-déclarable » par opposition aux hôtes optionnels — l'esprit de
+ce texte est respecté : l'accès à github.com reste statique, via
+`content_scripts.matches`, sans passer par `optional_host_permissions`.
+Retirer l'entrée `host_permissions` redondante ne contredit donc pas la
+spec, contrairement au retrait de `activeTab` ci-dessus.
 
 ### `optional_host_permissions`: `https://*/*`
 

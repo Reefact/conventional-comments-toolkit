@@ -58,13 +58,15 @@ jobs:
       # suivi pour que la notification GitHub standard (email/mobile) prévienne le
       # mainteneur, sans dépendre d'un webhook ou d'un secret supplémentaire.
       #
-      # Gardé sur l'issue de CE step (steps.check.outcome), pas sur failure() du job :
-      # failure() reste vrai après n'importe quel échec en amont (npm ci, installation de
-      # Chromium, résolution du binaire) même si la vérification elle-même n'a jamais
-      # tourné — ouvrir une issue qui affirme « des variables Primer ont disparu » dans ce
-      # cas serait un faux diagnostic.
+      # Gardé sur la sortie `drift` du step (positionnée par le script LUI-MÊME, seulement
+      # quand il a réellement comparé les variables et en a trouvé d'absentes), pas sur
+      # failure()/outcome() du step : ceux-ci restent vrais aussi bien après un échec en
+      # amont (npm ci, installation de Chromium) qu'après une panne de navigation
+      # (réseau, timeout vers github.com) — dans les deux cas, aucune variable n'a été
+      # comparée, et ouvrir une issue qui affirme « des variables Primer ont disparu »
+      # serait un faux diagnostic.
       - name: Ouvrir ou mettre à jour l'issue de suivi
-        if: always() && github.event_name == 'schedule' && steps.check.outcome == 'failure'
+        if: always() && github.event_name == 'schedule' && steps.check.outputs.drift == 'true'
         uses: actions/github-script@v7
         with:
           script: |

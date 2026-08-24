@@ -75,13 +75,17 @@ export class EditorController {
     // chose — un sélecteur global restylerait aussi celles qu'elle ne touche pas. Retiré
     // à dispose(), comme tout ce que cette méthode pose.
     //
-    // Réservé à la génération React du CommentBox GitHub — reconnue via le même indice que
-    // `selectors.ts` (`class*="CommentBox"`) : c'est la seule dont le conteneur est
-    // borderless et sans padding propre (§ci-dessus). Sur le DOM hérité de GitHub et sur
-    // Azure DevOps, la zone de saisie porte sa propre bordure et son propre padding ; y
-    // poser ce retrait décalerait le conteneur sans corriger l'alignement visé, et
-    // effacerait à tort le padding qui donne sa forme au champ.
-    if (this.deps.editor.element.className.includes('CommentBox')) {
+    // Réservé à la génération React du CommentBox GitHub (« Files changed réécrite » dans
+    // selectors.ts) — reconnue via les deux mêmes indices que ses deux sélecteurs candidats
+    // pour cette génération : la classe `CommentBox` et le composeur `data-testid`. C'est
+    // cette génération dont le conteneur est borderless et sans padding propre (§ci-dessus).
+    // Sur le DOM hérité de GitHub et sur Azure DevOps, la zone de saisie porte sa propre
+    // bordure et son propre padding ; y poser ce retrait décalerait le conteneur sans
+    // corriger l'alignement visé, et effacerait à tort le padding qui donne sa forme au champ.
+    const isModernReactComposer =
+      this.deps.editor.element.className.includes('CommentBox') ||
+      this.deps.editor.element.closest('[data-testid*="comment-composer"]') !== null;
+    if (isModernReactComposer) {
       host.classList.add('cct-host');
       this.#disposers.push(() => host.classList.remove('cct-host'));
       // La zone de saisie se donne souvent son propre retrait horizontal (sur GitHub,

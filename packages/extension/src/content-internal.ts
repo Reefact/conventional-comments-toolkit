@@ -149,32 +149,78 @@ export function prKeyFor(pr: PrRef | null): string | null {
   return pr ? `${pr.host}/${pr.scope.join('/')}#${pr.number}` : null;
 }
 
-/** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) : une seule
- * fois au chargement, puis à chaque fois qu'une navigation SPA fait pointer `currentPr()`
- * vers une PR différente (ou plus aucune). Le déclencheur générique — MutationObserver sur
- * le document — couvre Turbo comme les vues React qui n'émettent pas d'événement Turbo
- * (§A.3), et fonctionne à l'identique sur Azure DevOps (§B.3), sans dépendre d'un
- * mécanisme spécifique à une plateforme. */
+/** Borne de sûreté : nombre de rendus infructueux tolérés sur une même PR avant de cesser
+ * de retenter. La convergence tient au coalescing ci-dessous (un rendu à la fois, relancé
+ * une fois s'il a manqué des mutations) — cette borne garantit la terminaison même si une
+ * page mute sans jamais rien faire apparaître, sans quoi une PR réellement dépourvue de fil
+ * ferait retenter le rendu à chaque frappe de l'utilisateur. Réinitialisée à chaque PR. */
+const MAX_EMPTY_RENDER_ATTEMPTS = 20;
+
+/** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) — navigation
+ * SPA vers une PR différente (ou plus aucune) — ET, sur la MÊME PR, tant que le dernier
+ * rendu n'a rien eu à montrer : au premier chargement direct d'une PR, `getThreads()` et le
+ * statut publié se lisent dans le DOM, que GitHub/AzDO peuplent de façon asynchrone (fils
+ * chargés en différé, statut de check encore en vol). Sans cette relance, une lecture faite
+ * trop tôt reste définitive et la barre n'apparaît jamais avant un rechargement complet —
+ * ce qui explique qu'elle manque parfois dès la toute première visite d'une PR, et pas
+ * seulement après une navigation SPA. Le déclencheur générique — MutationObserver sur le
+ * document — couvre Turbo comme les vues React qui n'émettent pas d'événement Turbo (§A.3),
+ * et vaut à l'identique sur Azure DevOps (§B.3).
+ *
+ * Un seul rendu à la fois : le rendu écrit lui-même dans le DOM (bandeau, badges), donc
+ * réagir à chaque mutation sans coalescing ferait boucler l'observateur sur ses propres
+ * écritures. Les mutations survenues pendant un rendu en vol en déclenchent exactement un
+ * autre à sa fin, et une PR dont le rendu a montré quelque chose n'est plus retentée. */
 export function observePrChromeNavigation(adapter: PlatformAdapter, resolver: ClientConfigResolver, doc: Document): void {
   let lastPrKey: string | null = null;
   let hasRendered = false;
-  let generation = 0;
-  const rerenderIfNavigated = () => {
+  let showedSomething = false;
+  let emptyAttempts = 0;
+  let inFlight = false;
+  let missedMutation = false;
+
+  const run = (): void => {
+    if (inFlight) {
+      missedMutation = true; // traité en une seule relance à la fin du rendu en cours
+      return;
+    }
     const key = prKeyFor(currentPrOf(adapter));
-    if (hasRendered && key === lastPrKey) return;
-    hasRendered = true;
-    lastPrKey = key;
-    const renderedAt = ++generation;
-    // Une navigation plus récente peut survenir pendant que ce rendu est encore en
-    // cours (résolution de configuration hors cache) : le résultat périmé ne doit
-    // jamais s'insérer après celui, plus récent, qui l'a déjà supplanté.
-    void renderPrChrome(adapter, resolver, doc, () => renderedAt === generation);
+    if (!hasRendered || key !== lastPrKey) {
+      hasRendered = true;
+      lastPrKey = key;
+      showedSomething = false;
+      emptyAttempts = 0;
+    } else if (showedSomething || emptyAttempts >= MAX_EMPTY_RENDER_ATTEMPTS) {
+      return;
+    }
+    emptyAttempts++;
+    inFlight = true;
+    // Une navigation peut survenir pendant les lectures asynchrones : le rendu vérifie
+    // alors qu'il porte toujours sur la PR affichée avant d'écrire quoi que ce soit.
+    void renderPrChrome(adapter, resolver, doc, () => key === prKeyFor(currentPrOf(adapter)))
+      .then((showed) => {
+        if (key === lastPrKey) showedSomething = showed;
+      })
+      .finally(() => {
+        inFlight = false;
+        if (missedMutation) {
+          missedMutation = false;
+          run();
+        }
+      });
   };
-  rerenderIfNavigated();
-  const observer = new MutationObserver(rerenderIfNavigated);
+
+  run();
+  const observer = new MutationObserver(run);
   observer.observe(doc.documentElement, { childList: true, subtree: true });
 }
 
+/** Rend le bandeau et l'état de complétion pour la PR courante. Renvoie `true` quand
+ * l'issue est définitive — rien à retenter tant que la PR ne change pas (pas de PR, mode
+ * `off`, ou bandeau effectivement affiché) — et `false` quand la PR est active mais que
+ * rien n'a été trouvé à montrer : ce cas-là reste ambigu (page encore en cours
+ * d'hydratation, ou PR réellement sans fil ni statut) et `observePrChromeNavigation` doit
+ * retenter au prochain signe de vie de la page plutôt que de conclure trop tôt. */
 async function renderPrChrome(
   adapter: PlatformAdapter,
   resolver: ClientConfigResolver,
@@ -183,7 +229,7 @@ async function renderPrChrome(
   // asynchrones ci-dessous (§ observePrChromeNavigation) : par défaut (appel direct, hors
   // navigation observée) toujours actuel.
   isCurrent: () => boolean = () => true
-): Promise<void> {
+): Promise<boolean> {
   const clearStaleBanner = () => {
     for (const stale of doc.querySelectorAll('.cct-banner')) stale.remove();
   };
@@ -191,20 +237,20 @@ async function renderPrChrome(
   const pr = currentPrOf(adapter);
   if (!pr) {
     if (isCurrent()) clearStaleBanner();
-    return;
+    return true; // pas de PR : rien à retenter tant que la navigation ne change pas
   }
   const resolved = await resolver.resolve(adapter, pr);
   writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
   if (resolved.config.mode === 'off') {
     if (isCurrent()) clearStaleBanner();
-    return;
+    return true; // désactivé : un état délibéré, pas un chargement encore en cours
   }
   const published = adapter.readPublishedResult();
   const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
   const profile = adapter.platformProfile();
 
   const threads = await adapter.getThreads();
-  if (!isCurrent()) return; // supplanté entre-temps : ne jamais rendre un résultat périmé
+  if (!isCurrent()) return true; // supplanté entre-temps : la navigation suivante prend le relais
   clearStaleBanner(); // efface le bandeau d'un contexte précédent avant d'insérer le sien
   const model = buildBannerModel(
     published,
@@ -218,7 +264,8 @@ async function renderPrChrome(
   // par label du §5.5 porte sur la liste des fils, pas sur les seuls fils bloquants —
   // une page sans fil bloquant mais avec des fils reste filtrable (composant B non
   // déployé compris, §10).
-  if (model.count > 0 || published !== null || threads.length > 0) {
+  const hasSomethingToShow = model.count > 0 || published !== null || threads.length > 0;
+  if (hasSomethingToShow) {
     const labelOfThread = new Map<string, string | null>();
     for (const t of threads) {
       const a = analyze(
@@ -263,6 +310,7 @@ async function renderPrChrome(
   }
 
   applyCompletionState(adapter.getCompletionControl(), published, lang);
+  return hasSomethingToShow;
 }
 
 /** §6.5 : grise le bouton de complétion si et seulement si PublishedSummary.state vaut

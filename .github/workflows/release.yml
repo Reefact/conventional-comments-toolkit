@@ -242,6 +242,17 @@ jobs:
           prerelease=''
           if [ "$PRERELEASE" = 'true' ]; then prerelease='--prerelease'; fi
 
+          # `gh release create` avec des fichiers procède en trois appels : brouillon,
+          # téléversement, publication. Une coupure au milieu laisse donc un BROUILLON pour
+          # ce tag, sur lequel une nouvelle exécution buterait — il faudrait aller le
+          # supprimer à la main avant de pouvoir réessayer. On le retire ici.
+          # Une release DÉJÀ PUBLIÉE n'est jamais touchée : la collision est alors
+          # légitime, et `gh release create` doit échouer plutôt que d'écraser.
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null)" = 'true' ]; then
+            echo "Brouillon résiduel pour $TAG (exécution précédente interrompue) : suppression avant nouvelle tentative."
+            gh release delete "$TAG" --yes  # sans --cleanup-tag : le tag reste en place
+          fi
+
           gh release create "$TAG" \
             --title "Conventional Comments Toolkit $VERSION" \
             --notes-file "$notes" \

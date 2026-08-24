@@ -198,7 +198,18 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
     out.resolverOverrideGroup = asStringArray(out.resolverOverrideGroup, 'resolverOverrideGroup', notices);
   }
   if (out.labels !== undefined) {
-    out.labels = { minimum: asStringArray(out.labels?.minimum, 'labels.minimum', notices) };
+    const obj = asObject(out.labels, 'labels', notices);
+    if (obj === undefined) delete out.labels;
+    else {
+      // Les sous-clés inconnues de `labels`, comme celles de `rules`, d'`activation` et
+      // des règles de liste. `{"minimum": ["issue"], "minmum": ["todo"]}` protégeait
+      // `issue` seul, sans un mot sur `todo` : un niveau inférieur pouvait le désactiver
+      // alors que l'administration croyait l'avoir planché.
+      for (const k of Object.keys(obj)) {
+        if (k !== 'minimum') notices.push(floorWarning(`unknown floor key "labels.${k}" ignored`, `labels.${k}`));
+      }
+      out.labels = { minimum: asStringArray(obj['minimum'], 'labels.minimum', notices) };
+    }
   }
 
   // ————— Les clés scalaires, et les clés inconnues —————

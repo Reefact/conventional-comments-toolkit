@@ -592,6 +592,17 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     expect(config.mode).toBe('enforce'); // le reste du plancher s'applique
   });
 
+  it('une sous-clé inconnue de labels est signalée', () => {
+    // `minmum` : `issue` est planché, `todo` ne l'est pas, et rien ne le dit. Un niveau
+    // inférieur peut alors le désactiver alors que l'administration le croyait protégé.
+    const floor = { labels: { minimum: ['issue'], minmum: ['todo'] } } as unknown as Floor;
+    const repo = found({ labels: [{ id: 'issue', enabled: false }, { id: 'todo', enabled: false }] });
+    const { config, notices } = resolveConfig(floor, absent, repo, null, false);
+    expect(config.labels.find((l) => l.id === 'issue')!.enabled).toBe(true);  // planché
+    expect(config.labels.find((l) => l.id === 'todo')!.enabled).toBe(false);  // pas planché
+    expect(notices.some((n) => n.ref === 'labels.minmum')).toBe(true);        // et c'est dit
+  });
+
   it('contre-épreuve : un plancher bien formé s’applique intégralement', () => {
     const floor: Floor = {
       minimumMode: 'enforce',

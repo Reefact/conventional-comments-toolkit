@@ -79,7 +79,7 @@ export class Orchestrator {
   async probeOrgModeSoftening(): Promise<{ observed: Mode | null; invalidated: boolean }> {
     const { adapter, cache } = this.deps;
     const floor = await this.deps.floorProvider().catch(() => null);
-    const configUrl = floor?.configUrl ?? null;
+    const configUrl = vettedConfigUrl(vetFloor(floor));
     if (configUrl === null) return { observed: null, invalidated: false };
     const read = await cache.read(`org:${configUrl}`, 3600, true, () =>
       adapter.fetchOrgConfig(configUrl, { bypassCache: true })

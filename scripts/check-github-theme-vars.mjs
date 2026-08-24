@@ -12,13 +12,16 @@
 //
 // styles.css imbrique parfois un ANCIEN nom Primer en repli du nouveau (GitHub
 // Enterprise Server est figé par version et peut encore servir les noms d'avant le
-// renommage — specifications-fr.md §A.5). Seul le PREMIER nom Primer par déclaration
-// (le plus prioritaire) est exigé ici : les suivants sont un filet GHES qu'on ne peut
-// pas vérifier depuis github.com et dont l'absence sur github.com est normale, pas une
-// régression.
+// renommage — specifications-fr.md §A.5). Seul le nom Primer le plus prioritaire de
+// chaque CHAÎNE de repli est exigé ici : un nom imbriqué directement dans le repli d'un
+// autre nom Primer est ce filet GHES, qu'on ne peut pas vérifier depuis github.com et
+// dont l'absence y est normale, pas une régression. Deux variables Primer INDÉPENDANTES
+// dans la même déclaration (ex. deux couches de couleur d'un box-shadow) sont en
+// revanche chacune exigée — seule l'imbrication à l'intérieur d'un même var() compte
+// comme repli.
 
 import { chromium } from 'playwright-core';
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -37,13 +40,28 @@ const PRIMER_PREFIXES = ['--color-', '--border', '--bgColor-', '--fgColor-', '--
 
 function extractPrimerVarNames(css) {
   const names = new Set();
-  for (const declaration of css.split(';')) {
-    for (const match of declaration.matchAll(/var\((--[a-zA-Z0-9-]+)/g)) {
-      const name = match[1];
-      if (PRIMER_PREFIXES.some((prefix) => name.startsWith(prefix))) {
-        names.add(name);
-        break; // les noms Primer suivants dans la même déclaration sont un repli GHES
+  // Marche caractère par caractère en empilant une entrée par parenthèse ouvrante,
+  // portant `true` quand cette parenthèse appartient à un var(--primer-...) — un nom
+  // Primer n'est exigé que si la parenthèse englobante immédiate n'est PAS elle-même un
+  // var() Primer (sinon c'est un repli GHES imbriqué, cf. commentaire plus haut).
+  const stack = [];
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i];
+    if (ch === '(') {
+      let isPrimerVar = false;
+      if (css.slice(Math.max(0, i - 3), i) === 'var') {
+        const match = /^\(\s*(--[a-zA-Z0-9-]+)/.exec(css.slice(i));
+        if (match) {
+          const name = match[1];
+          const isPrimer = PRIMER_PREFIXES.some((prefix) => name.startsWith(prefix));
+          const parentIsPrimer = stack.length > 0 && stack[stack.length - 1];
+          if (isPrimer && !parentIsPrimer) names.add(name);
+          isPrimerVar = isPrimer;
+        }
       }
+      stack.push(isPrimerVar);
+    } else if (ch === ')') {
+      stack.pop();
     }
   }
   return [...names].sort();
@@ -66,17 +84,29 @@ try {
   const page = await browser.newPage();
   await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded' });
 
-  const values = await page.evaluate((names) => {
-    const style = getComputedStyle(document.documentElement);
-    return Object.fromEntries(names.map((name) => [name, style.getPropertyValue(name).trim()]));
-  }, varNames);
+  // L'extension promet le respect des thèmes clair ET sombre (§10) ; GitHub sélectionne
+  // ses tokens de couleur via des règles spécifiques à chaque thème (cf. l'imbrication
+  // [data-color-mode]/[data-light-theme]/[data-dark-theme] observée pendant
+  // l'investigation de ce canari). Une variable présente en clair mais renommée
+  // seulement dans les règles sombres doit être détectée, donc les deux schémas sont
+  // vérifiés plutôt que le seul rendu par défaut du navigateur headless.
+  const SCHEMES = ['light', 'dark'];
+  const valuesByScheme = {};
+  for (const scheme of SCHEMES) {
+    await page.emulateMedia({ colorScheme: scheme });
+    valuesByScheme[scheme] = await page.evaluate((names) => {
+      const style = getComputedStyle(document.documentElement);
+      return Object.fromEntries(names.map((name) => [name, style.getPropertyValue(name).trim()]));
+    }, varNames);
+  }
 
   console.log('\nRésultat :');
   for (const name of varNames) {
-    const value = values[name];
-    const ok = value !== '';
+    const perScheme = SCHEMES.map((scheme) => [scheme, valuesByScheme[scheme][name]]);
+    const ok = perScheme.every(([, value]) => value !== '');
     if (!ok) missing.push(name);
-    console.log(`  ${ok ? '✓' : '✗'} ${name}${ok ? ` = ${value}` : ' — absente'}`);
+    const detail = perScheme.map(([scheme, value]) => `${scheme}=${value || '∅'}`).join(', ');
+    console.log(`  ${ok ? '✓' : '✗'} ${name} — ${detail}`);
   }
 
   // Diagnostic : si des variables manquent, lister les propriétés personnalisées
@@ -123,6 +153,11 @@ if (missing.length > 0) {
       "l'apparence reste correcte mais n'est plus alignée sur le thème GitHub actuel. " +
       'Mettre à jour les noms de variables dans styles.css.'
   );
+  // Signal sémantique distinct du seul code de sortie : une panne de navigation (réseau,
+  // timeout) fait aussi échouer ce script, mais AVANT d'atteindre ce bloc — le workflow
+  // n'ouvre une issue de dérive que lorsque ce signal est bien positionné, jamais sur un
+  // échec générique en amont (installation de Chromium, panne réseau, etc.).
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, 'drift=true\n');
   process.exit(1);
 }
 

@@ -36,6 +36,10 @@ npm run spike                   # spike P1' dans Chromium (§9.3)
 npm run check:github-theme-vars # variables Primer de styles.css toujours présentes sur github.com
 ```
 
+`spike` et `check:github-theme-vars` pilotent un vrai Chromium via `playwright-core`, qui
+ne le télécharge pas à l'install : une fois par machine, `npx playwright-core install
+chromium` (comme le fait la CI avant ces deux commandes).
+
 La CI rejoue ces commandes (`.github/workflows/`) : `ci.yml` (build + tests, Node 20 et
 22), `conformance.yml` (les gardes ci-dessus + spécification non modifiée par une PR de
 code), `extension-package.yml` (bundle MV3, aucun code distant), `browser-smoke.yml`

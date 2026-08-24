@@ -51,11 +51,22 @@
   font-size: 12px;
 }
 
-/* Même appariement pour l'état actif : Highlight avec HighlightText, comme le segment de
-   décoration coché plus bas. ButtonFace avec Canvas mettait deux couleurs de FOND l'une
-   sur l'autre — blanc sur gris clair sous un thème système clair. */
+/* La couleur d'un label peint la BORDURE de l'état actif, jamais son fond.
+   Elle vient de la configuration (`labels[].color`, §8.2) : sa luminance est inconnue à
+   l'écriture, alors que le texte, lui, doit être choisi d'avance. La faire gagner sur le
+   fond revenait à écrire un texte « sur emphase » — blanc sur GitHub, HighlightText
+   ailleurs — par-dessus une couleur quelconque. Mesuré sur github.com même, avec le
+   `--fgColor-onEmphasis` réel : 1,63 pour un ambre clair, 1,78 pour un vert clair, 1,54
+   pour un gris clair, là où le §10 (RGAA 4.1.2, donc WCAG AA) en exige 4,5. Seul un ton
+   foncé passait. CSS ne sait pas dériver un texte contrasté d'une couleur d'auteur, et
+   un fond d'emphase apparié à son texte le peut : 4,63 sur github.com.
+
+   Le reste de l'appariement suit la même règle que le segment de décoration coché plus
+   bas : Highlight avec HighlightText. ButtonFace avec Canvas, avant, mettait deux
+   couleurs de FOND l'une sur l'autre — blanc sur gris clair sous un thème système
+   clair. */
 .cct-label-button[aria-pressed='true'] {
-  background: var(--cct-label-color, var(--bgColor-accent-emphasis, var(--color-accent-emphasis, Highlight)));
+  background: var(--bgColor-accent-emphasis, var(--color-accent-emphasis, Highlight));
   border-color: var(--cct-label-color, var(--bgColor-accent-emphasis, var(--color-accent-emphasis, Highlight)));
   color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, HighlightText));
 }

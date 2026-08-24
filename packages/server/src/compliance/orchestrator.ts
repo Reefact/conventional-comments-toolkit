@@ -188,7 +188,12 @@ export class Orchestrator {
           // passe ; une remarque ordinaire sans label ne déclenche rien.
           (d.code === 'E-NO-LABEL' && looksLikeToolCommand(d.comment.body))
       );
-      if (needsRefresh) {
+      // Un contournement stérile récent étrangle les suivants (§8.1.3 r.3) : un rejet qui
+      // ne vient pas d'une configuration en retard — `@alice peux-tu regarder ça ?` — ne
+      // disparaît pas, et relancerait sinon la double lecture à CHAQUE réévaluation.
+      if (needsRefresh && !cache.isBypassThrottled(rKey, ttl)) {
+        const beforeRepo = repoRead;
+        const beforeOrg = orgRead;
         repoRead = await cache.read(`repo:${rKey}`, ttl, true, () =>
           adapter.fetchConfigFile(pr, { bypassCache: true })
         );
@@ -198,8 +203,15 @@ export class Orchestrator {
             : await cache.read(`org:${configUrl}`, ttl, true, () =>
                 adapter.fetchOrgConfig(configUrl, { bypassCache: true })
               );
-        resolved = resolveConfig(floor, orgRead, repoRead, pinned, previouslyEvaluated);
-        evaluation = await this.runEvaluation(pr, pKey, rKey, resolved, floorNotices, current, previouslyEvaluated);
+        if (sameRead(beforeRepo, repoRead) && sameRead(beforeOrg, orgRead)) {
+          // Rien de neuf : le rejet ne venait pas d'un cache en retard. Ne pas réévaluer —
+          // le verdict serait identique au caractère près — et ne pas recommencer avant
+          // l'expiration ordinaire.
+          cache.markFruitlessBypass(rKey);
+        } else {
+          resolved = resolveConfig(floor, orgRead, repoRead, pinned, previouslyEvaluated);
+          evaluation = await this.runEvaluation(pr, pKey, rKey, resolved, floorNotices, current, previouslyEvaluated);
+        }
       }
       result = evaluation.result;
     } catch (e) {
@@ -596,4 +608,14 @@ function identical(a: PublishedRecord, b: PublishedRecord): boolean {
 const MODE_ORDER = { off: 0, assist: 1, warn: 2, enforce: 3 } as const;
 function softer(next: keyof typeof MODE_ORDER, prev: keyof typeof MODE_ORDER): boolean {
   return MODE_ORDER[next] < MODE_ORDER[prev];
+}
+
+/** Deux lectures de configuration portent-elles exactement la même chose ? Sert à savoir
+ * si un contournement du cache a appris quelque chose (§8.1.3, règle 3). Une lecture
+ * `unreachable` n'est jamais « la même » qu'une autre : elle n'est pas un état stable,
+ * et la traiter comme telle étranglerait les contournements sur une panne passagère. */
+function sameRead(a: ConfigRead, b: ConfigRead): boolean {
+  if (a.status === 'unreachable' || b.status === 'unreachable') return false;
+  if (a.status !== b.status) return false;
+  return a.status !== 'found' || a.text === (b as { text: string }).text;
 }

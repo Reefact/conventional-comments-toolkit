@@ -50,20 +50,6 @@ try {
   const page = await browser.newPage();
   await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded' });
 
-  // GitHub ne définit ses tokens de couleur sémantiques (--color-*) que sous des
-  // sélecteurs d'attribut [data-color-mode]/[data-light-theme]/[data-dark-theme] sur
-  // <html> — posés par son propre script au chargement pour un visiteur avec une
-  // préférence de thème enregistrée. Un run CI anonyme, sans cookie, ne les obtient
-  // jamais alors que la vraie extension tourne toujours sur une page GitHub authentifiée
-  // qui les pose (§ toolbar dans le contexte réel §5.1). Les poser nous-mêmes fait
-  // porter le test sur les NOMS de variables, sa seule responsabilité — pas sur l'état
-  // d'authentification du run CI, qui n'a rien à voir avec la question posée ici.
-  await page.evaluate(() => {
-    document.documentElement.setAttribute('data-color-mode', 'light');
-    document.documentElement.setAttribute('data-light-theme', 'light');
-    document.documentElement.setAttribute('data-dark-theme', 'dark');
-  });
-
   const values = await page.evaluate((names) => {
     const style = getComputedStyle(document.documentElement);
     return Object.fromEntries(names.map((name) => [name, style.getPropertyValue(name).trim()]));
@@ -75,6 +61,38 @@ try {
     const ok = value !== '';
     if (!ok) missing.push(name);
     console.log(`  ${ok ? '✓' : '✗'} ${name}${ok ? ` = ${value}` : ' — absente'}`);
+  }
+
+  // Diagnostic : si des variables manquent, lister les propriétés personnalisées
+  // effectivement présentes sur <html> dont le nom ressemble aux nôtres (renommage
+  // probable plutôt que suppression pure) — évite d'avoir à relancer une investigation
+  // manuelle à chaque échec de ce canari.
+  if (missing.length > 0) {
+    const candidates = await page.evaluate(() => {
+      const style = getComputedStyle(document.documentElement);
+      const names = new Set();
+      for (const sheet of document.styleSheets) {
+        let rules;
+        try {
+          rules = sheet.cssRules;
+        } catch {
+          continue; // feuille cross-origine — inaccessible, pas la source de nos variables
+        }
+        for (const rule of rules) {
+          if (!rule.style) continue;
+          for (let i = 0; i < rule.style.length; i++) {
+            const prop = rule.style[i];
+            if (prop.startsWith('--')) names.add(prop);
+          }
+        }
+      }
+      return [...names]
+        .filter((n) => /color|border|fg|bg/i.test(n))
+        .sort()
+        .map((n) => [n, style.getPropertyValue(n).trim()]);
+    });
+    console.log(`\nPropriétés personnalisées apparentées trouvées sur ${TARGET_URL} :`);
+    for (const [name, value] of candidates) console.log(`  ${name} = ${value}`);
   }
 } finally {
   await browser.close();

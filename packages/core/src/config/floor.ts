@@ -169,6 +169,16 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   for (const key of FLOOR_LIST_KEYS) {
     const rule = out[key] as { minimum?: unknown; closed?: unknown } | undefined | null;
     if (rule === undefined) continue;
+    // Les sous-clés inconnues d'une règle de liste, au même titre que celles de `rules`
+    // et d'`activation` : `{"minimum": [], "closd": true}` lisait `closed` absent et
+    // rendait la liste OUVERTE, alors que l'administration la voulait fermée.
+    if (rule !== null && typeof rule === 'object') {
+      for (const k of Object.keys(rule)) {
+        if (k !== 'minimum' && k !== 'closed') {
+          notices.push(floorWarning(`unknown floor key "${key}.${k}" ignored`, `${key}.${k}`));
+        }
+      }
+    }
     const raw = asStringArray(rule?.minimum, `${key}.minimum`, notices);
     const filtered: Notice[] = [];
     const kept =
@@ -278,6 +288,22 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   }
 
   return { floor: out, notices, unsupported: false };
+}
+
+/** L'URL de niveau 2 que ce plancher désigne — `null` s'il n'est pas applicable.
+ *
+ * UNE seule définition, parce que TROIS endroits en ont besoin, et deux d'entre eux en
+ * ont besoin AVANT `resolveConfig()` : l'orchestrateur et le résolveur de l'extension
+ * lancent la lecture du niveau 2 en amont de la résolution. Ils lisaient le plancher
+ * BRUT, si bien qu'un plancher de version non supportée — que le §8.1.1 déclare non
+ * appliqué — désignait quand même le document d'organisation et déclenchait la requête.
+ * `resolveConfig()` posait pourtant déjà `configUrl: null` dans ce cas : la décision
+ * était juste, elle arrivait trop tard.
+ *
+ * Prend le plancher DÉJÀ vérifié, pour ne pas le vérifier deux fois là où l'appelant
+ * l'a en main. */
+export function vettedConfigUrl(vetted: VettedFloor): string | null {
+  return vetted.unsupported ? null : (vetted.floor.configUrl ?? null);
 }
 
 export interface FloorApplication {

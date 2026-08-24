@@ -403,3 +403,81 @@ describe('§9.2.2 — empreinte de configuration', () => {
     expect(fingerprint(server)).toBe(fingerprint(extension));
   });
 });
+
+describe('§8.1.1 — le document de plancher est vérifié comme celui d’un dépôt', () => {
+  // Le plancher est écrit par une administration, mais il arrive par le même chemin
+  // qu’un fichier de dépôt : du JSON désérialisé. Ses entrées court-circuitaient les
+  // filtres que `parseConfigDocument()` applique aux MÊMES clés, et sa forme n’était
+  // vérifiée nulle part.
+
+  it('un motif de plancher hors des bornes du §8.2 est écarté et signalé', () => {
+    // Le cas qui compte : `^(a+)+$` est exactement ce que les bornes ReDoS interdisent
+    // à un dépôt. Sans cette passe, un plancher l’imposait aux deux composants — le
+    // navigateur du relecteur ET le service mutualisé.
+    const floor: Floor = { allowlistPatterns: { minimum: ['^(a+)+$', '^ok$'] } };
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.allowlistPatterns).toEqual(['^ok$']);
+    expect(notices.some((n) => n.kind === 'config-warning' && n.message.startsWith('floor: '))).toBe(true);
+  });
+
+  it('une entrée toolCommands hors grammaire est écartée et signalée', () => {
+    const floor: Floor = { toolCommands: { minimum: ['LGTM', '@bot'] } };
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.toolCommands).toEqual(['@bot']);
+    expect(notices.some((n) => n.kind === 'config-warning' && n.message.includes('floor: toolCommands'))).toBe(true);
+  });
+
+  it('l’avertissement dit que l’entrée vient du PLANCHER, pas d’un dépôt', () => {
+    // Sans le préfixe, une administration qui débogue sa politique lit un message
+    // identique à celui d’un fichier de dépôt et cherche au mauvais endroit.
+    const floor: Floor = { toolCommands: { minimum: ['LGTM'] } };
+    const repo = found({ toolCommands: ['NOPE'] });
+    const { notices } = resolveConfig(floor, absent, repo, null, false);
+    const warnings = notices.filter((n) => n.kind === 'config-warning' && n.ref === 'LGTM');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message.startsWith('floor: ')).toBe(true);
+    expect(notices.some((n) => n.ref === 'NOPE' && !n.message.startsWith('floor: '))).toBe(true);
+  });
+
+  it('`{ closed: true }` sans `minimum` ne fait plus lever la résolution', () => {
+    // `out[key] = [...rule.minimum]` sur un `minimum` absent : le type dit qu’il est
+    // obligatoire, mais la valeur vient d’un JSON.parse, jamais d’un compilateur.
+    const floor = { allowlistPatterns: { closed: true } } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, found({ allowlistPatterns: ['^x$'] }), null, false);
+    expect(config.allowlistPatterns).toEqual([]); // closed + minimum vide ferme la clé
+    expect(notices.some((n) => n.ref === 'allowlistPatterns.minimum')).toBe(true);
+  });
+
+  it('un resolverOverrideGroup qui n’est pas un tableau ne fait plus lever', () => {
+    const floor = { resolverOverrideGroup: 'org/team' } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.resolverOverrideGroup).toEqual([]);
+    expect(notices.some((n) => n.ref === 'resolverOverrideGroup')).toBe(true);
+  });
+
+  it('un labels.minimum qui n’est pas un tableau ne fait plus lever', () => {
+    const floor = { labels: { minimum: 'issue' } } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, found({ labels: [{ id: 'issue', enabled: false }] }), null, false);
+    expect(config.labels.find((l) => l.id === 'issue')!.enabled).toBe(false); // plancher vide : rien à protéger
+    expect(notices.some((n) => n.ref === 'labels.minimum')).toBe(true);
+  });
+
+  it('contre-épreuve : un plancher bien formé s’applique intégralement', () => {
+    const floor: Floor = {
+      minimumMode: 'enforce',
+      exemptUsers: { minimum: ['ci[bot]'] },
+      allowlistPatterns: { minimum: ['^ok$'] },
+      toolCommands: { minimum: ['/*'] },
+      labels: { minimum: ['issue'] },
+      resolverOverrideGroup: ['org/champions'],
+    };
+    const { config, notices } = resolveConfig(floor, absent, found({ labels: [{ id: 'issue', enabled: false }] }), null, false);
+    expect(config.mode).toBe('enforce');
+    expect(config.exemptUsers).toContain('ci[bot]');
+    expect(config.allowlistPatterns).toEqual(['^ok$']);
+    expect(config.toolCommands).toEqual(['/*']);
+    expect(config.labels.find((l) => l.id === 'issue')!.enabled).toBe(true);
+    expect(config.resolverOverrideGroup).toEqual(['org/champions']);
+    expect(notices.some((n) => n.kind === 'config-warning')).toBe(false);
+  });
+});

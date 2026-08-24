@@ -188,9 +188,14 @@ promet n'est pas encore livrée de bout en bout.
   que de décrire un mécanisme opt-in configurable qui n'existe pas
   encore côté extension.
 - Aucun jeton d'authentification (PAT) ni secret n'est stocké par
-  l'extension ; elle ne s'authentifie à aucune API à jeton — elle lit
-  uniquement le DOM des pages déjà chargées par la session de
-  l'utilisateur.
+  l'extension, et elle ne s'authentifie à aucune API à jeton. **Elle
+  émet en revanche des requêtes réseau**, et il faut le dire tel quel :
+  la lecture de `.conventional-comments.json` par la route `raw` du
+  dépôt affiché, et, si un plancher d'entreprise désigne un `configUrl`,
+  celle du document d'organisation. Ces requêtes portent les cookies de
+  session de l'utilisateur (`credentials: 'include'`) — la même
+  autorisation que s'il ouvrait ces URL dans un onglet — et ne
+  transportent aucun contenu vers l'extérieur : ce sont des lectures.
 - Aucun code distant : `content_security_policy` interdit tout script qui
   ne soit pas empaqueté dans l'extension, aucune dépendance CDN.
 - Code source public et auditable (dépôt Apache-2.0).

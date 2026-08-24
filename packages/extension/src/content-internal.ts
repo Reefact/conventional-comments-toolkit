@@ -16,7 +16,7 @@ import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage } from './config-resolver.js';
 import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
-import { applyLabelFilter, buildBannerModel, renderBanner } from './ui/banner.js';
+import { applyLabelFilter, buildBannerModel, clearLabelFilter, renderBanner } from './ui/banner.js';
 import { decorateComment } from './ui/badges.js';
 import { ui } from './ui/strings.js';
 
@@ -181,10 +181,32 @@ export const RENDER_RETRY_WINDOW_MS = 5000;
 export const RENDER_RETRY_THROTTLE_MS = 250;
 
 /** Signature légère du résumé publié (§5.5, §6.5, §8.1.3 règle 2, CA-03) : par valeur, pas
- * par identité d'objet — l'adaptateur peut renvoyer un objet neuf à chaque lecture. */
+ * par identité d'objet — l'adaptateur peut renvoyer un objet neuf à chaque lecture. Les
+ * quatre champs sont EXACTEMENT ceux que le rendu affiche — `state` pilote le grisage
+ * §6.5, `unresolvedBlockingCount` le titre du bandeau, `mode` et `coreVersion` la ligne
+ * « jugée par … » (`ui/banner.ts`, `banner.judged`) : un check qui se termine à nouveau
+ * avec le même décompte mais un `core` ou un `mode` différent doit rester détecté. */
 export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
   const p = adapter.readPublishedResult();
-  return p ? `${p.state}|${p.unresolvedBlockingCount}|${p.configFingerprint}` : null;
+  return p ? `${p.state}|${p.unresolvedBlockingCount}|${p.mode}|${p.coreVersion}` : null;
+}
+
+/** Signature de tout ce que `renderPrChrome` peut afficher pour la PR courante — le résumé
+ * publié (`publishedSignatureOf`), PLUS la présence du bouton de complétion et le nombre de
+ * fils/commentaires actuellement visibles dans le DOM. Sans ces trois derniers, un premier
+ * rendu où le résumé publié apparaît AVANT le reste de la page (bouton pas encore rendu,
+ * fils/commentaires pas encore chargés) suffit à satisfaire `hasSomethingToShow` — le
+ * bandeau s'affiche, `showedSomething` se fige, et le bouton de complétion comme les fils
+ * chargés ensuite ne reçoivent jamais leur grisage/leurs badges. Chaque lecture est
+ * synchrone et bon marché (DOM déjà en mémoire), du même ordre que le scan d'observeEditors
+ * à chaque mutation. */
+function chromeSignatureOf(adapter: PlatformAdapter): string {
+  const withRendered = adapter as PlatformAdapter & { getRenderedComments?: () => unknown[] };
+  const published = publishedSignatureOf(adapter) ?? '';
+  const completion = adapter.getCompletionControl() !== null ? '1' : '0';
+  const threadCount = renderedThreadsOf(adapter).length;
+  const commentCount = withRendered.getRenderedComments?.().length ?? 0;
+  return `${published}|${completion}|${threadCount}|${commentCount}`;
 }
 
 /** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) — navigation
@@ -192,12 +214,14 @@ export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
  * n'a rien eu à montrer (fenêtre `RENDER_RETRY_WINDOW_MS` : au premier chargement direct
  * d'une PR, `getThreads()` et le statut publié se lisent dans le DOM, que GitHub/AzDO
  * peuplent de façon asynchrone — fils chargés en différé, statut de check encore en vol),
- * et quand le résumé publié CHANGE après coup, même une fois quelque chose déjà affiché :
- * §5.5 fait du résumé publié la source qui fait autorité « dès qu'il est présent sur la
- * page », et §6.5 grise/dégrise le bouton de complétion sur son seul état — un rendu figé
- * sur le premier résumé lu contredirait CA-03 dès que le check se termine après coup. Ce
- * dernier cas ignore délibérément la fenêtre : ce n'est pas un chargement encore en cours,
- * juste une donnée qui a changé, et elle doit être adoptée quel que soit l'âge de la PR.
+ * et quand la signature de la « barre » (`chromeSignatureOf`) CHANGE après coup, même une
+ * fois quelque chose déjà affiché : §5.5 fait du résumé publié la source qui fait autorité
+ * « dès qu'il est présent sur la page », et §6.5 grise/dégrise le bouton de complétion sur
+ * son seul état — un rendu figé sur le premier résultat lu contredirait CA-03 dès que le
+ * check se termine après coup, ou laisserait un bouton apparu plus tard, ou des fils
+ * chargés ensuite, sans grisage ni badge. Ce dernier cas ignore délibérément la fenêtre : ce
+ * n'est pas un chargement encore en cours, juste une donnée qui a changé, et elle doit être
+ * adoptée quel que soit l'âge de la PR.
  *
  * Le déclencheur générique — MutationObserver sur le document — couvre Turbo comme les
  * vues React qui n'émettent pas d'événement Turbo (§A.3), et vaut à l'identique sur Azure
@@ -216,7 +240,7 @@ export function observePrChromeNavigation(
   now: () => number = Date.now
 ): void {
   let lastPrKey: string | null = null;
-  let lastPublishedSig: string | null = null;
+  let lastChromeSig: string | null = null;
   let hasRendered = false;
   let showedSomething = false;
   let retryUntil = 0;
@@ -230,7 +254,7 @@ export function observePrChromeNavigation(
       return;
     }
     const key = prKeyFor(currentPrOf(adapter));
-    const publishedSig = key === null ? null : publishedSignatureOf(adapter);
+    const chromeSig = key === null ? null : chromeSignatureOf(adapter);
     const nowMs = now();
     if (!hasRendered || key !== lastPrKey) {
       hasRendered = true;
@@ -238,11 +262,11 @@ export function observePrChromeNavigation(
       showedSomething = false;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
     } else if (showedSomething) {
-      if (publishedSig === lastPublishedSig) return; // rien de neuf à montrer
+      if (chromeSig === lastChromeSig) return; // rien de neuf à montrer
     } else if (nowMs > retryUntil) {
-      return; // fenêtre d'hydratation écoulée, résumé publié toujours absent/inchangé
+      return; // fenêtre d'hydratation écoulée, rien à montrer et toujours pas plus de contenu
     }
-    lastPublishedSig = publishedSig;
+    lastChromeSig = chromeSig;
     inFlight = true;
     // Une navigation peut survenir pendant les lectures asynchrones : le rendu vérifie
     // alors qu'il porte toujours sur la PR affichée avant d'écrire quoi que ce soit.
@@ -292,9 +316,9 @@ async function renderPrChrome(
     // none` posé sur l'élément de PAGE, pas sur le bandeau qu'on s'apprête à retirer : un
     // nouveau bandeau reconstruit son propre filtre (remis sur « tous »), mais sans ce
     // geste les fils resteraient masqués pour rien, orphelins du filtre qui les a cachés.
-    for (const { element } of renderedThreadsOf(adapter)) {
-      (element as HTMLElement).style.display = '';
-    }
+    // clearLabelFilter ne touche QUE ce que ce filtre avait lui-même masqué — jamais un
+    // `display` que la plateforme porte pour ses propres raisons (fil réduit, virtualisé).
+    clearLabelFilter(renderedThreadsOf(adapter));
     for (const stale of doc.querySelectorAll('.cct-banner')) stale.remove();
   };
 
@@ -306,7 +330,15 @@ async function renderPrChrome(
   const resolved = await resolver.resolve(adapter, pr);
   writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
   if (resolved.config.mode === 'off') {
-    if (isCurrent()) clearStaleBanner();
+    if (isCurrent()) {
+      clearStaleBanner();
+      // §7 : mode off = extension entièrement inactive. Un grisage posé par un rendu
+      // ANTÉRIEUR (mode enforce/warn encore actif à ce moment-là) ne doit pas survivre au
+      // passage à off — sinon aria-disabled/cct-merge-blocked/title restent affichés par
+      // une extension qui prétend ne plus intervenir. `lang` est sans effet ici : la
+      // branche de dégrisage de applyCompletionState ne le lit pas.
+      applyCompletionState(adapter.getCompletionControl(), null, '');
+    }
     return true; // désactivé : un état délibéré, pas un chargement encore en cours
   }
   const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);

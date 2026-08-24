@@ -133,6 +133,20 @@ export function queryChainAll(root: ParentNode, chain: SelectorChain): Element[]
   return [];
 }
 
+/** Texte d'un corps de commentaire, badge de label de l'extension EXCLU (§5.5) :
+ * `decorateComment` (extension/src/ui/badges.ts) insère `.cct-badge` comme premier enfant
+ * de ce même élément — celui que `getThreads()`/`getRenderedComments()` lisent ensuite.
+ * Un rendu répété sur la même PR (résumé publié changé après coup, §5.5) relirait sinon le
+ * texte du badge mêlé au corps réel, cassant la reconnaissance du préfixe par `analyze()`
+ * au tour suivant. `:scope >` : seul un badge posé en enfant DIRECT — jamais un badge
+ * hérité d'une citation ou d'un bloc de code imbriqué. */
+export function commentBodyText(element: Element): string {
+  if (!element.querySelector(':scope > .cct-badge')) return element.textContent ?? '';
+  const clone = element.cloneNode(true) as Element;
+  clone.querySelector(':scope > .cct-badge')?.remove();
+  return clone.textContent ?? '';
+}
+
 /** closest() sur une chaîne : les candidats s'essaient DANS L'ORDRE, comme queryChain —
  * les joindre en un seul sélecteur laisserait un candidat de repli large l'emporter sur
  * le candidat précis d'une génération plus récente (§9.4). */

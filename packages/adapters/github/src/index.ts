@@ -15,6 +15,7 @@ import {
 } from '@cct/core';
 import {
   closestChain,
+  commentBodyText,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -169,7 +170,7 @@ export class GithubClientAdapter implements PlatformAdapter {
         root: {
           id: `${id}-root`,
           author: { id: `login:${author.toLowerCase()}`, login: author, isServiceAccount: false },
-          body: bodyEl?.textContent ?? '',
+          body: bodyEl ? commentBodyText(bodyEl) : '',
           createdAt: '',
           permalink: anchor,
           isSystemGenerated: false,
@@ -216,7 +217,7 @@ export class GithubClientAdapter implements PlatformAdapter {
   getRenderedComments(): { element: Element; bodyText: string }[] {
     return queryChainAll(this.#doc, selectors.commentBody).map((element) => ({
       element,
-      bodyText: element.textContent ?? '',
+      bodyText: commentBodyText(element),
     }));
   }
 

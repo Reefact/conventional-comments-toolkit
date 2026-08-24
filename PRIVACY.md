@@ -26,7 +26,7 @@ plateforme.
 | Donnée | Où elle vit | Sort-elle du navigateur ? |
 |---|---|---|
 | Langue d'interface et raccourcis clavier directs | `chrome.storage.sync` | **Se synchronise entre les appareils de votre compte Chrome si la synchronisation est activée** — c'est le mécanisme natif de Chrome, pas un serveur propre à l'extension. Contenu limité à ces deux préférences, jamais de contenu de commentaire ou de code. |
-| État dégradé courant et journal local de dégradation de sélecteurs (diagnostic) | `chrome.storage.local`, sur votre appareil | Non |
+| État dégradé courant (diagnostic) | `chrome.storage.local`, sur votre appareil | Non |
 | Domaines optionnels activés (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, géré par Chrome | Non — c'est Chrome, pas l'extension, qui tient cette liste |
 | Configuration `.conventional-comments.json` du dépôt affiché | lue depuis la page déjà chargée par votre session, mise en cache en mémoire (perdue à chaque redémarrage du navigateur) | Non — lecture seule, via la route web que votre session autorise déjà, jamais par un jeton détenu par l'extension |
 | Contenu des commentaires, du code et des diffs que vous consultez ou rédigez | reste dans la page et dans l'éditeur natif de la plateforme | **Jamais transmis nulle part par l'extension** |
@@ -97,7 +97,7 @@ visual feedback inside the platform's native comment editor.
 | Data | Where it lives | Does it leave the browser? |
 |---|---|---|
 | Interface language and direct keyboard shortcuts | `chrome.storage.sync` | **Syncs across your Chrome account's devices if sync is enabled** — that's Chrome's own native mechanism, not a server run by the extension. Limited to these two preferences, never comment or code content. |
-| Current degraded state and local selector-degradation log (diagnostics) | `chrome.storage.local`, on your device | No |
+| Current degraded state (diagnostics) | `chrome.storage.local`, on your device | No |
 | Enabled optional domains (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, managed by Chrome | No — Chrome holds this list, not the extension |
 | The displayed repository's `.conventional-comments.json` configuration | read from the page already loaded by your session, cached in memory (lost on every browser restart) | No — read-only, via the web route your session already authorizes, never via a token held by the extension |
 | Comment, code, and diff content you view or write | stays in the page and the platform's native editor | **Never transmitted anywhere by the extension** |

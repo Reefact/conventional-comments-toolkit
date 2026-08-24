@@ -28,11 +28,18 @@ et `content-internal.ts`) :**
   clavier directs (`directShortcuts`) — ces deux préférences **se
   synchronisent entre les appareils du compte Chrome de l'utilisateur**
   si la synchronisation est activée (voir la note ci-dessous).
-- `chrome.storage.local` : état dégradé courant (`degradedState`) et
-  journal local de dégradation de sélecteurs (`selectorFailures`),
+- `chrome.storage.local` : état dégradé courant (`degradedState`),
   purement diagnostique.
 - `chrome.storage.managed` : lecture du plancher de politique d'entreprise
   (§8.1.1), pas d'écriture côté extension.
+
+**Correction (revue Codex, second passage) :** `selectorFailures` n'est
+que **lu** depuis `chrome.storage.local` par la page d'options
+(`options.ts:85`) — rien dans le code de production ne l'y **écrit**.
+`SelectorLog` ne garde ses échecs qu'en mémoire (tableau interne). Le
+journal affiché dans les réglages est donc toujours vide en l'état
+actuel ; ne pas le décrire comme une donnée réellement persistée tant que
+cette écriture n'existe pas.
 
 Il n'y a **pas** de liste de « dépôts autorisés » persistée, et le cache
 de lecture de `.conventional-comments.json` (`ClientConfigResolver`) est

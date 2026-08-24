@@ -18,9 +18,15 @@ de revue de code, pas de la productivité générale ni des réseaux sociaux.
 (144 caractères — **dépasse la limite de 132**, à raccourcir avant
 soumission. Variante conforme :)
 
-> Assistant Conventional Comments pour la revue de code sur GitHub : labels, validation, rien ne quitte votre navigateur.
+> Assistant Conventional Comments pour la revue de code GitHub : labels, validation, aucun code ni commentaire ne sort du navigateur.
 
-(119 caractères.)
+(131 caractères.)
+
+**Correction (Codex, deuxième passage) :** l'ancienne formulation « rien
+ne quitte votre navigateur » était fausse sans nuance — `language` et
+`directShortcuts` se synchronisent via `chrome.storage.sync` quand la
+synchronisation Chrome est active. Restreint à la garantie sur le
+contenu, qui elle tient sans condition.
 
 ## Description longue
 
@@ -52,7 +58,8 @@ soumission. Variante conforme :)
 > stocké. Permissions minimales : pas d'accès à `<all_urls>`, les domaines
 > hors GitHub (Azure DevOps, configuration d'entreprise) ne sont demandés
 > qu'à la demande et avec votre confirmation explicite.
-> Voir la [politique de confidentialité complète](../PRIVACY.md).
+> Politique de confidentialité complète :
+> https://github.com/reefact/conventional-comments-toolkit/blob/main/PRIVACY.md
 >
 > **Pour les organisations**
 > Un composant serveur optionnel (non requis pour utiliser l'extension)

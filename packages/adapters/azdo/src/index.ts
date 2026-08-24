@@ -56,10 +56,16 @@ export class AzdoClientAdapter implements PlatformAdapter {
     this.log = opts.log ?? new SelectorLog();
   }
 
-  matches(url: URL): boolean {
+  /** Sélection de plateforme par hôte seul (§2) — même raison qu'en annexe A : Azure
+   * DevOps étant entièrement SPA, la navigation vers une PR depuis les vues « Pull
+   * requests » ou « Mes demandes » arrive après l'injection du script, jamais avant. */
+  matchesHost(url: URL): boolean {
     const host = url.hostname;
-    const known = this.#hosts.some((h) => host === h) || host.endsWith('.visualstudio.com');
-    return known && /\/pullrequest\/\d+/i.test(url.pathname);
+    return this.#hosts.some((h) => host === h) || host.endsWith('.visualstudio.com');
+  }
+
+  matches(url: URL): boolean {
+    return this.matchesHost(url) && /\/pullrequest\/\d+/i.test(url.pathname);
   }
 
   platformProfile(): PlatformProfile {
@@ -112,9 +118,13 @@ export class AzdoClientAdapter implements PlatformAdapter {
     const scan = () => {
       for (const el of queryChainAll(this.#doc, selectors.editors)) {
         if (seen.has(el)) continue;
-        seen.add(el);
+        // Marquer « vu » APRÈS #toHandle() : un élément balayé avant que currentPr() ne
+        // trouve de PR (page pas encore navigée) doit rester réexaminable au prochain
+        // balayage, pas définitivement ignoré (§9.2.3).
         const handle = this.#toHandle(el);
-        if (handle) cb(handle);
+        if (!handle) continue;
+        seen.add(el);
+        cb(handle);
       }
     };
     scan();

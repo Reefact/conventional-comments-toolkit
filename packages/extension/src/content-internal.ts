@@ -102,11 +102,17 @@ async function readDirectShortcuts(): Promise<Record<string, string>> {
 export async function bootstrap(doc: Document = document): Promise<void> {
   const url = new URL(doc.location.href);
   // Un seul produit, un adaptateur par plateforme, activé sur les hôtes autorisés (§2).
-  const adapters: PlatformAdapter[] = [
+  // Sélection par HÔTE (matchesHost), pas par matches() — qui exige en plus une URL de
+  // PR : bootstrap() ne s'exécute qu'une fois, à l'injection du script, alors que la
+  // navigation SPA vers une PR arrive presque toujours ENSUITE (liste des PR,
+  // notifications, tableau de bord). Exiger une PR ici laissait l'extension
+  // intégralement inactive — aucun adaptateur choisi, donc aucun observateur armé — tant
+  // qu'un rechargement complet ne la relançait pas directement sur l'URL de la PR.
+  const adapters: (PlatformAdapter & { matchesHost(url: URL): boolean })[] = [
     new GithubClientAdapter({ documentRef: doc }),
     new AzdoClientAdapter({ documentRef: doc }),
   ];
-  const adapter = adapters.find((a) => a.matches(url));
+  const adapter = adapters.find((a) => a.matchesHost(url));
   if (!adapter) return;
 
   const resolver = new ClientConfigResolver(readManagedFloor);
@@ -145,55 +151,96 @@ function currentPrOf(adapter: PlatformAdapter): PrRef | null {
   return (adapter as GithubClientAdapter | AzdoClientAdapter).currentPr?.() ?? null;
 }
 
+function renderedThreadsOf(adapter: PlatformAdapter): { id: string; element: Element }[] {
+  const withRenderedThreads = adapter as PlatformAdapter & {
+    getRenderedThreadElements?: () => { id: string; element: Element }[];
+  };
+  return withRenderedThreads.getRenderedThreadElements?.() ?? [];
+}
+
 export function prKeyFor(pr: PrRef | null): string | null {
   return pr ? `${pr.host}/${pr.scope.join('/')}#${pr.number}` : null;
 }
 
-/** Borne de sûreté : nombre de rendus infructueux tolérés sur une même PR avant de cesser
- * de retenter. La convergence tient au coalescing ci-dessous (un rendu à la fois, relancé
- * une fois s'il a manqué des mutations) — cette borne garantit la terminaison même si une
- * page mute sans jamais rien faire apparaître, sans quoi une PR réellement dépourvue de fil
- * ferait retenter le rendu à chaque frappe de l'utilisateur. Réinitialisée à chaque PR. */
-const MAX_EMPTY_RENDER_ATTEMPTS = 20;
+/** Fenêtre de rattrapage après une navigation vers une PR : tant qu'aucun rendu n'a rien
+ * montré ET que cette fenêtre n'est pas écoulée, on retente. C'est un budget de TEMPS, pas
+ * un nombre de tentatives — une PR chargée sous forte charge réseau peut mettre plusieurs
+ * secondes à peupler ses fils/son statut publié, quel que soit le nombre de mutations DOM
+ * observées entre-temps (un compteur de tentatives s'épuiserait en quelques dizaines de
+ * millisecondes dès que la configuration est en cache, bien avant que le contenu n'arrive
+ * — précisément pendant l'hydratation qu'il est censé attendre). Réinitialisée à chaque PR. */
+export const RENDER_RETRY_WINDOW_MS = 5000;
+
+/** Espacement minimal entre deux tentatives déclenchées par une rafale de mutations que le
+ * rendu en cours a manquée (streaming de commentaires, virtualisation) : sans lui, chaque
+ * rafale se traduirait par une relecture DOM/réseau immédiate, ce que le §10 (NFR
+ * d'injection) ne tolère pas. Ne s'applique qu'au rattrapage, jamais au premier rendu
+ * d'une navigation ni à un changement du résumé publié — les deux restent immédiats. */
+export const RENDER_RETRY_THROTTLE_MS = 250;
+
+/** Signature légère du résumé publié (§5.5, §6.5, §8.1.3 règle 2, CA-03) : par valeur, pas
+ * par identité d'objet — l'adaptateur peut renvoyer un objet neuf à chaque lecture. */
+export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
+  const p = adapter.readPublishedResult();
+  return p ? `${p.state}|${p.unresolvedBlockingCount}|${p.configFingerprint}` : null;
+}
 
 /** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) — navigation
- * SPA vers une PR différente (ou plus aucune) — ET, sur la MÊME PR, tant que le dernier
- * rendu n'a rien eu à montrer : au premier chargement direct d'une PR, `getThreads()` et le
- * statut publié se lisent dans le DOM, que GitHub/AzDO peuplent de façon asynchrone (fils
- * chargés en différé, statut de check encore en vol). Sans cette relance, une lecture faite
- * trop tôt reste définitive et la barre n'apparaît jamais avant un rechargement complet —
- * ce qui explique qu'elle manque parfois dès la toute première visite d'une PR, et pas
- * seulement après une navigation SPA. Le déclencheur générique — MutationObserver sur le
- * document — couvre Turbo comme les vues React qui n'émettent pas d'événement Turbo (§A.3),
- * et vaut à l'identique sur Azure DevOps (§B.3).
+ * SPA vers une PR différente (ou plus aucune) —, tant que le dernier rendu sur la MÊME PR
+ * n'a rien eu à montrer (fenêtre `RENDER_RETRY_WINDOW_MS` : au premier chargement direct
+ * d'une PR, `getThreads()` et le statut publié se lisent dans le DOM, que GitHub/AzDO
+ * peuplent de façon asynchrone — fils chargés en différé, statut de check encore en vol),
+ * et quand le résumé publié CHANGE après coup, même une fois quelque chose déjà affiché :
+ * §5.5 fait du résumé publié la source qui fait autorité « dès qu'il est présent sur la
+ * page », et §6.5 grise/dégrise le bouton de complétion sur son seul état — un rendu figé
+ * sur le premier résumé lu contredirait CA-03 dès que le check se termine après coup. Ce
+ * dernier cas ignore délibérément la fenêtre : ce n'est pas un chargement encore en cours,
+ * juste une donnée qui a changé, et elle doit être adoptée quel que soit l'âge de la PR.
+ *
+ * Le déclencheur générique — MutationObserver sur le document — couvre Turbo comme les
+ * vues React qui n'émettent pas d'événement Turbo (§A.3), et vaut à l'identique sur Azure
+ * DevOps (§B.3).
  *
  * Un seul rendu à la fois : le rendu écrit lui-même dans le DOM (bandeau, badges), donc
  * réagir à chaque mutation sans coalescing ferait boucler l'observateur sur ses propres
- * écritures. Les mutations survenues pendant un rendu en vol en déclenchent exactement un
- * autre à sa fin, et une PR dont le rendu a montré quelque chose n'est plus retentée. */
-export function observePrChromeNavigation(adapter: PlatformAdapter, resolver: ClientConfigResolver, doc: Document): void {
+ * écritures. Les mutations survenues pendant un rendu en vol en déclenchent exactement une
+ * autre à sa fin, temporisée (§10). */
+export function observePrChromeNavigation(
+  adapter: PlatformAdapter,
+  resolver: ClientConfigResolver,
+  doc: Document,
+  // Horloge injectable — même convention que ClientConfigResolver (config-resolver.ts) —
+  // pour tester la fenêtre RENDER_RETRY_WINDOW_MS sans dépendre d'une attente réelle.
+  now: () => number = Date.now
+): void {
   let lastPrKey: string | null = null;
+  let lastPublishedSig: string | null = null;
   let hasRendered = false;
   let showedSomething = false;
-  let emptyAttempts = 0;
+  let retryUntil = 0;
   let inFlight = false;
   let missedMutation = false;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
   const run = (): void => {
     if (inFlight) {
-      missedMutation = true; // traité en une seule relance à la fin du rendu en cours
+      missedMutation = true; // traité en une seule relance temporisée à la fin du rendu en cours
       return;
     }
     const key = prKeyFor(currentPrOf(adapter));
+    const publishedSig = key === null ? null : publishedSignatureOf(adapter);
+    const nowMs = now();
     if (!hasRendered || key !== lastPrKey) {
       hasRendered = true;
       lastPrKey = key;
       showedSomething = false;
-      emptyAttempts = 0;
-    } else if (showedSomething || emptyAttempts >= MAX_EMPTY_RENDER_ATTEMPTS) {
-      return;
+      retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
+    } else if (showedSomething) {
+      if (publishedSig === lastPublishedSig) return; // rien de neuf à montrer
+    } else if (nowMs > retryUntil) {
+      return; // fenêtre d'hydratation écoulée, résumé publié toujours absent/inchangé
     }
-    emptyAttempts++;
+    lastPublishedSig = publishedSig;
     inFlight = true;
     // Une navigation peut survenir pendant les lectures asynchrones : le rendu vérifie
     // alors qu'il porte toujours sur la PR affichée avant d'écrire quoi que ce soit.
@@ -203,9 +250,12 @@ export function observePrChromeNavigation(adapter: PlatformAdapter, resolver: Cl
       })
       .finally(() => {
         inFlight = false;
-        if (missedMutation) {
+        if (missedMutation && retryTimer === null) {
           missedMutation = false;
-          run();
+          retryTimer = setTimeout(() => {
+            retryTimer = null;
+            run();
+          }, RENDER_RETRY_THROTTLE_MS);
         }
       });
   };
@@ -231,6 +281,13 @@ async function renderPrChrome(
   isCurrent: () => boolean = () => true
 ): Promise<boolean> {
   const clearStaleBanner = () => {
+    // Un fil masqué par le filtre local du §5.5 (applyLabelFilter) porte un `display:
+    // none` posé sur l'élément de PAGE, pas sur le bandeau qu'on s'apprête à retirer : un
+    // nouveau bandeau reconstruit son propre filtre (remis sur « tous »), mais sans ce
+    // geste les fils resteraient masqués pour rien, orphelins du filtre qui les a cachés.
+    for (const { element } of renderedThreadsOf(adapter)) {
+      (element as HTMLElement).style.display = '';
+    }
     for (const stale of doc.querySelectorAll('.cct-banner')) stale.remove();
   };
 
@@ -283,18 +340,9 @@ async function renderPrChrome(
     }
     // Fils rendus sur la page — surface d'affichage, hors contrat §9.2.3 : le filtre les
     // masque AUSSI, pas seulement les ancres du bandeau (§5.5).
-    const withRenderedThreads = adapter as PlatformAdapter & {
-      getRenderedThreadElements?: () => { id: string; element: Element }[];
-    };
     const banner = renderBanner(model, published, lang, {
       filterLabels: enabledLabels(resolved.config).map((l) => l.id),
-      onFilter: (labelId) =>
-        applyLabelFilter(
-          banner,
-          withRenderedThreads.getRenderedThreadElements?.() ?? [],
-          labelOfThread,
-          labelId
-        ),
+      onFilter: (labelId) => applyLabelFilter(banner, renderedThreadsOf(adapter), labelOfThread, labelId),
     });
     doc.body.insertAdjacentElement('afterbegin', banner);
   }
@@ -326,6 +374,13 @@ export function applyCompletionState(
     control.element.classList.add('cct-merge-blocked');
     control.element.setAttribute('title', ui(lang, 'merge.blocked'));
   } else {
+    // Ne retirer le `title` que si c'est bien celui posé ci-dessus (marqué par la
+    // présence de la classe, jamais réappliquée sans elle) : la plateforme peut porter
+    // sur ce bouton une infobulle native qui n'a rien à voir avec le §6.5, qu'il ne faut
+    // jamais effacer.
+    if (control.element.classList.contains('cct-merge-blocked')) {
+      control.element.removeAttribute('title');
+    }
     control.element.removeAttribute('aria-disabled');
     control.element.classList.remove('cct-merge-blocked');
   }

@@ -75,6 +75,19 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.dispose();
   });
 
+  it('marque le conteneur et la zone pour le retrait intérieur, et les démarque à dispose()', () => {
+    const { controller, textarea, host } = setup();
+    controller.attach();
+    // Le retrait n'est posé que sur les boîtes réellement instrumentées : un sélecteur
+    // visant le conteneur de la plateforme restylerait aussi celles qu'on ne touche pas.
+    expect(host.classList.contains('cct-host')).toBe(true);
+    expect(textarea.classList.contains('cct-editor')).toBe(true);
+    controller.dispose();
+    // Rien de ce que attach() pose ne doit survivre au détachement.
+    expect(host.classList.contains('cct-host')).toBe(false);
+    expect(textarea.classList.contains('cct-editor')).toBe(false);
+  });
+
   it('§5.3 : rend une pastille et les diagnostics sous la zone', async () => {
     const { controller, textarea, host } = setup();
     controller.attach();

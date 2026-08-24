@@ -68,6 +68,20 @@ export class EditorController {
     const host = this.deps.editor.element.parentElement;
     if (!host) return;
 
+    // Retrait intérieur de la boîte de commentaire (styles.css). Posé par une classe, et
+    // non par un sélecteur visant directement le conteneur de la plateforme, pour deux
+    // raisons : le nom de ce conteneur est propre à chaque plateforme, et surtout le
+    // retrait ne doit s'appliquer QU'AUX boîtes où l'extension injecte réellement quelque
+    // chose — un sélecteur global restylerait aussi celles qu'elle ne touche pas. Retiré
+    // à dispose(), comme tout ce que cette méthode pose.
+    host.classList.add('cct-host');
+    this.#disposers.push(() => host.classList.remove('cct-host'));
+    // La zone de saisie se donne souvent son propre retrait horizontal (sur GitHub,
+    // `.CommentBox-input` porte `padding: var(--base-size-8)`), qui ferait double emploi
+    // avec celui du conteneur et désalignerait son texte du reste. Neutralisé en CSS.
+    this.deps.editor.element.classList.add('cct-editor');
+    this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-editor'));
+
     // §5.1 — barre d'outils au-dessus de la zone de saisie.
     const toolbar = buildToolbar({
       config: this.config,

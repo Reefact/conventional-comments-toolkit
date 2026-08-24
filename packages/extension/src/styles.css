@@ -19,26 +19,33 @@
    d'avant le renommage (specifications-fr.md §A.5). Le canari n'exige que le nom actuel
    (premier niveau) — l'ancien est un filet non vérifiable depuis github.com. */
 
-/* Retrait horizontal aligné sur celui que la zone de saisie se donne à elle-même.
-   Sur GitHub, le conteneur hôte (`.CommentBox-container`) n'a AUCUN padding : il porte
-   une marge de `--base-size-8` et rien d'autre. C'est `.CommentBox-input` qui s'octroie
-   `padding: var(--base-size-8)`. Nos éléments injectés, eux, étaient collés à la bordure,
-   et le texte du champ commençait 8 px plus loin — trois alignements différents dans une
-   même boîte.
+/* Retrait intérieur de la boîte de commentaire : plus rien ne touche la bordure.
+   Le conteneur de la plateforme n'en a aucun — sur GitHub, `.CommentBox-container` porte
+   `margin: var(--base-size-8)` et c'est tout —, si bien que son en-tête et nos éléments
+   injectés étaient collés au bord, et que seul le texte du champ s'en écartait, par son
+   propre padding. On égalise en donnant au conteneur un retrait égal à sa marge.
 
-   Le retrait se pose donc ICI, sur nos propres éléments, et jamais en ajoutant un padding
-   au conteneur de GitHub : celui-ci héberge aussi `.CommentBox-header`, dont le fond
-   teinté et les coins arrondis sont faits pour rejoindre la bordure, et dont les onglets
-   se décalent de `-1px` exprès pour la chevaucher. Mesuré : un padding sur le conteneur
-   ramène l'en-tête à 726 px de large dans une boîte de 744, et repousse le texte du champ
-   à 17 px pendant que la barre reste à 9 — l'écart change de place au lieu de
-   disparaître. */
+   Classe posée par editor-controller.ts, jamais un sélecteur visant le conteneur de la
+   plateforme : le retrait ne doit s'appliquer QU'AUX boîtes où l'extension injecte
+   quelque chose. Sélecteur doublé pour passer devant la règle de la plateforme sans
+   `!important` — GitHub emploie le même procédé sur ce conteneur. */
+.cct-host.cct-host {
+  padding: var(--base-size-8, 8px);
+}
+
+/* Le retrait du conteneur remplace celui que la zone de saisie se donnait : les deux
+   cumulés porteraient son texte deux fois plus loin que la barre d'outils. */
+.cct-host > .cct-editor {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .cct-toolbar {
   display: flex;
   flex-wrap: wrap;
   column-gap: 6px;
   row-gap: 8px;
-  padding: 4px var(--base-size-8, 8px);
+  padding: 4px 0;
   margin-bottom: 8px;
   align-items: center;
 }
@@ -130,7 +137,6 @@
 .cct-feedback {
   min-height: 1.6em; /* pas de layout shift (§5.3) */
   font-size: 12px;
-  padding: 0 var(--base-size-8, 8px); /* même alignement que la barre (voir plus haut) */
 }
 
 .cct-diagnostics {

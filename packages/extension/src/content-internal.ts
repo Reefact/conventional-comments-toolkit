@@ -192,21 +192,32 @@ export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
 }
 
 /** Signature de tout ce que `renderPrChrome` peut afficher pour la PR courante — le résumé
- * publié (`publishedSignatureOf`), PLUS la présence du bouton de complétion et le nombre de
- * fils/commentaires actuellement visibles dans le DOM. Sans ces trois derniers, un premier
- * rendu où le résumé publié apparaît AVANT le reste de la page (bouton pas encore rendu,
- * fils/commentaires pas encore chargés) suffit à satisfaire `hasSomethingToShow` — le
- * bandeau s'affiche, `showedSomething` se fige, et le bouton de complétion comme les fils
- * chargés ensuite ne reçoivent jamais leur grisage/leurs badges. Chaque lecture est
- * synchrone et bon marché (DOM déjà en mémoire), du même ordre que le scan d'observeEditors
- * à chaque mutation. */
-function chromeSignatureOf(adapter: PlatformAdapter): string {
+ * publié (`publishedSignatureOf`), PLUS l'identité des fils rendus (pas seulement leur
+ * nombre : React peut remplacer un fil par un autre sans changer le compte) et le nombre de
+ * commentaires visibles dans le DOM ; PLUS, seulement si `probeCompletionControl`, la
+ * présence du bouton de complétion. Sans ces signaux, un premier rendu où le résumé publié
+ * apparaît AVANT le reste de la page (bouton pas encore rendu, fils/commentaires pas encore
+ * chargés) suffit à satisfaire `hasSomethingToShow` — le bandeau s'affiche, `showedSomething`
+ * se fige, et le bouton de complétion comme les fils chargés ensuite ne reçoivent jamais
+ * leur grisage/leurs badges.
+ *
+ * `probeCompletionControl` : `getCompletionControl()` journalise une dégradation de
+ * sélecteur (§9.4) à CHAQUE appel où il ne trouve rien — un bouton absent est la norme sur
+ * une PR fermée ou sans droit de fusion, pas une dégradation. L'inclure dans une signature
+ * recalculée à chaque mutation ferait grossir `SelectorLog.failures` (et la télémétrie
+ * opt-in, §10) sans borne pour toute la durée de vie de l'onglet — `observePrChromeNavigation`
+ * ne sonde donc que dans la fenêtre d'hydratation (`RENDER_RETRY_WINDOW_MS`) ; au-delà, ce
+ * champ se fige (`'?'`), et seuls le résumé publié et les fils/commentaires — sans effet de
+ * bord, `queryChainAll` ne journalise rien — restent surveillés indéfiniment. */
+function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boolean): string {
   const withRendered = adapter as PlatformAdapter & { getRenderedComments?: () => unknown[] };
   const published = publishedSignatureOf(adapter) ?? '';
-  const completion = adapter.getCompletionControl() !== null ? '1' : '0';
-  const threadCount = renderedThreadsOf(adapter).length;
+  const completion = probeCompletionControl ? (adapter.getCompletionControl() !== null ? '1' : '0') : '?';
+  const threadIds = renderedThreadsOf(adapter)
+    .map((t) => t.id)
+    .join(',');
   const commentCount = withRendered.getRenderedComments?.().length ?? 0;
-  return `${published}|${completion}|${threadCount}|${commentCount}`;
+  return `${published}|${completion}|${threadIds}|${commentCount}`;
 }
 
 /** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) — navigation
@@ -254,17 +265,24 @@ export function observePrChromeNavigation(
       return;
     }
     const key = prKeyFor(currentPrOf(adapter));
-    const chromeSig = key === null ? null : chromeSignatureOf(adapter);
     const nowMs = now();
-    if (!hasRendered || key !== lastPrKey) {
+    const navigated = !hasRendered || key !== lastPrKey;
+    if (navigated) {
       hasRendered = true;
       lastPrKey = key;
       showedSomething = false;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
-    } else if (showedSomething) {
-      if (chromeSig === lastChromeSig) return; // rien de neuf à montrer
-    } else if (nowMs > retryUntil) {
-      return; // fenêtre d'hydratation écoulée, rien à montrer et toujours pas plus de contenu
+    }
+    // Sonde le bouton de complétion (chromeSignatureOf) seulement dans la fenêtre
+    // d'hydratation de CETTE PR — jamais indéfiniment (§9.4, cf. chromeSignatureOf).
+    const probeCompletionControl = navigated || nowMs <= retryUntil;
+    const chromeSig = key === null ? null : chromeSignatureOf(adapter, probeCompletionControl);
+    if (!navigated) {
+      if (showedSomething) {
+        if (chromeSig === lastChromeSig) return; // rien de neuf à montrer
+      } else if (nowMs > retryUntil) {
+        return; // fenêtre d'hydratation écoulée, rien à montrer et toujours pas plus de contenu
+      }
     }
     lastChromeSig = chromeSig;
     inFlight = true;
@@ -321,10 +339,20 @@ async function renderPrChrome(
     clearLabelFilter(renderedThreadsOf(adapter));
     for (const stale of doc.querySelectorAll('.cct-banner')) stale.remove();
   };
+  // Retire les badges posés par un rendu antérieur (§5.5) — seulement quand on quitte le
+  // contexte qui les justifiait (plus de PR, ou extension désactivée) : un rendu normal
+  // ne doit JAMAIS passer par ici, sous peine de retirer puis réinsérer les mêmes badges à
+  // chaque relecture, sans bénéfice, juste du DOM churn.
+  const clearBadges = () => {
+    for (const badge of doc.querySelectorAll('.cct-badge')) badge.remove();
+  };
 
   const pr = currentPrOf(adapter);
   if (!pr) {
-    if (isCurrent()) clearStaleBanner();
+    if (isCurrent()) {
+      clearStaleBanner();
+      clearBadges();
+    }
     return true; // pas de PR : rien à retenter tant que la navigation ne change pas
   }
   const resolved = await resolver.resolve(adapter, pr);
@@ -332,6 +360,7 @@ async function renderPrChrome(
   if (resolved.config.mode === 'off') {
     if (isCurrent()) {
       clearStaleBanner();
+      clearBadges();
       // §7 : mode off = extension entièrement inactive. Un grisage posé par un rendu
       // ANTÉRIEUR (mode enforce/warn encore actif à ce moment-là) ne doit pas survivre au
       // passage à off — sinon aria-disabled/cct-merge-blocked/title restent affichés par
@@ -418,15 +447,14 @@ export function applyCompletionState(
     control.element.setAttribute('aria-disabled', 'true');
     control.element.classList.add('cct-merge-blocked');
     control.element.setAttribute('title', ui(lang, 'merge.blocked'));
-  } else {
-    // Ne retirer le `title` que si c'est bien celui posé ci-dessus (marqué par la
-    // présence de la classe, jamais réappliquée sans elle) : la plateforme peut porter
-    // sur ce bouton une infobulle native qui n'a rien à voir avec le §6.5, qu'il ne faut
-    // jamais effacer.
-    if (control.element.classList.contains('cct-merge-blocked')) {
-      control.element.removeAttribute('title');
-    }
+  } else if (control.element.classList.contains('cct-merge-blocked')) {
+    // Ne retirer aria-disabled/title que si c'est bien nous qui les avons posés (marqué
+    // par la présence de la classe, jamais réappliquée sans elle) : la plateforme peut
+    // porter son PROPRE aria-disabled/title natif sur ce bouton — branche protégée,
+    // revue requise, PR verrouillée — pour des raisons sans rapport avec le §6.5, que
+    // nous ne devons jamais effacer à sa place.
     control.element.removeAttribute('aria-disabled');
+    control.element.removeAttribute('title');
     control.element.classList.remove('cct-merge-blocked');
   }
 }

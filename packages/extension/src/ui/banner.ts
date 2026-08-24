@@ -141,6 +141,13 @@ export function renderBanner(
   return root;
 }
 
+/** Marqueur posé sur un fil de PAGE masqué par ce filtre (`data-cct-filtered`) — jamais sur
+ * les `<li>` du bandeau, qui nous appartiennent entièrement. Sert à ne restaurer QUE ce que
+ * ce filtre a lui-même masqué (§5.5) : un fil déjà masqué par la plateforme (collapsed,
+ * virtualisé) porte son propre `display` en ligne, que ni ce filtre ni un rendu ultérieur
+ * ne doivent effacer. */
+const FILTERED_MARKER = 'cctFiltered';
+
 /** §5.5 — filtre local par label « dans la liste des fils de discussion » : masque les
  * ancres du bandeau ET les fils rendus de la page. `labelId` null = tous. Purement
  * visuel — le contenu stocké et le DOM des fils restent intacts. */
@@ -156,7 +163,30 @@ export function applyLabelFilter(
     (li as HTMLElement).style.display = visible ? '' : 'none';
   }
   for (const { id, element } of renderedThreads) {
+    const el = element as HTMLElement;
     const visible = labelId === null || labelOfThread.get(id) === labelId;
-    (element as HTMLElement).style.display = visible ? '' : 'none';
+    if (!visible) {
+      el.dataset[FILTERED_MARKER] = 'true';
+      el.style.display = 'none';
+    } else if (el.dataset[FILTERED_MARKER]) {
+      // Seulement si CE filtre l'avait masqué : sinon, ne pas toucher à un `display` que la
+      // plateforme porte pour ses propres raisons.
+      delete el.dataset[FILTERED_MARKER];
+      el.style.display = '';
+    }
+  }
+}
+
+/** Restaure la visibilité des fils de page masqués par un filtre `applyLabelFilter`
+ * antérieur — jamais ceux masqués par la plateforme elle-même (§5.5). Appelé avant de
+ * reconstruire le bandeau : le nouveau filtre repart sur « tous », les fils qu'il avait
+ * masqués ne doivent pas rester orphelins, cachés pour rien. */
+export function clearLabelFilter(renderedThreads: { id: string; element: Element }[]): void {
+  for (const { element } of renderedThreads) {
+    const el = element as HTMLElement;
+    if (el.dataset[FILTERED_MARKER]) {
+      delete el.dataset[FILTERED_MARKER];
+      el.style.display = '';
+    }
   }
 }

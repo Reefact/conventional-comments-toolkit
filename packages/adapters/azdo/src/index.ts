@@ -20,6 +20,7 @@ import {
 } from '@cct/core';
 import {
   closestChain,
+  commentBodyText,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -169,7 +170,8 @@ export class AzdoClientAdapter implements PlatformAdapter {
         : /active|pending/.test(statusText)
           ? ('unresolved' as const)
           : ('unknown' as const); // non rendu → unknown, compté non résolu (§5.5, §B.5)
-      const body = queryChain(el, selectors.commentBody).element?.textContent ?? '';
+      const bodyEl = queryChain(el, selectors.commentBody).element;
+      const body = bodyEl ? commentBodyText(bodyEl) : '';
       return {
         id,
         pr,
@@ -220,7 +222,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
   getRenderedComments(): { element: Element; bodyText: string }[] {
     return queryChainAll(this.#doc, selectors.commentBody).map((element) => ({
       element,
-      bodyText: element.textContent ?? '',
+      bodyText: commentBodyText(element),
     }));
   }
 

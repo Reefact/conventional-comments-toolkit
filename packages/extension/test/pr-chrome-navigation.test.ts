@@ -15,6 +15,19 @@
 //      rien ne retentait sur la même PR : le résumé publié du composant B, arrivé après
 //      coup, n'était jamais adopté (CA-03, §6.5).
 //
+// Revue automatisée de la PR (Codex, 2026-08-24) — cinq constats confirmés, tous des
+// conséquences directes du fait que D3 rend possible un DEUXIÈME rendu sur la même PR,
+// ce qu'aucun chemin de code n'avait jamais eu à affronter avant :
+//   - la signature de reprise ne couvrait que state/count/fingerprint, pas mode/coreVersion
+//     — pourtant affichés (`banner.judged`) ;
+//   - un premier rendu où le résumé publié précède le reste de la page (bouton, fils,
+//     commentaires) se figeait sans jamais les attraper ensuite ;
+//   - un badge posé par decorateComment() sur un commentaire est lu par getThreads()/
+//     getRenderedComments() au tour SUIVANT, corrompant le corps qu'analyze() reçoit ;
+//   - un grisage posé pendant que le mode est enforce/warn survivait à un passage à off ;
+//   - clearStaleBanner remettait `display: ''` sur TOUT fil rendu, y compris ceux que la
+//     plateforme masque elle-même (réduit, virtualisé) — jamais seulement ceux du filtre.
+//
 // Convention de ce fichier : chaque `observePrChromeNavigation`/`bootstrap()` arme un
 // MutationObserver vivant, JAMAIS disposé (comme en production), sur le `document` GLOBAL
 // happy-dom partagé par tout le fichier — `afterEach` ne fait que vider `document.body`, il
@@ -31,9 +44,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
-import type { PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
-import type { PrRef, PublishedSummary, ThreadInfo } from '@cct/core';
+import { commentBodyText, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
+import { defaultConfig, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver } from '../src/config-resolver.js';
+import { decorateComment } from '../src/ui/badges.js';
 import {
   applyCompletionState,
   bootstrap,
@@ -83,10 +97,12 @@ function makeAdapter(
     getThreads?: () => Promise<ThreadInfo[]>;
     getCompletionControl?: () => SubmitControl | null;
     getRenderedThreadElements?: () => { id: string; element: Element }[];
+    getRenderedComments?: () => { element: Element; bodyText: string }[];
   } = {}
 ): PlatformAdapter & {
   currentPr(): PrRef | null;
   getRenderedThreadElements?: () => { id: string; element: Element }[];
+  getRenderedComments?: () => { element: Element; bodyText: string }[];
 } {
   return {
     matches: () => true,
@@ -103,6 +119,7 @@ function makeAdapter(
     readPublishedResult: getPublished,
     currentPr: getCurrent,
     getRenderedThreadElements: opts.getRenderedThreadElements,
+    getRenderedComments: opts.getRenderedComments,
   };
 }
 
@@ -146,6 +163,23 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
       publishedSignatureOf(makeAdapter(() => pr(1), () => published(3)))
     );
     expect(publishedSignatureOf(makeAdapter(() => pr(1), () => null))).toBeNull();
+  });
+
+  it('publishedSignatureOf réagit à mode et coreVersion — tous deux affichés (banner.judged, revue Codex)', () => {
+    // §5.5 : la ligne « jugée par mode X, core Y » (ui/banner.ts, banner.judged) est
+    // affichée pour CHAQUE résumé publié. Un check qui se termine à nouveau avec le même
+    // décompte et le même state, mais un core ou un mode différent (mise à jour du
+    // composant B, ou reconfiguration du mode en cours de session), doit rester détecté —
+    // sinon la ligne affichée reste celle du tout premier résumé, indéfiniment.
+    const base = publishedSummary({ state: 'success', unresolvedBlockingCount: 1, mode: 'assist', coreVersion: '1.0.0' });
+    const differentMode = { ...base, mode: 'enforce' as const };
+    const differentCore = { ...base, coreVersion: '1.1.0' };
+    expect(publishedSignatureOf(makeAdapter(() => pr(1), () => differentMode))).not.toBe(
+      publishedSignatureOf(makeAdapter(() => pr(1), () => base))
+    );
+    expect(publishedSignatureOf(makeAdapter(() => pr(1), () => differentCore))).not.toBe(
+      publishedSignatureOf(makeAdapter(() => pr(1), () => base))
+    );
   });
 
   it('rend le bandeau dès le chargement quand une PR est déjà affichée', async () => {
@@ -550,6 +584,187 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
 
     expect(bannerTitles(doc)[0]).not.toContain('3'); // jamais la valeur périmée
     expect(bannerTitles(doc)[0]).toContain('0'); // la valeur réelle au moment de l'écriture
+  });
+});
+
+describe('Codex #2 — retente tant que tout le contexte de la barre n’a pas été observé', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('un bouton de complétion apparu APRÈS le premier rendu reçoit quand même son grisage', async () => {
+    // Cas signalé : le résumé publié est déjà dans le DOM au premier rendu, mais le
+    // mergebox (§A.7) — donc le bouton de complétion — se peuple en différé. Avant ce
+    // correctif, `hasSomethingToShow` valait déjà vrai grâce au seul résumé publié :
+    // `showedSomething` se figeait sans jamais retenter pour le bouton.
+    const doc = document;
+    const current = pr(20);
+    let control: SubmitControl | null = null; // absent au premier rendu
+    const adapter = makeAdapter(
+      () => current,
+      () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), // publié dès le début
+      { getCompletionControl: () => control }
+    );
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // le bandeau, oui
+
+    // Le bouton apparaît ensuite ; le résumé publié, lui, n'a pas changé.
+    control = { element: doc.createElement('button'), kind: 'complete-pr' };
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect(control.element.getAttribute('aria-disabled')).toBe('true');
+    expect(control.element.classList.contains('cct-merge-blocked')).toBe(true);
+  });
+
+  it('des fils chargés APRÈS le premier rendu reçoivent quand même leur ancre au bandeau', async () => {
+    const doc = document;
+    const current = pr(21);
+    const thread: ThreadInfo = {
+      id: 't1',
+      pr: current,
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'issue: x',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution: 'unknown',
+      canCarryBlockingState: true,
+    };
+    let loaded = false; // le fil n'existe pas encore dans le DOM au premier rendu
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+      getThreads: async () => (loaded ? [thread] : []),
+      getRenderedThreadElements: () => (loaded ? [{ id: 't1', element: doc.createElement('div') }] : []),
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner li[data-thread-id]')).toHaveLength(0); // rien encore
+
+    loaded = true;
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect(doc.querySelectorAll('.cct-banner li[data-thread-id]')).toHaveLength(1); // ancre présente
+  });
+});
+
+describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au corps relu (§5.5)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('commentBodyText exclut un badge posé en enfant direct, laisse le reste intact', () => {
+    const el = document.createElement('div');
+    el.textContent = 'issue: quelque chose ne va pas';
+    expect(commentBodyText(el)).toBe('issue: quelque chose ne va pas');
+
+    const badge = document.createElement('span');
+    badge.className = 'cct-badge';
+    badge.textContent = '🐛 issue';
+    el.insertAdjacentElement('afterbegin', badge);
+
+    expect(el.textContent).toContain('🐛 issue'); // le DOM, lui, porte bien le badge
+    expect(commentBodyText(el)).toBe('issue: quelque chose ne va pas'); // mais pas la lecture
+  });
+
+  it('un .cct-badge imbriqué (pas enfant direct) n’est pas exclu à tort', () => {
+    // decorateComment() ne pose jamais un badge autrement qu'en `afterbegin` — un
+    // `.cct-badge` plus profond (citation, bloc de code d'un autre commentaire cité) est un
+    // texte normal, pas notre propre badge.
+    const el = document.createElement('div');
+    el.innerHTML = '<blockquote><span class="cct-badge">🐛 issue</span></blockquote>issue: x';
+    expect(commentBodyText(el)).toBe(el.textContent);
+  });
+
+  it('GithubClientAdapter.getThreads() relit le vrai corps même après un badge posé par decorateComment', async () => {
+    document.body.innerHTML =
+      '<div data-testid="review-thread" id="t1"><div data-testid="comment-body">issue: quelque chose ne va pas</div></div>';
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/acme/demo/pull/9'),
+      configurable: true,
+    });
+    const adapter = new GithubClientAdapter({ documentRef: document });
+    const bodyEl = document.querySelector('[data-testid="comment-body"]')!;
+    const profile = { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: [] };
+
+    // Simule ce que le premier rendu a fait : decorateComment() a posé un badge.
+    decorateComment(bodyEl, 'issue: quelque chose ne va pas', defaultConfig(), profile);
+    expect(bodyEl.querySelector('.cct-badge')).not.toBeNull();
+
+    const threads = await adapter.getThreads();
+    // Sans le correctif, le corps relu commencerait par le texte du badge (« 🐛 issue »),
+    // cassant la reconnaissance du préfixe par analyze() au tour suivant.
+    expect(threads[0]!.root.body).toBe('issue: quelque chose ne va pas');
+  });
+});
+
+describe('Codex #5 — un grisage antérieur ne survit pas au passage du mode à off (§7)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('le grisage posé pendant que le mode était actif est retiré dès que le mode passe à off', async () => {
+    const doc = document;
+    const current = pr(22);
+    let configText = '{}'; // défauts : mode assist
+    let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
+    const control: SubmitControl = { element: doc.createElement('button'), kind: 'complete-pr' };
+    const adapter = makeAdapter(() => current, () => currentPublished, { getCompletionControl: () => control });
+    adapter.getRepoConfig = async () => ({ status: 'found', text: configText });
+    let resolverNow = 0;
+    const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+    expect(control.element.getAttribute('aria-disabled')).toBe('true'); // grisé (mode assist, check en échec)
+
+    // La configuration du dépôt bascule sur off ; le check se termine au même moment (dernier
+    // fil résolu) — c'est ce second changement, visible dans la signature de reprise, qui
+    // déclenche la relecture ; le passage à off lui-même n'est pas un signal de reprise (hors
+    // périmètre de cette revue, indépendant du bug de la barre).
+    configText = JSON.stringify({ mode: 'off' });
+    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    resolverNow += 3601 * 1000; // dépasse le TTL du cache de configuration (§8.1.2)
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect(control.element.hasAttribute('aria-disabled')).toBe(false);
+    expect(control.element.classList.contains('cct-merge-blocked')).toBe(false);
+    expect(control.element.hasAttribute('title')).toBe(false);
+  });
+});
+
+describe('Codex #6 — un rendu répété ne touche pas au display d’un fil masqué par la plateforme (§5.5)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('clearStaleBanner ne restaure jamais un display posé par la plateforme, seulement celui posé par notre filtre', async () => {
+    const doc = document;
+    const current = pr(23);
+    const platformHidden = doc.createElement('div');
+    platformHidden.style.display = 'none'; // ex. fil réduit/virtualisé par GitHub lui-même
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 1 }), {
+      getRenderedThreadElements: () => [{ id: 't1', element: platformHidden }],
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+
+    // clearStaleBanner tourne dès le premier rendu (efface un bandeau d'un contexte
+    // précédent) : sans le correctif, il aurait déjà remis `display: ''` ici.
+    expect(platformHidden.style.display).toBe('none');
   });
 });
 

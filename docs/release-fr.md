@@ -23,15 +23,20 @@ GitHub qui les porte.
    git push origin v1.1.0
    ```
 
-Pour vérifier **avant** de poser le tag qu'il passera la garde, la même commande que le
-workflow se lance en local :
+Poser et pousser un tag ne demande que `git` — **rien de plus**, pas de Node ni de `npm`
+localement. C'est le workflow qui vérifie, sur le runner GitHub, que le tag correspond au
+manifeste ; s'il ne correspond pas, le job échoue avec un message qui dit quoi corriger, à
+lire dans l'onglet **Actions** du dépôt. Il suffit alors de corriger le manifeste (retour à
+l'étape 1) et de reposer le tag.
+
+Si Node est installé sur le poste qui publie, la même vérification peut se lancer en local
+avant de poser le tag, pour l'avoir tout de suite plutôt que d'attendre le job :
 
 ```
 node scripts/release-version.mjs v1.1.0
 ```
 
-Le workflow refuse de publier si le tag et le manifeste divergent : le message d'erreur
-dit quoi corriger.
+C'est un confort, jamais un prérequis — l'étape 3 ci-dessus marche sans.
 
 **Pré-version.** Le tag peut porter une étiquette : `v1.1.0-rc.1`. C'est alors le noyau
 numérique (`1.1.0`) qui doit correspondre au manifeste, et l'étiquette vit là où elle est

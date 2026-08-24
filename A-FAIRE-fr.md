@@ -83,7 +83,8 @@ npm run build:extension  # génère packages/extension/dist-ext/ (Chromium + var
 ### GitHub fonctionne tout de suite, Azure DevOps demande un clic de plus
 
 `github.com` est préautorisé dans le manifeste. Pour Azure DevOps (ou un GitHub
-Enterprise Server interne), ouvrez la page d'options de l'extension et ajoutez le
+Enterprise Server interne), ouvrez la page d'options de l'extension (un clic sur son
+icône dans la barre d'outils, ou `chrome://extensions` puis « Détails ») et ajoutez le
 domaine (`dev.azure.com`, ou votre `*.visualstudio.com`, ou le domaine de votre GHES) —
 un clic sur **Autoriser** suffit ensuite. *(Correction apportée aujourd'hui même : avant
 ce commit, accorder cette permission n'activait rien du tout sur ces domaines — le

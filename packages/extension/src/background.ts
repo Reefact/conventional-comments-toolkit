@@ -1,7 +1,8 @@
-// Service worker MV3 (event page sur Firefox — §10, Compatibilité). Deux rôles :
+// Service worker MV3 (event page sur Firefox — §10, Compatibilité). Trois rôles :
 // répondre aux demandes de lecture de configuration des scripts de contenu quand la
-// permission d'hôte vit ici, et ENREGISTRER DYNAMIQUEMENT le script de contenu sur les
-// hôtes accordés via `optional_host_permissions` (§2, §A.4, §B.4).
+// permission d'hôte vit ici, ENREGISTRER DYNAMIQUEMENT le script de contenu sur les
+// hôtes accordés via `optional_host_permissions` (§2, §A.4, §B.4), et ouvrir la page
+// d'options au clic sur l'icône de la barre d'outils.
 //
 // `content_scripts.matches` du manifeste est statique et ne liste que github.com : sans
 // ce second rôle, accorder la permission sur dev.azure.com ou un GHES depuis la page
@@ -31,6 +32,10 @@ declare const chrome: {
       ) => void;
     };
     lastError?: { message?: string } | null;
+    openOptionsPage?: () => void;
+  };
+  action?: {
+    onClicked: { addListener: (cb: () => void) => void };
   };
   permissions?: {
     getAll: (cb: (perms: { origins?: string[] }) => void) => void;
@@ -57,6 +62,17 @@ chrome?.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
   })();
   return true; // réponse asynchrone
+});
+
+// Le bouton de la barre d'outils (`action` du manifeste) n'ouvre aucun popup : son seul
+// rôle est d'amener aux réglages en un clic, depuis n'importe quel onglet — sinon la
+// page d'options ne s'atteint que par chrome://extensions puis « Détails ». Sans ce
+// gestionnaire, l'icône serait un bouton inerte, ce qui se lit comme une extension
+// cassée. `action` est absent sur un navigateur qui ignorerait la clé, et
+// `openOptionsPage` derrière une garde : le service worker ne doit jamais échouer au
+// démarrage pour un bouton.
+chrome?.action?.onClicked.addListener(() => {
+  chrome?.runtime.openOptionsPage?.();
 });
 
 // L'hôte github.com est déjà couvert par l'entrée statique de `content_scripts` — ne

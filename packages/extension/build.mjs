@@ -35,6 +35,17 @@ const manifest = JSON.parse(await readFile(join(here, 'src/manifest.json'), 'utf
 manifest.options_ui = { page: 'options.html', open_in_tab: true };
 await writeFile(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
+// Icônes : la liste qui fait foi est celle du manifeste, jamais une copie écrite ici.
+// Une taille ajoutée à `icons` ou à `action.default_icon` sans le fichier correspondant
+// dans le bundle empêche le chargement de l'extension ; dériver la liste du manifeste
+// rend cet oubli impossible. Les chemins y sont déjà relatifs à la racine du bundle, et
+// `src/` reproduit cette arborescence : le même chemin sert des deux côtés.
+const icons = [
+  ...new Set([...Object.values(manifest.icons ?? {}), ...Object.values(manifest.action?.default_icon ?? {})]),
+];
+await mkdir(join(out, 'icons'), { recursive: true });
+for (const icon of icons) await copyFile(join(here, 'src', icon), join(out, icon));
+
 // Variante Firefox : event page (§10 — Firefox n'implémente pas le service worker MV3),
 // et déclaration d'identifiant pour les politiques ExtensionSettings.
 const firefox = structuredClone(manifest);
@@ -43,7 +54,9 @@ firefox.browser_specific_settings = {
   gecko: { id: 'conventional-comments-toolkit@example.org', strict_min_version: '128.0' },
 };
 await writeFile(join(out, 'firefox/manifest.json'), JSON.stringify(firefox, null, 2));
-for (const f of ['content.js', 'background.js', 'options.js', 'styles.css', 'options.html', 'managed-schema.json']) {
+await mkdir(join(out, 'firefox/icons'), { recursive: true });
+const shared = ['content.js', 'background.js', 'options.js', 'styles.css', 'options.html', 'managed-schema.json'];
+for (const f of [...shared, ...icons]) {
   await copyFile(join(out, f), join(out, 'firefox', f));
 }
 

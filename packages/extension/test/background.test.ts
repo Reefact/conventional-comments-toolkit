@@ -8,7 +8,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface FakeChrome {
-  runtime: { onMessage: { addListener: ReturnType<typeof vi.fn> }; lastError: null };
+  runtime: {
+    onMessage: { addListener: ReturnType<typeof vi.fn> };
+    lastError: null;
+    openOptionsPage: ReturnType<typeof vi.fn>;
+  };
+  action: { onClicked: { addListener: ReturnType<typeof vi.fn> } };
   permissions: {
     getAll: ReturnType<typeof vi.fn>;
     onAdded: { addListener: ReturnType<typeof vi.fn> };
@@ -22,7 +27,8 @@ interface FakeChrome {
 
 function installFakeChrome(grantedOrigins: string[]): FakeChrome {
   const fake: FakeChrome = {
-    runtime: { onMessage: { addListener: vi.fn() }, lastError: null },
+    runtime: { onMessage: { addListener: vi.fn() }, lastError: null, openOptionsPage: vi.fn() },
+    action: { onClicked: { addListener: vi.fn() } },
     permissions: {
       getAll: vi.fn((cb: (p: { origins: string[] }) => void) => cb({ origins: grantedOrigins })),
       onAdded: { addListener: vi.fn() },
@@ -99,5 +105,30 @@ describe('résidu — §2/§A.4/§B.4 : le script de contenu s’enregistre dyna
       { ids: ['cct-https-dev-azure-com'] },
       expect.any(Function)
     );
+  });
+});
+
+describe('bouton de la barre d’outils : le clic amène aux réglages', () => {
+  it('un clic sur l’icône ouvre la page d’options', async () => {
+    // Sans ce gestionnaire, l'icône déclarée par `action` serait un bouton inerte : le
+    // manifeste n'ouvre `options_ui` que depuis la page de gestion des extensions.
+    const fake = installFakeChrome([]);
+    await import('../src/background.js');
+
+    const onClicked = fake.action.onClicked.addListener.mock.calls[0]![0] as () => void;
+    onClicked();
+
+    expect(fake.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('un navigateur sans API `action` ne fait pas échouer le démarrage', async () => {
+    // `chrome.action` manque sur toute variante qui ignorerait la clé du manifeste ; le
+    // service worker doit continuer à assurer ses deux autres rôles.
+    const fake = installFakeChrome(['https://dev.azure.com/*']);
+    delete (fake as Partial<FakeChrome>).action;
+
+    await expect(import('../src/background.js')).resolves.toBeDefined();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fake.scripting.registerContentScripts).toHaveBeenCalledTimes(1);
   });
 });

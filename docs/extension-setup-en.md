@@ -173,6 +173,12 @@ extension bundled into ...\conventional-comments-toolkit\packages\extension\dist
 The **"Conventional Comments Toolkit"** extension should now appear in the list,
 enabled, with no red "Errors" button.
 
+It carries its icon: a blue comment bubble with a green check mark. The same icon is
+available in the browser toolbar — click the puzzle piece to the right of the address
+bar, then pin "Conventional Comments Toolkit". Clicking the pinned icon opens the
+extension's settings page from any tab, without going back through
+`chrome://extensions`.
+
 ## 9. Test on a real GitHub Pull Request
 
 1. Open a Pull Request on `github.com` (one of your own, or any PR you can comment on).

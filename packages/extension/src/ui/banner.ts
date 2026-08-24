@@ -25,14 +25,15 @@ export function localBlockingUnresolved(
   config: EffectiveConfig,
   platformId: string,
   suggestionInfoString: string | null,
-  slashPrefixes: string[]
+  slashCommands: boolean,
+  commandPrefixes: string[]
 ): ThreadInfo[] {
   return threads.filter((t) => {
     if (!t.canCarryBlockingState) return false;
     const a = analyze(
       {
         body: t.root.body,
-        platform: { id: platformId, suggestionInfoString, slashPrefixes },
+        platform: { id: platformId, suggestionInfoString, slashCommands, commandPrefixes },
         isSystemGenerated: t.root.isSystemGenerated,
         zone: 'thread-root',
         canCarryBlockingState: true,
@@ -51,9 +52,17 @@ export function buildBannerModel(
   config: EffectiveConfig,
   platformId: string,
   suggestionInfoString: string | null,
-  slashPrefixes: string[]
+  slashCommands: boolean,
+  commandPrefixes: string[]
 ): BannerModel {
-  const local = localBlockingUnresolved(threads, config, platformId, suggestionInfoString, slashPrefixes);
+  const local = localBlockingUnresolved(
+    threads,
+    config,
+    platformId,
+    suggestionInfoString,
+    slashCommands,
+    commandPrefixes
+  );
   const anchors = local.map((t) => ({ threadId: t.id, href: t.root.permalink }));
   if (published !== null) {
     // CA-03 : le décompte affiché est le décompte publié, jamais le nombre d'ancres.

@@ -15,13 +15,25 @@ import { defaultConfig } from '../src/config/defaults.js';
 export const githubProfile: PlatformProfile = {
   id: 'github',
   suggestionInfoString: 'suggestion',
-  slashPrefixes: ['/azp', '/rebase'],
+  slashCommands: true,
+  commandPrefixes: [
+    '@dependabot',
+    '@copilot',
+    '@coderabbitai',
+    '@codex',
+    '@claude',
+    '@mergifyio',
+    '@renovate',
+    '@rustbot',
+    '@bors',
+  ],
 };
 
 export const azdoProfile: PlatformProfile = {
   id: 'azdo',
   suggestionInfoString: null,
-  slashPrefixes: [],
+  slashCommands: false,
+  commandPrefixes: [],
 };
 
 export function user(login: string, opts: Partial<UserInfo> = {}): UserInfo {

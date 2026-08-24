@@ -39,7 +39,7 @@ describe('§5.5 / CA-03 — bandeau des fils bloquants', () => {
     const threads = [thread('issue: a\n\nd', 'unresolved', 't1')];
     // Le serveur compte 3 (édition affaiblissante, résolution refusée, épinglage — §5.5),
     // l'extension n'apparie qu'une ancre.
-    const model = buildBannerModel(published(3), threads, defaultConfig(), 'github', 'suggestion', []);
+    const model = buildBannerModel(published(3), threads, defaultConfig(), 'github', 'suggestion', false, []);
     expect(model.count).toBe(3);
     expect(model.anchors).toHaveLength(1);
     expect(model.partial).toBe(true); // « 1 sur 3 localisés »
@@ -48,7 +48,7 @@ describe('§5.5 / CA-03 — bandeau des fils bloquants', () => {
 
   it('issue (non-blocking) n’est jamais compté localement (CA-03)', () => {
     const threads = [thread('issue (non-blocking): a\n\nd', 'unresolved', 't1')];
-    expect(localBlockingUnresolved(threads, defaultConfig(), 'github', 'suggestion', [])).toHaveLength(0);
+    expect(localBlockingUnresolved(threads, defaultConfig(), 'github', 'suggestion', false, [])).toHaveLength(0);
   });
 
   it('sans résumé publié : vue locale, unknown compté non résolu (§5.5, §B.5)', () => {
@@ -57,13 +57,13 @@ describe('§5.5 / CA-03 — bandeau des fils bloquants', () => {
       thread('issue: b\n\nd', 'resolved', 't2'),
       thread('todo: c\n\nd', 'unresolved', 't3'),
     ];
-    const model = buildBannerModel(null, threads, defaultConfig(), 'github', 'suggestion', []);
+    const model = buildBannerModel(null, threads, defaultConfig(), 'github', 'suggestion', false, []);
     expect(model.fromPublished).toBe(false);
     expect(model.count).toBe(2); // t1 (unknown → non résolu) et t3 ; t2 résolu exclu
   });
 
   it('départage E-CONFLICT : une racine issue (blocking, non-blocking) reste comptée', () => {
     const threads = [thread('issue (blocking, non-blocking): a\n\nd', 'unresolved', 't1')];
-    expect(localBlockingUnresolved(threads, defaultConfig(), 'github', 'suggestion', [])).toHaveLength(1);
+    expect(localBlockingUnresolved(threads, defaultConfig(), 'github', 'suggestion', false, [])).toHaveLength(1);
   });
 });

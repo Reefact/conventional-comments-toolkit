@@ -145,7 +145,8 @@ export type Zone = 'thread-root' | 'reply' | 'review-body' | 'conversation';
 export interface PlatformProfile {
   id: string; // jamais une union fermée
   suggestionInfoString: string | null; // §3.5.1 étage 0 ; null = pas d'étage 0
-  slashPrefixes: string[]; // §4.2
+  slashCommands: boolean; // §4.2 — reconnaissance générique de `/[A-Za-z][A-Za-z0-9_-]*`
+  commandPrefixes: string[]; // §4.2 — handles de robot (`@codex`), liste fermée, portée par l'adaptateur
 }
 
 export interface ValidationInput {

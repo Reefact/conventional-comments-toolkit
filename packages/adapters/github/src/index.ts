@@ -27,6 +27,20 @@ import {
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
 
+// Handles de robot dont l'interpellation exempte (§4.2, §A.7) — liste fermée, portée par
+// l'adaptateur, jamais par la configuration d'un dépôt. Même liste que côté serveur (§9.2.4).
+export const GITHUB_COMMAND_PREFIXES = [
+  '@dependabot',
+  '@copilot',
+  '@coderabbitai',
+  '@codex',
+  '@claude',
+  '@mergifyio',
+  '@renovate',
+  '@rustbot',
+  '@bors',
+];
+
 export interface GithubClientOptions {
   /** Hôtes autorisés par l'utilisateur ou la politique (§2, §A.4) — github.com n'est que
    * le domaine pré-déclarable ; GHES et ghe.com passent par optional_host_permissions. */
@@ -68,7 +82,12 @@ export class GithubClientAdapter implements PlatformAdapter {
 
   platformProfile(): PlatformProfile {
     // Même profil que l'adaptateur serveur, même source (§9.2.4).
-    return { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: ['/azp', '/rebase'] };
+    return {
+      id: 'github',
+      suggestionInfoString: 'suggestion',
+      slashCommands: true,
+      commandPrefixes: GITHUB_COMMAND_PREFIXES,
+    };
   }
 
   /** Route web `raw`, servie sur la session de l'utilisateur, sans jeton (§A.4) —

@@ -414,7 +414,8 @@ async function renderPrChrome(
     resolved.config,
     profile.id,
     profile.suggestionInfoString,
-    profile.slashPrefixes
+    profile.slashCommands,
+    profile.commandPrefixes
   );
   // Le bandeau se rend dès qu'il y a quelque chose à montrer OU à filtrer : le filtre
   // par label du §5.5 porte sur la liste des fils, pas sur les seuls fils bloquants —

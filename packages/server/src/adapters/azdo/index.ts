@@ -59,9 +59,9 @@ export class AzdoServerAdapter implements ServerPlatformAdapter {
   }
 
   platformProfile(): PlatformProfile {
-    // Pas de commande slash native (§B.6) ; pas d'étage 0 tant que l'info string du bloc
-    // de suggestion n'est pas établi par le spike (§B.6) : `null` = cas général.
-    return { id: 'azdo', suggestionInfoString: null, slashPrefixes: [] };
+    // Aucune commande native, ni slash ni mention (§B.6) ; pas d'étage 0 tant que l'info
+    // string du bloc de suggestion n'est pas établi par le spike (§B.6) : `null` = cas général.
+    return { id: 'azdo', suggestionInfoString: null, slashCommands: false, commandPrefixes: [] };
   }
 
   matchesWebhook(payload: unknown): boolean {

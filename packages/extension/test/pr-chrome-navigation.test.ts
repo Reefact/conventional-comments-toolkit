@@ -142,6 +142,27 @@ async function flushAll(times = 5): Promise<void> {
   for (let i = 0; i < times; i++) await flush();
 }
 
+/** Toute observation ouverte par un test est révoquée à sa fin. Sans cela, l'observateur
+ * survit au test qui l'a créé et continue de réagir aux mutations du SUIVANT, dans le
+ * document que happy-dom partage entre eux : il y réinjecte alors son propre bandeau, et
+ * les assertions du test en cours portent sur le DOM d'un autre. */
+const openObservations: (() => void)[] = [];
+
+function observe(
+  adapter: Parameters<typeof observePrChromeNavigation>[0],
+  resolver: Parameters<typeof observePrChromeNavigation>[1],
+  doc: Parameters<typeof observePrChromeNavigation>[2],
+  now?: Parameters<typeof observePrChromeNavigation>[3]
+): () => void {
+  const dispose = observePrChromeNavigation(adapter, resolver, doc, now);
+  openObservations.push(dispose);
+  return dispose;
+}
+
+afterEach(() => {
+  for (const dispose of openObservations.splice(0)) dispose();
+});
+
 function bannerTitles(doc: Document): string[] {
   return [...doc.querySelectorAll('.cct-banner strong')].map((el) => el.textContent ?? '');
 }
@@ -203,7 +224,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     const adapter = makeAdapter(() => current, () => published(current!.number));
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
@@ -215,7 +236,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     const adapter = makeAdapter(() => current, () => published(current!.number));
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(bannerTitles(doc)[0]).toContain('1');
 
@@ -239,7 +260,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     );
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // rien à afficher pour l'instant
 
@@ -257,7 +278,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     const adapter = makeAdapter(() => current, () => (current ? published(current.number) : null));
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
 
@@ -306,7 +327,7 @@ describe('D1 — bootstrap() choisit l’adaptateur par hôte, pas par présence
       configurable: true,
     });
 
-    await bootstrap(document);
+    openObservations.push(await bootstrap(document));
     await flushAll();
     // Avant ce correctif, aucun adaptateur n'était choisi ici (matches() exigeait une PR) :
     // bootstrap() sortait aussitôt, sans armer observeEditors ni observePrChromeNavigation —
@@ -356,7 +377,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     const resolver = new ClientConfigResolver(async () => null);
     const clock = makeClock();
 
-    observePrChromeNavigation(adapter, resolver, doc, clock.now);
+    observe(adapter, resolver, doc, clock.now);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // trop tôt : rien à montrer
 
@@ -383,7 +404,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     const resolver = new ClientConfigResolver(async () => null);
     const clock = makeClock();
 
-    observePrChromeNavigation(adapter, resolver, doc, clock.now);
+    observe(adapter, resolver, doc, clock.now);
     await flushAll();
     expect(getThreadsCalls).toBe(1);
 
@@ -419,7 +440,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
     const callsOnceShown = getThreadsCalls;
@@ -450,7 +471,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flush(); // laisse le premier run() démarrer et se bloquer sur getThreads()
     expect(getThreadsCalls).toBe(1);
 
@@ -523,7 +544,7 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
     // Vue locale (pas encore de résumé publié) : le fil bloquant local suffit à afficher
@@ -590,7 +611,7 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(bannerTitles(doc)[0]).toContain('1');
 
@@ -638,7 +659,7 @@ describe('Codex #2 — retente tant que tout le contexte de la barre n’a pas �
     );
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // le bandeau, oui
 
@@ -677,7 +698,7 @@ describe('Codex #2 — retente tant que tout le contexte de la barre n’a pas �
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner li[data-thread-id]')).toHaveLength(0); // rien encore
 
@@ -766,7 +787,7 @@ describe('Codex #5 — un grisage antérieur ne survit pas au passage du mode à
     let resolverNow = 0;
     const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(control.element.getAttribute('aria-disabled')).toBe('true'); // grisé (mode assist, check en échec)
 
@@ -801,7 +822,7 @@ describe('Codex #6 — un rendu répété ne touche pas au display d’un fil ma
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
     // clearStaleBanner tourne dès le premier rendu (efface un bandeau d'un contexte
@@ -917,7 +938,7 @@ describe('Codex round 2 #6 — cesse de sonder le bouton de complétion après l
     const resolver = new ClientConfigResolver(async () => null);
     const clock = makeClock();
 
-    observePrChromeNavigation(adapter, resolver, doc, clock.now);
+    observe(adapter, resolver, doc, clock.now);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // affichée dès le premier rendu
     const callsWithinWindow = completionCalls;
@@ -958,7 +979,7 @@ describe('Codex round 2 #7 — les badges posés pendant que le mode était acti
     let resolverNow = 0;
     const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(commentEl.querySelector('.cct-badge')).not.toBeNull();
 
@@ -1015,7 +1036,7 @@ describe('Codex round 4 — le filtre par label survit à un rendu répété sur
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
     filterChip(doc, 'praise')!.dispatchEvent(new Event('click'));
@@ -1074,7 +1095,7 @@ describe('Codex round 5 — le filtre repart à zéro quand son label n’est pl
     let resolverNow = 0;
     const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
     filterChip(doc, 'praise')!.dispatchEvent(new Event('click'));
@@ -1114,7 +1135,7 @@ describe('§5.5 — le bandeau se monte en tête de PR, le filtre en tête des f
     const adapter = makeAdapter(() => pr(40), () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
       getBannerMount: () => header,
     });
-    observePrChromeNavigation(adapter, new ClientConfigResolver(async () => null), doc);
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
     await flushAll();
 
     const banner = doc.querySelector('.cct-banner');
@@ -1128,7 +1149,7 @@ describe('§5.5 — le bandeau se monte en tête de PR, le filtre en tête des f
     const adapter = makeAdapter(() => pr(41), () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
       getBannerMount: () => null,
     });
-    observePrChromeNavigation(adapter, new ClientConfigResolver(async () => null), doc);
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
     await flushAll();
 
     expect(doc.body.firstElementChild).toBe(doc.querySelector('.cct-banner'));
@@ -1158,7 +1179,7 @@ describe('§5.5 — le bandeau se monte en tête de PR, le filtre en tête des f
       getThreads: async () => [thread],
       getRenderedThreadElements: () => [{ id: 't1', element: first }],
     });
-    observePrChromeNavigation(adapter, new ClientConfigResolver(async () => null), doc);
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
     await flushAll();
 
     const filter = doc.querySelector('.cct-thread-filter');
@@ -1192,11 +1213,135 @@ describe('§5.5 — le bandeau se monte en tête de PR, le filtre en tête des f
       getThreads: async () => [thread],
       getRenderedThreadElements: () => [{ id: 't1', element: first }],
     });
-    observePrChromeNavigation(adapter, new ClientConfigResolver(async () => null), doc);
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
     await flushAll();
 
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // une PR saine ne se décore pas
     expect(doc.querySelector('.cct-thread-filter')).not.toBeNull();
+  });
+});
+
+describe('§5.5 — ce que notre rendu a laissé dans la page est surveillé aussi (revue Codex, PR #26)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  /** Fil dont le corps ET le texte rendu suivent la même source : une racine éditée SUR
+   * PLACE, comme le fait la plateforme quand on corrige un commentaire. */
+  function editableThread(doc: Document, prRef: PrRef, body: () => string) {
+    const element = doc.createElement('div');
+    element.textContent = body();
+    return {
+      element,
+      retext: (next: string) => {
+        element.textContent = next;
+      },
+      info: (): ThreadInfo => ({
+        id: 't1',
+        pr: prRef,
+        root: {
+          id: 't1-root',
+          author: { id: 'login:alice', login: 'alice', isServiceAccount: false },
+          body: body(),
+          createdAt: '2026-01-01T00:00:00Z',
+          permalink: '#t1',
+          isSystemGenerated: false,
+          canCarryBlockingState: true,
+        },
+        replies: [],
+        resolution: 'unresolved',
+        canCarryBlockingState: true,
+      }),
+    };
+  }
+
+  it('une racine éditée sur place rafraîchit le sujet : ni le nombre de fils ni leurs identifiants ne bougent', async () => {
+    // Le bandeau affiche désormais le SUJET (§5.5). Une correction en place ne change ni le
+    // nombre de fils, ni leurs identifiants, ni le nombre de commentaires : la signature de
+    // plateforme reste identique, et sans surveillance du texte le bandeau resterait périmé.
+    const doc = document;
+    const current = pr(50);
+    let body = 'issue: le retry ne borne pas le backoff';
+    const thread = editableThread(doc, current, () => body);
+    doc.body.appendChild(thread.element);
+
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
+      getThreads: async () => [thread.info()],
+      getRenderedThreadElements: () => [{ id: 't1', element: thread.element }],
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    expect(doc.querySelector('.cct-banner-subject')?.textContent).toBe('le retry ne borne pas le backoff');
+
+    body = 'issue: le backoff doit être plafonné';
+    thread.retext(body); // édition en place : le DOM du fil change, son identifiant non
+    await flushAll();
+
+    expect(doc.querySelector('.cct-banner-subject')?.textContent).toBe('le backoff doit être plafonné');
+  });
+
+  it('un bandeau emporté par une réhydratation de la plateforme est remonté', async () => {
+    // Le bandeau est adossé à un élément qui appartient à la PLATEFORME (`bannerMount`) :
+    // un rerendu React qui remplace ce parent emporte notre élément avec lui, sans rien
+    // changer au résumé publié ni aux fils.
+    const doc = document;
+    const current = pr(51);
+    const header = doc.createElement('div');
+    doc.body.appendChild(header);
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
+      getBannerMount: () => header,
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+
+    doc.querySelector('.cct-banner')!.remove(); // la plateforme reprend la main sur son en-tête
+    await flushAll();
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // remonté, pas laissé absent
+  });
+
+  it('nos propres écritures ne se re-déclenchent pas elles-mêmes : un seul rendu par changement', async () => {
+    // Le revers du test précédent. La photo de notre sortie est prise APRÈS le rendu ; prise
+    // avant, chaque insertion de bandeau relancerait un rendu, indéfiniment.
+    const doc = document;
+    const current = pr(52);
+    let renders = 0;
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
+      getThreads: async () => {
+        renders++;
+        return [];
+      },
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    const afterFirst = renders;
+
+    for (let i = 0; i < 5; i++) {
+      doc.body.appendChild(doc.createElement('span'));
+      await flushAll();
+    }
+
+    expect(renders).toBe(afterFirst); // aucune relance : ni nos écritures, ni des mutations neutres
+  });
+
+  it('révoquée, l’observation n’écrit plus rien — y compris depuis un rendu en vol', async () => {
+    const doc = document;
+    const current = pr(53);
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }));
+    const dispose = observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+
+    dispose();
+    doc.querySelector('.cct-banner')!.remove();
+    for (let i = 0; i < 5; i++) {
+      doc.body.appendChild(doc.createElement('span'));
+      await flushAll();
+    }
+    await new Promise((resolve) => setTimeout(resolve, RENDER_RETRY_THROTTLE_MS + 20));
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // plus rien ne repousse
   });
 });
 
@@ -1223,7 +1368,7 @@ describe('Codex round 4 — la signature de reprise sonde le COMPTE de commentai
     };
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     for (let i = 0; i < 5; i++) {
       doc.body.appendChild(doc.createElement('span'));

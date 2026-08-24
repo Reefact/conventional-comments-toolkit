@@ -53,7 +53,7 @@ export class FakeAdapter implements ServerPlatformAdapter {
 
   constructor(
     public state: FakePlatformState,
-    private profile: PlatformProfile = { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: [] }
+    private profile: PlatformProfile = { id: 'github', suggestionInfoString: 'suggestion', slashCommands: false, commandPrefixes: [] }
   ) {}
 
   platformProfile(): PlatformProfile {

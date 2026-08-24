@@ -107,7 +107,7 @@ function makeAdapter(
 } {
   return {
     matches: () => true,
-    platformProfile: () => ({ id: 'github', suggestionInfoString: null, slashPrefixes: [] }),
+    platformProfile: () => ({ id: 'github', suggestionInfoString: null, slashCommands: false, commandPrefixes: [] }),
     getRepoConfig: async () => ({ status: 'absent' }),
     getOrgConfig: async () => ({ status: 'absent' }),
     observeEditors: () => ({ dispose: () => {} }),
@@ -699,7 +699,7 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     });
     const adapter = new GithubClientAdapter({ documentRef: document });
     const bodyEl = document.querySelector('[data-testid="comment-body"]')!;
-    const profile = { id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: [] };
+    const profile = { id: 'github', suggestionInfoString: 'suggestion', slashCommands: false, commandPrefixes: [] };
 
     // Simule ce que le premier rendu a fait : decorateComment() a posé un badge.
     decorateComment(bodyEl, 'issue: quelque chose ne va pas', defaultConfig(), profile);

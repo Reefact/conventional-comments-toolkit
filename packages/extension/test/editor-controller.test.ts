@@ -32,7 +32,7 @@ function setup(mode: 'enforce' | 'warn' = 'enforce') {
   };
 
   const adapter: Partial<PlatformAdapter> = {
-    platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion', slashPrefixes: [] }),
+    platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion', slashCommands: false, commandPrefixes: [] }),
     getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
     readValue: () => textarea.value,
     writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),

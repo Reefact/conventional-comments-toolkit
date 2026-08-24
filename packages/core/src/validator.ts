@@ -205,13 +205,13 @@ function isExempt(
     const login = input.author.login.toLowerCase();
     if (config.exemptUsers.some((u) => u.toLowerCase() === login)) return true;
   }
-  // Commande slash propre à la plateforme.
+  // Commande adressée à un outil (§4.2) — premier jeton du corps, suivi d'une espace ou de la
+  // fin de ligne. Deux formes : slash générique, mention nominative.
   const trimmed = input.body.trimStart();
-  for (const p of input.platform.slashPrefixes) {
-    if (trimmed.startsWith(p)) {
-      const rest = trimmed.slice(p.length);
-      if (rest === '' || /^\s/.test(rest) || /[^A-Za-z0-9-]$/.test(p)) return true;
-    }
+  const firstToken = /^(\S+)/.exec(trimmed)?.[1] ?? null;
+  if (firstToken) {
+    if (input.platform.slashCommands && /^\/[A-Za-z][A-Za-z0-9_-]*$/.test(firstToken)) return true;
+    if (input.platform.commandPrefixes.includes(firstToken)) return true;
   }
   // allowlistPatterns — appliquées au corps entier une fois trim() appliqué (§4.2).
   const wholeTrimmed = input.body.trim();

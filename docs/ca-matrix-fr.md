@@ -50,6 +50,7 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 | CA-37 | Bloc de suggestion + phrase libre : conforme sans label, compté `suggestion`, ni `W-MISSING-DECORATION` ni diagnostic de sujet | `core/test/validator.test.ts` |
 | CA-38 | Préfixe mal formé : motif exact, jamais `E-NO-LABEL` ; `Attention :` reste `E-NO-LABEL` | `core/test/validator.test.ts` |
 | CA-39 | Cohérence de l'exemption sur le chemin de repli : pose ratée → aucune exemption ; étiquette retirée d'une exemption confirmée → restaurée, vert | `core/test/evaluate.test.ts`, `server/test/orchestrator.test.ts`, `server/test/admin.test.ts` |
+| CA-40 | Commande adressée à un outil exemptée (§4.2) : slash reconnu génériquement (forme du jeton, aucune liste), mention de robot reconnue sur liste fermée — une interpellation de personne ou un handle inconnu restent des remarques de revue | `core/test/validator.test.ts` |
 
 ## Critères vérifiés partiellement de façon non automatisée
 

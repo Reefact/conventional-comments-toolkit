@@ -13,11 +13,23 @@
    d'avant le renommage (specifications-fr.md §A.5). Le canari n'exige que le nom actuel
    (premier niveau) — l'ancien est un filet non vérifiable depuis github.com. */
 
+/* Le conteneur GitHub natif qui héberge la zone de texte porte lui-même une bordure —
+   pensée pour n'entourer que le textarea. Comme la barre d'outils et le retour visuel de
+   l'extension sont insérés dans ce même conteneur (editor-controller.ts), cette bordure
+   native se retrouve à tort autour de tout le bloc. On la supprime ici : la zone de texte
+   garde son propre encadré natif, inchangé. */
+.cct-host {
+  border: none !important;
+  box-shadow: none !important;
+}
+
 .cct-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  column-gap: 6px;
+  row-gap: 8px;
   padding: 4px 0;
+  margin-bottom: 8px;
   align-items: center;
 }
 

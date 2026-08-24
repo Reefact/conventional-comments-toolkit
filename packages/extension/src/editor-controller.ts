@@ -68,6 +68,13 @@ export class EditorController {
     const host = this.deps.editor.element.parentElement;
     if (!host) return;
 
+    // Le conteneur natif GitHub porte une bordure/ombre pensée pour n'entourer que la
+    // zone de texte ; nos éléments injectés (barre d'outils, retour visuel) partagent ce
+    // même conteneur et se retrouvent donc, sans intervention, à l'intérieur de cette
+    // bordure — visuellement incohérent. On la neutralise via cette classe (styles.css).
+    host.classList.add('cct-host');
+    this.#disposers.push(() => host.classList.remove('cct-host'));
+
     // §5.1 — barre d'outils au-dessus de la zone de saisie.
     const toolbar = buildToolbar({
       config: this.config,

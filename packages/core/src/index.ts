@@ -50,6 +50,7 @@ export {
   isBlocking,
   analyze,
   isCompliant,
+  looksLikeToolCommand,
   malformedMotif,
   DIAGNOSTIC_ORDER,
   DEFAULT_SEVERITIES,

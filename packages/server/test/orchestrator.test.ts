@@ -230,6 +230,57 @@ describe('§6.4 — cycle d’évaluation', () => {
     expect(pinned!.labels.some((l) => l.id === 'perfo')).toBe(true);
   });
 
+  it('CA-40 : un E-NO-LABEL sur une commande déclenche aussi la seconde passe (§8.1.3 r.3)', async () => {
+    const env = makeEnv({
+      repoConfig: enforceConfig({ formatSeverity: 'error' }),
+      threads: [thread(comment('@codex review'))],
+    });
+    // Le dépôt vient d'ajouter `@codex` à toolCommands ; le serveur a encore l'ancienne
+    // configuration en cache. Sans le troisième déclencheur, la commande resterait rejetée
+    // pendant tout le TTL alors que l'extension, elle, l'exempte déjà.
+    const original = env.adapter.state.repoConfig;
+    let bypassed = false;
+    const adapterAny = env.adapter;
+    const originalFetch = adapterAny.fetchConfigFile.bind(adapterAny);
+    adapterAny.fetchConfigFile = async (pr, opts) => {
+      if (opts?.bypassCache) {
+        bypassed = true;
+        return {
+          status: 'found',
+          text: JSON.stringify({
+            ...(JSON.parse((original as { text: string }).text) as object),
+            toolCommands: ['@codex'],
+          }),
+        };
+      }
+      return originalFetch(pr, opts);
+    };
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(bypassed).toBe(true);
+    const status = env.adapter.published[0]!;
+    expect(status.formatDiagnostics.some((d) => d.code === 'E-NO-LABEL')).toBe(false);
+    expect(status.state).toBe('success');
+  });
+
+  it('CA-40 : un E-NO-LABEL ordinaire ne déclenche RIEN — le discriminant borne le coût', async () => {
+    // Contre-épreuve indispensable : sans qualification, le déclencheur contournerait le
+    // cache sur la quasi-totalité des commentaires non conformes.
+    const env = makeEnv({
+      repoConfig: enforceConfig({ formatSeverity: 'error' }),
+      threads: [thread(comment('il faudrait renommer ça'))],
+    });
+    let bypassed = false;
+    const adapterAny = env.adapter;
+    const originalFetch = adapterAny.fetchConfigFile.bind(adapterAny);
+    adapterAny.fetchConfigFile = async (pr, opts) => {
+      if (opts?.bypassCache) bypassed = true;
+      return originalFetch(pr, opts);
+    };
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(bypassed).toBe(false);
+    expect(env.adapter.published[0]!.formatDiagnostics.some((d) => d.code === 'E-NO-LABEL')).toBe(true);
+  });
+
   it('CA-30 : l’épinglage se fait à la première évaluation et n’est jamais réécrit', async () => {
     const env = makeEnv({ repoConfig: enforceConfig() });
     await env.orchestrator.evaluatePr(PR, nextSeq());

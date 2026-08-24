@@ -43,6 +43,7 @@ const PRIMER_PREFIXES = [
   '--fgColor-',
   '--overlay-',
   '--button-', // tokens des boutons natifs, repris par .cct-label-button
+  '--base-size-', // primitif d'espacement, repris pour aligner sur .CommentBox-input
 ];
 
 // Les commentaires CSS documentent parfois des noms de variables (« préférer

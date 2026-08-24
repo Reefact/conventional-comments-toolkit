@@ -81,8 +81,8 @@ instance, avec sa propre destination et durée de conservation.
 
 ## Permissions et pourquoi
 
-Le détail permission par permission (`storage`, `scripting`, `activeTab`,
-`host_permissions`, `optional_host_permissions`) est documenté dans
+Le détail permission par permission (`storage`, `scripting`,
+`optional_host_permissions`) est documenté dans
 [`docs/store-permissions-justification-fr.md`](docs/store-permissions-justification-fr.md).
 En résumé : aucune permission `<all_urls>` statique, les domaines hors
 GitHub (Azure DevOps, configuration d'entreprise) sont demandés à la
@@ -191,7 +191,7 @@ own destination and retention terms.
 ## Permissions and why
 
 A permission-by-permission breakdown (`storage`, `scripting`,
-`activeTab`, `host_permissions`, `optional_host_permissions`) is
+`optional_host_permissions`) is
 documented in
 [`docs/store-permissions-justification-fr.md`](docs/store-permissions-justification-fr.md).
 In short: no static `<all_urls>` permission; domains beyond GitHub (Azure

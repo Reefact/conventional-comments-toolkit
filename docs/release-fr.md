@@ -11,7 +11,9 @@ GitHub qui les porte.
 ## Poser une release
 
 1. Mettre à jour `version` dans `packages/extension/src/manifest.json` — c'est cette
-   valeur que le navigateur affichera une fois l'extension chargée.
+   valeur que le navigateur affichera une fois l'extension chargée. **Uniquement des
+   chiffres** : un à quatre entiers de 0 à 65535 séparés par des points. Chromium refuse
+   de charger une extension dont le manifeste porte autre chose.
 2. Committer et pousser sur `main` (la CI doit être verte).
 3. Poser et pousser le tag, identique à la version du manifeste au `v` près :
 
@@ -21,8 +23,15 @@ GitHub qui les porte.
    ```
 
 Le workflow refuse de publier si le tag et le manifeste divergent : le message d'erreur
-dit quoi corriger. Un tag pré-version (`v1.1.0-rc.1`, reconnu au tiret) produit une
-Release marquée *pre-release*.
+dit quoi corriger.
+
+**Pré-version.** Le tag peut porter une étiquette : `v1.1.0-rc.1`. C'est alors le noyau
+numérique (`1.1.0`) qui doit correspondre au manifeste, et l'étiquette vit là où elle est
+sans danger — nom des archives, titre de la Release, marquée *pre-release*. Le manifeste,
+lui, reste numérique : l'extension chargée affichera donc `1.1.0`. C'est une contrainte de
+Chromium, pas un oubli. La résolution complète, ses cas d'erreur et ses tests sont dans
+[`scripts/release-version.mjs`](../scripts/release-version.mjs) et
+[`tests/release-version.test.ts`](../tests/release-version.test.ts).
 
 ## Ce que la release contient
 
@@ -34,6 +43,20 @@ Release marquée *pre-release*.
 
 Chaque archive se décompresse en **un** dossier dont la racine porte `manifest.json` —
 directement chargeable — et embarque un `INSTALLATION.txt` bilingue ainsi que la licence.
+
+## Ce que ces archives ne sont pas
+
+Un canal de déploiement. La spécification est explicite : le déploiement principal du
+composant A passe par les stores publics, avec mise à jour automatique depuis le store
+d'origine ou depuis un store privé d'entreprise (§10), et **toute livraison du composant A
+passe par la revue des stores** (§14, `docs/operations-fr.md`). Une extension chargée
+depuis un zip ne se met jamais à jour toute seule : chaque nouvelle version demande de
+retélécharger et de recharger à la main.
+
+Ces archives servent donc à **essayer** l'extension, et à la faire tourner sur les postes
+où la chaîne de build n'est pas installable. Elles ne remplacent ni la soumission aux
+stores, ni l'installation forcée par politique d'entreprise (`ExtensionInstallForcelist`,
+`ExtensionSettings` — §10, §8.2).
 
 ## Ce qui est vérifié avant publication
 

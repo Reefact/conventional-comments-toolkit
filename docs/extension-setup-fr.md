@@ -35,6 +35,11 @@ Chaque archive embarque un `INSTALLATION.txt` qui reprend ces étapes. Le fichie
 Get-FileHash conventional-comments-toolkit-<version>-chromium.zip -Algorithm SHA256
 ```
 
+Une extension chargée depuis un zip **ne se met pas à jour toute seule** : chaque nouvelle
+version demande de retélécharger et de recharger à la main. C'est une voie d'essai et de
+dépannage ; le déploiement du composant A passe par les stores publics et, en entreprise,
+par l'installation forcée par politique (§10).
+
 La suite du guide reste la voie à suivre pour **construire l'extension soi-même** depuis
 les sources : nécessaire pour la modifier, ou pour installer un état non encore publié.
 

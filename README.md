@@ -43,7 +43,10 @@ guide: [`docs/extension-setup-en.md`](./docs/extension-setup-en.md) (French:
 zip — one for Chromium, one for Firefox. Download it from the
 [releases page](https://github.com/reefact/conventional-comments-toolkit/releases/latest),
 unzip it, and load the folder (`chrome://extensions` → Developer mode → Load unpacked).
-No Node, no npm, no Git. How a release is cut: [`docs/release-fr.md`](./docs/release-fr.md).
+No Node, no npm, no Git. That path is for **trying the extension** and for machines where
+the build chain can't be installed — it is not a deployment channel: an extension loaded
+from a zip never auto-updates, and §10 routes every delivery of component A through the
+public stores. How a release is cut: [`docs/release-fr.md`](./docs/release-fr.md).
 
 ## Configuration
 

@@ -45,8 +45,10 @@ pas, avec les messages d'erreur exacts et leur solution :
 **Poste où `npm` est impossible** (pas de Node, pas de droits, politique d'entreprise) ?
 Poser un tag `vX.Y.Z` publie une Release GitHub qui porte l'extension déjà construite, en
 zip : un pour Chromium, un pour Firefox. Il ne reste qu'à télécharger, décompresser et
-charger le dossier — rien à installer sur le poste. La procédure de publication est dans
-[`docs/release-fr.md`](./docs/release-fr.md).
+charger le dossier — rien à installer sur le poste. C'est une voie d'**essai**, pas un
+canal de déploiement : une extension chargée depuis un zip ne se met pas à jour toute
+seule, et la spécification fait passer toute livraison du composant A par les stores (§10,
+§14). La procédure est dans [`docs/release-fr.md`](./docs/release-fr.md).
 
 Si Node.js et npm sont déjà installés, la version courte suffit. Le bundle **n'est pas
 committé** (`dist-ext/` est dans `.gitignore` — c'est un artefact de build) : sur un clone
@@ -123,7 +125,7 @@ corps du check GitHub (`CA-25`).
 | 4 | Créer une app GitHub / un service hook Azure DevOps (jetons, secret de webhook) | Vous | Non |
 | 5 | **Mesure de référence P0** (temps de revue, taux de conformité *avant* l'outil) | Vous | Non, mais **irrattrapable** si l'outil est déployé avant — §14, `docs/operations-fr.md` |
 | 6 | Choisir un dépôt pilote et suivre la trajoire `assist → warn → enforce` | Vous | Non |
-| 7 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) si diffusion au-delà de vous — pour une diffusion interne, les zips de release suffisent (`docs/release-fr.md`) | Vous | Non |
+| 7 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) : **toute livraison du composant A y passe** (§10, §14), et c'est le seul chemin qui donne la mise à jour automatique. Les zips de release (`docs/release-fr.md`) servent à l'essai et aux postes sans chaîne de build, ils ne s'y substituent pas | Vous | Non |
 | 8 | Fournir des captures DOM réelles pour le smoke test de sélecteurs (§9.4) | Vous (ou moi, avec un accès) | Non |
 | 9 | Vérifier les deux hypothèses AzDO non tranchées par le spike (type d'éditeur, lisibilité du fichier de config) sur un vrai tenant Azure DevOps | Vous (ou moi, avec un accès) | Non — replis dégradés déjà en place, documentés dans `spikes/p1-prime/README-fr.md` |
 

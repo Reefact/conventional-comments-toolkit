@@ -12,7 +12,7 @@
 
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { EffectiveConfig, Floor } from '@cct/core';
+import { completeStoredConfig, type EffectiveConfig, type Floor } from '@cct/core';
 import type {
   ActiveExemption,
   ExemptionLogEntry,
@@ -155,7 +155,10 @@ export class SqliteStorage implements Storage {
 
   // 3. Configuration épinglée — écrite une fois, jamais réécrite (§8.1.3).
   async getPinnedConfig(prKey: string): Promise<EffectiveConfig | null> {
-    return this.#get('pinned', prKey);
+    // Frontière de désérialisation (§6.4) : un document écrit par une version antérieure
+    // de `core/` n'a pas les clés ajoutées depuis. Complété ICI, comme dans l'autre backend.
+    const v = this.#get<EffectiveConfig>('pinned', prKey);
+    return v === null ? null : completeStoredConfig(v);
   }
   async setPinnedConfig(prKey: string, config: EffectiveConfig): Promise<void> {
     this.#setOnce('pinned', prKey, config);
@@ -188,7 +191,10 @@ export class SqliteStorage implements Storage {
 
   // 6. Dernière configuration effective par dépôt (§6.4).
   async getLastEffectiveConfig(repoKey: string): Promise<EffectiveConfig | null> {
-    return this.#get('lastConfig', repoKey);
+    // Même frontière : ce document part directement dans evaluate() sur le chemin dégradé
+    // du §6.4, sans passer par le mélange du §8.1.3.
+    const v = this.#get<EffectiveConfig>('lastConfig', repoKey);
+    return v === null ? null : completeStoredConfig(v);
   }
   async setLastEffectiveConfig(repoKey: string, config: EffectiveConfig): Promise<void> {
     this.#set('lastConfig', repoKey, config);

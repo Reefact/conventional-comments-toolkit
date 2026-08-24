@@ -5,7 +5,7 @@
 // durcissement.
 
 import type { DecorationConfig, EffectiveConfig, LabelConfig } from '../types.js';
-import { defaultConfig } from './defaults.js';
+import { completeStoredConfig } from './defaults.js';
 import { minMode, minSeverity, maxSeverity } from './floor.js';
 
 /** Mélange la configuration épinglée d'une PR et la configuration vivante (hors bornes —
@@ -13,16 +13,14 @@ import { minMode, minSeverity, maxSeverity } from './floor.js';
  * `activation.activatedAt`). Granularité : une clé à la fois, une entrée à la fois pour
  * les listes (§8.1.3). */
 export function mixPinnedWithLive(pinnedRaw: EffectiveConfig, live: EffectiveConfig): EffectiveConfig {
-  // Une configuration épinglée est un document PERSISTÉ (§6.4), écrit par la version de
-  // `core/` qui tournait à l'ouverture de la PR et relu tel quel — `JSON.parse` sans
-  // normalisation, sur les deux backends de stockage. Une clé ajoutée au §8.2 depuis
-  // l'épinglage y est donc ABSENTE, et le mélange ci-dessous la lirait `undefined` : les
-  // unions de listes lèveraient, et toute PR déjà épinglée cesserait d'être évaluée après
-  // une mise à jour du serveur. Compléter par les valeurs par défaut du produit est le
-  // comportement juste, et pas seulement le comportement sûr : une clé qui n'existait pas
-  // à l'ouverture de la PR n'a jamais pu y être configurée, et sa valeur par défaut est
-  // exactement ce sous quoi cette PR a été jugée jusqu'ici.
-  const pinned: EffectiveConfig = { ...defaultConfig(), ...pinnedRaw };
+  // Défense de bordure. Le stockage complète déjà les documents persistés à leur frontière
+  // de désérialisation (§6.4) — c'est là qu'est le correctif porteur, parce qu'il couvre
+  // TOUS les consommateurs, `unableToEvaluate()` compris, qui passe la dernière
+  // configuration effective directement à `evaluate()` sans jamais passer par ici.
+  // `mixPinnedWithLive()` est néanmoins exportée : rien ne garantit que son appelant ait
+  // franchi cette frontière, et la lire `undefined` ferait lever les unions ci-dessous.
+  // Même règle, une seule définition — jamais une seconde écriture de la même complétion.
+  const pinned: EffectiveConfig = completeStoredConfig(pinnedRaw);
 
   // Point de départ : le vivant — toutes les clés purement opérationnelles ou cosmétiques
   // s'appliquent en direct (server.*, exemptionLog.*, configUrl, configCacheTtlSeconds,

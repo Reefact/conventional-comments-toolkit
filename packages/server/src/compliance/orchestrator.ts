@@ -9,6 +9,8 @@ import {
   parseConfigDocument,
   resolveConfig,
   SUPPORTED_FLOOR_VERSION,
+  vetFloor,
+  vettedConfigUrl,
   type ComplianceResult,
   type ConfigRead,
   type EffectiveConfig,
@@ -118,21 +120,31 @@ export class Orchestrator {
     // non supportée fait substituer le dernier plancher valide connu (§8.1.1).
     const floorNotices: Notice[] = [];
     let floor = await this.deps.floorProvider().catch(() => null);
-    if (floor && floor.floorVersion !== undefined && floor.floorVersion > SUPPORTED_FLOOR_VERSION) {
+    // La version se juge par `vetFloor()`, jamais par une comparaison réécrite ici : la
+    // comparaison locale acceptait `1.5` comme « supérieure », là où la vérification
+    // exige un entier et écarte simplement la valeur. Deux règles pour un même verdict
+    // finissaient par diverger, et le serveur substituait le plancher précédent là où
+    // `resolveConfig()` aurait appliqué le document.
+    const declaredVersion = floor?.floorVersion;
+    let vetted = vetFloor(floor);
+    if (floor && vetted.unsupported) {
       const last = await storage.getLastValidFloor();
       if (last) {
         floorNotices.push({
           kind: 'unsupported-version',
-          message: `floor version ${floor.floorVersion} exceeds supported version ${SUPPORTED_FLOOR_VERSION}: the previously known floor is applied (§8.1.1)`,
+          message: `floor version ${declaredVersion} exceeds supported version ${SUPPORTED_FLOOR_VERSION}: the previously known floor is applied (§8.1.1)`,
           ref: 'floorVersion',
         });
         floor = last;
+        vetted = vetFloor(last);
       }
       // Sans plancher précédemment connu, resolveConfig applique lui-même le repli assist.
     } else if (floor) {
       await storage.setLastValidFloor(floor);
     }
-    const configUrl = floor?.configUrl ?? null;
+    // L'URL du plancher VÉRIFIÉ : un plancher non appliqué ne doit pas désigner le
+    // document d'organisation ni déclencher sa lecture (§8.1.1).
+    const configUrl = vettedConfigUrl(vetted);
 
     // ————— Étape 5 : relire l'état courant — jamais le contenu de l'événement —————
     let repoRead: ConfigRead;

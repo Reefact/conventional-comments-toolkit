@@ -3,6 +3,7 @@ import { resolveConfig } from '../src/config/resolve.js';
 import { defaultConfig } from '../src/config/defaults.js';
 import { hasNestedQuantifier } from '../src/config/schema.js';
 import { fingerprint, fingerprintDomain } from '../src/config/fingerprint.js';
+import { vetFloor, vettedConfigUrl } from '../src/config/floor.js';
 import type { ConfigRead, Floor } from '../src/types.js';
 
 const absent: ConfigRead = { status: 'absent' };
@@ -554,6 +555,41 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     expect(config.mode).toBe('enforce'); // le plancher est appliqué, pas escamoté
     expect(notices.some((n) => n.ref === 'floorVersion')).toBe(true);
     expect(notices.some((n) => n.kind === 'unsupported-version')).toBe(false);
+  });
+
+  it('la règle d’URL du plancher : nulle si non applicable, transmise sinon', () => {
+    // La règle elle-même. Que les APPELANTS la consultent AVANT de lire le réseau se
+    // teste là où le défaut vivait — `server/test/orchestrator.test.ts`.
+    const trop = { floorVersion: 99, configUrl: 'https://interne.example/cc.json' } as Floor;
+    expect(vettedConfigUrl(vetFloor(trop))).toBeNull();
+    const bon = { floorVersion: 1, configUrl: 'https://interne.example/cc.json' } as Floor;
+    expect(vettedConfigUrl(vetFloor(bon))).toBe('https://interne.example/cc.json');
+  });
+
+  it('un configUrl qui n’est pas une chaîne est écarté, pas transmis', () => {
+    const floor = { configUrl: 42 } as unknown as Floor;
+    const vet = vetFloor(floor);
+    expect(vettedConfigUrl(vet)).toBeNull();
+    expect(vet.notices.some((n) => n.ref === 'configUrl')).toBe(true);
+  });
+
+  it('une sous-clé inconnue d’une règle de liste est signalée', () => {
+    // `closd` laissait `closed` absent, donc la liste OUVERTE, alors que
+    // l'administration la voulait fermée — et sans un mot.
+    const floor = { exemptUsers: { minimum: ['ci[bot]'], closd: true } } as unknown as Floor;
+    const { notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(notices.some((n) => n.ref === 'exemptUsers.closd')).toBe(true);
+  });
+
+  it('une version fractionnaire est écartée, pas tenue pour supérieure', () => {
+    // `1.5 > 1` est vrai : une comparaison écrite à la main la déclarait non supportée,
+    // là où la vérification exige un entier et applique le reste du document.
+    const floor = { floorVersion: 1.5, minimumMode: 'enforce' } as unknown as Floor;
+    const vet = vetFloor(floor);
+    expect(vet.unsupported).toBe(false);
+    expect(vet.notices.some((n) => n.ref === 'floorVersion')).toBe(true);
+    const { config } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.mode).toBe('enforce'); // le reste du plancher s'applique
   });
 
   it('contre-épreuve : un plancher bien formé s’applique intégralement', () => {

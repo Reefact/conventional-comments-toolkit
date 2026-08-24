@@ -71,6 +71,7 @@ export { mergeLevel } from './config/merge.js';
 export {
   applyFloor,
   vetFloor,
+  vettedConfigUrl,
   defaultFloor,
   maxMode,
   minMode,

@@ -6,6 +6,8 @@
 import {
   fingerprint,
   resolveConfig,
+  vetFloor,
+  vettedConfigUrl,
   type ConfigRead,
   type EffectiveConfig,
   type Floor,
@@ -43,7 +45,9 @@ export class ClientConfigResolver {
    * `configCacheTtlSeconds` et faites hors du chemin critique par l'appelant (§9.2.3). */
   async resolve(adapter: PlatformAdapter, pr: PrRef): Promise<ResolvedClientConfig> {
     const floor = await this.#floorProvider().catch(() => null);
-    const configUrl = floor?.configUrl ?? null;
+    // Le plancher VÉRIFIÉ, jamais le brut : un plancher de version non supportée ne doit
+    // pas désigner le document d'organisation ni déclencher sa lecture (§8.1.1).
+    const configUrl = vettedConfigUrl(vetFloor(floor));
 
     const repo = await this.#cached(`repo:${pr.host}/${pr.scope.join('/')}`, () =>
       adapter.getRepoConfig(pr)

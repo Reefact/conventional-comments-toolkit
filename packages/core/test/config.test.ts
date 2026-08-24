@@ -489,6 +489,73 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     expect(notices.some((n) => n.ref === 'resolverOverrideGroup' && n.message.includes('non-string'))).toBe(true);
   });
 
+  it('P1 — une date d’activation invalide est écartée, pas installée', () => {
+    // Le pire défaut de cette famille : `Date.parse("pas-une-date")` rend NaN, la
+    // comparaison de périmètre du §6.2.3 devient fausse pour TOUTE PR, et `evaluate()`
+    // publie `success` partout. Une coquille de plancher annulait l'enforcement d'une
+    // organisation entière, sans que rien ne le signale.
+    const floor = { activation: { activatedAt: 'pas-une-date' } } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.activation.activatedAt).toBeNull(); // écartée : le défaut du produit
+    expect(notices.some((n) => n.ref === 'activation.activatedAt')).toBe(true);
+
+    // Et surtout : la date du dépôt survit au lieu d'être écrasée par la coquille. Sans
+    // l'écart, `min(plancher, dépôt)` installait `NaN` et le périmètre du §6.2.3
+    // devenait faux pour toute PR.
+    const avecDepot = resolveConfig(floor, absent, found({ activation: { activatedAt: '2026-01-01T00:00:00Z' } }), null, false);
+    expect(avecDepot.config.activation.activatedAt).toBe('2026-01-01T00:00:00Z');
+    expect(Number.isNaN(Date.parse(avecDepot.config.activation.activatedAt!))).toBe(false);
+  });
+
+  it('une date d’activation valide passe intacte', () => {
+    const floor: Floor = { activation: { activatedAt: '2026-09-01T00:00:00Z' } };
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.activation.activatedAt).toBe('2026-09-01T00:00:00Z');
+    expect(notices.some((n) => n.ref === 'activation.activatedAt')).toBe(false);
+  });
+
+  it('une clé de plancher inconnue est écartée et signalée', () => {
+    // `minimumMood` laisse l'administration croire son plancher posé alors que tout le
+    // reste du code ignore la clé.
+    const floor = { minimumMood: 'enforce' } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.mode).toBe('assist'); // le défaut produit : aucun plancher appliqué
+    expect(notices.some((n) => n.ref === 'minimumMood' && n.message.includes('unknown floor key'))).toBe(true);
+  });
+
+  it('un configCacheTtlSeconds négatif est écarté, pas installé', () => {
+    // Installé, il rendait tout cache inutilisable : `écoulé < -1000` est toujours faux,
+    // donc relecture des deux niveaux à chaque évaluation et à chaque navigation.
+    const floor = { configCacheTtlSeconds: -1 } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.configCacheTtlSeconds).toBeGreaterThanOrEqual(0);
+    expect(notices.some((n) => n.ref === 'configCacheTtlSeconds')).toBe(true);
+  });
+
+  it('un minimumMode hors énumération est écarté et signalé', () => {
+    const floor = { minimumMode: 'ENFORCE' } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.mode).toBe('assist');
+    expect(notices.some((n) => n.ref === 'minimumMode')).toBe(true);
+  });
+
+  it('une sévérité de plancher hors énumération est écartée, les autres restent', () => {
+    const floor = { severities: { 'E-NO-LABEL': 'error', 'E-UNKNOWN-LABEL': 'critique' } } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, found({ severities: { 'E-NO-LABEL': 'warn' } }), null, false);
+    expect(config.severities['E-NO-LABEL']).toBe('error'); // le plancher tient
+    expect(notices.some((n) => n.ref === 'severities.E-UNKNOWN-LABEL')).toBe(true);
+  });
+
+  it('une version de plancher entre guillemets ne déclenche pas le repli par coercition', () => {
+    // `"99" > 1` est vrai en JavaScript : la comparaison passait avant la vérification de
+    // type, et une version mal écrite faisait retomber le plancher en `assist`.
+    const floor = { floorVersion: '99', minimumMode: 'enforce' } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.mode).toBe('enforce'); // le plancher est appliqué, pas escamoté
+    expect(notices.some((n) => n.ref === 'floorVersion')).toBe(true);
+    expect(notices.some((n) => n.kind === 'unsupported-version')).toBe(false);
+  });
+
   it('contre-épreuve : un plancher bien formé s’applique intégralement', () => {
     const floor: Floor = {
       minimumMode: 'enforce',

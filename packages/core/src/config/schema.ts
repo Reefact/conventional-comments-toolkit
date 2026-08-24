@@ -16,8 +16,8 @@ export interface ParsedDocument {
   unsupported: boolean;
 }
 
-const MODES = ['off', 'assist', 'warn', 'enforce'];
-const SEVERITIES = ['off', 'warn', 'error'];
+export const MODES = ['off', 'assist', 'warn', 'enforce'];
+export const SEVERITIES = ['off', 'warn', 'error'];
 const FORCES = ['blocking', 'non-blocking', null];
 
 const KNOWN_KEYS = new Set([

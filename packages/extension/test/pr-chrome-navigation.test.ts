@@ -1,17 +1,35 @@
 // @vitest-environment happy-dom
-// Non-régression : la barre (bandeau, §5.5) doit se ré-afficher après une navigation SPA
-// vers une PR différente — signalé par un utilisateur obligé de recharger la page pour la
-// voir apparaître. Avant ce correctif, `renderPrChrome` n'était invoqué qu'une seule fois,
-// au chargement du script de contenu (`bootstrap()`) ; une navigation Turbo/React vers une
-// autre PR (ou vers la première PR, depuis une page où aucune PR n'était encore visible)
-// ne relance jamais le script, donc le bandeau restait absent ou périmé jusqu'à un
-// rechargement complet.
+// Non-régression : la barre (bandeau, §5.5) doit se ré-afficher sans rechargement complet
+// de la page. Trois causes indépendantes, corrigées séparément (D1/D2/D3, revue du
+// 2026-08-24) :
+//
+// D1 — bootstrap() n'armait les observateurs QUE si la page chargée était déjà une PR.
+//      Sur le chemin le plus courant (liste des PR, notifications, tableau de bord → clic
+//      sur une PR, en SPA), la page de CHARGEMENT n'est jamais la PR elle-même : l'extension
+//      restait intégralement inactive.
+// D2 — le budget de rattrapage de l'hydratation se comptait en nombre de tentatives (20),
+//      épuisées en quelques dizaines de millisecondes dès que la configuration était en
+//      cache — bien avant que le contenu réel (fils, statut publié) n'ait le temps
+//      d'arriver. Remplacé par une fenêtre de TEMPS.
+// D3 — une fois qu'un premier rendu avait montré quelque chose (ex. la vue locale), plus
+//      rien ne retentait sur la même PR : le résumé publié du composant B, arrivé après
+//      coup, n'était jamais adopté (CA-03, §6.5).
 
-import { afterEach, describe, expect, it } from 'vitest';
-import type { PlatformAdapter } from '@cct/adapter-shared';
-import type { PrRef, PublishedSummary } from '@cct/core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { GithubClientAdapter } from '@cct/adapter-github';
+import { AzdoClientAdapter } from '@cct/adapter-azdo';
+import type { PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import type { PrRef, PublishedSummary, ThreadInfo } from '@cct/core';
 import { ClientConfigResolver } from '../src/config-resolver.js';
-import { observePrChromeNavigation, prKeyFor } from '../src/content-internal.js';
+import {
+  applyCompletionState,
+  bootstrap,
+  observePrChromeNavigation,
+  prKeyFor,
+  publishedSignatureOf,
+  RENDER_RETRY_THROTTLE_MS,
+  RENDER_RETRY_WINDOW_MS,
+} from '../src/content-internal.js';
 
 function pr(number: number): PrRef {
   return { platform: 'github', createdAt: '2026-01-01T00:00:00Z', host: 'github.com', scope: ['acme', 'demo'], number };
@@ -32,15 +50,31 @@ function published(unresolvedBlockingCount: number): PublishedSummary {
   };
 }
 
+function publishedSummary(overrides: Partial<PublishedSummary>): PublishedSummary {
+  return { ...published(0), ...overrides };
+}
+
+/** Ligne cc/1 valide (§6.3.1) — mêmes clés que `encodeSummary` (core/src/summary.ts),
+ * écrite en dur ici pour ne pas dépendre d'un `ComplianceResult` complet. */
+function summaryLine(unresolvedBlockingCount: number): string {
+  return `cc/1 state=success draft=0 exempt=0 mode=assist activated=- core=1.0.0 cfg=deadbeef t=${unresolvedBlockingCount} c=0 w=0`;
+}
+
 /** Adaptateur factice : `currentPr()` — non porté par `PlatformAdapter`, lu par cast comme
  * dans content-internal.ts — reflète la PR « affichée » par la page à un instant donné, au
- * gré des mutations simulées ci-dessous. `isHydrated` simule le contenu que la plateforme
- * peuple en différé : tant qu'il est faux, le DOM ne porte encore ni statut publié ni fil,
- * comme au tout début du chargement d'une PR. */
+ * gré des mutations simulées ci-dessous. */
 function makeAdapter(
   getCurrent: () => PrRef | null,
-  isHydrated: () => boolean = () => true
-): PlatformAdapter & { currentPr(): PrRef | null } {
+  getPublished: () => PublishedSummary | null = () => null,
+  opts: {
+    getThreads?: () => Promise<ThreadInfo[]>;
+    getCompletionControl?: () => SubmitControl | null;
+    getRenderedThreadElements?: () => { id: string; element: Element }[];
+  } = {}
+): PlatformAdapter & {
+  currentPr(): PrRef | null;
+  getRenderedThreadElements?: () => { id: string; element: Element }[];
+} {
   return {
     matches: () => true,
     platformProfile: () => ({ id: 'github', suggestionInfoString: null, slashPrefixes: [] }),
@@ -50,15 +84,20 @@ function makeAdapter(
     getSubmitControls: () => [],
     readValue: () => '',
     writeValue: () => {},
-    getThreads: async () => [],
-    getCompletionControl: () => null,
+    getThreads: opts.getThreads ?? (async () => []),
+    getCompletionControl: opts.getCompletionControl ?? (() => null),
     getCurrentUser: async () => ({ id: 'u', login: 'u', isServiceAccount: false }),
-    readPublishedResult: () => {
-      const current = getCurrent();
-      return current && isHydrated() ? published(current.number) : null;
-    },
+    readPublishedResult: getPublished,
     currentPr: getCurrent,
+    getRenderedThreadElements: opts.getRenderedThreadElements,
   };
+}
+
+/** Horloge injectable — même convention que `ClientConfigResolver` (config-resolver.ts) —
+ * pour tester `RENDER_RETRY_WINDOW_MS` sans dépendre d'une attente réelle. */
+function makeClock(start = 0): { now: () => number; advance: (ms: number) => void } {
+  let t = start;
+  return { now: () => t, advance: (ms) => (t += ms) };
 }
 
 function flush(): Promise<void> {
@@ -87,10 +126,19 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     expect(prKeyFor(pr(2))).toBe('github.com/acme/demo#2');
   });
 
+  it('publishedSignatureOf compare par valeur, pas par identité d’objet (§8.1.3 règle 2)', () => {
+    const adapter = makeAdapter(() => pr(1), () => published(3));
+    expect(publishedSignatureOf(adapter)).toBe(publishedSignatureOf(adapter)); // deux lectures, même valeur
+    expect(publishedSignatureOf(makeAdapter(() => pr(1), () => published(4)))).not.toBe(
+      publishedSignatureOf(makeAdapter(() => pr(1), () => published(3)))
+    );
+    expect(publishedSignatureOf(makeAdapter(() => pr(1), () => null))).toBeNull();
+  });
+
   it('rend le bandeau dès le chargement quand une PR est déjà affichée', async () => {
     const doc = document;
     let current: PrRef | null = pr(1);
-    const adapter = makeAdapter(() => current);
+    const adapter = makeAdapter(() => current, () => published(current!.number));
     const resolver = new ClientConfigResolver(async () => null);
 
     observePrChromeNavigation(adapter, resolver, doc);
@@ -102,7 +150,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
   it('navigation vers une PR différente : le bandeau se ré-affiche sans rechargement, sans doublon', async () => {
     const doc = document;
     let current: PrRef | null = pr(1);
-    const adapter = makeAdapter(() => current);
+    const adapter = makeAdapter(() => current, () => published(current!.number));
     const resolver = new ClientConfigResolver(async () => null);
 
     observePrChromeNavigation(adapter, resolver, doc);
@@ -123,7 +171,10 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
   it('première PR atteinte après le chargement (page initiale sans PR) : le bandeau apparaît sans rechargement', async () => {
     const doc = document;
     let current: PrRef | null = null;
-    const adapter = makeAdapter(() => current);
+    const adapter = makeAdapter(
+      () => current,
+      () => (current ? published(current.number) : null)
+    );
     const resolver = new ClientConfigResolver(async () => null);
 
     observePrChromeNavigation(adapter, resolver, doc);
@@ -141,7 +192,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
   it('navigation vers une page sans PR : le bandeau de l’ancienne PR est retiré, pas laissé périmé', async () => {
     const doc = document;
     let current: PrRef | null = pr(3);
-    const adapter = makeAdapter(() => current);
+    const adapter = makeAdapter(() => current, () => (current ? published(current.number) : null));
     const resolver = new ClientConfigResolver(async () => null);
 
     observePrChromeNavigation(adapter, resolver, doc);
@@ -156,7 +207,78 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
   });
 });
 
-describe('barre — première visite directe d’une PR dont le contenu arrive en différé', () => {
+describe('D1 — bootstrap() choisit l’adaptateur par hôte, pas par présence d’une PR (§2)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+  });
+
+  it('GithubClientAdapter : matchesHost accepte une page github.com sans PR, matches() reste exigeant', () => {
+    const adapter = new GithubClientAdapter();
+    const pulls = new URL('https://github.com/acme/demo/pulls');
+    const onPr = new URL('https://github.com/acme/demo/pull/42');
+    expect(adapter.matchesHost(pulls)).toBe(true);
+    expect(adapter.matches(pulls)).toBe(false);
+    expect(adapter.matchesHost(onPr)).toBe(true);
+    expect(adapter.matches(onPr)).toBe(true);
+    expect(adapter.matchesHost(new URL('https://example.com/'))).toBe(false);
+  });
+
+  it('AzdoClientAdapter : idem, y compris sur *.visualstudio.com', () => {
+    const adapter = new AzdoClientAdapter();
+    const list = new URL('https://dev.azure.com/acme/demo/_git/repo/pullrequests');
+    const onPr = new URL('https://dev.azure.com/acme/demo/_git/repo/pullrequest/7');
+    const vs = new URL('https://acme.visualstudio.com/demo/_git/repo/pullrequests');
+    expect(adapter.matchesHost(list)).toBe(true);
+    expect(adapter.matches(list)).toBe(false);
+    expect(adapter.matchesHost(onPr)).toBe(true);
+    expect(adapter.matches(onPr)).toBe(true);
+    expect(adapter.matchesHost(vs)).toBe(true);
+    expect(adapter.matches(vs)).toBe(false);
+  });
+
+  it('la barre apparaît après une navigation SPA vers une PR atteinte depuis une page non-PR, sans second appel à bootstrap()', async () => {
+    vi.stubGlobal('fetch', () => Promise.reject(new Error('stubbed : pas de réseau en test')));
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/acme/demo/pulls'),
+      configurable: true,
+    });
+
+    await bootstrap(document);
+    await flushAll();
+    // Avant ce correctif, aucun adaptateur n'était choisi ici (matches() exigeait une PR) :
+    // bootstrap() sortait aussitôt, sans armer observeEditors ni observePrChromeNavigation —
+    // l'extension restait définitivement inactive sur cette page, et sur la PR atteinte
+    // ensuite en SPA.
+    expect(document.querySelectorAll('.cct-banner')).toHaveLength(0); // page non-PR : rien à montrer pour l'instant
+
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/acme/demo/pull/42'),
+      configurable: true,
+    });
+    const check = document.createElement('div');
+    check.setAttribute('data-testid', 'check-run-item');
+    check.textContent = summaryLine(2);
+    document.body.appendChild(check); // la mutation qui signale la navigation SPA (Turbo/React, §A.3)
+    await flushAll();
+
+    expect(document.querySelectorAll('.cct-banner')).toHaveLength(1);
+    expect(bannerTitles(document)[0]).toContain('2');
+
+    // bootstrap() a armé un MutationObserver vivant (jamais disposé, comme en production)
+    // sur ce `document` PARTAGÉ par tout le fichier : sans neutralisation explicite, il
+    // continuerait à réagir aux mutations des tests suivants et à effacer LEURS bandeaux
+    // via clearStaleBanner(). Navigue vers une page sans PR pour l'y installer, dormant.
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/acme/demo/pulls'),
+      configurable: true,
+    });
+    document.body.innerHTML = '';
+    await flushAll();
+  });
+});
+
+describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas en nombre de tentatives', () => {
   afterEach(() => {
     document.body.innerHTML = '';
   });
@@ -168,10 +290,11 @@ describe('barre — première visite directe d’une PR dont le contenu arrive e
     // GitHub/AzDO les peuplent en différé. Le premier rendu ne trouve donc rien à montrer.
     const current = pr(11);
     let hydrated = false;
-    const adapter = makeAdapter(() => current, () => hydrated);
+    const adapter = makeAdapter(() => current, () => (hydrated ? published(current.number) : null));
     const resolver = new ClientConfigResolver(async () => null);
+    const clock = makeClock();
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observePrChromeNavigation(adapter, resolver, doc, clock.now);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // trop tôt : rien à montrer
 
@@ -185,49 +308,56 @@ describe('barre — première visite directe d’une PR dont le contenu arrive e
     expect(bannerTitles(doc)[0]).toContain('11');
   });
 
-  it('une PR réellement vide n’est pas retentée indéfiniment : le rendu se borne', async () => {
+  it('une PR réellement vide n’est pas retentée indéfiniment : bornée par le TEMPS, pas un nombre de tentatives', async () => {
     const doc = document;
     const current = pr(12);
     let getThreadsCalls = 0;
-    const adapter = makeAdapter(() => current, () => false);
-    const counting: PlatformAdapter = {
-      ...adapter,
+    const adapter = makeAdapter(() => current, () => null /* ne s'hydrate jamais */, {
       getThreads: async () => {
         getThreadsCalls++;
         return [];
       },
-    };
+    });
     const resolver = new ClientConfigResolver(async () => null);
+    const clock = makeClock();
 
-    observePrChromeNavigation(counting, resolver, doc);
+    observePrChromeNavigation(adapter, resolver, doc, clock.now);
+    await flushAll();
+    expect(getThreadsCalls).toBe(1);
+
+    // Bien au-delà de l'ancien plafond de tentatives (MAX_EMPTY_RENDER_ATTEMPTS = 20,
+    // supprimé) : toujours DANS la fenêtre (l'horloge injectée n'a pas avancé), donc
+    // toujours retenté. C'est exactement l'inverse de la régression que cbd4457 avait
+    // introduite — un plafond de 20 tentatives, épuisé en quelques dizaines de
+    // millisecondes, bien avant que le contenu réel n'ait eu le temps d'arriver.
+    for (let i = 0; i < 25; i++) {
+      doc.body.appendChild(doc.createElement('span'));
+      await flushAll();
+    }
+    expect(getThreadsCalls).toBe(26); // 1 + 25 : aucune n'a été ignorée dans la fenêtre
+
+    // Hors fenêtre : plus aucune relecture, quel que soit le nombre de mutations.
+    clock.advance(RENDER_RETRY_WINDOW_MS + 1000);
+    doc.body.appendChild(doc.createElement('span'));
     await flushAll();
 
-    // Une page vivante mute sans cesse (frappe, survol, minuteries de la plateforme) :
-    // la borne doit empêcher que chaque mutation relance une lecture pour toujours.
-    for (let i = 0; i < 60; i++) {
-      doc.body.appendChild(doc.createElement('span'));
-      await flushAll(2);
-    }
-
+    expect(getThreadsCalls).toBe(26); // pas de 27e lecture
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0);
-    expect(getThreadsCalls).toBeLessThanOrEqual(20); // MAX_EMPTY_RENDER_ATTEMPTS
   });
 
-  it('une fois la barre affichée, les mutations suivantes ne la re-rendent pas', async () => {
+  it('une fois la barre affichée, les mutations suivantes sans changement du résumé publié ne la re-rendent pas', async () => {
     const doc = document;
     const current = pr(13);
     let getThreadsCalls = 0;
-    const adapter = makeAdapter(() => current);
-    const counting: PlatformAdapter = {
-      ...adapter,
+    const adapter = makeAdapter(() => current, () => published(current.number), {
       getThreads: async () => {
         getThreadsCalls++;
         return [];
       },
-    };
+    });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(counting, resolver, doc);
+    observePrChromeNavigation(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
     const callsOnceShown = getThreadsCalls;
@@ -239,5 +369,140 @@ describe('barre — première visite directe d’une PR dont le contenu arrive e
 
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // toujours un seul
     expect(getThreadsCalls).toBe(callsOnceShown); // plus aucune relecture
+  });
+
+  it('la relance après une mutation manquée pendant un rendu en vol est temporisée (§10), pas immédiate', async () => {
+    const doc = document;
+    let current: PrRef | null = pr(15);
+    let getThreadsCalls = 0;
+    let releaseFirstRender: (() => void) | null = null;
+    const gate = new Promise<void>((resolve) => {
+      releaseFirstRender = resolve;
+    });
+    const adapter = makeAdapter(() => current, () => null, {
+      getThreads: async () => {
+        getThreadsCalls++;
+        if (getThreadsCalls === 1) await gate; // maintient le premier rendu « en vol »
+        return [];
+      },
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flush(); // laisse le premier run() démarrer et se bloquer sur getThreads()
+    expect(getThreadsCalls).toBe(1);
+
+    // Une mutation arrive PENDANT que ce premier rendu est en vol.
+    doc.body.appendChild(doc.createElement('span'));
+    await flush();
+    expect(getThreadsCalls).toBe(1); // pas de second rendu concurrent
+
+    releaseFirstRender!(); // le premier rendu se termine
+    await flushAll();
+    expect(getThreadsCalls).toBe(1); // toujours pas de rattrapage IMMÉDIAT au même tick
+
+    await new Promise((resolve) => setTimeout(resolve, RENDER_RETRY_THROTTLE_MS + 100));
+    expect(getThreadsCalls).toBe(2); // ...mais la relance temporisée finit par arriver
+
+    // Cette PR ne s'hydrate jamais (getPublished renvoie toujours null) : l'observateur
+    // reste dans sa fenêtre de rattrapage (horloge réelle, à peine entamée) et resterait
+    // réactif — donc capable d'effacer le bandeau des tests suivants sur ce document
+    // PARTAGÉ — bien après la fin de CE test. Neutralisé en navigant vers une page sans PR.
+    current = null;
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+  });
+});
+
+describe('D3 — le résumé publié arrivé après coup est adopté, même une fois la barre déjà affichée (§5.5, §6.5, CA-03)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('décompte, grisage, infobulle et filtre actif se corrigent tous quand le résumé publié apparaît puis change', async () => {
+    const doc = document;
+    const current = pr(16);
+    const thread: ThreadInfo = {
+      id: 't1',
+      pr: current,
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'issue: quelque chose ne va pas',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution: 'unknown',
+      canCarryBlockingState: true,
+    };
+    const renderedThreadEl = doc.createElement('div');
+    let currentPublished: PublishedSummary | null = null;
+    const control: SubmitControl = { element: doc.createElement('button'), kind: 'complete-pr' };
+    const adapter = makeAdapter(() => current, () => currentPublished, {
+      getThreads: async () => [thread],
+      getCompletionControl: () => control,
+      getRenderedThreadElements: () => [{ id: 't1', element: renderedThreadEl }],
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+
+    // Vue locale (pas encore de résumé publié) : le fil bloquant local suffit à afficher
+    // la barre ; le bouton n'est pas grisé.
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+    expect(control.element.hasAttribute('aria-disabled')).toBe(false);
+
+    // Filtre actif sur un label différent de celui du fil : le fil est masqué.
+    const select = doc.querySelector('.cct-banner select') as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    select.value = 'praise';
+    select.dispatchEvent(new Event('change'));
+    expect(renderedThreadEl.style.display).toBe('none');
+
+    // Le check se termine APRÈS ce premier rendu, en échec : sans D3, `showedSomething`
+    // resterait bloqué sur le premier constat (la vue locale) et cette lecture n'aurait
+    // jamais lieu.
+    currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 3 });
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect(bannerTitles(doc)[0]).toContain('3'); // décompte publié adopté, pas la vue locale
+    expect(control.element.getAttribute('aria-disabled')).toBe('true');
+    expect(control.element.classList.contains('cct-merge-blocked')).toBe(true);
+    expect(control.element.hasAttribute('title')).toBe(true);
+    // Le nouveau bandeau reconstruit son filtre à « tous » : le fil masqué par l'ancien
+    // filtre ne doit pas rester orphelin, caché pour rien.
+    expect(renderedThreadEl.style.display).toBe('');
+
+    // Le check redevient vert (dernier fil résolu, nouveau commit) : le grisage se
+    // retire, ainsi que l'infobulle posée ci-dessus — jamais laissée mensongère.
+    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect(control.element.hasAttribute('aria-disabled')).toBe(false);
+    expect(control.element.classList.contains('cct-merge-blocked')).toBe(false);
+    expect(control.element.hasAttribute('title')).toBe(false);
+  });
+});
+
+describe('applyCompletionState — le titre n’est retiré que s’il a été posé par le §6.5', () => {
+  it('ne touche jamais un title natif sur un bouton jamais grisé par l’extension', () => {
+    const control: SubmitControl = { element: document.createElement('button'), kind: 'complete-pr' };
+    control.element.setAttribute('title', 'Merge pull request'); // infobulle native de la plateforme
+    applyCompletionState(control, published(0), 'en'); // state 'success' : jamais bloquant
+    expect(control.element.getAttribute('title')).toBe('Merge pull request'); // intact
+  });
+
+  it('grise puis dégrise, en retirant le title qu’il a lui-même posé', () => {
+    const control: SubmitControl = { element: document.createElement('button'), kind: 'complete-pr' };
+    applyCompletionState(control, publishedSummary({ state: 'failure' }), 'en');
+    expect(control.element.hasAttribute('title')).toBe(true);
+    applyCompletionState(control, publishedSummary({ state: 'success' }), 'en');
+    expect(control.element.hasAttribute('title')).toBe(false);
   });
 });

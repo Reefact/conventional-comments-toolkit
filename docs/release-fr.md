@@ -80,6 +80,15 @@ lui-même les gardes qui comptent, et n'importe laquelle qui échoue empêche la
 - les deux archives se décompressent en un dossier complet, et l'archive Chromium
   n'embarque pas la variante Firefox.
 
+## Si une exécution est interrompue
+
+`gh release create` procède en trois appels — brouillon, téléversement des archives,
+publication. Une coupure au milieu laisse un brouillon pour ce tag. Le workflow le retire
+de lui-même à la tentative suivante : relancer le run suffit, rien à nettoyer à la main.
+
+Une release **déjà publiée** pour le même tag n'est jamais touchée : la publication échoue
+alors franchement, plutôt que d'écraser ce que des gens ont peut-être déjà téléchargé.
+
 ## Répétition à blanc
 
 `workflow_dispatch` sur `release.yml` exécute tout sauf la publication : les archives

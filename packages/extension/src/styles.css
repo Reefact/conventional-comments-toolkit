@@ -161,14 +161,98 @@
 .cct-border-warn { outline: 1px solid var(--fgColor-attention, var(--color-attention-fg, #f9a825)) !important; }
 .cct-border-error { outline: 2px solid var(--fgColor-danger, var(--color-danger-fg, #b3261e)) !important; }
 
+/* Bandeau du §5.5 — un sommaire, pas une alarme. Le verdict de conformité appartient au
+   check de la plateforme, déjà rouge et déjà bloquant ; le rejouer ici en « danger »
+   dévaluerait les deux. Surface neutre, fanion d'attention, icône ET texte (§10). */
 .cct-banner {
-  border: 1px solid var(--fgColor-danger, var(--color-danger-fg, #b3261e));
+  border: 1px solid var(--borderColor-default, var(--color-btn-border, currentColor));
   border-radius: var(--borderRadius-medium, 6px);
-  padding: 8px 12px;
   margin: 8px 0;
   font-size: 13px;
-  background: var(--bgColor-danger-muted, var(--color-danger-subtle, transparent));
+  background: var(--bgColor-default, var(--color-canvas-default, transparent));
   color: var(--fgColor-default, var(--color-fg-default, currentColor));
+}
+
+/* Pas de `display: flex` ici : il ferait disparaître le triangle natif du <summary>, seule
+   marque visible du pliage. Espacement par marge, affordance intacte. */
+.cct-banner-head {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.cct-banner-head > * { margin-right: 6px; }
+
+.cct-banner-glyph { color: var(--fgColor-attention, var(--color-attention-fg, #8a6d00)); }
+
+.cct-banner-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cct-banner-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--borderColor-default, var(--color-btn-border, currentColor));
+}
+
+.cct-banner-label {
+  border: 1px solid var(--borderColor-default, var(--color-btn-border, currentColor));
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 11px;
+  flex: none;
+}
+
+.cct-banner-subject {
+  flex: 1;
+  min-width: 0;
+}
+
+.cct-banner-hint,
+.cct-banner-author,
+.cct-banner-unlocated,
+.cct-banner-judged {
+  color: var(--fgColor-muted, var(--color-fg-muted, currentColor));
+  font-size: 11px;
+}
+
+.cct-banner-judged {
+  display: block;
+  padding: 4px 12px;
+}
+
+/* Filtre du §5.5 — en tête des fils rendus, avec ce qu'il contrôle. En puces plutôt qu'en
+   menu déroulant : l'état actif reste lisible pendant qu'on parcourt les fils. */
+.cct-thread-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.cct-filter-chip {
+  font: inherit;
+  font-size: 11px;
+  border: 1px solid var(--button-default-borderColor-rest, var(--color-btn-border, currentColor));
+  background: var(--button-default-bgColor-rest, var(--color-btn-bg, transparent));
+  color: var(--fgColor-muted, var(--color-fg-muted, currentColor));
+  border-radius: 999px;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+
+.cct-filter-chip[aria-pressed='true'] {
+  color: var(--fgColor-default, var(--color-fg-default, currentColor));
+  border-color: var(--fgColor-accent, var(--color-accent-fg, currentColor));
+}
+
+.cct-filter-chip:focus-visible,
+.cct-banner-head:focus-visible {
+  outline: 2px solid var(--fgColor-accent, var(--color-accent-fg, currentColor));
+  outline-offset: 1px;
 }
 
 .cct-badge {

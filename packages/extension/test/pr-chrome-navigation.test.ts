@@ -48,7 +48,7 @@ import { commentBodyText, type PlatformAdapter, type SubmitControl } from '@cct/
 import { defaultConfig, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver } from '../src/config-resolver.js';
 import { decorateComment } from '../src/ui/badges.js';
-import { applyLabelFilter, clearLabelFilter } from '../src/ui/banner.js';
+import { applyLabelFilter, clearLabelFilter } from '../src/ui/thread-filter.js';
 import {
   applyCompletionState,
   bootstrap,
@@ -99,11 +99,13 @@ function makeAdapter(
     getCompletionControl?: () => SubmitControl | null;
     getRenderedThreadElements?: () => { id: string; element: Element }[];
     getRenderedComments?: () => { element: Element; bodyText: string }[];
+    getBannerMount?: () => Element | null;
   } = {}
 ): PlatformAdapter & {
   currentPr(): PrRef | null;
   getRenderedThreadElements?: () => { id: string; element: Element }[];
   getRenderedComments?: () => { element: Element; bodyText: string }[];
+  getBannerMount?: () => Element | null;
 } {
   return {
     matches: () => true,
@@ -121,6 +123,7 @@ function makeAdapter(
     currentPr: getCurrent,
     getRenderedThreadElements: opts.getRenderedThreadElements,
     getRenderedComments: opts.getRenderedComments,
+    getBannerMount: opts.getBannerMount,
   };
 }
 
@@ -139,8 +142,40 @@ async function flushAll(times = 5): Promise<void> {
   for (let i = 0; i < times; i++) await flush();
 }
 
+/** Toute observation ouverte par un test est révoquée à sa fin. Sans cela, l'observateur
+ * survit au test qui l'a créé et continue de réagir aux mutations du SUIVANT, dans le
+ * document que happy-dom partage entre eux : il y réinjecte alors son propre bandeau, et
+ * les assertions du test en cours portent sur le DOM d'un autre. */
+const openObservations: (() => void)[] = [];
+
+function observe(
+  adapter: Parameters<typeof observePrChromeNavigation>[0],
+  resolver: Parameters<typeof observePrChromeNavigation>[1],
+  doc: Parameters<typeof observePrChromeNavigation>[2],
+  now?: Parameters<typeof observePrChromeNavigation>[3]
+): () => void {
+  const dispose = observePrChromeNavigation(adapter, resolver, doc, now);
+  openObservations.push(dispose);
+  return dispose;
+}
+
+afterEach(() => {
+  for (const dispose of openObservations.splice(0)) dispose();
+});
+
 function bannerTitles(doc: Document): string[] {
   return [...doc.querySelectorAll('.cct-banner strong')].map((el) => el.textContent ?? '');
+}
+
+/** Puce du filtre par label (§5.5) — en tête des fils rendus, plus dans le bandeau. */
+function filterChip(doc: Document, labelId: string | null): HTMLElement | null {
+  return doc.querySelector(`.cct-thread-filter .cct-filter-chip[data-label="${labelId ?? ''}"]`);
+}
+
+/** Label actuellement filtré d'après l'état LU des puces (`aria-pressed`), null pour « tous ». */
+function activeFilter(doc: Document): string | null {
+  const pressed = doc.querySelector('.cct-thread-filter .cct-filter-chip[aria-pressed="true"]') as HTMLElement | null;
+  return pressed?.dataset['label'] || null;
 }
 
 describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5)', () => {
@@ -189,7 +224,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     const adapter = makeAdapter(() => current, () => published(current!.number));
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
@@ -201,7 +236,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     const adapter = makeAdapter(() => current, () => published(current!.number));
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(bannerTitles(doc)[0]).toContain('1');
 
@@ -225,7 +260,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     );
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // rien à afficher pour l'instant
 
@@ -243,7 +278,7 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     const adapter = makeAdapter(() => current, () => (current ? published(current.number) : null));
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
 
@@ -292,7 +327,7 @@ describe('D1 — bootstrap() choisit l’adaptateur par hôte, pas par présence
       configurable: true,
     });
 
-    await bootstrap(document);
+    openObservations.push(await bootstrap(document));
     await flushAll();
     // Avant ce correctif, aucun adaptateur n'était choisi ici (matches() exigeait une PR) :
     // bootstrap() sortait aussitôt, sans armer observeEditors ni observePrChromeNavigation —
@@ -342,7 +377,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     const resolver = new ClientConfigResolver(async () => null);
     const clock = makeClock();
 
-    observePrChromeNavigation(adapter, resolver, doc, clock.now);
+    observe(adapter, resolver, doc, clock.now);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // trop tôt : rien à montrer
 
@@ -369,7 +404,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     const resolver = new ClientConfigResolver(async () => null);
     const clock = makeClock();
 
-    observePrChromeNavigation(adapter, resolver, doc, clock.now);
+    observe(adapter, resolver, doc, clock.now);
     await flushAll();
     expect(getThreadsCalls).toBe(1);
 
@@ -405,7 +440,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
     const callsOnceShown = getThreadsCalls;
@@ -436,7 +471,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flush(); // laisse le premier run() démarrer et se bloquer sur getThreads()
     expect(getThreadsCalls).toBe(1);
 
@@ -486,17 +521,30 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
       resolution: 'unknown',
       canCarryBlockingState: true,
     };
+    // Un second fil, non bloquant, pour que 'praise' soit proposé par le filtre : celui-ci
+    // ne propose que les labels PRÉSENTS sur la page (§5.5).
+    const praised: ThreadInfo = {
+      ...thread,
+      id: 't2',
+      root: { ...thread.root, id: 't2-root', body: 'praise: joliment fait', permalink: '#t2' },
+    };
+    // Les fils rendus vivent dans la page : le filtre s'insère juste avant le premier.
     const renderedThreadEl = doc.createElement('div');
+    const praisedThreadEl = doc.createElement('div');
+    doc.body.append(renderedThreadEl, praisedThreadEl);
     let currentPublished: PublishedSummary | null = null;
     const control: SubmitControl = { element: doc.createElement('button'), kind: 'complete-pr' };
     const adapter = makeAdapter(() => current, () => currentPublished, {
-      getThreads: async () => [thread],
+      getThreads: async () => [thread, praised],
       getCompletionControl: () => control,
-      getRenderedThreadElements: () => [{ id: 't1', element: renderedThreadEl }],
+      getRenderedThreadElements: () => [
+        { id: 't1', element: renderedThreadEl },
+        { id: 't2', element: praisedThreadEl },
+      ],
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
     // Vue locale (pas encore de résumé publié) : le fil bloquant local suffit à afficher
@@ -504,12 +552,12 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
     expect(control.element.hasAttribute('aria-disabled')).toBe(false);
 
-    // Filtre actif sur un label différent de celui du fil : le fil est masqué.
-    const select = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(select).not.toBeNull();
-    select.value = 'praise';
-    select.dispatchEvent(new Event('change'));
+    // Filtre actif sur un label différent de celui du fil bloquant : ce fil est masqué.
+    const chip = filterChip(doc, 'praise');
+    expect(chip).not.toBeNull();
+    chip!.dispatchEvent(new Event('click'));
     expect(renderedThreadEl.style.display).toBe('none');
+    expect(praisedThreadEl.style.display).toBe('');
 
     // Le check se termine APRÈS ce premier rendu, en échec : sans D3, `showedSomething`
     // resterait bloqué sur le premier constat (la vue locale) et cette lecture n'aurait
@@ -522,11 +570,10 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     expect(control.element.getAttribute('aria-disabled')).toBe('true');
     expect(control.element.classList.contains('cct-merge-blocked')).toBe(true);
     expect(control.element.hasAttribute('title')).toBe(true);
-    // Le nouveau bandeau reconstruit un nouveau `<select>`, mais la SÉLECTION elle-même
-    // (§5.5, revue Codex round 4) survit à un rendu répété sur la MÊME PR — jamais
-    // réinitialisée à « tous » tant que le contexte de PR ne change pas.
-    const selectAfterRerender = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(selectAfterRerender.value).toBe('praise');
+    // La barre de puces est reconstruite, mais la SÉLECTION elle-même (§5.5, revue Codex
+    // round 4) survit à un rendu répété sur la MÊME PR — jamais réinitialisée à « tous »
+    // tant que le contexte de PR ne change pas.
+    expect(activeFilter(doc)).toBe('praise');
     expect(renderedThreadEl.style.display).toBe('none');
 
     // Le check redevient vert (dernier fil résolu, nouveau commit) : le grisage se
@@ -564,7 +611,7 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(bannerTitles(doc)[0]).toContain('1');
 
@@ -575,19 +622,20 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     expect(getThreadsCalls).toBe(2);
 
     // Second changement, PENDANT que ce rendu est encore en vol : coalescé (missedMutation),
-    // pas un rendu concurrent.
-    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    // pas un rendu concurrent. Décompte non nul de part et d'autre : ce test porte sur la
+    // FRAÎCHEUR de la valeur écrite, pas sur le silence du bandeau à zéro (testé ailleurs).
+    currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 });
     doc.body.appendChild(doc.createElement('span'));
     await flush();
 
     // Le rendu en vol se termine : sans le correctif, il écrirait « 3 » (valeur lue tout en
-    // haut de la fonction, au début de SON exécution) au lieu de « 0 » (valeur réelle au
+    // haut de la fonction, au début de SON exécution) au lieu de « 2 » (valeur réelle au
     // moment où il écrit effectivement dans le DOM).
     releaseSecondRender!();
     await flushAll();
 
     expect(bannerTitles(doc)[0]).not.toContain('3'); // jamais la valeur périmée
-    expect(bannerTitles(doc)[0]).toContain('0'); // la valeur réelle au moment de l'écriture
+    expect(bannerTitles(doc)[0]).toContain('2'); // la valeur réelle au moment de l'écriture
   });
 });
 
@@ -611,7 +659,7 @@ describe('Codex #2 — retente tant que tout le contexte de la barre n’a pas �
     );
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // le bandeau, oui
 
@@ -644,13 +692,13 @@ describe('Codex #2 — retente tant que tout le contexte de la barre n’a pas �
       canCarryBlockingState: true,
     };
     let loaded = false; // le fil n'existe pas encore dans le DOM au premier rendu
-    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
       getThreads: async () => (loaded ? [thread] : []),
       getRenderedThreadElements: () => (loaded ? [{ id: 't1', element: doc.createElement('div') }] : []),
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner li[data-thread-id]')).toHaveLength(0); // rien encore
 
@@ -739,7 +787,7 @@ describe('Codex #5 — un grisage antérieur ne survit pas au passage du mode à
     let resolverNow = 0;
     const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(control.element.getAttribute('aria-disabled')).toBe('true'); // grisé (mode assist, check en échec)
 
@@ -774,7 +822,7 @@ describe('Codex #6 — un rendu répété ne touche pas au display d’un fil ma
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
     // clearStaleBanner tourne dès le premier rendu (efface un bandeau d'un contexte
@@ -845,10 +893,10 @@ describe('Codex round 2 #2 — le display d’origine est restauré, jamais une 
     el.style.display = 'flex'; // posé par la plateforme, pour SA mise en page
     const labelOfThread = new Map([['t1', 'issue']]);
 
-    applyLabelFilter(document.createElement('div'), [{ id: 't1', element: el }], labelOfThread, 'praise');
+    applyLabelFilter([{ id: 't1', element: el }], labelOfThread, 'praise');
     expect(el.style.display).toBe('none'); // masqué par le filtre
 
-    applyLabelFilter(document.createElement('div'), [{ id: 't1', element: el }], labelOfThread, null); // « tous »
+    applyLabelFilter([{ id: 't1', element: el }], labelOfThread, null); // « tous »
     expect(el.style.display).toBe('flex'); // restauré tel quel, jamais une chaîne vide
   });
 
@@ -856,7 +904,7 @@ describe('Codex round 2 #2 — le display d’origine est restauré, jamais une 
     const el = document.createElement('div');
     el.style.display = 'grid';
     const labelOfThread = new Map([['t1', 'issue']]);
-    applyLabelFilter(document.createElement('div'), [{ id: 't1', element: el }], labelOfThread, 'praise');
+    applyLabelFilter([{ id: 't1', element: el }], labelOfThread, 'praise');
     expect(el.style.display).toBe('none');
     clearLabelFilter([{ id: 't1', element: el }]);
     expect(el.style.display).toBe('grid');
@@ -881,7 +929,7 @@ describe('Codex round 2 #6 — cesse de sonder le bouton de complétion après l
     const doc = document;
     const current = pr(25);
     let completionCalls = 0;
-    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
       getCompletionControl: () => {
         completionCalls++;
         return null; // jamais de bouton sur cette PR
@@ -890,7 +938,7 @@ describe('Codex round 2 #6 — cesse de sonder le bouton de complétion après l
     const resolver = new ClientConfigResolver(async () => null);
     const clock = makeClock();
 
-    observePrChromeNavigation(adapter, resolver, doc, clock.now);
+    observe(adapter, resolver, doc, clock.now);
     await flushAll();
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // affichée dès le premier rendu
     const callsWithinWindow = completionCalls;
@@ -931,7 +979,7 @@ describe('Codex round 2 #7 — les badges posés pendant que le mode était acti
     let resolverNow = 0;
     const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     expect(commentEl.querySelector('.cct-badge')).not.toBeNull();
 
@@ -969,38 +1017,45 @@ describe('Codex round 4 — le filtre par label survit à un rendu répété sur
       resolution: 'unknown',
       canCarryBlockingState: true,
     };
+    // Un second fil, non bloquant : le filtre ne propose que les labels PRÉSENTS (§5.5).
+    const praised: ThreadInfo = {
+      ...thread,
+      id: 't2',
+      root: { ...thread.root, id: 't2-root', body: 'praise: joliment fait', permalink: '#t2' },
+    };
     const renderedThreadEl = doc.createElement('div');
+    const praisedThreadEl = doc.createElement('div');
+    doc.body.append(renderedThreadEl, praisedThreadEl);
     let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
     const adapter = makeAdapter(() => current, () => currentPublished, {
-      getThreads: async () => [thread],
-      getRenderedThreadElements: () => [{ id: 't1', element: renderedThreadEl }],
+      getThreads: async () => [thread, praised],
+      getRenderedThreadElements: () => [
+        { id: 't1', element: renderedThreadEl },
+        { id: 't2', element: praisedThreadEl },
+      ],
     });
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
-    const select = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    select.value = 'praise';
-    select.dispatchEvent(new Event('change'));
+    filterChip(doc, 'praise')!.dispatchEvent(new Event('click'));
     expect(renderedThreadEl.style.display).toBe('none');
 
-    // Rendu répété sur la MÊME PR (résumé publié changé, §5.5, D3) : avant ce correctif, le
-    // nouveau `<select>` reconstruit repartait toujours sur « tous », perdant la sélection.
+    // Rendu répété sur la MÊME PR (résumé publié changé, §5.5, D3) : avant ce correctif, la
+    // barre reconstruite repartait toujours sur « tous », perdant la sélection.
     currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
     doc.body.appendChild(doc.createElement('span'));
     await flushAll();
-    const selectAfterRerender = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(selectAfterRerender.value).toBe('praise');
+    expect(activeFilter(doc)).toBe('praise');
     expect(renderedThreadEl.style.display).toBe('none');
 
     // Navigation vers une AUTRE PR : le filtre, lui, repart bien à zéro.
     current = pr(28);
     doc.body.appendChild(doc.createElement('span'));
     await flushAll();
-    const selectOnNewPr = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(selectOnNewPr).not.toBeNull();
-    expect(selectOnNewPr.value).toBe('');
+    expect(filterChip(doc, null)).not.toBeNull();
+    expect(activeFilter(doc)).toBeNull();
   });
 });
 
@@ -1029,6 +1084,7 @@ describe('Codex round 5 — le filtre repart à zéro quand son label n’est pl
       canCarryBlockingState: true,
     };
     const renderedThreadEl = doc.createElement('div');
+    doc.body.appendChild(renderedThreadEl); // le filtre s'insère juste avant le premier fil rendu
     let configText = '{}'; // défauts : 'praise' activé
     let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
     const adapter = makeAdapter(() => current, () => currentPublished, {
@@ -1039,12 +1095,10 @@ describe('Codex round 5 — le filtre repart à zéro quand son label n’est pl
     let resolverNow = 0;
     const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
 
-    const select = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    select.value = 'praise';
-    select.dispatchEvent(new Event('change'));
+    filterChip(doc, 'praise')!.dispatchEvent(new Event('click'));
     expect(renderedThreadEl.style.display).toBe(''); // le fil EST 'praise' : filtre actif, mais visible
 
     // La configuration du dépôt désactive 'praise' ; le compteur bloquant change aussi
@@ -1055,12 +1109,425 @@ describe('Codex round 5 — le filtre repart à zéro quand son label n’est pl
     doc.body.appendChild(doc.createElement('span'));
     await flushAll();
 
-    // Sans le correctif : le `<select>` retombe visuellement sur « tous » (aucune option
-    // 'praise' ne correspond) mais le filtre appliqué reste 'praise' — un label que plus
-    // aucun fil ne porte (analyze() ne résout plus un label désactivé) — masquant tout.
-    const selectAfterDisable = doc.querySelector('.cct-banner select') as HTMLSelectElement;
-    expect(selectAfterDisable.value).toBe('');
+    // Sans le correctif : la barre retombe visuellement sur « tous » (aucune puce 'praise'
+    // ne subsiste) mais le filtre appliqué reste 'praise' — un label que plus aucun fil ne
+    // porte (analyze() ne résout plus un label désactivé) — masquant tout.
+    expect(filterChip(doc, 'praise')).toBeNull();
+    expect(activeFilter(doc)).toBeNull();
     expect(renderedThreadEl.style.display).toBe('');
+  });
+});
+
+describe('§5.5 — le bandeau se monte en tête de PR, le filtre en tête des fils', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('s’insère après l’en-tête que l’adaptateur désigne, jamais au-dessus du chrome de la page', async () => {
+    // Injecté en tête de <body>, il flotte au-dessus du header de la plateforme et se lit
+    // comme une greffe. « En tête de PR » (§5.5) veut dire dans le flux de la page.
+    const doc = document;
+    const header = doc.createElement('div');
+    header.className = 'gh-header';
+    const after = doc.createElement('div');
+    doc.body.append(header, after);
+
+    const adapter = makeAdapter(() => pr(40), () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
+      getBannerMount: () => header,
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const banner = doc.querySelector('.cct-banner');
+    expect(banner).not.toBeNull();
+    expect(banner!.previousElementSibling).toBe(header);
+    expect(doc.body.firstElementChild).not.toBe(banner);
+  });
+
+  it('se replie sur le haut du document quand aucun en-tête n’apparie — jamais rien afficher serait pire', async () => {
+    const doc = document;
+    const adapter = makeAdapter(() => pr(41), () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
+      getBannerMount: () => null,
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    expect(doc.body.firstElementChild).toBe(doc.querySelector('.cct-banner'));
+  });
+
+  it('le filtre s’insère avant le premier fil rendu, hors du bandeau', async () => {
+    const doc = document;
+    const first = doc.createElement('div');
+    doc.body.appendChild(first);
+    const thread: ThreadInfo = {
+      id: 't1',
+      pr: pr(42),
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'issue: quelque chose ne va pas',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution: 'unknown',
+      canCarryBlockingState: true,
+    };
+    const adapter = makeAdapter(() => pr(42), () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
+      getThreads: async () => [thread],
+      getRenderedThreadElements: () => [{ id: 't1', element: first }],
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const filter = doc.querySelector('.cct-thread-filter');
+    expect(filter).not.toBeNull();
+    expect(filter!.nextElementSibling).toBe(first);
+    expect(doc.querySelector('.cct-banner .cct-thread-filter')).toBeNull(); // plus dans le bandeau
+    expect(doc.querySelector('.cct-banner select')).toBeNull(); // ni le menu déroulant d'avant
+  });
+
+  it('un décompte publié nul n’affiche aucun bandeau, mais laisse le filtre disponible', async () => {
+    const doc = document;
+    const first = doc.createElement('div');
+    doc.body.appendChild(first);
+    const thread: ThreadInfo = {
+      id: 't1',
+      pr: pr(43),
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'praise: joliment fait',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution: 'unknown',
+      canCarryBlockingState: true,
+    };
+    const adapter = makeAdapter(() => pr(43), () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+      getThreads: async () => [thread],
+      getRenderedThreadElements: () => [{ id: 't1', element: first }],
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // une PR saine ne se décore pas
+    expect(doc.querySelector('.cct-thread-filter')).not.toBeNull();
+  });
+});
+
+describe('§5.5 — ce que notre rendu a laissé dans la page est surveillé aussi (revue Codex, PR #26)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  /** Fil dont le corps ET le texte rendu suivent la même source : une racine éditée SUR
+   * PLACE, comme le fait la plateforme quand on corrige un commentaire. */
+  function editableThread(doc: Document, prRef: PrRef, body: () => string) {
+    const element = doc.createElement('div');
+    element.textContent = body();
+    return {
+      element,
+      retext: (next: string) => {
+        element.textContent = next;
+      },
+      info: (): ThreadInfo => ({
+        id: 't1',
+        pr: prRef,
+        root: {
+          id: 't1-root',
+          author: { id: 'login:alice', login: 'alice', isServiceAccount: false },
+          body: body(),
+          createdAt: '2026-01-01T00:00:00Z',
+          permalink: '#t1',
+          isSystemGenerated: false,
+          canCarryBlockingState: true,
+        },
+        replies: [],
+        resolution: 'unresolved',
+        canCarryBlockingState: true,
+      }),
+    };
+  }
+
+  it('une racine éditée sur place rafraîchit le sujet : ni le nombre de fils ni leurs identifiants ne bougent', async () => {
+    // Le bandeau affiche désormais le SUJET (§5.5). Une correction en place ne change ni le
+    // nombre de fils, ni leurs identifiants, ni le nombre de commentaires : la signature de
+    // plateforme reste identique, et sans surveillance du texte le bandeau resterait périmé.
+    const doc = document;
+    const current = pr(50);
+    let body = 'issue: le retry ne borne pas le backoff';
+    const thread = editableThread(doc, current, () => body);
+    doc.body.appendChild(thread.element);
+
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
+      getThreads: async () => [thread.info()],
+      getRenderedThreadElements: () => [{ id: 't1', element: thread.element }],
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    expect(doc.querySelector('.cct-banner-subject')?.textContent).toBe('le retry ne borne pas le backoff');
+
+    body = 'issue: le backoff doit être plafonné';
+    thread.retext(body); // édition en place : le DOM du fil change, son identifiant non
+    await flushAll();
+
+    expect(doc.querySelector('.cct-banner-subject')?.textContent).toBe('le backoff doit être plafonné');
+  });
+
+  it('un bandeau emporté par une réhydratation de la plateforme est remonté', async () => {
+    // Le bandeau est adossé à un élément qui appartient à la PLATEFORME (`bannerMount`) :
+    // un rerendu React qui remplace ce parent emporte notre élément avec lui, sans rien
+    // changer au résumé publié ni aux fils.
+    const doc = document;
+    const current = pr(51);
+    const header = doc.createElement('div');
+    doc.body.appendChild(header);
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
+      getBannerMount: () => header,
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+
+    doc.querySelector('.cct-banner')!.remove(); // la plateforme reprend la main sur son en-tête
+    await flushAll();
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // remonté, pas laissé absent
+  });
+
+  it('nos propres écritures ne se re-déclenchent pas elles-mêmes : un seul rendu par changement', async () => {
+    // Le revers du test précédent. La photo de notre sortie est prise APRÈS le rendu ; prise
+    // avant, chaque insertion de bandeau relancerait un rendu, indéfiniment.
+    const doc = document;
+    const current = pr(52);
+    let renders = 0;
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
+      getThreads: async () => {
+        renders++;
+        return [];
+      },
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    const afterFirst = renders;
+
+    for (let i = 0; i < 5; i++) {
+      doc.body.appendChild(doc.createElement('span'));
+      await flushAll();
+    }
+
+    expect(renders).toBe(afterFirst); // aucune relance : ni nos écritures, ni des mutations neutres
+  });
+
+  it('révoquée, l’observation n’écrit plus rien — y compris depuis un rendu en vol', async () => {
+    const doc = document;
+    const current = pr(53);
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }));
+    const dispose = observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+
+    dispose();
+    doc.querySelector('.cct-banner')!.remove();
+    for (let i = 0; i < 5; i++) {
+      doc.body.appendChild(doc.createElement('span'));
+      await flushAll();
+    }
+    await new Promise((resolve) => setTimeout(resolve, RENDER_RETRY_THROTTLE_MS + 20));
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // plus rien ne repousse
+  });
+});
+
+describe('§5.5 — révocation et pliage (revue Codex round 3, PR #26)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('révoquée pendant un rendu EN VOL, l’observation n’écrit plus rien', async () => {
+    // Déconnecter l'observateur ne suffit pas : le rendu déjà parti aboutit et écrirait
+    // bandeau, badges et grisage dans une page dont cette observation ne sait plus rien.
+    const doc = document;
+    const current = pr(60);
+    let releaseThreads: (() => void) | null = null;
+    const gate = new Promise<void>((resolve) => {
+      releaseThreads = resolve;
+    });
+    const control: SubmitControl = { element: doc.createElement('button'), kind: 'complete-pr' };
+    const commentEl = doc.createElement('div');
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 2 }), {
+      getThreads: async () => {
+        await gate; // le rendu se bloque ici, avant toute écriture
+        return [];
+      },
+      getCompletionControl: () => control,
+      getRenderedComments: () => [{ element: commentEl, bodyText: 'issue: x' }],
+    });
+
+    const dispose = observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flush(); // laisse le rendu démarrer et se bloquer
+    dispose();
+    releaseThreads!();
+    await flushAll();
+
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0);
+    expect(commentEl.querySelector('.cct-badge')).toBeNull(); // ni badge
+    expect(control.element.hasAttribute('aria-disabled')).toBe(false); // ni grisage
+  });
+
+  it('un bandeau replié par l’utilisateur le reste quand un fil est édité', async () => {
+    // Le bandeau est reconstruit à chaque rendu, et depuis que le texte des fils est
+    // surveillé, une correction en place en déclenche un : réappliquer le défaut rouvrirait
+    // ce que l'utilisateur vient de replier.
+    const doc = document;
+    const current = pr(61);
+    const threadEl = doc.createElement('div');
+    threadEl.textContent = 'issue: le retry ne borne pas le backoff';
+    doc.body.appendChild(threadEl);
+    let body = 'issue: le retry ne borne pas le backoff';
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
+      getThreads: async () => [
+        {
+          id: 't1',
+          pr: current,
+          root: {
+            id: 't1-root',
+            author: { id: 'login:alice', login: 'alice', isServiceAccount: false },
+            body,
+            createdAt: '2026-01-01T00:00:00Z',
+            permalink: '#t1',
+            isSystemGenerated: false,
+            canCarryBlockingState: true,
+          },
+          replies: [],
+          resolution: 'unresolved',
+          canCarryBlockingState: true,
+        } as ThreadInfo,
+      ],
+      getRenderedThreadElements: () => [{ id: 't1', element: threadEl }],
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const banner = doc.querySelector('.cct-banner') as HTMLDetailsElement;
+    expect(banner.open).toBe(true); // le merge est bloqué : déplié par défaut
+    banner.open = false; // l'utilisateur le replie
+    banner.dispatchEvent(new Event('toggle'));
+
+    body = 'issue: le backoff doit être plafonné';
+    threadEl.textContent = body; // édition en place → nouveau rendu
+    await flushAll();
+
+    const rebuilt = doc.querySelector('.cct-banner') as HTMLDetailsElement;
+    expect(rebuilt.querySelector('.cct-banner-subject')?.textContent).toBe('le backoff doit être plafonné');
+    expect(rebuilt.open).toBe(false); // toujours replié : son choix a survécu
+  });
+
+  it('mais le défaut revient quand le caractère bloquant change', async () => {
+    // Son choix portait sur une situation qui n'existe plus : un merge qui se met à bloquer
+    // n'est plus celle sur laquelle il s'était prononcé.
+    const doc = document;
+    const current = pr(62);
+    let currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 2, mode: 'warn' });
+    const adapter = makeAdapter(() => current, () => currentPublished);
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const banner = doc.querySelector('.cct-banner') as HTMLDetailsElement;
+    expect(banner.open).toBe(false); // informatif (warn) : replié par défaut
+    banner.open = true; // l'utilisateur le déplie
+    banner.dispatchEvent(new Event('toggle'));
+
+    currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 2, mode: 'enforce' });
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect((doc.querySelector('.cct-banner') as HTMLDetailsElement).open).toBe(true); // le défaut reprend
+  });
+});
+
+describe('§5.5 — révocation complète et pliage remis à neuf (revue Codex round 4, PR #26)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.unstubAllGlobals();
+  });
+
+  it('un bandeau replié puis DISPARU repart sur son défaut quand un fil bloquant revient', async () => {
+    // Le choix de l'utilisateur portait sur une situation qui n'existe plus : entre-temps le
+    // décompte est retombé à zéro et le bandeau s'est effacé. Un nouveau fil bloquant est une
+    // nouvelle, et mérite le défaut déplié — sans quoi il arriverait replié, inaperçu.
+    const doc = document;
+    const current = pr(70);
+    let currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
+    const adapter = makeAdapter(() => current, () => currentPublished);
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const banner = doc.querySelector('.cct-banner') as HTMLDetailsElement;
+    expect(banner.open).toBe(true);
+    banner.open = false; // l'utilisateur le replie
+    banner.dispatchEvent(new Event('toggle'));
+
+    // Tout est résolu : plus de bandeau du tout.
+    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0);
+
+    // Un nouveau fil bloquant apparaît sur la MÊME PR.
+    currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect((doc.querySelector('.cct-banner') as HTMLDetailsElement).open).toBe(true);
+  });
+
+  it('la révocation de bootstrap() rend AUSSI l’observation des éditeurs', async () => {
+    // Elle n'en rendait qu'une : les éditeurs apparus ensuite recevaient encore un
+    // contrôleur, et deux bootstrap() successifs en empilaient deux par éditeur.
+    const doc = document;
+    Object.defineProperty(doc, 'location', {
+      value: new URL('https://github.com/acme/demo/pull/80'),
+      configurable: true,
+    });
+    doc.body.innerHTML = '';
+
+    // Le `Disposable` d'observeEditors était simplement jeté : la révocation ne rendait que
+    // l'observation du bandeau. On l'observe directement plutôt qu'à travers une barre
+    // d'outils, dont le rendu dépend d'un DOM de PR complet sans rapport avec ce constat.
+    const disposeEditors = vi.fn();
+    let onEditor: ((editor: unknown) => void) | null = null;
+    const observeEditors = vi
+      .spyOn(GithubClientAdapter.prototype, 'observeEditors')
+      .mockImplementation((cb: (editor: never) => void) => {
+        onEditor = cb as (editor: unknown) => void;
+        return { dispose: disposeEditors };
+      });
+    const readRepoConfig = vi.spyOn(GithubClientAdapter.prototype, 'getRepoConfig');
+
+    const dispose = await bootstrap(doc);
+    expect(observeEditors).toHaveBeenCalled();
+    expect(disposeEditors).not.toHaveBeenCalled();
+
+    dispose();
+    expect(disposeEditors).toHaveBeenCalledTimes(1); // l'observation des éditeurs est rendue
+
+    // Et un éditeur signalé malgré tout après coup ne déclenche plus rien : `attach()`
+    // traverse plusieurs `await` avant d'installer, il doit renoncer dès le premier pas.
+    await flushAll(); // laisse retomber le rendu de bandeau encore en vol, qui lit lui aussi la config
+    readRepoConfig.mockClear();
+    onEditor!({ element: doc.createElement('textarea'), context: { pr: null, zone: 'conversation' } });
+    await flushAll();
+    expect(readRepoConfig).not.toHaveBeenCalled();
+
+    observeEditors.mockRestore();
+    readRepoConfig.mockRestore();
   });
 });
 
@@ -1087,7 +1554,7 @@ describe('Codex round 4 — la signature de reprise sonde le COMPTE de commentai
     };
     const resolver = new ClientConfigResolver(async () => null);
 
-    observePrChromeNavigation(adapter, resolver, doc);
+    observe(adapter, resolver, doc);
     await flushAll();
     for (let i = 0; i < 5; i++) {
       doc.body.appendChild(doc.createElement('span'));

@@ -12,8 +12,9 @@ GitHub qui les porte.
 
 1. Mettre à jour `version` dans `packages/extension/src/manifest.json` — c'est cette
    valeur que le navigateur affichera une fois l'extension chargée. **Uniquement des
-   chiffres** : un à quatre entiers de 0 à 65535 séparés par des points. Chromium refuse
-   de charger une extension dont le manifeste porte autre chose.
+   chiffres** : un à quatre entiers de 0 à 65535 séparés par des points, pas tous nuls
+   (`0.1.0` convient, `0.0.0` non). Chromium refuse de charger une extension dont le
+   manifeste porte autre chose.
 2. Committer et pousser sur `main` (la CI doit être verte).
 3. Poser et pousser le tag, identique à la version du manifeste au `v` près :
 
@@ -21,6 +22,13 @@ GitHub qui les porte.
    git tag v1.1.0
    git push origin v1.1.0
    ```
+
+Pour vérifier **avant** de poser le tag qu'il passera la garde, la même commande que le
+workflow se lance en local :
+
+```
+node scripts/release-version.mjs v1.1.0
+```
 
 Le workflow refuse de publier si le tag et le manifeste divergent : le message d'erreur
 dit quoi corriger.
@@ -40,6 +48,9 @@ Chromium, pas un oubli. La résolution complète, ses cas d'erreur et ses tests 
 | `conventional-comments-toolkit-<version>-chromium.zip` | Chrome, Edge, tout navigateur Chromium |
 | `conventional-comments-toolkit-<version>-firefox.zip` | Firefox (event page, identifiant gecko) |
 | `SHA256SUMS.txt` | contrôle du téléchargement |
+
+Les liens d'installation pointent la **liste** des releases, pas `/releases/latest` : ce
+raccourci saute les pré-versions, et rend 404 tant qu'aucune version stable n'est publiée.
 
 Chaque archive se décompresse en **un** dossier dont la racine porte `manifest.json` —
 directement chargeable — et embarque un `INSTALLATION.txt` bilingue ainsi que la licence.

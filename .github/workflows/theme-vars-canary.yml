@@ -1,0 +1,113 @@
+# Canari hebdomadaire (scripts/check-github-theme-vars.mjs) : les couleurs/rayons de
+# packages/extension/src/styles.css reprennent les variables Primer de github.com, avec
+# repli sur des valeurs système si elles disparaissent (cf. la PR qui a introduit ce
+# fichier). Ce workflow vérifie que ces variables existent toujours sur une vraie page
+# github.com — une refonte GitHub qui les renommerait ne casse rien visuellement (le
+# repli absorbe le choc) mais désaligne discrètement l'extension du thème réel ; ce job
+# le détecte au lieu de laisser passer la dérive.
+name: Canari des variables de thème GitHub
+
+on:
+  schedule:
+    # 09:03 UTC le lundi — hebdomadaire, décalé du canari navigateur quotidien (04:17).
+    - cron: '3 9 * * 1'
+  pull_request:
+    paths:
+      - 'packages/extension/src/styles.css'
+      - 'scripts/check-github-theme-vars.mjs'
+      - '.github/workflows/theme-vars-canary.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: theme-vars-canary-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: Variables Primer toujours présentes sur github.com
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Installer Chromium
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Résoudre le binaire Chromium
+        run: |
+          path=$(node --input-type=module -e "import { chromium } from 'playwright-core'; console.log(chromium.executablePath());")
+          echo "PLAYWRIGHT_CHROMIUM=$path" >> "$GITHUB_ENV"
+          echo "Chromium : $path"
+
+      - name: Vérifier les variables Primer utilisées par styles.css
+        id: check
+        run: npm run check:github-theme-vars
+
+      # Le job rouge suffit pour une PR ; sur le cron hebdomadaire, personne ne regarde
+      # l'onglet Actions chaque semaine — on ouvre donc (ou met à jour) une issue de
+      # suivi pour que la notification GitHub standard (email/mobile) prévienne le
+      # mainteneur, sans dépendre d'un webhook ou d'un secret supplémentaire.
+      - name: Ouvrir ou mettre à jour l'issue de suivi
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Variables de thème GitHub (Primer) désynchronisées';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              'Le canari hebdomadaire (`.github/workflows/theme-vars-canary.yml`) a détecté',
+              'qu\'une ou plusieurs variables Primer utilisées par',
+              '`packages/extension/src/styles.css` ne sont plus présentes sur github.com.',
+              '',
+              `Détail dans le run échoué : ${runUrl}`,
+              '',
+              'L\'extension reste fonctionnelle (repli système), mais son rendu n\'est plus',
+              'aligné sur le thème GitHub actuel. Mettre à jour les noms de variables dans',
+              '`styles.css` puis fermer cette issue.',
+            ].join('\n');
+
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'theme-vars-canary',
+                color: 'b60205',
+                description: "Créée/mise à jour par le canari des variables de thème GitHub",
+              });
+            } catch (err) {
+              if (err.status !== 422) throw err; // 422 = le label existe déjà
+            }
+
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'theme-vars-canary',
+            });
+
+            if (existing.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing[0].number,
+                body: `Toujours en échec : ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['theme-vars-canary'],
+              });
+            }

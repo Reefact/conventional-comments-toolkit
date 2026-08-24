@@ -45,7 +45,7 @@ function makeAdmin(overrides: Parameters<typeof fakeState>[0] = {}) {
       groupMembers: { 'org/leads': [lead.id] },
       ...overrides,
     }),
-    { id: 'azdo', suggestionInfoString: null, slashCommands: false, commandPrefixes: [] }
+    { id: 'azdo', suggestionInfoString: null }
   );
   const storage = new MemoryStorage();
   const admin = new AdminEntryPoint({

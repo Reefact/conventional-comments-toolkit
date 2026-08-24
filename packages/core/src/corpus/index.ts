@@ -96,7 +96,11 @@ export const corpus: CorpusCase[] = [
   { id: 'blank-body', body: '   \n\t\n', zone: 'review-body', canCarryBlockingState: false, platform: 'github', expected: [] },
   { id: 'quote-only', body: '> tout mon commentaire est cité', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'code-block-only', body: '```\ntout mon commentaire\n```', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
-  { id: 'slash-command', body: '/azp run', zone: 'conversation', canCarryBlockingState: false, platform: 'github', expected: [] },
+  { id: 'slash-command', body: '/azp run', zone: 'conversation', canCarryBlockingState: false, platform: 'github', configDoc: { toolCommands: ['/*'] }, expected: [] },
+  { id: 'slash-command-unconfigured', body: '/azp run', zone: 'conversation', canCarryBlockingState: false, platform: 'github', expected: [['E-NO-LABEL', 'error']] },
+  { id: 'mention-command', body: '@codex review', zone: 'conversation', canCarryBlockingState: false, platform: 'github', configDoc: { toolCommands: ['@codex'] }, expected: [] },
+  { id: 'mention-command-mixed-case', body: '@Codex review', zone: 'conversation', canCarryBlockingState: false, platform: 'github', configDoc: { toolCommands: ['@codex'] }, expected: [] },
+  { id: 'mention-of-a-person', body: '@alice peux-tu regarder ça ?', zone: 'conversation', canCarryBlockingState: false, platform: 'github', configDoc: { toolCommands: ['@codex'] }, expected: [['E-NO-LABEL', 'error']] },
   { id: 'allowlist-lgtm', body: 'LGTM\n', zone: 'conversation', canCarryBlockingState: false, platform: 'github', configDoc: { allowlistPatterns: ['^LGTM$'] }, expected: [] },
   { id: 'exempt-author', body: 'Bump lodash from 4.17.20 to 4.17.21', zone: 'conversation', canCarryBlockingState: false, platform: 'github', configDoc: { exemptUsers: ['Dependabot[bot]'] }, authorLogin: 'dependabot[bot]', expected: [] },
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { validate, analyze, isBlocking, isCompliant, malformedMotif } from '../src/validator.js';
-import { codes, codeSev, config, githubProfile, azdoProfile, user, vInput } from './helpers.js';
+import { codes, codeSev, config, githubProfile, azdoProfile, GITHUB_TOOL_COMMANDS, user, vInput } from './helpers.js';
+
+const withToolCommands = (c: ReturnType<typeof config>) => {
+  c.toolCommands = GITHUB_TOOL_COMMANDS;
+};
 
 describe('§3.5.1 — temps 1, reconnaissance du préfixe (séquentiel et exclusif)', () => {
   it('nominal : aucun diagnostic', () => {
@@ -308,47 +312,44 @@ describe('§3.5.1 — étages −2 et −1', () => {
     expect(validate(vInput('Bump lodash', { author: user('dependabot[bot]') }), cfg)).toEqual([]);
   });
 
-  it('CA-40 : commande slash exemptée génériquement, sans liste nominative (§4.2)', () => {
+  it('CA-40 : commande slash exemptée génériquement si toolCommands contient `/*` (§4.2)', () => {
     // Reconnues sans figurer dans aucune liste : la forme du premier jeton suffit.
-    expect(validate(vInput('/azp run'), config())).toEqual([]);
-    expect(validate(vInput('/azp'), config())).toEqual([]);
-    expect(validate(vInput('/deploy staging'), config())).toEqual([]);
-    expect(validate(vInput('/lgtm'), config())).toEqual([]);
+    expect(validate(vInput('/azp run'), config(withToolCommands))).toEqual([]);
+    expect(validate(vInput('/azp'), config(withToolCommands))).toEqual([]);
+    expect(validate(vInput('/deploy staging'), config(withToolCommands))).toEqual([]);
+    expect(validate(vInput('/lgtm'), config(withToolCommands))).toEqual([]);
     // Faux positif écarté par la forme : un second `/` dans le jeton n'est pas une commande.
-    expect(codes(validate(vInput('/etc/hosts n’est pas le bon endroit'), config()))).toEqual([
+    expect(codes(validate(vInput('/etc/hosts n’est pas le bon endroit'), config(withToolCommands)))).toEqual([
       'E-NO-LABEL',
     ]);
-    expect(codes(validate(vInput('/api/v1/users devrait être versionné'), config()))).toEqual([
+    expect(codes(validate(vInput('/api/v1/users devrait être versionné'), config(withToolCommands)))).toEqual([
       'E-NO-LABEL',
     ]);
-    // Pas de commande sur azdo (slashCommands: false) → E-NO-LABEL.
-    expect(codes(validate(vInput('/azp run', { platform: azdoProfile }), config()))).toEqual([
-      'E-NO-LABEL',
-    ]);
+    // toolCommands vide par défaut (§4.2) : sans configuration explicite, rien n'est exempté —
+    // et le comportement ne dépend d'aucun champ de PlatformProfile.
+    expect(codes(validate(vInput('/azp run'), config()))).toEqual(['E-NO-LABEL']);
   });
 
-  it('CA-40 : interpellation d’un robot connu exemptée, liste fermée (§4.2)', () => {
-    expect(validate(vInput('@codex review'), config())).toEqual([]);
-    expect(validate(vInput('@dependabot rebase'), config())).toEqual([]);
-    expect(validate(vInput('@coderabbitai review'), config())).toEqual([]);
+  it('CA-40 : interpellation d’un robot exemptée si son handle figure dans toolCommands (§4.2)', () => {
+    expect(validate(vInput('@codex review'), config(withToolCommands))).toEqual([]);
+    expect(validate(vInput('@dependabot rebase'), config(withToolCommands))).toEqual([]);
+    expect(validate(vInput('@coderabbitai review'), config(withToolCommands))).toEqual([]);
     // Jeton entier requis : une mention qui continue le mot n'est pas une commande.
-    expect(codes(validate(vInput('@codexplique pourquoi'), config()))).toEqual(['E-NO-LABEL']);
-    // Handle absent de la liste fermée : pas exempté, même en forme de commande.
-    expect(codes(validate(vInput('@notre-bot deploy'), config()))).toEqual(['E-NO-LABEL']);
+    expect(codes(validate(vInput('@codexplique pourquoi'), config(withToolCommands)))).toEqual(['E-NO-LABEL']);
+    // Handle absent de la liste : pas exempté, même en forme de commande.
+    expect(codes(validate(vInput('@notre-bot deploy'), config(withToolCommands)))).toEqual(['E-NO-LABEL']);
     // Interpeller une personne reste une remarque de revue.
-    expect(codes(validate(vInput('@alice peux-tu regarder ça ?'), config()))).toEqual([
+    expect(codes(validate(vInput('@alice peux-tu regarder ça ?'), config(withToolCommands)))).toEqual([
       'E-NO-LABEL',
     ]);
-    // Aucune mention native sur azdo (commandPrefixes: []) → E-NO-LABEL.
-    expect(codes(validate(vInput('@codex review', { platform: azdoProfile }), config()))).toEqual(
-      ['E-NO-LABEL']
-    );
+    // toolCommands vide par défaut : sans configuration explicite, rien n'est exempté.
+    expect(codes(validate(vInput('@codex review'), config()))).toEqual(['E-NO-LABEL']);
   });
 
   it('CA-40 : mention insensible à la casse — @Codex désigne le même compte que @codex (§4.2)', () => {
-    expect(validate(vInput('@Codex review'), config())).toEqual([]);
-    expect(validate(vInput('@COPILOT review'), config())).toEqual([]);
-    expect(validate(vInput('@DependaBot rebase'), config())).toEqual([]);
+    expect(validate(vInput('@Codex review'), config(withToolCommands))).toEqual([]);
+    expect(validate(vInput('@COPILOT review'), config(withToolCommands))).toEqual([]);
+    expect(validate(vInput('@DependaBot rebase'), config(withToolCommands))).toEqual([]);
   });
 
   it('allowlistPatterns appliquées au corps entier après trim() (§4.2)', () => {

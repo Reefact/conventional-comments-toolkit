@@ -149,8 +149,8 @@ export function applyFloor(
     }
   }
 
-  // exemptUsers / allowlistPatterns — minimum + closed (§8.1.1).
-  for (const key of ['exemptUsers', 'allowlistPatterns'] as const) {
+  // exemptUsers / allowlistPatterns / toolCommands — minimum + closed (§8.1.1).
+  for (const key of ['exemptUsers', 'allowlistPatterns', 'toolCommands'] as const) {
     const rule = floor[key];
     if (!rule) continue;
     if (rule.closed) {

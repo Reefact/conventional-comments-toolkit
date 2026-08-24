@@ -32,6 +32,7 @@ const KNOWN_KEYS = new Set([
   'formatSeverity',
   'exemptUsers',
   'allowlistPatterns',
+  'toolCommands',
   'resolverOverrideGroup',
   'overrideLabel',
   'activation',
@@ -259,6 +260,14 @@ export function parseConfigDocument(
         out[key] = filterAllowlistPatterns(value as string[], notices);
         break;
       }
+      case 'toolCommands': {
+        if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+          bad(key, 'must be an array of strings');
+          break;
+        }
+        out[key] = filterToolCommands(value as string[], notices);
+        break;
+      }
       case 'resolverOverrideGroup': {
         // « Groupe ou liste de groupes » (§8.2) — normalisé en liste.
         if (typeof value === 'string') out[key] = [value];
@@ -445,6 +454,22 @@ function readBooleanObject(
       continue;
     }
     out[k] = v;
+  }
+  return out;
+}
+
+// ————— Grammaire de toolCommands (§4.2, §8.2) —————
+
+const TOOL_COMMAND_MENTION = /^@[A-Za-z0-9_-]+$/;
+
+/** Chaque entrée est comparée telle quelle, jamais interprétée comme un motif : `/*`
+ * (sentinel générique) ou un handle exact `@notre-bot`. Aucune autre forme n'est admise —
+ * l'entrée qui n'y correspond pas est ignorée et signalée (§4.2). */
+export function filterToolCommands(entries: string[], notices: Notice[]): string[] {
+  const out: string[] = [];
+  for (const e of entries) {
+    if (e === '/*' || TOOL_COMMAND_MENTION.test(e)) out.push(e);
+    else notices.push(warning('toolCommands entry ignored: must be "/*" or an exact "@handle"', e));
   }
   return out;
 }

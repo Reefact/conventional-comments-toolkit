@@ -12,29 +12,24 @@ import type {
 } from '../src/types.js';
 import { defaultConfig } from '../src/config/defaults.js';
 
-export const githubProfile: PlatformProfile = {
-  id: 'github',
-  suggestionInfoString: 'suggestion',
-  slashCommands: true,
-  commandPrefixes: [
-    '@dependabot',
-    '@copilot',
-    '@coderabbitai',
-    '@codex',
-    '@claude',
-    '@mergifyio',
-    '@renovate',
-    '@rustbot',
-    '@bors',
-  ],
-};
+export const githubProfile: PlatformProfile = { id: 'github', suggestionInfoString: 'suggestion' };
 
-export const azdoProfile: PlatformProfile = {
-  id: 'azdo',
-  suggestionInfoString: null,
-  slashCommands: false,
-  commandPrefixes: [],
-};
+export const azdoProfile: PlatformProfile = { id: 'azdo', suggestionInfoString: null };
+
+// §4.2 — valeur recommandée en annexe A.7, jamais un défaut produit (defaultConfig().toolCommands
+// est vide) : les tests qui exercent l'exemption de commande la posent explicitement via config().
+export const GITHUB_TOOL_COMMANDS = [
+  '/*',
+  '@dependabot',
+  '@copilot',
+  '@coderabbitai',
+  '@codex',
+  '@claude',
+  '@mergifyio',
+  '@renovate',
+  '@rustbot',
+  '@bors',
+];
 
 export function user(login: string, opts: Partial<UserInfo> = {}): UserInfo {
   return { id: `id-${login}`, login, isServiceAccount: false, ...opts };

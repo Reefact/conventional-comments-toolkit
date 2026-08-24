@@ -237,15 +237,20 @@ export class AzdoClientAdapter implements PlatformAdapter {
     const loc = this.#doc.location;
     if (!loc) return null;
     const path = loc.pathname;
-    const { element } = queryChain(this.#doc, selectors.prCreatedAt);
-    const createdAt = element?.getAttribute('datetime') ?? '';
-    const mk = (scope: [string, string, string], number: string): PrRef => ({
-      platform: 'azdo',
-      createdAt,
-      host: loc.hostname,
-      scope,
-      number: Number(number),
-    });
+    // La lecture DOM ne se fait qu'à la construction d'une PrRef effective — jamais sur le
+    // chemin d'échec (page hors PR) : depuis que `matchesHost` (§2) arme les observateurs
+    // sur tout l'hôte, `currentPr()` est appelé à chaque mutation même hors PR (listes,
+    // work items, wiki), et cette route ne doit y coûter qu'un test d'expression régulière.
+    const mk = (scope: [string, string, string], number: string): PrRef => {
+      const { element } = queryChain(this.#doc, selectors.prCreatedAt);
+      return {
+        platform: 'azdo',
+        createdAt: element?.getAttribute('datetime') ?? '',
+        host: loc.hostname,
+        scope,
+        number: Number(number),
+      };
+    };
     // Forme historique : {org}.visualstudio.com/[DefaultCollection/]{project}/_git/{repo}
     // /pullrequest/{id} — l'organisation vit dans le SOUS-DOMAINE (§B.1) ; un segment de
     // collection peut précéder le projet, et la forme moderne ne doit JAMAIS s'y essayer :

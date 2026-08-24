@@ -42,15 +42,22 @@
   border-radius: var(--borderRadius-medium, 6px);
   padding: 3px 10px;
   background: var(--button-default-bgColor-rest, var(--color-btn-bg, ButtonFace));
-  color: var(--fgColor-default, var(--color-fg-default, currentColor));
+  /* ButtonText, et non currentColor : hors GitHub (Azure DevOps, §B) aucun token Primer
+     n'est défini et le fond retombe sur la couleur système ButtonFace, opaque et claire.
+     Un texte hérité de la page — clair sur un thème sombre — deviendrait illisible. Les
+     deux mots-clés système vont par paire, et ne se lisent que l'un avec l'autre. */
+  color: var(--fgColor-default, var(--color-fg-default, ButtonText));
   cursor: pointer;
   font-size: 12px;
 }
 
+/* Même appariement pour l'état actif : Highlight avec HighlightText, comme le segment de
+   décoration coché plus bas. ButtonFace avec Canvas mettait deux couleurs de FOND l'une
+   sur l'autre — blanc sur gris clair sous un thème système clair. */
 .cct-label-button[aria-pressed='true'] {
-  background: var(--cct-label-color, var(--bgColor-accent-emphasis, var(--color-accent-emphasis, ButtonFace)));
-  border-color: var(--cct-label-color, var(--bgColor-accent-emphasis, var(--color-accent-emphasis, ButtonFace)));
-  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, Canvas));
+  background: var(--cct-label-color, var(--bgColor-accent-emphasis, var(--color-accent-emphasis, Highlight)));
+  border-color: var(--cct-label-color, var(--bgColor-accent-emphasis, var(--color-accent-emphasis, Highlight)));
+  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, HighlightText));
 }
 
 .cct-label-button:focus-visible {
@@ -70,7 +77,7 @@
   border: none;
   padding: 3px 10px;
   background: var(--button-default-bgColor-rest, var(--color-btn-bg, ButtonFace));
-  color: var(--fgColor-default, var(--color-fg-default, currentColor));
+  color: var(--fgColor-default, var(--color-fg-default, ButtonText));
   cursor: pointer;
   font-size: 12px;
 }

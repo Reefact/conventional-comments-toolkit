@@ -435,6 +435,13 @@ async function renderPrChrome(
   return hasSomethingToShow;
 }
 
+/** Porte le `title` NATIF du bouton (branche protégée, revue requise…) capturé juste avant
+ * de le remplacer par notre propre infobulle — jamais réappliqué tant que la classe posée
+ * par nous est déjà là, sous peine d'écraser la valeur capturée par notre PROPRE infobulle
+ * lors d'un second cycle échec→échec. Chaîne vide = pas de title natif (absence et title=""
+ * se restaurent de la même façon : retrait de l'attribut). */
+const NATIVE_TITLE_MARKER = 'cctNativeTitle';
+
 /** §6.5 : grise le bouton de complétion si et seulement si PublishedSummary.state vaut
  * 'failure' — jamais à partir des compteurs. Visuel : le clic n'est PAS intercepté. */
 export function applyCompletionState(
@@ -444,17 +451,25 @@ export function applyCompletionState(
 ): void {
   if (!control) return;
   if (published?.state === 'failure') {
+    if (!control.element.classList.contains('cct-merge-blocked')) {
+      (control.element as HTMLElement).dataset[NATIVE_TITLE_MARKER] = control.element.getAttribute('title') ?? '';
+    }
     control.element.setAttribute('aria-disabled', 'true');
     control.element.classList.add('cct-merge-blocked');
     control.element.setAttribute('title', ui(lang, 'merge.blocked'));
   } else if (control.element.classList.contains('cct-merge-blocked')) {
-    // Ne retirer aria-disabled/title que si c'est bien nous qui les avons posés (marqué
-    // par la présence de la classe, jamais réappliquée sans elle) : la plateforme peut
-    // porter son PROPRE aria-disabled/title natif sur ce bouton — branche protégée,
-    // revue requise, PR verrouillée — pour des raisons sans rapport avec le §6.5, que
-    // nous ne devons jamais effacer à sa place.
+    // Ne retirer aria-disabled que si c'est bien nous qui l'avons posé (marqué par la
+    // présence de la classe, jamais réappliquée sans elle) : la plateforme peut porter son
+    // PROPRE aria-disabled natif sur ce bouton — branche protégée, revue requise, PR
+    // verrouillée — pour des raisons sans rapport avec le §6.5, que nous ne devons jamais
+    // effacer à sa place. Le title, lui, est restauré à sa valeur NATIVE capturée plus
+    // haut, jamais simplement retiré — sinon un title natif préexistant disparaît pour de
+    // bon après un seul cycle de grisage.
     control.element.removeAttribute('aria-disabled');
-    control.element.removeAttribute('title');
+    const nativeTitle = (control.element as HTMLElement).dataset[NATIVE_TITLE_MARKER];
+    if (nativeTitle) control.element.setAttribute('title', nativeTitle);
+    else control.element.removeAttribute('title');
+    delete (control.element as HTMLElement).dataset[NATIVE_TITLE_MARKER];
     control.element.classList.remove('cct-merge-blocked');
   }
 }

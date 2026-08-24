@@ -804,6 +804,25 @@ describe('applyCompletionState — le titre n’est retiré que s’il a été p
     applyCompletionState(control, published(0), 'en'); // state 'success' : jamais bloquant pour nous
     expect(control.element.getAttribute('aria-disabled')).toBe('true'); // intact
   });
+
+  it('restaure le title NATIF après un cycle de grisage/dégrisage, ne le retire jamais (revue Codex, round 3)', () => {
+    // Un title natif déjà présent (branche protégée, revue requise…) est ÉCRASÉ par notre
+    // infobulle pendant le grisage : le retirer simplement au dégrisage l'aurait perdu pour
+    // de bon, comme le title n'avait jamais existé.
+    const control: SubmitControl = { element: document.createElement('button'), kind: 'complete-pr' };
+    control.element.setAttribute('title', 'Merge pull request'); // infobulle native de la plateforme
+    applyCompletionState(control, publishedSummary({ state: 'failure' }), 'en');
+    expect(control.element.getAttribute('title')).not.toBe('Merge pull request'); // écrasé par la nôtre
+    applyCompletionState(control, publishedSummary({ state: 'success' }), 'en');
+    expect(control.element.getAttribute('title')).toBe('Merge pull request'); // restauré, pas retiré
+
+    // Un second cycle échec→échec ne doit pas capturer NOTRE PROPRE infobulle comme si elle
+    // était native : la valeur restaurée reste toujours celle de la plateforme.
+    applyCompletionState(control, publishedSummary({ state: 'failure' }), 'en');
+    applyCompletionState(control, publishedSummary({ state: 'failure' }), 'en');
+    applyCompletionState(control, publishedSummary({ state: 'success' }), 'en');
+    expect(control.element.getAttribute('title')).toBe('Merge pull request');
+  });
 });
 
 describe('Codex round 2 #2 — le display d’origine est restauré, jamais une chaîne vide (§5.5)', () => {

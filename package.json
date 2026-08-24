@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b --force packages/core packages/adapters/shared packages/adapters/github packages/adapters/azdo packages/server packages/extension",
     "spike": "node spikes/p1-prime/run.mjs",
+    "check:github-theme-vars": "node scripts/check-github-theme-vars.mjs",
     "build:extension": "node packages/extension/build.mjs",
     "check:ca-matrix": "node scripts/check-ca-matrix.mjs",
     "check:invisible": "node scripts/check-invisible-chars.mjs",

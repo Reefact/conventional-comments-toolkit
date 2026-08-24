@@ -104,6 +104,19 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.dispose();
   });
 
+  it('pose le retrait sur le composeur React reconnu par data-testid, sans classe CommentBox', () => {
+    const { controller, textarea, host } = setup();
+    // Second sélecteur candidat de la même génération React dans selectors.ts
+    // (`div[data-testid*="comment-composer"] textarea`) : le composeur, et non la classe
+    // du textarea, porte l'indice de reconnaissance.
+    textarea.className = '';
+    host.setAttribute('data-testid', 'comment-composer-foo');
+    controller.attach();
+    expect(host.classList.contains('cct-host')).toBe(true);
+    expect(textarea.classList.contains('cct-editor')).toBe(true);
+    controller.dispose();
+  });
+
   it('§5.3 : rend une pastille et les diagnostics sous la zone', async () => {
     const { controller, textarea, host } = setup();
     controller.attach();

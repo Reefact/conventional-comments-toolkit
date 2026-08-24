@@ -99,3 +99,14 @@ listing:
 
 Chrome Web Store recommended format: 1280×800 or 640×400, PNG or JPEG,
 up to 5 screenshots.
+
+**If the "Configuration unread" banner shows up in a screenshot**, it is
+**not** because the repository lacks a `.conventional-comments.json`.
+`ClientConfigResolver` enters the degraded state (§5.4) only when a read
+returns `unreachable`; a **missing** file returns `absent` with
+`degraded: false` and shows no banner — per §10 ("a simply absent file
+is a nominal case, not a degradation"). The banner therefore means a
+`fetch` genuinely failed against
+`https://{host}/{owner}/{repo}/raw/HEAD/.conventional-comments.json`
+(network error, or an HTTP status other than 404): inspect that request
+in the network tab — **adding a config file will not make it go away**.

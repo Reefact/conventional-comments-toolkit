@@ -16,6 +16,10 @@ const pr: PrRef = {
 function setup(mode: 'enforce' | 'warn' = 'enforce') {
   const host = document.createElement('div');
   const textarea = document.createElement('textarea');
+  // Génération React du CommentBox GitHub (cf. selectors.ts, `class*="CommentBox"`) : c'est
+  // le cas par défaut que la plupart des tests exercent ; voir plus bas pour le cas où cette
+  // classe est absente (DOM hérité, Azure DevOps).
+  textarea.className = 'CommentBox-input';
   const submit = document.createElement('button');
   submit.type = 'submit';
   host.append(textarea, submit);
@@ -86,6 +90,18 @@ describe('§5 — contrôleur d’éditeur', () => {
     // Rien de ce que attach() pose ne doit survivre au détachement.
     expect(host.classList.contains('cct-host')).toBe(false);
     expect(textarea.classList.contains('cct-editor')).toBe(false);
+  });
+
+  it('ne pose pas le retrait hors du CommentBox GitHub moderne (DOM hérité, Azure DevOps)', () => {
+    const { controller, textarea, host } = setup();
+    // Aucun conteneur borderless ni padding propre à neutraliser sur ces éditeurs (§ci-dessus
+    // dans editor-controller.ts) : la zone de saisie porte sa propre bordure et son propre
+    // padding, que ce retrait effacerait à tort.
+    textarea.className = 'comment-textarea';
+    controller.attach();
+    expect(host.classList.contains('cct-host')).toBe(false);
+    expect(textarea.classList.contains('cct-editor')).toBe(false);
+    controller.dispose();
   });
 
   it('§5.3 : rend une pastille et les diagnostics sous la zone', async () => {

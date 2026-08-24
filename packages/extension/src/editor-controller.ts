@@ -74,13 +74,22 @@ export class EditorController {
     // retrait ne doit s'appliquer QU'AUX boîtes où l'extension injecte réellement quelque
     // chose — un sélecteur global restylerait aussi celles qu'elle ne touche pas. Retiré
     // à dispose(), comme tout ce que cette méthode pose.
-    host.classList.add('cct-host');
-    this.#disposers.push(() => host.classList.remove('cct-host'));
-    // La zone de saisie se donne souvent son propre retrait horizontal (sur GitHub,
-    // `.CommentBox-input` porte `padding: var(--base-size-8)`), qui ferait double emploi
-    // avec celui du conteneur et désalignerait son texte du reste. Neutralisé en CSS.
-    this.deps.editor.element.classList.add('cct-editor');
-    this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-editor'));
+    //
+    // Réservé à la génération React du CommentBox GitHub — reconnue via le même indice que
+    // `selectors.ts` (`class*="CommentBox"`) : c'est la seule dont le conteneur est
+    // borderless et sans padding propre (§ci-dessus). Sur le DOM hérité de GitHub et sur
+    // Azure DevOps, la zone de saisie porte sa propre bordure et son propre padding ; y
+    // poser ce retrait décalerait le conteneur sans corriger l'alignement visé, et
+    // effacerait à tort le padding qui donne sa forme au champ.
+    if (this.deps.editor.element.className.includes('CommentBox')) {
+      host.classList.add('cct-host');
+      this.#disposers.push(() => host.classList.remove('cct-host'));
+      // La zone de saisie se donne souvent son propre retrait horizontal (sur GitHub,
+      // `.CommentBox-input` porte `padding: var(--base-size-8)`), qui ferait double emploi
+      // avec celui du conteneur et désalignerait son texte du reste. Neutralisé en CSS.
+      this.deps.editor.element.classList.add('cct-editor');
+      this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-editor'));
+    }
 
     // §5.1 — barre d'outils au-dessus de la zone de saisie.
     const toolbar = buildToolbar({

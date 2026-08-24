@@ -6,7 +6,12 @@
    Noms de variables vérifiés en direct sur github.com (scripts/check-github-theme-vars.mjs,
    canari hebdomadaire) — GitHub a renommé ses tokens sémantiques --color-fg-*/--color-
    canvas-*/--color-accent-*/... en --fgColor-*/--bgColor-*/--overlay-bgColor courant 2026 ;
-   seuls les primitifs --borderColor-default et --borderRadius-* ont gardé leur nom. */
+   seuls les primitifs --borderColor-default et --borderRadius-* ont gardé leur nom.
+
+   Chaque token renommé imbrique l'ANCIEN nom Primer comme repli avant le mot-clé système
+   final : GitHub Enterprise Server est figé par version et peut encore servir les noms
+   d'avant le renommage (specifications-fr.md §A.5). Le canari n'exige que le nom actuel
+   (premier niveau) — l'ancien est un filet non vérifiable depuis github.com. */
 
 .cct-toolbar {
   display: flex;
@@ -20,20 +25,20 @@
   border: 1px solid var(--cct-label-color, var(--borderColor-default, currentColor));
   border-radius: var(--borderRadius-medium, 6px);
   padding: 3px 10px;
-  background: var(--bgColor-default, transparent);
-  color: var(--fgColor-default, currentColor);
+  background: var(--bgColor-default, var(--color-canvas-default, transparent));
+  color: var(--fgColor-default, var(--color-fg-default, currentColor));
   cursor: pointer;
   font-size: 12px;
 }
 
 .cct-label-button[aria-pressed='true'] {
-  background: var(--cct-label-color, var(--bgColor-accent-emphasis, ButtonFace));
-  border-color: var(--cct-label-color, var(--bgColor-accent-emphasis, ButtonFace));
-  color: var(--fgColor-onEmphasis, Canvas);
+  background: var(--cct-label-color, var(--bgColor-accent-emphasis, var(--color-accent-emphasis, ButtonFace)));
+  border-color: var(--cct-label-color, var(--bgColor-accent-emphasis, var(--color-accent-emphasis, ButtonFace)));
+  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, Canvas));
 }
 
 .cct-label-button:focus-visible {
-  outline: 2px solid var(--fgColor-accent, Highlight);
+  outline: 2px solid var(--fgColor-accent, var(--color-accent-fg, Highlight));
   outline-offset: 1px;
 }
 
@@ -47,19 +52,19 @@
 .cct-decoration-segment {
   border: none;
   padding: 3px 10px;
-  background: var(--bgColor-default, transparent);
-  color: var(--fgColor-default, currentColor);
+  background: var(--bgColor-default, var(--color-canvas-default, transparent));
+  color: var(--fgColor-default, var(--color-fg-default, currentColor));
   cursor: pointer;
   font-size: 12px;
 }
 
 .cct-decoration-segment[aria-checked='true'] {
-  background: var(--bgColor-accent-emphasis, Highlight);
-  color: var(--fgColor-onEmphasis, HighlightText);
+  background: var(--bgColor-accent-emphasis, var(--color-accent-emphasis, Highlight));
+  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, HighlightText));
 }
 
 .cct-decoration-segment:focus-visible {
-  outline: 2px solid var(--fgColor-accent, Highlight);
+  outline: 2px solid var(--fgColor-accent, var(--color-accent-fg, Highlight));
   outline-offset: -2px;
 }
 
@@ -69,8 +74,8 @@
   max-width: 12em;
   border: 1px solid var(--borderColor-default, currentColor);
   border-radius: var(--borderRadius-medium, 6px);
-  background: var(--bgColor-default, transparent);
-  color: var(--fgColor-default, currentColor);
+  background: var(--bgColor-default, var(--color-canvas-default, transparent));
+  color: var(--fgColor-default, var(--color-fg-default, currentColor));
 }
 
 .cct-feedback {
@@ -83,8 +88,8 @@
   padding-left: 1.2em;
 }
 
-.cct-diagnostics li[data-severity='error'] { color: var(--fgColor-danger, #b3261e); }
-.cct-diagnostics li[data-severity='warn'] { color: var(--fgColor-attention, #8a6d00); }
+.cct-diagnostics li[data-severity='error'] { color: var(--fgColor-danger, var(--color-danger-fg, #b3261e)); }
+.cct-diagnostics li[data-severity='warn'] { color: var(--fgColor-attention, var(--color-attention-fg, #8a6d00)); }
 
 .cct-fix,
 .cct-alias button {
@@ -93,18 +98,18 @@
   cursor: pointer;
 }
 
-.cct-border-ok { outline: 1px solid var(--fgColor-success, #2e7d32) !important; }
-.cct-border-warn { outline: 1px solid var(--fgColor-attention, #f9a825) !important; }
-.cct-border-error { outline: 2px solid var(--fgColor-danger, #b3261e) !important; }
+.cct-border-ok { outline: 1px solid var(--fgColor-success, var(--color-success-fg, #2e7d32)) !important; }
+.cct-border-warn { outline: 1px solid var(--fgColor-attention, var(--color-attention-fg, #f9a825)) !important; }
+.cct-border-error { outline: 2px solid var(--fgColor-danger, var(--color-danger-fg, #b3261e)) !important; }
 
 .cct-banner {
-  border: 1px solid var(--fgColor-danger, #b3261e);
+  border: 1px solid var(--fgColor-danger, var(--color-danger-fg, #b3261e));
   border-radius: var(--borderRadius-medium, 6px);
   padding: 8px 12px;
   margin: 8px 0;
   font-size: 13px;
-  background: var(--bgColor-danger-muted, transparent);
-  color: var(--fgColor-default, currentColor);
+  background: var(--bgColor-danger-muted, var(--color-danger-subtle, transparent));
+  color: var(--fgColor-default, var(--color-fg-default, currentColor));
 }
 
 .cct-badge {
@@ -113,7 +118,7 @@
   border: 1px solid var(--cct-label-color, var(--borderColor-default, currentColor));
   padding: 0 6px;
   margin-right: 6px;
-  color: var(--fgColor-default, currentColor);
+  color: var(--fgColor-default, var(--color-fg-default, currentColor));
 }
 
 .cct-badge-pill { border-radius: 999px; }
@@ -130,13 +135,13 @@
   max-height: 12em;
   overflow-y: auto;
   font-size: 12px;
-  background: var(--overlay-bgColor, Canvas);
-  color: var(--fgColor-default, currentColor);
+  background: var(--overlay-bgColor, var(--color-canvas-overlay, Canvas));
+  color: var(--fgColor-default, var(--color-fg-default, currentColor));
 }
 
 .cct-quick-list [aria-selected='true'] {
-  background: var(--bgColor-accent-emphasis, Highlight);
-  color: var(--fgColor-onEmphasis, HighlightText);
+  background: var(--bgColor-accent-emphasis, var(--color-accent-emphasis, Highlight));
+  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, HighlightText));
 }
 
 .sr-only {

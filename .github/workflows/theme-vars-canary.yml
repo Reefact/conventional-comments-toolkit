@@ -57,8 +57,14 @@ jobs:
       # l'onglet Actions chaque semaine — on ouvre donc (ou met à jour) une issue de
       # suivi pour que la notification GitHub standard (email/mobile) prévienne le
       # mainteneur, sans dépendre d'un webhook ou d'un secret supplémentaire.
+      #
+      # Gardé sur l'issue de CE step (steps.check.outcome), pas sur failure() du job :
+      # failure() reste vrai après n'importe quel échec en amont (npm ci, installation de
+      # Chromium, résolution du binaire) même si la vérification elle-même n'a jamais
+      # tourné — ouvrir une issue qui affirme « des variables Primer ont disparu » dans ce
+      # cas serait un faux diagnostic.
       - name: Ouvrir ou mettre à jour l'issue de suivi
-        if: failure() && github.event_name == 'schedule'
+        if: always() && github.event_name == 'schedule' && steps.check.outcome == 'failure'
         uses: actions/github-script@v7
         with:
           script: |

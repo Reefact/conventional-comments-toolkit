@@ -353,4 +353,24 @@ describe('§9.2.2 — empreinte de configuration', () => {
     b.exemptUsers = ['a', 'b'];
     expect(fingerprint(a)).toBe(fingerprint(b));
   });
+
+  it('CA-40 : la casse d’une entrée toolCommands ne fait pas diverger l’empreinte', () => {
+    const a = defaultConfig();
+    a.toolCommands = ['@Codex'];
+    const b = defaultConfig();
+    b.toolCommands = ['@codex'];
+    expect(fingerprint(a)).toBe(fingerprint(b));
+  });
+
+  it('CA-40 : un doublon de casse ne fabrique pas de désaccord (§8.1.3, règle 2)', () => {
+    // Ce que l’union du §8.1.4 produit après une correction de casse sur une PR épinglée :
+    // le serveur porte les deux orthographes, l’extension une seule. Les deux exemptent
+    // exactement les mêmes commentaires — l’empreinte doit le refléter, sans quoi la
+    // règle 2 désarmerait le blocage d’envoi en permanence.
+    const server = defaultConfig();
+    server.toolCommands = ['@Codex', '@codex'];
+    const extension = defaultConfig();
+    extension.toolCommands = ['@codex'];
+    expect(fingerprint(server)).toBe(fingerprint(extension));
+  });
 });

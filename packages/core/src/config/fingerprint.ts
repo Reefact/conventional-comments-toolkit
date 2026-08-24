@@ -62,8 +62,14 @@ export function fingerprintDomain(config: EffectiveConfig): FingerprintDomain {
     exemptUsers: [...config.exemptUsers].map((u) => u.toLowerCase()).sort(),
     allowlistPatterns: [...config.allowlistPatterns].sort(),
     // Insensible à la casse, comme la comparaison des mentions (§4.2) : `@Codex` et
-    // `@codex` ne doivent jamais produire deux empreintes différentes.
-    toolCommands: [...config.toolCommands].map((c) => c.toLowerCase()).sort(),
+    // `@codex` ne doivent jamais produire deux empreintes différentes. DÉDOUBLONNÉ après
+    // normalisation, et pas seulement normalisé : l'union du §8.1.4 compare au caractère
+    // près, si bien qu'une correction de casse sur une PR déjà épinglée laisse `@Codex`
+    // ET `@codex` dans la configuration mélangée. Sans ce `Set`, le serveur projetterait
+    // deux entrées là où l'extension n'en projette qu'une, et la règle 2 du §8.1.3
+    // désarmerait le blocage d'envoi sur un désaccord fabriqué — deux configurations qui
+    // exemptent pourtant exactement les mêmes commentaires.
+    toolCommands: [...new Set(config.toolCommands.map((c) => c.toLowerCase()))].sort(),
     activatedAt: config.activation.activatedAt,
   };
 }

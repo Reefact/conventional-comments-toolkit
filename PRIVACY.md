@@ -9,9 +9,19 @@ volontairement hébergée sur ce dépôt public : l'URL de cette page (vue
 GitHub de ce fichier) est l'URL à renseigner dans les formulaires de
 soumission des stores.
 
-Résumé en une phrase : **l'extension ne collecte, ne stocke sur un serveur
-distant, ni ne transmet aucun contenu de code, de commentaire ou de diff
-que vous consultez ou rédigez.**
+Résumé en une phrase : **l'extension elle-même ne collecte, ne stocke sur
+un serveur distant, ni ne transmet aucun contenu de code, de commentaire
+ou de diff que vous consultez ou rédigez.**
+
+**Périmètre de ce document.** Le tableau ci-dessous couvre exclusivement
+l'**extension navigateur** — c'est elle qui est distribuée sur les stores
+et pour laquelle ce document sert de politique de confidentialité
+publique. Le produit inclut aussi un **composant serveur optionnel**,
+auto-hébergé et exploité par chaque organisation qui choisit de le
+déployer (§10, §14 de la spécification) : voir la section dédiée plus bas
+plutôt que le tableau, qui ne l'engloble pas champ par champ — c'est un
+composant à la surface de persistance propre, sous le contrôle de
+l'organisation qui l'exploite, pas de l'éditeur de l'extension.
 
 ## Ce que l'extension fait
 
@@ -21,7 +31,7 @@ et, en option, Azure DevOps : barre d'outils d'insertion de labels,
 validation du format à la saisie, retour visuel dans l'éditeur natif de la
 plateforme.
 
-## Données traitées
+## Données traitées par l'extension navigateur
 
 | Donnée | Où elle vit | Sort-elle du navigateur ? |
 |---|---|---|
@@ -30,13 +40,42 @@ plateforme.
 | Domaines optionnels activés (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, géré par Chrome | Non — c'est Chrome, pas l'extension, qui tient cette liste |
 | Configuration `.conventional-comments.json` du dépôt affiché | l'extension fait une requête réseau dédiée vers la route `raw` du fichier (avec vos cookies de session, jamais un jeton propre à l'extension), mise en cache en mémoire par onglet (perdue à la navigation ou au rechargement de la page) | Non — c'est une lecture, sur une route web que votre session autorise déjà de la même façon que si vous l'ouvriez vous-même dans un onglet |
 | Contenu des commentaires, du code et des diffs que vous consultez ou rédigez | reste dans la page et dans l'éditeur natif de la plateforme | **Jamais transmis nulle part par l'extension** |
-| Télémétrie d'usage | — | **Aucune actuellement : cette version ne collecte ni n'émet de télémétrie.** |
-| Journal d'exemption de PR (identifiant de PR, action — accordée/refusée/révoquée —, auteur de la demande, horodatage, et **un motif en texte libre si la personne en saisit un**) — mécanisme de gouvernance distinct de la télémétrie ci-dessus, propre au composant serveur de l'organisation, pas à cette extension. **Le motif en texte libre peut contenir des informations personnelles ou sensibles**, saisies par la personne qui accorde, refuse ou révoque l'exemption. | serveur de l'organisation, si le mécanisme est déployé et activé | Uniquement si l'organisation a déployé et configuré ce mécanisme ; destination et durée de conservation sont sous son contrôle |
+| Télémétrie d'usage | — | **Aucune actuellement : cette version de l'extension ne collecte ni n'émet de télémétrie.** |
 
 L'extension ne stocke **aucun jeton d'authentification ni secret**. Elle
 ne s'authentifie auprès d'aucune API à jeton : les seules données qu'elle
 lit hors du DOM de la page sont celles accessibles par la route web déjà
 autorisée par votre session de navigation.
+
+## Composant serveur optionnel (auto-hébergé par votre organisation)
+
+**Non requis pour utiliser l'extension.** Une organisation peut déployer
+ce composant pour faire respecter la convention comme condition de
+fusion des pull requests, avec un mécanisme d'exemption gouverné. S'il
+est déployé, il persiste — sur l'infrastructure de l'organisation, pas
+sur un service tiers de l'éditeur de l'extension — des catégories de
+données propres à son fonctionnement, entre autres :
+- le journal et l'état actif des exemptions de PR (identifiant de PR,
+  action, personne à l'origine, horodatage, et **un motif en texte libre
+  si la personne en saisit un** — susceptible de contenir des
+  informations personnelles ou sensibles) ;
+- des enregistrements d'évaluation de conformité par PR, qui incluent un
+  **court extrait** (jusqu'à ~80 caractères) du commentaire racine de
+  chaque fil bloquant non résolu, avec l'identifiant de son auteur ;
+- des compteurs d'usage agrégés par dépôt et par PR (répartition des
+  labels, nombre de fils non résolus, etc.), **indépendants du réglage
+  `telemetry.enabled`** de l'extension — ce sont deux mécanismes
+  distincts ;
+- un état opérationnel courant (configuration en cache, séquencement des
+  publications, alias de chemin de PR) nécessaire au fonctionnement du
+  composant.
+
+**Cette liste illustre les catégories, elle n'est pas exhaustive et n'a
+pas vocation à l'être** : le code de ce composant évolue, et une
+organisation qui le déploie en est l'opérateur au sens du RGPD (ou du
+cadre équivalent) — c'est à elle, pas à ce document, de fournir la
+politique de confidentialité applicable à ses utilisateurs pour cette
+instance, avec sa propre destination et durée de conservation.
 
 ## Permissions et pourquoi
 
@@ -81,9 +120,19 @@ equivalent stores (Firefox Add-ons, Edge Add-ons). It is intentionally
 hosted on this public repository: this file's GitHub view URL is the URL
 to enter in store submission forms.
 
-One-sentence summary: **the extension does not collect, store on a remote
-server, or transmit any code, comment, or diff content you view or
-write.**
+One-sentence summary: **the extension itself does not collect, store on
+a remote server, or transmit any code, comment, or diff content you view
+or write.**
+
+**Scope of this document.** The table below covers the **browser
+extension** only — that's what's distributed on the stores and what this
+document serves as the public privacy policy for. The product also
+includes an **optional server component**, self-hosted and operated by
+each organization that chooses to deploy it (§10, §14 of the functional
+spec): see the dedicated section below instead of the table, which
+doesn't try to enumerate it field by field — it's a component with its
+own persistence surface, under the control of the organization running
+it, not of the extension's publisher.
 
 ## What the extension does
 
@@ -92,7 +141,7 @@ follow the Conventional Comments convention, on GitHub and, optionally,
 Azure DevOps: a toolbar for inserting labels, input validation, and
 visual feedback inside the platform's native comment editor.
 
-## Data processed
+## Data processed by the browser extension
 
 | Data | Where it lives | Does it leave the browser? |
 |---|---|---|
@@ -101,13 +150,39 @@ visual feedback inside the platform's native comment editor.
 | Enabled optional domains (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, managed by Chrome | No — Chrome holds this list, not the extension |
 | The displayed repository's `.conventional-comments.json` configuration | the extension makes a dedicated network request to the file's `raw` route (using your session cookies, never a token of its own), cached in memory per tab (lost on navigation or page reload) | No — it's a read, on a web route your session already authorizes, the same way it would if you opened it yourself in a tab |
 | Comment, code, and diff content you view or write | stays in the page and the platform's native editor | **Never transmitted anywhere by the extension** |
-| Usage telemetry | — | **None currently: this version collects and emits no telemetry.** |
-| PR exemption log (PR id, action — granted/refused/revoked —, requester, timestamp, and **a free-text reason if one was entered**) — a governance mechanism distinct from the telemetry above, owned by the organization's server component, not by this extension. **The free-text reason may contain personal or sensitive information**, entered by whoever grants, refuses, or revokes the exemption. | your organization's server, if that mechanism is deployed and enabled | Only if the organization has deployed and configured that mechanism; destination and retention are under its control |
+| Usage telemetry | — | **None currently: this version of the extension collects and emits no telemetry.** |
 
 The extension stores **no authentication token or secret**. It does not
 authenticate against any token-based API: the only data it reads outside
 the page DOM is what is reachable via the web route your browsing session
 already authorizes.
+
+## Optional server component (self-hosted by your organization)
+
+**Not required to use the extension.** An organization may deploy this
+component to enforce the convention as a merge requirement for pull
+requests, with a governed exemption mechanism. If deployed, it persists
+— on the organization's own infrastructure, not a third-party service run
+by the extension's publisher — categories of data specific to its
+operation, including but not limited to:
+- the PR exemption log and active-exemption state (PR id, action, actor,
+  timestamp, and **a free-text reason if one was entered** — potentially
+  containing personal or sensitive information);
+- compliance-evaluation records per PR, which include a **short excerpt**
+  (up to ~80 characters) of the root comment of each unresolved blocking
+  thread, along with its author's identifier;
+- aggregated usage counters per repository and PR (label distribution,
+  unresolved-thread counts, etc.), **independent of the extension's
+  `telemetry.enabled` setting** — these are two distinct mechanisms;
+- operational state (cached configuration, publication sequencing, PR
+  path aliases) needed for the component to function.
+
+**This list illustrates categories; it is not exhaustive and isn't meant
+to be** — the code of this component evolves, and an organization that
+deploys it is the operator, under GDPR or an equivalent framework: it is
+that organization's responsibility, not this document's, to provide the
+applicable privacy policy to its own users for that deployment, with its
+own destination and retention terms.
 
 ## Permissions and why
 

@@ -73,6 +73,21 @@ export function fingerprintDomain(config: EffectiveConfig): FingerprintDomain {
     // projetterait deux entrées là où l'extension n'en projette qu'une, et la règle 2 du
     // §8.1.3 désarmerait le blocage d'envoi sur un désaccord fabriqué.
     exemptUsers: [...new Set(config.exemptUsers.map((u) => u.toLowerCase()))].sort(),
+    //
+    // CE DÉDOUBLONNAGE OUVRE UNE FENÊTRE DE DÉCALAGE, et il faut la connaître : une
+    // organisation déclarant `Dependabot[bot]` et un dépôt déclarant `dependabot[bot]`
+    // donnent, chez les DEUX composants, une liste résolue à deux entrées — `mergeLevel()`
+    // unit au caractère près. L'ancienne projection en produisait deux (`42f3097d`), la
+    // nouvelle une (`3c5793aa`) : tant qu'un seul des deux composants est à jour, ils
+    // divergent alors qu'ils exemptent la même chose.
+    //
+    // La fenêtre est inévitable pour toute correction de cette classe — dédoublonner dans
+    // `mergeLevel()` plutôt qu'ici produirait exactement le même écart —, et elle est
+    // transitoire : la règle 5 du §8.1.3 déclare le décalage NORMAL, et le désarmement du
+    // blocage d'envoi qu'il provoque va dans le sens sûr. Sans le dédoublonnage, le
+    // désaccord serait au contraire PERMANENT et sur une même version, ce que le principe
+    // de ce fichier interdit — « jamais de désaccord fabriqué ». Le §9.2.2 tranche dans ce
+    // sens, et c'est lui qui fait foi.
     // OMIS QUAND LA LISTE EST VIDE, et ce n'est pas une micro-optimisation : c'est ce qui
     // rend l'ajout de la clé compatible avec la version précédente de `core/`.
     //

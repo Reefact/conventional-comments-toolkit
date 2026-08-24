@@ -1,0 +1,5 @@
+{
+  "$schema": "https://conventional-comments-toolkit.dev/schema/v1.json",
+  "version": 1,
+  "mode": "assist"
+}

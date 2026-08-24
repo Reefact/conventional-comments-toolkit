@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveConfig } from '../src/config/resolve.js';
 import { defaultConfig } from '../src/config/defaults.js';
 import { hasNestedQuantifier } from '../src/config/schema.js';
-import { fingerprint } from '../src/config/fingerprint.js';
+import { fingerprint, fingerprintDomain } from '../src/config/fingerprint.js';
 import type { ConfigRead, Floor } from '../src/types.js';
 
 const absent: ConfigRead = { status: 'absent' };
@@ -360,6 +360,25 @@ describe('§9.2.2 — empreinte de configuration', () => {
     const b = defaultConfig();
     b.toolCommands = ['@codex'];
     expect(fingerprint(a)).toBe(fingerprint(b));
+  });
+
+  it('CA-40 : une liste toolCommands vide ne fait PAS diverger l’empreinte (§8.1.3 r.5)', () => {
+    // Compatibilité de l'ajout de la clé. L'entrée de fingerprint() est sérialisée en JSON :
+    // un membre présent avec `[]` ne produit pas le même texte qu'un membre absent. Sans
+    // l'omission, la mise à jour de `core/` changerait à elle seule l'empreinte de TOUT
+    // dépôt — y compris ceux qui ne configurent rien —, et la règle 2 désarmerait le
+    // blocage d'envoi partout pendant la fenêtre de décalage que la règle 5 dit normale.
+    const c = defaultConfig();
+    expect(c.toolCommands).toEqual([]);
+    // Le membre est ABSENT de la projection — c'est le mécanisme, et c'est ce qui rend le
+    // texte JSON identique à celui que produisait la version antérieure de `core/`.
+    expect('toolCommands' in fingerprintDomain(c)).toBe(false);
+    // Contre-épreuve : dès qu'une entrée existe, le membre apparaît et l'empreinte diverge
+    // — c'est tout l'intérêt de faire entrer la clé dans le domaine.
+    const avec = defaultConfig();
+    avec.toolCommands = ['@codex'];
+    expect('toolCommands' in fingerprintDomain(avec)).toBe(true);
+    expect(fingerprint(avec)).not.toBe(fingerprint(c));
   });
 
   it('exemptUsers : un doublon de casse ne fabrique pas de désaccord non plus (§4.2)', () => {

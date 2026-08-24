@@ -178,7 +178,7 @@ export class Orchestrator {
 
       // Étape 12 : seconde passe sans cache avant un rejet dépendant de la configuration
       // (§8.1.3, règle 3) — seul ce second verdict compte.
-      const needsRefresh = evaluation.result.formatDiagnostics.some(
+      const triggers = evaluation.result.formatDiagnostics.filter(
         (d) =>
           d.code === 'E-UNKNOWN-LABEL' ||
           d.code === 'E-UNKNOWN-DECORATION' ||
@@ -188,10 +188,16 @@ export class Orchestrator {
           // passe ; une remarque ordinaire sans label ne déclenche rien.
           (d.code === 'E-NO-LABEL' && looksLikeToolCommand(d.comment.body))
       );
-      // Un contournement stérile récent étrangle les suivants (§8.1.3 r.3) : un rejet qui
-      // ne vient pas d'une configuration en retard — `@alice peux-tu regarder ça ?` — ne
-      // disparaît pas, et relancerait sinon la double lecture à CHAQUE réévaluation.
-      if (needsRefresh && !cache.isBypassThrottled(rKey, ttl)) {
+      const needsRefresh = triggers.length > 0;
+      // L'étranglement porte sur le COUPLE (dépôt, déclencheurs), jamais sur le dépôt seul.
+      // Un contournement stérile n'apprend rien sur CES rejets-là — il n'apprend rien sur
+      // les suivants. Étrangler le dépôt entier ferait qu'un `@alice peux-tu regarder ça ?`
+      // laissé ouvert empêcherait, pendant tout le TTL, le rafraîchissement dû à un
+      // `@codex` ajouté après lui ou à un label nouveau — des modifications élargissantes
+      // que le §8.1.3 exige d'appliquer en direct. La signature change dès qu'un rejet
+      // apparaît, disparaît ou change de jeton : le contournement est alors de nouveau tenté.
+      const triggerKey = `${rKey}|${triggerSignature(triggers)}`;
+      if (needsRefresh && !cache.isBypassThrottled(triggerKey, ttl)) {
         const beforeRepo = repoRead;
         const beforeOrg = orgRead;
         repoRead = await cache.read(`repo:${rKey}`, ttl, true, () =>
@@ -204,10 +210,10 @@ export class Orchestrator {
                 adapter.fetchOrgConfig(configUrl, { bypassCache: true })
               );
         if (sameRead(beforeRepo, repoRead) && sameRead(beforeOrg, orgRead)) {
-          // Rien de neuf : le rejet ne venait pas d'un cache en retard. Ne pas réévaluer —
-          // le verdict serait identique au caractère près — et ne pas recommencer avant
-          // l'expiration ordinaire.
-          cache.markFruitlessBypass(rKey);
+          // Rien de neuf : ces rejets-là ne venaient pas d'un cache en retard. Ne pas
+          // réévaluer — le verdict serait identique au caractère près — et ne pas
+          // recommencer POUR EUX avant l'expiration ordinaire.
+          cache.markFruitlessBypass(triggerKey);
         } else {
           resolved = resolveConfig(floor, orgRead, repoRead, pinned, previouslyEvaluated);
           evaluation = await this.runEvaluation(pr, pKey, rKey, resolved, floorNotices, current, previouslyEvaluated);
@@ -618,4 +624,20 @@ function sameRead(a: ConfigRead, b: ConfigRead): boolean {
   if (a.status === 'unreachable' || b.status === 'unreachable') return false;
   if (a.status !== b.status) return false;
   return a.status !== 'found' || a.text === (b as { text: string }).text;
+}
+
+/** Signature de l'ensemble des rejets qui ont déclenché un contournement (§8.1.3, règle 3).
+ * Elle identifie CE QUI a été cherché en vain, pour que l'étranglement d'un contournement
+ * stérile ne déborde jamais sur un rejet différent.
+ *
+ * Le jeton entre dans la signature, et pas seulement le code : `@alice …` et `@codex …`
+ * produisent tous deux un `E-NO-LABEL`, mais un contournement resté vain pour le premier
+ * n'apprend rien sur le second. Sans le jeton, ajouter `@codex` à la configuration serait
+ * sans effet pendant tout le TTL. Trié, pour qu'un même ensemble donne toujours la même
+ * signature quel que soit l'ordre des diagnostics. */
+function triggerSignature(triggers: { code: string; comment: CommentInfo }[]): string {
+  return triggers
+    .map((d) => `${d.code}:${/^(\S+)/.exec(d.comment.body.trimStart())?.[1] ?? ''}`)
+    .sort()
+    .join('|');
 }

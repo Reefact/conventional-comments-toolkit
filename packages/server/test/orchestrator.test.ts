@@ -297,6 +297,38 @@ describe('§6.4 — cycle d’évaluation', () => {
     expect(bypasses).toBe(2);
   });
 
+  it('CA-40 : l’étranglement ne déborde pas sur un rejet DIFFÉRENT (§8.1.3 r.3)', async () => {
+    // Le point que l'étranglement par dépôt manquait : un `@alice …` laissé ouvert ne doit
+    // pas empêcher le rafraîchissement dû à un `@codex` ajouté après lui. Les deux
+    // produisent un `E-NO-LABEL` ; seul le jeton les distingue.
+    const env = makeEnv({
+      repoConfig: enforceConfig({ formatSeverity: 'error' }),
+      threads: [thread(comment('@alice peux-tu regarder ça ?'))],
+    });
+    let bypasses = 0;
+    const adapterAny = env.adapter;
+    const originalFetch = adapterAny.fetchConfigFile.bind(adapterAny);
+    adapterAny.fetchConfigFile = async (pr, opts) => {
+      if (opts?.bypassCache) bypasses += 1;
+      return originalFetch(pr, opts);
+    };
+
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(bypasses).toBe(1);
+    env.adapter.state.headSha = 'sha-2';
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(bypasses).toBe(1); // même rejet : étranglé
+
+    // Un rejet NOUVEAU apparaît — la signature change, le contournement est de nouveau tenté.
+    env.adapter.state.threads = [
+      thread(comment('@alice peux-tu regarder ça ?')),
+      thread(comment('@codex review')),
+    ];
+    env.adapter.state.headSha = 'sha-3';
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(bypasses).toBe(2);
+  });
+
   it('CA-40 : un contournement FRUCTUEUX n’est jamais étranglé (§8.1.3 r.3)', async () => {
     // Contre-épreuve : l'étranglement ne doit mordre que sur les contournements stériles.
     const env = makeEnv({

@@ -40,6 +40,8 @@ plateforme.
 | Domaines optionnels activés (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, géré par Chrome | Non — c'est Chrome, pas l'extension, qui tient cette liste |
 | Configuration `.conventional-comments.json` du dépôt affiché | l'extension fait une requête réseau dédiée vers la route `raw` du fichier (avec vos cookies de session, jamais un jeton propre à l'extension), mise en cache en mémoire par onglet — la navigation interne du site (d'une PR à l'autre sans rechargement) la conserve ; seul un rechargement complet ou la fermeture de l'onglet la détruit | Non — c'est une lecture, sur une route web que votre session autorise déjà de la même façon que si vous l'ouvriez vous-même dans un onglet |
 | Contenu des commentaires, du code et des diffs que vous consultez ou rédigez | reste dans la page et dans l'éditeur natif de la plateforme | **Jamais transmis nulle part par l'extension** |
+| Plancher de politique d'entreprise (`configUrl`, `exemptUsers`, motifs d'allowlist…), si votre organisation en déploie un | lu depuis `chrome.storage.managed`, alimenté par la politique navigateur de votre organisation ; l'extension ne fait que le lire | Non |
+| **Données traitées en mémoire uniquement, jamais écrites ni transmises** — notamment votre identifiant de compte sur la plateforme et ceux des auteurs des commentaires affichés, lus dans le DOM de la page pour la validation et l'affichage des fils | mémoire vive de l'onglet, le temps de la page | Non — ni écrites dans `chrome.storage`, ni envoyées nulle part ; elles disparaissent à la fermeture de l'onglet |
 | Télémétrie d'usage | — | **Aucune actuellement : cette version de l'extension ne collecte ni n'émet de télémétrie.** |
 
 L'extension ne stocke **aucun jeton d'authentification ni secret**. Elle
@@ -150,6 +152,8 @@ visual feedback inside the platform's native comment editor.
 | Enabled optional domains (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, managed by Chrome | No — Chrome holds this list, not the extension |
 | The displayed repository's `.conventional-comments.json` configuration | the extension makes a dedicated network request to the file's `raw` route (using your session cookies, never a token of its own), cached in memory per tab — in-site navigation (moving between PRs without a reload) keeps it; only a full page reload or closing the tab destroys it | No — it's a read, on a web route your session already authorizes, the same way it would if you opened it yourself in a tab |
 | Comment, code, and diff content you view or write | stays in the page and the platform's native editor | **Never transmitted anywhere by the extension** |
+| Enterprise policy floor (`configUrl`, `exemptUsers`, allowlist patterns…), if your organization deploys one | read from `chrome.storage.managed`, populated by your organization's browser policy; the extension only reads it | No |
+| **Data processed in memory only, never written or transmitted** — notably your platform account identifier and those of the authors of displayed comments, read from the page DOM for validation and thread display | the tab's memory, for the lifetime of the page | No — neither written to `chrome.storage` nor sent anywhere; gone when the tab closes |
 | Usage telemetry | — | **None currently: this version of the extension collects and emits no telemetry.** |
 
 The extension stores **no authentication token or secret**. It does not

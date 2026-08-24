@@ -179,6 +179,12 @@ extension bundled into ...\conventional-comments-toolkit\packages\extension\dist
 L'extension **« Conventional Comments Toolkit »** doit apparaître dans la liste, activée,
 sans bouton rouge « Erreurs ».
 
+Elle porte son icône : une bulle de commentaire bleue frappée d'une coche verte. Cette
+même icône est disponible dans la barre d'outils du navigateur — cliquez la pièce de
+puzzle à droite de la barre d'adresse, puis épinglez « Conventional Comments Toolkit ».
+Un clic sur l'icône ainsi épinglée ouvre la page de réglages de l'extension depuis
+n'importe quel onglet, sans repasser par `chrome://extensions`.
+
 ## 9. Tester sur une vraie Pull Request GitHub
 
 1. Ouvrez une Pull Request sur `github.com` (l'une des vôtres, ou toute PR où vous pouvez

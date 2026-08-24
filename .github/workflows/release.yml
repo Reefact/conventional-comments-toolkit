@@ -88,6 +88,31 @@ jobs:
           # étiquette que le manifeste ne peut pas déclarer.
           CORE: ${{ steps.version.outputs.core }}
 
+      # Une icône déclarée par le manifeste mais absente du bundle fait REFUSER le
+      # chargement de l'extension par Chromium : l'utilisateur ne voit qu'un message
+      # d'erreur. Les deux variantes sont vérifiées, la Firefox recevant ses icônes par
+      # une copie distincte.
+      - name: Icônes déclarées présentes dans les deux bundles
+        run: |
+          node --input-type=module -e "
+            import { readFileSync, statSync } from 'node:fs';
+            const roots = ['packages/extension/dist-ext', 'packages/extension/dist-ext/firefox'];
+            for (const root of roots) {
+              const m = JSON.parse(readFileSync(root + '/manifest.json', 'utf8'));
+              const declared = [...new Set([
+                ...Object.values(m.icons ?? {}),
+                ...Object.values(m.action?.default_icon ?? {}),
+              ])];
+              if (declared.length === 0) throw new Error(root + ' : aucune icône déclarée');
+              for (const icon of declared) {
+                let size = 0;
+                try { size = statSync(root + '/' + icon).size; } catch { size = 0; }
+                if (size === 0) throw new Error(root + '/' + icon + ' : déclarée par le manifeste, absente ou vide du bundle');
+              }
+              console.log('✓ ' + root + ' : ' + declared.length + ' icônes déclarées et présentes');
+            }
+          "
+
       # Deux archives distinctes : `dist-ext/` contient le sous-dossier `firefox/`, que
       # Chromium n'a aucune raison d'embarquer. Chaque zip se décompresse en UN dossier
       # dont la racine porte `manifest.json` — c'est ce dossier que le navigateur attend.
@@ -181,7 +206,8 @@ jobs:
           rm -rf "$check" && mkdir -p "$check"
           ( cd "$check" && unzip -q "$WORK/$CHROMIUM" && unzip -q "$WORK/$FIREFOX" )
           for dir in conventional-comments-toolkit conventional-comments-toolkit-firefox; do
-            for file in manifest.json content.js background.js options.js options.html styles.css INSTALLATION.txt; do
+            for file in manifest.json content.js background.js options.js options.html styles.css INSTALLATION.txt \
+                        icons/icon-16.png icons/icon-32.png icons/icon-48.png icons/icon-128.png; do
               test -s "$check/$dir/$file" || { echo "::error::$dir/$file manquant ou vide dans l'archive"; exit 1; }
             done
           done

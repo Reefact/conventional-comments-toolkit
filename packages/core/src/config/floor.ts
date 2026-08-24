@@ -4,6 +4,7 @@
 
 import type { EffectiveConfig, Floor, Mode, Notice, Severity } from '../types.js';
 import { SUPPORTED_FLOOR_VERSION } from '../version.js';
+import { filterAllowlistPatterns, filterToolCommands } from './schema.js';
 
 export const MODE_SCALE: Record<Mode, number> = { off: 0, assist: 1, warn: 2, enforce: 3 };
 const SEVERITY_SCALE: Record<Severity, number> = { off: 0, warn: 1, error: 2 };
@@ -36,6 +37,30 @@ export interface VettedFloor {
   unsupported: boolean;
 }
 
+/** Les trois clés de liste du plancher (§8.1.1). UNE SEULE définition, consommée par
+ * `vetFloor()` comme par `applyFloor()` : deux listes tenues séparément finiraient par
+ * diverger, et le trou se rouvrirait en silence sur la clé oubliée par l'une des deux. */
+export const FLOOR_LIST_KEYS = ['exemptUsers', 'allowlistPatterns', 'toolCommands'] as const;
+
+function floorWarning(message: string, ref: string): Notice {
+  return { kind: 'config-warning', message, ref };
+}
+
+/** Ce que le plancher prétend être un tableau de chaînes, réduit à ce qu'il en est
+ * vraiment. Le document arrive d'un `JSON.parse` — d'un fichier d'administration ou de
+ * `chrome.storage.managed` —, jamais d'un compilateur : le type `Floor` ne garantit rien
+ * de sa forme réelle.
+ *
+ * L'ABSENCE est signalée comme un mauvais type, et ce n'est pas du zèle : sur une règle
+ * de liste, `{ "closed": true }` sans `minimum` FERME la clé sur la liste vide. Une
+ * faute de frappe y produit donc le maximum d'effet, et la réparer en silence la
+ * rendrait invisible à qui a écrit la politique. */
+function asStringArray(value: unknown, ref: string, notices: Notice[]): string[] {
+  if (Array.isArray(value)) return value.filter((e): e is string => typeof e === 'string');
+  notices.push(floorWarning('floor key ignored: expected an array of strings', ref));
+  return [];
+}
+
 export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   if (!floor) return { floor: defaultFloor(), notices: [], unsupported: false };
   if (floor.floorVersion !== undefined && floor.floorVersion > SUPPORTED_FLOOR_VERSION) {
@@ -51,7 +76,49 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
       unsupported: true,
     };
   }
-  return { floor, notices: [], unsupported: false };
+
+  // ————— Le plancher n'est pas plus fiable que le document d'un dépôt —————
+  //
+  // Il est écrit par une administration, pas par le dépôt qu'il contraint, mais il arrive
+  // par le même chemin : du JSON désérialisé. Faute de cette passe, ses entrées
+  // court-circuitaient les filtres que `parseConfigDocument()` applique aux MÊMES clés —
+  // un plancher pouvait donc poser un `^(a+)+$` que les bornes du §8.2 existent pour
+  // interdire, et geler le navigateur du relecteur autant que le service mutualisé.
+  //
+  // Une entrée fautive est ÉCARTÉE ET SIGNALÉE, jamais cause d'un repli en `assist` : le
+  // §8.2 énonce la règle sur la clé, pas sur le canal, et une faute de frappe dans une
+  // politique d'entreprise ne doit pas désactiver la contrainte sur tout un parc. Écarter
+  // ne va d'ailleurs jamais que dans le sens durcissant — une exemption ou un motif
+  // d'allowlist en moins protège davantage.
+  const notices: Notice[] = [];
+  const out: Floor = { ...floor };
+
+  for (const key of FLOOR_LIST_KEYS) {
+    const rule = out[key] as { minimum?: unknown; closed?: unknown } | undefined | null;
+    if (rule === undefined) continue;
+    const raw = asStringArray(rule?.minimum, `${key}.minimum`, notices);
+    const filtered: Notice[] = [];
+    const kept =
+      key === 'allowlistPatterns'
+        ? filterAllowlistPatterns(raw, filtered)
+        : key === 'toolCommands'
+          ? filterToolCommands(raw, filtered)
+          : raw; // `exemptUsers` n'a pas de filtre d'entrée : un login est libre (§8.2).
+    // Le message dit d'OÙ vient l'entrée écartée : sans cela, une administration qui
+    // débogue sa politique lirait un avertissement identique à celui d'un fichier de
+    // dépôt et chercherait au mauvais endroit.
+    for (const n of filtered) notices.push({ ...n, message: `floor: ${n.message}` });
+    out[key] = { minimum: kept, closed: rule?.closed === true };
+  }
+
+  if (out.resolverOverrideGroup !== undefined) {
+    out.resolverOverrideGroup = asStringArray(out.resolverOverrideGroup, 'resolverOverrideGroup', notices);
+  }
+  if (out.labels !== undefined) {
+    out.labels = { minimum: asStringArray(out.labels?.minimum, 'labels.minimum', notices) };
+  }
+
+  return { floor: out, notices, unsupported: false };
 }
 
 export interface FloorApplication {
@@ -61,6 +128,13 @@ export interface FloorApplication {
 
 /**
  * Applique les bornes du plancher à une configuration résolue (§8.1.1, tableau normatif).
+ *
+ * PRÉCONDITION : `floor` sort de `vetFloor()`. C'est là, et là seulement, que la forme du
+ * document est vérifiée et que ses entrées passent leurs filtres ; cette fonction lit
+ * donc `rule.minimum` sans défense. Répéter la normalisation ici donnerait deux
+ * définitions de la même règle, qui finiraient par diverger — le défaut même que la
+ * constante `FLOOR_LIST_KEYS` existe pour empêcher.
+ *
  * `written` — les clés effectivement écrites par un niveau inférieur (org/repo), pour
  * n'émettre `floor-override` que lorsqu'une valeur écrite est ignorée.
  * `skipActivation` — l'exception du §8.1.1 : un durcissement du plancher sur
@@ -150,7 +224,7 @@ export function applyFloor(
   }
 
   // exemptUsers / allowlistPatterns / toolCommands — minimum + closed (§8.1.1).
-  for (const key of ['exemptUsers', 'allowlistPatterns', 'toolCommands'] as const) {
+  for (const key of FLOOR_LIST_KEYS) {
     const rule = floor[key];
     if (!rule) continue;
     if (rule.closed) {

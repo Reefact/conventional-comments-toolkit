@@ -142,10 +142,12 @@ export function renderBanner(
 }
 
 /** Marqueur posé sur un fil de PAGE masqué par ce filtre (`data-cct-filtered`) — jamais sur
- * les `<li>` du bandeau, qui nous appartiennent entièrement. Sert à ne restaurer QUE ce que
- * ce filtre a lui-même masqué (§5.5) : un fil déjà masqué par la plateforme (collapsed,
- * virtualisé) porte son propre `display` en ligne, que ni ce filtre ni un rendu ultérieur
- * ne doivent effacer. */
+ * les `<li>` du bandeau, qui nous appartiennent entièrement. Porte la valeur ORIGINALE de
+ * `style.display` (chaîne vide comprise) capturée juste avant de la remplacer par `none` :
+ * restaurer un simple `''` perdrait un display en ligne non vide posé par la plateforme
+ * (`grid`, `flex`…) pour ses propres raisons de mise en page. Présence de l'attribut —
+ * `!== undefined`, jamais un test de vérité — distingue « masqué par nous » de « jamais
+ * touché », y compris quand la valeur capturée est elle-même la chaîne vide. */
 const FILTERED_MARKER = 'cctFiltered';
 
 /** §5.5 — filtre local par label « dans la liste des fils de discussion » : masque les
@@ -166,13 +168,14 @@ export function applyLabelFilter(
     const el = element as HTMLElement;
     const visible = labelId === null || labelOfThread.get(id) === labelId;
     if (!visible) {
-      el.dataset[FILTERED_MARKER] = 'true';
+      if (el.dataset[FILTERED_MARKER] === undefined) el.dataset[FILTERED_MARKER] = el.style.display;
       el.style.display = 'none';
-    } else if (el.dataset[FILTERED_MARKER]) {
+    } else if (el.dataset[FILTERED_MARKER] !== undefined) {
       // Seulement si CE filtre l'avait masqué : sinon, ne pas toucher à un `display` que la
-      // plateforme porte pour ses propres raisons.
+      // plateforme porte pour ses propres raisons. Restaure la valeur D'ORIGINE, pas une
+      // chaîne vide — un `display: grid` posé par la plateforme doit revenir tel quel.
+      el.style.display = el.dataset[FILTERED_MARKER]!;
       delete el.dataset[FILTERED_MARKER];
-      el.style.display = '';
     }
   }
 }
@@ -184,9 +187,9 @@ export function applyLabelFilter(
 export function clearLabelFilter(renderedThreads: { id: string; element: Element }[]): void {
   for (const { element } of renderedThreads) {
     const el = element as HTMLElement;
-    if (el.dataset[FILTERED_MARKER]) {
+    if (el.dataset[FILTERED_MARKER] !== undefined) {
+      el.style.display = el.dataset[FILTERED_MARKER]!;
       delete el.dataset[FILTERED_MARKER];
-      el.style.display = '';
     }
   }
 }

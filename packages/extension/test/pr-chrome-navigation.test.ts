@@ -48,6 +48,7 @@ import { commentBodyText, type PlatformAdapter, type SubmitControl } from '@cct/
 import { defaultConfig, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver } from '../src/config-resolver.js';
 import { decorateComment } from '../src/ui/badges.js';
+import { applyLabelFilter, clearLabelFilter } from '../src/ui/banner.js';
 import {
   applyCompletionState,
   bootstrap,
@@ -705,6 +706,17 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     // Sans le correctif, le corps relu commencerait par le texte du badge (« 🐛 issue »),
     // cassant la reconnaissance du préfixe par analyze() au tour suivant.
     expect(threads[0]!.root.body).toBe('issue: quelque chose ne va pas');
+
+    // Contrairement aux adaptateurs factices (makeAdapter), currentPr() d'un VRAI
+    // GithubClientAdapter relit `document.location` à chaque appel : le laisser pointer sur
+    // cette PR ferait revivre, à la prochaine mutation, l'observateur dormant armé par
+    // bootstrap() dans le test D1 ci-dessus (même document PARTAGÉ) — sa clé de PR
+    // changerait, `navigated` redeviendrait vrai, et son clearStaleBanner() effacerait le
+    // bandeau d'un test SUIVANT. Neutralise en repointant vers une page sans PR.
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/acme/demo/pulls'),
+      configurable: true,
+    });
   });
 });
 
@@ -782,5 +794,120 @@ describe('applyCompletionState — le titre n’est retiré que s’il a été p
     expect(control.element.hasAttribute('title')).toBe(true);
     applyCompletionState(control, publishedSummary({ state: 'success' }), 'en');
     expect(control.element.hasAttribute('title')).toBe(false);
+  });
+
+  it('ne touche jamais un aria-disabled natif sur un bouton jamais grisé par l’extension (revue Codex, round 2)', () => {
+    // Même défaut que le title, sur aria-disabled : rien ne garantissait qu'un
+    // aria-disabled natif (branche protégée, revue requise…) survive à un dégrisage.
+    const control: SubmitControl = { element: document.createElement('button'), kind: 'complete-pr' };
+    control.element.setAttribute('aria-disabled', 'true'); // état natif de la plateforme
+    applyCompletionState(control, published(0), 'en'); // state 'success' : jamais bloquant pour nous
+    expect(control.element.getAttribute('aria-disabled')).toBe('true'); // intact
+  });
+});
+
+describe('Codex round 2 #2 — le display d’origine est restauré, jamais une chaîne vide (§5.5)', () => {
+  it('applyLabelFilter restaure la valeur D’ORIGINE, pas juste `\'\'`', () => {
+    const el = document.createElement('div');
+    el.style.display = 'flex'; // posé par la plateforme, pour SA mise en page
+    const labelOfThread = new Map([['t1', 'issue']]);
+
+    applyLabelFilter(document.createElement('div'), [{ id: 't1', element: el }], labelOfThread, 'praise');
+    expect(el.style.display).toBe('none'); // masqué par le filtre
+
+    applyLabelFilter(document.createElement('div'), [{ id: 't1', element: el }], labelOfThread, null); // « tous »
+    expect(el.style.display).toBe('flex'); // restauré tel quel, jamais une chaîne vide
+  });
+
+  it('clearLabelFilter restaure aussi la valeur d’origine, y compris quand elle était déjà vide', () => {
+    const el = document.createElement('div');
+    el.style.display = 'grid';
+    const labelOfThread = new Map([['t1', 'issue']]);
+    applyLabelFilter(document.createElement('div'), [{ id: 't1', element: el }], labelOfThread, 'praise');
+    expect(el.style.display).toBe('none');
+    clearLabelFilter([{ id: 't1', element: el }]);
+    expect(el.style.display).toBe('grid');
+
+    const untouched = document.createElement('div'); // jamais filtré : rien à restaurer
+    clearLabelFilter([{ id: 't2', element: untouched }]);
+    expect(untouched.style.display).toBe('');
+  });
+});
+
+describe('Codex round 2 #6 — cesse de sonder le bouton de complétion après la fenêtre d’hydratation (§9.4)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('un bouton jamais présent ne fait grossir SelectorLog.failures qu’à l’intérieur de la fenêtre, jamais après', async () => {
+    // getCompletionControl() journalise une dégradation de sélecteur à chaque appel où il
+    // ne trouve rien (§9.4) — un bouton absent est la norme sur une PR fermée ou sans
+    // droit de fusion, pas une dégradation. L'inclure dans une signature recalculée à
+    // chaque mutation, pour toute la durée de vie de l'onglet, ferait grossir ce journal
+    // (et la télémétrie opt-in) sans borne.
+    const doc = document;
+    const current = pr(25);
+    let completionCalls = 0;
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+      getCompletionControl: () => {
+        completionCalls++;
+        return null; // jamais de bouton sur cette PR
+      },
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+    const clock = makeClock();
+
+    observePrChromeNavigation(adapter, resolver, doc, clock.now);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1); // affichée dès le premier rendu
+    const callsWithinWindow = completionCalls;
+    expect(callsWithinWindow).toBeGreaterThan(0);
+
+    // Hors fenêtre : au plus UNE relecture de transition (la mutation suivante voit encore
+    // l'ancienne signature, sondée une dernière fois) — jamais une par mutation ensuite.
+    clock.advance(RENDER_RETRY_WINDOW_MS + 1000);
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+    expect(completionCalls).toBeLessThanOrEqual(callsWithinWindow + 1);
+
+    const settled = completionCalls;
+    for (let i = 0; i < 10; i++) {
+      doc.body.appendChild(doc.createElement('span'));
+      await flushAll();
+    }
+    expect(completionCalls).toBe(settled); // vraiment plus rien, quel que soit le nombre de mutations
+  });
+});
+
+describe('Codex round 2 #7 — les badges posés pendant que le mode était actif sont retirés au passage à off (§7)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('un badge posé avant le passage à off ne reste pas affiché par une extension censée être inactive', async () => {
+    const doc = document;
+    const current = pr(26);
+    let configText = '{}'; // défauts : mode assist
+    const commentEl = doc.createElement('div');
+    doc.body.appendChild(commentEl); // clearBadges() interroge le document entier, pas un élément détaché
+    let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
+    const adapter = makeAdapter(() => current, () => currentPublished, {
+      getRenderedComments: () => [{ element: commentEl, bodyText: 'issue: quelque chose ne va pas' }],
+    });
+    adapter.getRepoConfig = async () => ({ status: 'found', text: configText });
+    let resolverNow = 0;
+    const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+    expect(commentEl.querySelector('.cct-badge')).not.toBeNull();
+
+    configText = JSON.stringify({ mode: 'off' });
+    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    resolverNow += 3601 * 1000; // dépasse le TTL du cache de configuration (§8.1.2)
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect(commentEl.querySelector('.cct-badge')).toBeNull();
   });
 });

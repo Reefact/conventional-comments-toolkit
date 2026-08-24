@@ -85,3 +85,24 @@ export function defaultConfig(): EffectiveConfig {
     telemetry: { enabled: false, endpoint: null },
   };
 }
+
+/**
+ * Complète un document `EffectiveConfig` **relu du stockage** (§6.4) par les valeurs par
+ * défaut du produit. Deux documents sont persistés — la configuration épinglée d'une PR et
+ * la dernière configuration effective connue d'un dépôt —, tous deux écrits par la version
+ * de `core/` qui tournait alors et relus par `JSON.parse` sans normalisation, sur les deux
+ * backends. Une clé ajoutée au §8.2 depuis l'écriture y est donc ABSENTE, et le premier
+ * consommateur qui la lit lève : `fingerprint()` sur un `.map()`, le mélange du §8.1.3 sur
+ * une union de listes.
+ *
+ * À appeler à la **frontière de désérialisation**, jamais au cas par cas chez les
+ * consommateurs : c'est ce qui rend le correctif vrai pour toute clé future, et pour tout
+ * consommateur — présent ou à venir — d'un document persisté.
+ *
+ * Compléter est le comportement juste, et pas seulement le comportement sûr : une clé qui
+ * n'existait pas au moment de l'écriture n'a jamais pu être configurée sur ce dépôt ni sur
+ * cette PR, et sa valeur par défaut est exactement ce sous quoi ils ont été jugés jusque-là.
+ */
+export function completeStoredConfig(stored: EffectiveConfig): EffectiveConfig {
+  return { ...defaultConfig(), ...stored };
+}

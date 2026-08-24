@@ -1452,6 +1452,85 @@ describe('§5.5 — révocation et pliage (revue Codex round 3, PR #26)', () => 
   });
 });
 
+describe('§5.5 — révocation complète et pliage remis à neuf (revue Codex round 4, PR #26)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.unstubAllGlobals();
+  });
+
+  it('un bandeau replié puis DISPARU repart sur son défaut quand un fil bloquant revient', async () => {
+    // Le choix de l'utilisateur portait sur une situation qui n'existe plus : entre-temps le
+    // décompte est retombé à zéro et le bandeau s'est effacé. Un nouveau fil bloquant est une
+    // nouvelle, et mérite le défaut déplié — sans quoi il arriverait replié, inaperçu.
+    const doc = document;
+    const current = pr(70);
+    let currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
+    const adapter = makeAdapter(() => current, () => currentPublished);
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+
+    const banner = doc.querySelector('.cct-banner') as HTMLDetailsElement;
+    expect(banner.open).toBe(true);
+    banner.open = false; // l'utilisateur le replie
+    banner.dispatchEvent(new Event('toggle'));
+
+    // Tout est résolu : plus de bandeau du tout.
+    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0);
+
+    // Un nouveau fil bloquant apparaît sur la MÊME PR.
+    currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+
+    expect((doc.querySelector('.cct-banner') as HTMLDetailsElement).open).toBe(true);
+  });
+
+  it('la révocation de bootstrap() rend AUSSI l’observation des éditeurs', async () => {
+    // Elle n'en rendait qu'une : les éditeurs apparus ensuite recevaient encore un
+    // contrôleur, et deux bootstrap() successifs en empilaient deux par éditeur.
+    const doc = document;
+    Object.defineProperty(doc, 'location', {
+      value: new URL('https://github.com/acme/demo/pull/80'),
+      configurable: true,
+    });
+    doc.body.innerHTML = '';
+
+    // Le `Disposable` d'observeEditors était simplement jeté : la révocation ne rendait que
+    // l'observation du bandeau. On l'observe directement plutôt qu'à travers une barre
+    // d'outils, dont le rendu dépend d'un DOM de PR complet sans rapport avec ce constat.
+    const disposeEditors = vi.fn();
+    let onEditor: ((editor: unknown) => void) | null = null;
+    const observeEditors = vi
+      .spyOn(GithubClientAdapter.prototype, 'observeEditors')
+      .mockImplementation((cb: (editor: never) => void) => {
+        onEditor = cb as (editor: unknown) => void;
+        return { dispose: disposeEditors };
+      });
+    const readRepoConfig = vi.spyOn(GithubClientAdapter.prototype, 'getRepoConfig');
+
+    const dispose = await bootstrap(doc);
+    expect(observeEditors).toHaveBeenCalled();
+    expect(disposeEditors).not.toHaveBeenCalled();
+
+    dispose();
+    expect(disposeEditors).toHaveBeenCalledTimes(1); // l'observation des éditeurs est rendue
+
+    // Et un éditeur signalé malgré tout après coup ne déclenche plus rien : `attach()`
+    // traverse plusieurs `await` avant d'installer, il doit renoncer dès le premier pas.
+    await flushAll(); // laisse retomber le rendu de bandeau encore en vol, qui lit lui aussi la config
+    readRepoConfig.mockClear();
+    onEditor!({ element: doc.createElement('textarea'), context: { pr: null, zone: 'conversation' } });
+    await flushAll();
+    expect(readRepoConfig).not.toHaveBeenCalled();
+
+    observeEditors.mockRestore();
+    readRepoConfig.mockRestore();
+  });
+});
+
 describe('Codex round 4 — la signature de reprise sonde le COMPTE de commentaires, jamais leur corps (§9.4)', () => {
   afterEach(() => {
     document.body.innerHTML = '';

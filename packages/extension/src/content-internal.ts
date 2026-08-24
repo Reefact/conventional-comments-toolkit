@@ -100,9 +100,11 @@ async function readDirectShortcuts(): Promise<Record<string, string>> {
   });
 }
 
-/** Renvoie de quoi révoquer l'observation armée ici. Sans emploi en production — elle vit
- * le temps de l'onglet — mais un appelant qui n'est pas un onglet doit pouvoir la rendre :
- * deux observations sur le même document se répondent l'une à l'autre. */
+/** Renvoie de quoi révoquer les DEUX observations armées ici — celle des éditeurs (§5.1) et
+ * celle du bandeau (§5.5). Sans emploi en production, où elles vivent le temps de l'onglet,
+ * mais un appelant qui n'est pas un onglet doit pouvoir les rendre : deux observations sur
+ * le même document se répondent l'une à l'autre, et deux `bootstrap()` successifs
+ * empileraient un contrôleur par éditeur (revue Codex, PR #26). */
 export async function bootstrap(doc: Document = document): Promise<() => void> {
   const url = new URL(doc.location.href);
   // Un seul produit, un adaptateur par plateforme, activé sur les hôtes autorisés (§2).
@@ -122,7 +124,13 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   const resolver = new ClientConfigResolver(readManagedFloor);
   const currentUser = await adapter.getCurrentUser();
 
+  // Révoqué : plus aucun contrôleur ne doit s'attacher. Comme pour le rendu du bandeau,
+  // déconnecter l'observateur ne suffit pas — un `attach()` déjà parti traverse plusieurs
+  // `await` avant d'installer quoi que ce soit, et aboutirait après la révocation.
+  let disposed = false;
+
   const attach = async (editor: Parameters<Parameters<PlatformAdapter['observeEditors']>[0]>[0]) => {
+    if (disposed) return;
     // Résolution hors chemin critique : la NFR d'injection porte sur l'appel du cb (§10).
     const resolved = await resolver.resolve(adapter, editor.context.pr);
     writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
@@ -138,17 +146,23 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
       currentUserLogin: currentUser.login,
       directShortcuts: await readDirectShortcuts(), // §5.2 — préférence locale (§8.1.2)
     });
+    if (disposed) return; // révoqué pendant les lectures ci-dessus : ne rien installer
     controller.attach();
   };
 
-  adapter.observeEditors((editor) => void attach(editor));
+  const editors = adapter.observeEditors((editor) => void attach(editor));
 
   // Bandeau (§5.5) et grisage du bouton de complétion (§6.5) — ré-armés à chaque
   // navigation SPA vers un contexte de PR différent, pas seulement au chargement initial
   // du script : Turbo/React ne rechargent pas le document, donc sans ce ré-armement la
   // barre reste absente d'une PR atteinte par un lien interne tant qu'un rechargement
   // complet ne relance pas bootstrap().
-  return observePrChromeNavigation(adapter, resolver, doc);
+  const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc);
+  return () => {
+    disposed = true;
+    editors.dispose();
+    stopPrChrome();
+  };
 }
 
 function currentPrOf(adapter: PlatformAdapter): PrRef | null {
@@ -412,6 +426,10 @@ export function observePrChromeNavigation(
       set: (open) => {
         bannerOpen = open;
       },
+      clear: () => {
+        bannerOpen = null;
+        bannerBlocked = null;
+      },
     })
       .then((showed) => {
         if (key !== lastPrKey) return; // supplanté par une navigation : ce rendu ne fait plus foi
@@ -475,9 +493,14 @@ async function renderPrChrome(
   // Pliage du bandeau, même raison et même portée que `filterState` (§5.5) : `resolve` rend
   // l'ouverture à appliquer pour la situation courante, `set` enregistre un choix de
   // l'utilisateur.
-  bannerState: { resolve: (blocksMerge: boolean) => boolean; set: (open: boolean) => void } = {
+  bannerState: {
+    resolve: (blocksMerge: boolean) => boolean;
+    set: (open: boolean) => void;
+    clear: () => void;
+  } = {
     resolve: (blocksMerge) => blocksMerge,
     set: () => {},
+    clear: () => {},
   }
 ): Promise<boolean> {
   const clearStaleBanner = () => {
@@ -547,6 +570,13 @@ async function renderPrChrome(
   // bloquants — une page sans fil bloquant mais avec des fils reste filtrable (composant B
   // non déployé compris, §10). Ce que chacune des deux surfaces affiche ensuite est décidé
   // séparément : le bandeau se tait sur un décompte nul, le filtre n'existe pas sans fil.
+  // Le bandeau disparaît (décompte retombé à zéro) : le choix de pliage s'efface avec lui.
+  // Sans cela, un fil bloquant APPARU ENSUITE rouvrirait sur la décision que l'utilisateur
+  // avait prise pour la situation précédente — repliée — au lieu de son défaut déplié : le
+  // caractère bloquant n'aurait pas « changé » entre les deux rendus qui portent un bandeau
+  // (revue Codex, PR #26).
+  if (!bannerHasContent(model)) bannerState.clear();
+
   const hasSomethingToShow = model.count > 0 || published !== null || threads.length > 0;
   if (hasSomethingToShow) {
     const labelOfThread = new Map<string, string | null>();

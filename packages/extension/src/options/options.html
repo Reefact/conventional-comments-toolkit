@@ -24,8 +24,17 @@
       <label>
         Ajouter un domaine :
         <input type="text" id="host-input" placeholder="ghes.example.interne" />
+        <select id="host-platform">
+          <option value="github">GitHub Enterprise Server / GHE Cloud (résidence)</option>
+          <option value="azdo">Azure DevOps Server</option>
+          <option value="">Autre (hôte de configuration d'organisation uniquement)</option>
+        </select>
         <button id="host-add" type="button">Autoriser</button>
       </label>
+      <p>
+        La plateforme choisie détermine quel adaptateur reconnaît ce domaine — un domaine
+        autorisé mais non associé n'active aucune interface (§2).
+      </p>
       <ul id="host-list" aria-live="polite"></ul>
     </fieldset>
 

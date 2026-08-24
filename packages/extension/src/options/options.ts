@@ -16,28 +16,101 @@ declare const chrome: {
     };
     local?: {
       get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
+      set: (items: Record<string, unknown>) => void;
     };
   };
 } | undefined;
 
-function refreshHosts(): void {
+const PLATFORM_LABELS: Record<string, string> = {
+  github: 'GitHub Enterprise Server / GHE Cloud',
+  azdo: 'Azure DevOps Server',
+};
+
+function hostnameOfOrigin(origin: string): string | null {
+  try {
+    return new URL(origin.replace(/\*$/, '')).hostname;
+  } catch {
+    return null;
+  }
+}
+
+function readHostPlatforms(): Promise<Record<string, string>> {
+  return new Promise((resolve) => {
+    if (!chrome?.storage?.local) return resolve({});
+    chrome.storage.local.get(['hostPlatforms'], (items) => {
+      resolve((items['hostPlatforms'] as Record<string, string> | undefined) ?? {});
+    });
+  });
+}
+
+function setHostPlatform(host: string, platform: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (!chrome?.storage?.local) return resolve();
+    readHostPlatforms().then((tags) => {
+      const next = { ...tags };
+      if (platform) next[host] = platform;
+      else delete next[host];
+      chrome!.storage!.local!.set({ hostPlatforms: next });
+      resolve();
+    });
+  });
+}
+
+/** github.com est couvert par `content_scripts` (§2) et jamais renvoyé par
+ * `chrome.permissions.getAll()` en tant qu'octroi optionnel : rien à étiqueter pour lui. */
+async function refreshHosts(): Promise<void> {
   const list = document.getElementById('host-list');
   if (!list || !chrome?.permissions) return;
-  chrome.permissions.getAll((perms) => {
-    list.textContent = '';
-    for (const origin of perms.origins ?? []) {
-      const li = document.createElement('li');
+  const [perms, tags] = await Promise.all([
+    new Promise<{ origins?: string[] }>((resolve) => chrome!.permissions!.getAll(resolve)),
+    readHostPlatforms(),
+  ]);
+  list.textContent = '';
+  for (const origin of perms.origins ?? []) {
+    const host = hostnameOfOrigin(origin);
+    const li = document.createElement('li');
+    if (!host) {
       li.textContent = origin;
       list.appendChild(li);
+      continue;
     }
-  });
+    const known = tags[host];
+    if (known) {
+      li.textContent = `${host} — ${PLATFORM_LABELS[known] ?? known}`;
+      list.appendChild(li);
+      continue;
+    }
+    // Octroi antérieur à cette étiquette (ou jamais confirmé) : ni GithubClientAdapter ni
+    // AzdoClientAdapter ne reconnaît ce domaine tant qu'il n'est pas associé (§2). Un
+    // sélecteur de rattrapage évite d'exiger un nouveau geste `permissions.request`.
+    li.append(`${host} — plateforme non précisée : `);
+    const select = document.createElement('select');
+    for (const [value, label] of Object.entries(PLATFORM_LABELS)) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      select.appendChild(opt);
+    }
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.textContent = 'Confirmer';
+    confirm.addEventListener('click', () => {
+      void setHostPlatform(host, select.value).then(() => void refreshHosts());
+    });
+    li.append(select, confirm);
+    list.appendChild(li);
+  }
 }
 
 document.getElementById('host-add')?.addEventListener('click', () => {
   const input = document.getElementById('host-input') as HTMLInputElement | null;
+  const platformSelect = document.getElementById('host-platform') as HTMLSelectElement | null;
   const host = input?.value.trim();
   if (!host || !chrome?.permissions) return;
-  chrome.permissions.request({ origins: [`https://${host}/*`] }, () => refreshHosts());
+  chrome.permissions.request({ origins: [`https://${host}/*`] }, (granted) => {
+    if (!granted) return;
+    void setHostPlatform(host, platformSelect?.value ?? '').then(() => void refreshHosts());
+  });
 });
 
 const language = document.getElementById('language') as HTMLSelectElement | null;
@@ -100,4 +173,4 @@ chrome?.storage?.local?.get(['degradedState', 'selectorFailures'], (items) => {
   }
 });
 
-refreshHosts();
+void refreshHosts();

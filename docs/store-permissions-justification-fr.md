@@ -91,14 +91,29 @@ pour l'option 1, s'écarte du jeu de permissions énuméré par
 
 ### `host_permissions`: `https://github.com/*`
 
-**Usage :** lire et modifier le DOM des pages GitHub pour y injecter la
-barre d'outils, valider les commentaires en cours de rédaction et lire
-l'état des fils de discussion affiché par la page.
+**⚠️ Statut à trancher avant soumission — même famille de problème que
+`activeTab` ci-dessus.** Vérifié dans le code : cette permission statique
+n'est probablement **pas ce qui active** l'injection sur GitHub.
+- L'injection de la barre d'outils est déjà couverte par
+  `content_scripts.matches: ["https://github.com/*"]` du manifeste, qui
+  suffit à lui seul en MV3 — sans avoir besoin d'une entrée
+  correspondante dans `host_permissions`.
+- La lecture de `.conventional-comments.json`
+  (`getRepoConfig()`/`getOrgConfig()`) est une requête **same-origin**
+  (le script de contenu tourne déjà sur `github.com` et interroge
+  `github.com`) : elle ne franchit aucune frontière CORS et ne dépend
+  donc pas de `host_permissions`.
+- `registerContentScriptForOrigin()` (`background.ts`) **exclut
+  explicitement** `https://github.com/*` de son mécanisme d'activation
+  dynamique — cette permission statique n'est le déclencheur d'aucun
+  chemin de code identifié.
 
-**Justification :** GitHub est la plateforme cible principale de
-l'extension (§1 de la spécification fonctionnelle) ; la permission est
-statique parce que l'usage est systématique dès l'installation, sans
-étape de consentement supplémentaire à chaque session.
+**Ce qui reste à trancher :** soit un usage réel existe et manque
+d'être documenté ici, soit cette entrée est un legs redondant avec
+`content_scripts.matches` qu'un reviewer Google est en droit de
+questionner. Vérifier avant de soumettre, plutôt que de reconduire la
+justification précédente ("lire et modifier le DOM… injecter la barre
+d'outils") qui décrit un besoin déjà couvert ailleurs.
 
 ### `optional_host_permissions`: `https://*/*`
 

@@ -17,10 +17,12 @@ export { FeedbackView } from './ui/feedback.js';
 export {
   buildBannerModel,
   renderBanner,
+  bannerHasContent,
   localBlockingUnresolved,
-  applyLabelFilter,
+  type BannerAnchor,
   type BannerModel,
 } from './ui/banner.js';
+export { renderThreadFilter, applyLabelFilter, clearLabelFilter } from './ui/thread-filter.js';
 export { decorateComment } from './ui/badges.js';
 export { bootstrap, applyCompletionState, writeDegradedState, mergeDirectShortcuts } from './content-internal.js';
 export { ui } from './ui/strings.js';

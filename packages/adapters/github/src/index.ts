@@ -230,6 +230,13 @@ export class GithubClientAdapter implements PlatformAdapter {
     return queryChainAll(this.#doc, selectors.commentBody).length;
   }
 
+  /** Élément après lequel insérer le bandeau (§5.5) — surface d'affichage, hors du contrat
+   * normatif §9.2.3. Null quand rien n'apparie : l'appelant se replie sur le haut du
+   * document plutôt que de ne rien afficher. */
+  getBannerMount(): Element | null {
+    return queryChain(this.#doc, selectors.bannerMount).element;
+  }
+
   /** Conteneurs de fils rendus, pour le filtre local du §5.5 — même dérivation
    * d'identifiant que getThreads(), même surface d'affichage hors contrat. */
   getRenderedThreadElements(): { id: string; element: Element }[] {

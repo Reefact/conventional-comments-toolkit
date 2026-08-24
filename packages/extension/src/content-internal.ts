@@ -16,7 +16,8 @@ import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage } from './config-resolver.js';
 import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
-import { applyLabelFilter, buildBannerModel, clearLabelFilter, renderBanner } from './ui/banner.js';
+import { bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
+import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
 import { decorateComment } from './ui/badges.js';
 import { ui } from './ui/strings.js';
 
@@ -151,6 +152,13 @@ function currentPrOf(adapter: PlatformAdapter): PrRef | null {
   return (adapter as GithubClientAdapter | AzdoClientAdapter).currentPr?.() ?? null;
 }
 
+/** Élément après lequel monter le bandeau (§5.5) — surface d'affichage, hors contrat
+ * §9.2.3 : un adaptateur qui ne l'expose pas laisse le repli sur le haut du document. */
+function bannerMountOf(adapter: PlatformAdapter): Element | null {
+  const withMount = adapter as PlatformAdapter & { getBannerMount?: () => Element | null };
+  return withMount.getBannerMount?.() ?? null;
+}
+
 function renderedThreadsOf(adapter: PlatformAdapter): { id: string; element: Element }[] {
   const withRenderedThreads = adapter as PlatformAdapter & {
     getRenderedThreadElements?: () => { id: string; element: Element }[];
@@ -267,8 +275,8 @@ export function observePrChromeNavigation(
   let missedMutation = false;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   // Filtre par label choisi par l'utilisateur (§5.5) — vit ICI, pas dans renderPrChrome (qui
-  // reconstruit le bandeau à chaque appel, y compris sur la MÊME PR une fois D3 en jeu) : sans
-  // cet état, chaque rendu répété repartirait sur « tous », perdant la sélection.
+  // reconstruit la barre de puces à chaque appel, y compris sur la MÊME PR une fois D3 en
+  // jeu) : sans cet état, chaque rendu répété repartirait sur « tous », perdant la sélection.
   let selectedLabel: string | null = null;
 
   const run = (): void => {
@@ -347,8 +355,8 @@ async function renderPrChrome(
   // navigation observée) toujours actuel.
   isCurrent: () => boolean = () => true,
   // Filtre par label persistant à travers les rendus répétés sur la MÊME PR (§5.5) — porté
-  // par observePrChromeNavigation, jamais par cette fonction qui reconstruit le bandeau (et
-  // son `<select>`) depuis rien à chaque appel.
+  // par observePrChromeNavigation, jamais par cette fonction qui reconstruit la barre de
+  // puces depuis rien à chaque appel.
   filterState: { get: () => string | null; set: (label: string | null) => void } = {
     get: () => null,
     set: () => {},
@@ -356,13 +364,14 @@ async function renderPrChrome(
 ): Promise<boolean> {
   const clearStaleBanner = () => {
     // Un fil masqué par le filtre local du §5.5 (applyLabelFilter) porte un `display:
-    // none` posé sur l'élément de PAGE, pas sur le bandeau qu'on s'apprête à retirer : un
-    // nouveau bandeau reconstruit son propre filtre (remis sur « tous »), mais sans ce
-    // geste les fils resteraient masqués pour rien, orphelins du filtre qui les a cachés.
+    // none` posé sur l'élément de PAGE, pas sur la barre qu'on s'apprête à retirer : une
+    // barre reconstruite repart sur « tous », mais sans ce geste les fils resteraient
+    // masqués pour rien, orphelins du filtre qui les a cachés.
     // clearLabelFilter ne touche QUE ce que ce filtre avait lui-même masqué — jamais un
     // `display` que la plateforme porte pour ses propres raisons (fil réduit, virtualisé).
     clearLabelFilter(renderedThreadsOf(adapter));
     for (const stale of doc.querySelectorAll('.cct-banner')) stale.remove();
+    for (const stale of doc.querySelectorAll('.cct-thread-filter')) stale.remove();
   };
   // Retire les badges posés par un rendu antérieur (§5.5) — seulement quand on quitte le
   // contexte qui les justifiait (plus de PR, ou extension désactivée) : un rendu normal
@@ -415,10 +424,11 @@ async function renderPrChrome(
     profile.id,
     profile.suggestionInfoString
   );
-  // Le bandeau se rend dès qu'il y a quelque chose à montrer OU à filtrer : le filtre
-  // par label du §5.5 porte sur la liste des fils, pas sur les seuls fils bloquants —
-  // une page sans fil bloquant mais avec des fils reste filtrable (composant B non
-  // déployé compris, §10).
+  // Le rendu a une issue définitive dès qu'il y a quelque chose à montrer OU à filtrer :
+  // le filtre par label du §5.5 porte sur la liste des fils, pas sur les seuls fils
+  // bloquants — une page sans fil bloquant mais avec des fils reste filtrable (composant B
+  // non déployé compris, §10). Ce que chacune des deux surfaces affiche ensuite est décidé
+  // séparément : le bandeau se tait sur un décompte nul, le filtre n'existe pas sans fil.
   const hasSomethingToShow = model.count > 0 || published !== null || threads.length > 0;
   if (hasSomethingToShow) {
     const labelOfThread = new Map<string, string | null>();
@@ -436,30 +446,54 @@ async function renderPrChrome(
       );
       labelOfThread.set(t.id, a.resolved?.label.id ?? null);
     }
-    // Fils rendus sur la page — surface d'affichage, hors contrat §9.2.3 : le filtre les
-    // masque AUSSI, pas seulement les ancres du bandeau (§5.5).
-    const enabledLabelIds = enabledLabels(resolved.config).map((l) => l.id);
+
+    if (bannerHasContent(model)) {
+      const banner = renderBanner(model, published, lang);
+      // « En tête de PR » (§5.5) : après l'en-tête que l'adaptateur désigne, donc dans le
+      // flux de la page. Le repli sur le haut du document ne vaut que si rien n'apparie —
+      // au-dessus du chrome de la plateforme, un encart flottant se lit comme une greffe,
+      // pas comme une partie de la PR.
+      const mount = bannerMountOf(adapter);
+      if (mount?.parentNode) mount.insertAdjacentElement('afterend', banner);
+      else doc.body.insertAdjacentElement('afterbegin', banner);
+    }
+
+    // Filtre local par label, « dans la liste des fils de discussion » (§5.5) : en tête des
+    // fils rendus, jamais dans le bandeau. Seuls les labels effectivement PRÉSENTS sur la
+    // page sont proposés — filtrer sur un label qu'aucun fil ne porte ne masquerait que
+    // tout, et treize puces pour trois fils sont un décor, pas un outil.
+    const rendered = renderedThreadsOf(adapter);
+    const present = new Set([...labelOfThread.values()].filter((id): id is string => id !== null));
+    const filterLabelIds = enabledLabels(resolved.config)
+      .map((l) => l.id)
+      .filter((id) => present.has(id));
     let selectedLabel = filterState.get();
-    if (selectedLabel !== null && !enabledLabelIds.includes(selectedLabel)) {
-      // Une configuration rafraîchie sur la MÊME PR (§5.5, revue Codex round 5) a désactivé
-      // le label sélectionné : le `<select>` reconstruit retombe sur « tous » (aucune
-      // `<option>` ne correspond) — la sélection mémorisée doit suivre, sous peine de
-      // continuer à filtrer sur un label fantôme pendant que l'affichage dit « tous ».
+    if (selectedLabel !== null && !filterLabelIds.includes(selectedLabel)) {
+      // Le label sélectionné a disparu des puces reconstruites — configuration rafraîchie
+      // sur la MÊME PR (§5.5, revue Codex round 5), ou dernier fil qui le portait résolu :
+      // la sélection mémorisée doit suivre, sous peine de continuer à filtrer sur un label
+      // fantôme pendant que l'affichage dit « tous ».
       selectedLabel = null;
       filterState.set(null);
     }
-    const banner = renderBanner(model, published, lang, {
-      filterLabels: enabledLabelIds,
-      selectedLabel,
-      onFilter: (labelId) => {
-        filterState.set(labelId);
-        applyLabelFilter(banner, renderedThreadsOf(adapter), labelOfThread, labelId);
-      },
-    });
-    // Réapplique le filtre restauré aux fils de PAGE — renderBanner n'a positionné que le
-    // `<select>` lui-même, pas le `display` des fils/ancres (§5.5).
-    if (selectedLabel !== null) applyLabelFilter(banner, renderedThreadsOf(adapter), labelOfThread, selectedLabel);
-    doc.body.insertAdjacentElement('afterbegin', banner);
+    if (rendered.length > 0 && filterLabelIds.length > 0) {
+      const filter = renderThreadFilter({
+        labels: filterLabelIds,
+        lang,
+        selected: selectedLabel,
+        onSelect: (labelId) => {
+          filterState.set(labelId);
+          applyLabelFilter(renderedThreadsOf(adapter), labelOfThread, labelId);
+          for (const chip of filter.querySelectorAll('.cct-filter-chip')) {
+            chip.setAttribute('aria-pressed', String((chip as HTMLElement).dataset['label'] === (labelId ?? '')));
+          }
+        },
+      });
+      rendered[0]!.element.insertAdjacentElement('beforebegin', filter);
+      // Réapplique le filtre restauré aux fils de PAGE — renderThreadFilter n'a positionné
+      // que l'état des puces, pas le `display` des fils (§5.5).
+      if (selectedLabel !== null) applyLabelFilter(rendered, labelOfThread, selectedLabel);
+    }
   }
 
   // Badges des commentaires publiés (§5.5) — rendu visuel, contenu stocké intact.

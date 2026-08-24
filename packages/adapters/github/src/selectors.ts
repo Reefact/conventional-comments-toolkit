@@ -131,6 +131,14 @@ export const selectors = {
     candidates: ['.gh-header-meta relative-time', '[data-testid="pr-header"] relative-time', 'relative-time'],
   } satisfies SelectorChain,
 
+  /** Élément après lequel insérer le bandeau du §5.5 : « en tête de PR » — dans le flux de
+   * la page, sous le titre, et non au-dessus du chrome de la plateforme. Rien n'apparie sur
+   * une page hors PR : l'appelant se replie alors sur le haut du document. */
+  bannerMount: {
+    name: 'banner-mount',
+    candidates: ['[data-testid="pr-header"]', '.gh-header-show', '.gh-header'],
+  } satisfies SelectorChain,
+
   /** Titres de checks rendus sur la page — c'est là que vit la ligne cc/1 (§6.3.1, §A.8). */
   checkRunTitles: {
     name: 'check-run-titles',

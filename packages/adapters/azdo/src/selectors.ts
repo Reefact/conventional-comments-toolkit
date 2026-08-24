@@ -53,6 +53,13 @@ export const selectors = {
     candidates: ['.bolt-header-user-avatar img[alt]', 'img.user-avatar[alt]'],
   } satisfies SelectorChain,
 
+  /** Élément après lequel insérer le bandeau du §5.5 : « en tête de PR » — dans le flux de
+   * la page, sous le titre, et non au-dessus du chrome de la plateforme. */
+  bannerMount: {
+    name: 'banner-mount',
+    candidates: ['.repos-pr-header', '.vc-pullrequest-header'],
+  } satisfies SelectorChain,
+
   prCreatedAt: {
     name: 'pr-created-at',
     candidates: ['.repos-pr-header time', 'time[datetime]'],

@@ -82,15 +82,22 @@ export class EditorController {
     // Sur le DOM hérité de GitHub et sur Azure DevOps, la zone de saisie porte sa propre
     // bordure et son propre padding ; y poser ce retrait décalerait le conteneur sans
     // corriger l'alignement visé, et effacerait à tort le padding qui donne sa forme au champ.
-    const isModernReactComposer =
-      this.deps.editor.element.className.includes('CommentBox') ||
-      this.deps.editor.element.closest('[data-testid*="comment-composer"]') !== null;
-    if (isModernReactComposer) {
-      host.classList.add('cct-host');
-      this.#disposers.push(() => host.classList.remove('cct-host'));
+    //
+    // Le composeur `data-testid` est un sélecteur DESCENDANT (`div[...] textarea`, sans
+    // combinateur d'enfant direct) : la zone de saisie peut y être nichée sous un wrapper
+    // intermédiaire, distinct de `host`. Le conteneur à padder est donc l'ancêtre réellement
+    // trouvé par ce sélecteur — pas `host` — pour que l'en-tête et les onglets natifs, situés
+    // au même niveau que ce wrapper, reçoivent eux aussi le retrait.
+    const commentBoxContainer = this.deps.editor.element.closest('[data-testid*="comment-composer"]');
+    const paddedContainer = commentBoxContainer ?? (this.deps.editor.element.className.includes('CommentBox') ? host : null);
+    if (paddedContainer) {
+      paddedContainer.classList.add('cct-host');
+      this.#disposers.push(() => paddedContainer.classList.remove('cct-host'));
       // La zone de saisie se donne souvent son propre retrait horizontal (sur GitHub,
       // `.CommentBox-input` porte `padding: var(--base-size-8)`), qui ferait double emploi
-      // avec celui du conteneur et désalignerait son texte du reste. Neutralisé en CSS.
+      // avec celui du conteneur et désalignerait son texte du reste. Neutralisé en CSS ; la
+      // règle correspondante (styles.css) cible un descendant, pas seulement un enfant
+      // direct, pour couvrir aussi ce wrapper intermédiaire.
       this.deps.editor.element.classList.add('cct-editor');
       this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-editor'));
     }

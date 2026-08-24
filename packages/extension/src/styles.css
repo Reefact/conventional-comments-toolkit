@@ -34,8 +34,11 @@
 }
 
 /* Le retrait du conteneur remplace celui que la zone de saisie se donnait : les deux
-   cumulés porteraient son texte deux fois plus loin que la barre d'outils. */
-.cct-host > .cct-editor {
+   cumulés porteraient son texte deux fois plus loin que la barre d'outils. Combinateur
+   descendant, et non enfant direct : sur le composeur React reconnu par data-testid
+   (editor-controller.ts), la zone de saisie peut être nichée sous un wrapper intermédiaire
+   entre elle et le conteneur qui porte `cct-host`. */
+.cct-host .cct-editor {
   padding-left: 0;
   padding-right: 0;
 }

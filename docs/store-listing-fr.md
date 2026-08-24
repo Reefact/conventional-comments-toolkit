@@ -104,3 +104,15 @@ priorité pour la fiche store :
 
 Format recommandé par Chrome Web Store : 1280×800 ou 640×400, PNG ou JPEG,
 jusqu'à 5 captures.
+
+**Si le bandeau « Configuration non lue » apparaît sur la capture**, ce
+n'est **pas** parce que le dépôt n'a pas de `.conventional-comments.json`.
+`ClientConfigResolver` ne passe en état dégradé (§5.4) que lorsqu'une
+lecture rend `unreachable` ; un fichier **absent** rend `absent`, avec
+`degraded: false`, et n'affiche aucun bandeau — conformément au §10
+(« un fichier simplement absent est un cas nominal, pas une
+dégradation »). Le bandeau signale donc un `fetch` réellement en échec
+sur `https://{hôte}/{owner}/{repo}/raw/HEAD/.conventional-comments.json`
+(erreur réseau, ou statut HTTP autre que 404) : c'est cette requête qu'il
+faut inspecter dans l'onglet réseau, et **ajouter un fichier de
+configuration ne le fera pas disparaître**.

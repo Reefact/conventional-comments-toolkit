@@ -1,6 +1,7 @@
-/* Styles de l'extension — thèmes clair/sombre respectés via les variables de la
-   plateforme quand elles existent, prefers-reduced-motion respecté (§10). Hauteur
-   réservée pour la pastille : aucun layout shift pendant la frappe (§5.3). */
+/* Styles de l'extension — thèmes clair/sombre respectés via les variables Primer de
+   GitHub quand elles existent (repli sur les variables de la plateforme sinon),
+   prefers-reduced-motion respecté (§10). Hauteur réservée pour la pastille : aucun
+   layout shift pendant la frappe (§5.3). */
 
 .cct-toolbar {
   display: flex;
@@ -11,43 +12,60 @@
 }
 
 .cct-label-button {
-  border: 1px solid var(--cct-label-color, currentColor);
-  border-radius: 6px;
-  padding: 2px 8px;
-  background: transparent;
+  border: 1px solid var(--cct-label-color, var(--borderColor-default, currentColor));
+  border-radius: var(--borderRadius-medium, 6px);
+  padding: 3px 10px;
+  background: var(--color-canvas-default, transparent);
+  color: var(--color-fg-default, currentColor);
   cursor: pointer;
   font-size: 12px;
 }
 
 .cct-label-button[aria-pressed='true'] {
-  background: var(--cct-label-color, ButtonFace);
-  color: Canvas;
+  background: var(--cct-label-color, var(--color-accent-emphasis, ButtonFace));
+  border-color: var(--cct-label-color, var(--color-accent-emphasis, ButtonFace));
+  color: var(--color-fg-on-emphasis, Canvas);
+}
+
+.cct-label-button:focus-visible {
+  outline: 2px solid var(--color-accent-fg, Highlight);
+  outline-offset: 1px;
 }
 
 .cct-decoration-group {
   display: inline-flex;
-  border: 1px solid currentColor;
-  border-radius: 6px;
+  border: 1px solid var(--borderColor-default, currentColor);
+  border-radius: var(--borderRadius-medium, 6px);
   overflow: hidden;
 }
 
 .cct-decoration-segment {
   border: none;
-  padding: 2px 8px;
-  background: transparent;
+  padding: 3px 10px;
+  background: var(--color-canvas-default, transparent);
+  color: var(--color-fg-default, currentColor);
   cursor: pointer;
   font-size: 12px;
 }
 
 .cct-decoration-segment[aria-checked='true'] {
-  background: Highlight;
-  color: HighlightText;
+  background: var(--color-accent-emphasis, Highlight);
+  color: var(--color-fg-on-emphasis, HighlightText);
+}
+
+.cct-decoration-segment:focus-visible {
+  outline: 2px solid var(--color-accent-fg, Highlight);
+  outline-offset: -2px;
 }
 
 .cct-free-decoration {
   font-size: 12px;
-  padding: 2px 6px;
+  padding: 3px 8px;
   max-width: 12em;
+  border: 1px solid var(--borderColor-default, currentColor);
+  border-radius: var(--borderRadius-medium, 6px);
+  background: var(--color-canvas-default, transparent);
+  color: var(--color-fg-default, currentColor);
 }
 
 .cct-feedback {
@@ -60,8 +78,8 @@
   padding-left: 1.2em;
 }
 
-.cct-diagnostics li[data-severity='error'] { color: #b3261e; }
-.cct-diagnostics li[data-severity='warn'] { color: #8a6d00; }
+.cct-diagnostics li[data-severity='error'] { color: var(--color-danger-fg, #b3261e); }
+.cct-diagnostics li[data-severity='warn'] { color: var(--color-attention-fg, #8a6d00); }
 
 .cct-fix,
 .cct-alias button {
@@ -70,28 +88,31 @@
   cursor: pointer;
 }
 
-.cct-border-ok { outline: 1px solid #2e7d32 !important; }
-.cct-border-warn { outline: 1px solid #f9a825 !important; }
-.cct-border-error { outline: 2px solid #b3261e !important; }
+.cct-border-ok { outline: 1px solid var(--color-success-fg, #2e7d32) !important; }
+.cct-border-warn { outline: 1px solid var(--color-attention-fg, #f9a825) !important; }
+.cct-border-error { outline: 2px solid var(--color-danger-fg, #b3261e) !important; }
 
 .cct-banner {
-  border: 1px solid #b3261e;
-  border-radius: 6px;
+  border: 1px solid var(--color-danger-fg, #b3261e);
+  border-radius: var(--borderRadius-medium, 6px);
   padding: 8px 12px;
   margin: 8px 0;
   font-size: 13px;
+  background: var(--color-danger-subtle, transparent);
+  color: var(--color-fg-default, currentColor);
 }
 
 .cct-badge {
   display: inline-block;
   font-size: 11px;
-  border: 1px solid var(--cct-label-color, currentColor);
+  border: 1px solid var(--cct-label-color, var(--borderColor-default, currentColor));
   padding: 0 6px;
   margin-right: 6px;
+  color: var(--color-fg-default, currentColor);
 }
 
 .cct-badge-pill { border-radius: 999px; }
-.cct-badge-flat { border-radius: 2px; }
+.cct-badge-flat { border-radius: var(--borderRadius-small, 2px); }
 
 .cct-merge-blocked { opacity: 0.5; }
 
@@ -99,16 +120,18 @@
   list-style: none;
   margin: 0;
   padding: 2px;
-  border: 1px solid currentColor;
-  border-radius: 6px;
+  border: 1px solid var(--borderColor-default, currentColor);
+  border-radius: var(--borderRadius-medium, 6px);
   max-height: 12em;
   overflow-y: auto;
   font-size: 12px;
+  background: var(--color-canvas-overlay, Canvas);
+  color: var(--color-fg-default, currentColor);
 }
 
 .cct-quick-list [aria-selected='true'] {
-  background: Highlight;
-  color: HighlightText;
+  background: var(--color-accent-emphasis, Highlight);
+  color: var(--color-fg-on-emphasis, HighlightText);
 }
 
 .sr-only {

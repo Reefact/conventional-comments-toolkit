@@ -117,6 +117,26 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.dispose();
   });
 
+  it('pose le retrait sur le composeur lui-même, pas sur un wrapper intermédiaire, quand la zone de saisie y est nichée', () => {
+    const { controller, textarea, host } = setup();
+    // Le sélecteur `div[data-testid*="comment-composer"] textarea` est un sélecteur
+    // descendant : la zone de saisie peut être nichée sous un wrapper intermédiaire (ici
+    // `host`, qui reste le parent direct utilisé pour insérer la barre d'outils) distinct
+    // du composeur qui doit recevoir le retrait — en-tête et onglets natifs sont à son
+    // niveau, pas à celui du wrapper.
+    textarea.className = '';
+    const composer = document.createElement('div');
+    composer.setAttribute('data-testid', 'comment-composer-foo');
+    host.replaceWith(composer);
+    composer.appendChild(host);
+    controller.attach();
+    expect(composer.classList.contains('cct-host')).toBe(true);
+    expect(host.classList.contains('cct-host')).toBe(false);
+    expect(textarea.classList.contains('cct-editor')).toBe(true);
+    controller.dispose();
+    expect(composer.classList.contains('cct-host')).toBe(false);
+  });
+
   it('§5.3 : rend une pastille et les diagnostics sous la zone', async () => {
     const { controller, textarea, host } = setup();
     controller.attach();

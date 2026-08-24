@@ -1,5 +1,5 @@
-// Tests de non-régression des écarts confirmés par la revue de conformité adversariale
-// (voir PROGRESS.md). Chaque test cite la règle de la spécification qu'il verrouille.
+// Tests de non-régression des écarts confirmés par la revue de conformité adversariale.
+// Chaque test cite la règle de la spécification qu'il verrouille.
 
 import { describe, expect, it } from 'vitest';
 import { evaluate } from '../src/evaluate.js';

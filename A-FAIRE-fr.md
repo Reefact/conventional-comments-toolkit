@@ -1,8 +1,7 @@
 # À faire — état des lieux pour vous
 
-Ce fichier est pour **vous**, pas pour une reprise de code (ça, c'est `PROGRESS.md`, qui
-suit une convention différente et plus technique). Il répond à trois questions : où en
-est le projet, comment l'essayer en vrai, qu'est-ce qui reste à faire et par qui.
+Ce fichier est pour **vous**. Il répond à trois questions : où en est le projet, comment
+l'essayer en vrai, qu'est-ce qui reste à faire et par qui.
 
 À supprimer ou déplacer dans `docs/` une fois que vous n'en avez plus besoin — il ne fait
 partie d'aucune convention du chantier.
@@ -135,5 +134,3 @@ inachevé.
 - `docs/ca-matrix-fr.md` — chaque critère d'acceptation → le test qui le vérifie.
 - `specifications-fr.md` — la référence normative complète (ne se modifie jamais pour
   suivre le code).
-- `PROGRESS.md` — état de reprise technique, pour une session de développement future ;
-  pas destiné à un usage humain direct.

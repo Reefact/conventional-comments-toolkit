@@ -173,9 +173,11 @@ export const RENDER_RETRY_WINDOW_MS = 5000;
 
 /** Espacement minimal entre deux tentatives déclenchées par une rafale de mutations que le
  * rendu en cours a manquée (streaming de commentaires, virtualisation) : sans lui, chaque
- * rafale se traduirait par une relecture DOM/réseau immédiate, ce que le §10 (NFR
- * d'injection) ne tolère pas. Ne s'applique qu'au rattrapage, jamais au premier rendu
- * d'une navigation ni à un changement du résumé publié — les deux restent immédiats. */
+ * rafale se traduirait par une relecture DOM/réseau immédiate à chaque mutation reçue
+ * pendant le rendu précédent. Choix d'ingénierie, pas une exigence du §10 — cette NFR ne
+ * borne que l'appel du `cb` d'`observeEditors` (§9.2.3), jamais `renderPrChrome`. Ne
+ * s'applique qu'au rattrapage, jamais au premier rendu d'une navigation ni à un changement
+ * du résumé publié — les deux restent immédiats. */
 export const RENDER_RETRY_THROTTLE_MS = 250;
 
 /** Signature légère du résumé publié (§5.5, §6.5, §8.1.3 règle 2, CA-03) : par valeur, pas
@@ -262,7 +264,12 @@ export function observePrChromeNavigation(
 
   run();
   const observer = new MutationObserver(run);
-  observer.observe(doc.documentElement, { childList: true, subtree: true });
+  // `characterData` en plus de `childList` (§5.5) : la ligne cc/1 ou un fil peuvent être mis
+  // à jour par une mutation de TEXTE sur un nœud déjà en place, pas seulement par un ajout/
+  // retrait de nœud — sans quoi ce cas précis échapperait à l'observateur, contredisant « dès
+  // qu'il est présent » (§5.5). `run()` reste bon marché sur un déclenchement sans rien de
+  // neuf : une comparaison de clé/signature, puis un retour immédiat.
+  observer.observe(doc.documentElement, { childList: true, subtree: true, characterData: true });
 }
 
 /** Rend le bandeau et l'état de complétion pour la PR courante. Renvoie `true` quand

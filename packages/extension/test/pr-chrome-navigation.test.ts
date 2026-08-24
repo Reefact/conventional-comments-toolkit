@@ -14,6 +14,19 @@
 // D3 — une fois qu'un premier rendu avait montré quelque chose (ex. la vue locale), plus
 //      rien ne retentait sur la même PR : le résumé publié du composant B, arrivé après
 //      coup, n'était jamais adopté (CA-03, §6.5).
+//
+// Convention de ce fichier : chaque `observePrChromeNavigation`/`bootstrap()` arme un
+// MutationObserver vivant, JAMAIS disposé (comme en production), sur le `document` GLOBAL
+// happy-dom partagé par tout le fichier — `afterEach` ne fait que vider `document.body`, il
+// ne désarme aucun observateur. Un observateur qui n'atteint jamais un état durablement
+// dormant (fenêtre de rattrapage jamais expirée, résumé publié jamais stabilisé) resterait
+// réactif aux mutations des tests SUIVANTS et pourrait leur retirer leur bandeau via
+// `clearStaleBanner()`. Chaque test qui n'atteint pas cet état naturellement (navigation
+// vers `pr → null`, ou signature de résumé publié stable) le neutralise explicitement avant
+// sa fin (voir les commentaires « Neutralise »/« Cette PR ne s'hydrate jamais » ci-dessous).
+// Un test ajouté qui laisserait un observateur indéfiniment réactif casserait cette garantie
+// SANS qu'aucune assertion ne le signale à l'endroit fautif — le symptôme apparaîtrait dans
+// un test ultérieur, sans rapport apparent.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';

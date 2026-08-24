@@ -25,9 +25,13 @@ declare const chrome: {
   storage?: {
     managed?: { get: (cb: (items: Record<string, unknown>) => void) => void };
     sync?: { get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void };
-    local?: { set?: (items: Record<string, unknown>) => void };
+    local?: {
+      get?: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
+      set?: (items: Record<string, unknown>) => void;
+    };
   };
   runtime?: { sendMessage?: (msg: unknown) => Promise<unknown> };
+  permissions?: { getAll: (cb: (perms: { origins?: string[] }) => void) => void };
 } | undefined;
 
 /** §9.2.3 — l'état dégradé se signale « dans les options ET dans son indicateur » : la
@@ -53,6 +57,53 @@ async function readManagedFloor(): Promise<Floor | null> {
       });
     } catch {
       resolve(null);
+    }
+  });
+}
+
+/** Hostname d'une origine accordée (`"https://ghes.example.corp/*"`) — `null` si l'entrée
+ * n'est pas une URL exploitable (défensif : `chrome.permissions` reste hors du contrôle
+ * de ce module). */
+export function hostnameOfOrigin(origin: string): string | null {
+  try {
+    return new URL(origin.replace(/\*$/, '')).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/** Hôtes accordés via `optional_host_permissions` (§2, §A.4, §B.4), triés par plateforme
+ * grâce à l'étiquette posée dans la page d'options (`hostPlatforms`, `chrome.storage.local`).
+ *
+ * `chrome.permissions.getAll()` seul ne suffit pas : la page d'options laisse saisir
+ * n'importe quel domaine dans un champ libre, sans savoir s'il sert GitHub Enterprise
+ * Server ou Azure DevOps Server — remonter la même liste aux deux adaptateurs ferait
+ * gagner `GithubClientAdapter` à chaque fois (premier de la liste dans `bootstrap()`),
+ * cassant la reconnaissance d'un domaine Azure DevOps Server auto-hébergé. Un hôte
+ * accordé mais non étiqueté (grant fait avant l'ajout de cette étiquette, ou jamais
+ * confirmé dans les réglages) n'est transmis à AUCUN adaptateur plutôt que deviné : la
+ * page d'options invite alors à le confirmer. */
+export async function readExtraHostsByPlatform(): Promise<{ github: string[]; azdo: string[] }> {
+  const empty = { github: [], azdo: [] };
+  return new Promise((resolve) => {
+    try {
+      if (!chrome?.permissions?.getAll || !chrome?.storage?.local?.get) return resolve(empty);
+      chrome.permissions.getAll((perms) => {
+        chrome!.storage!.local!.get!(['hostPlatforms'], (items) => {
+          const tags = (items?.['hostPlatforms'] as Record<string, string> | undefined) ?? {};
+          const github: string[] = [];
+          const azdo: string[] = [];
+          for (const origin of perms.origins ?? []) {
+            const host = hostnameOfOrigin(origin);
+            if (!host) continue;
+            if (tags[host] === 'github') github.push(host);
+            else if (tags[host] === 'azdo') azdo.push(host);
+          }
+          resolve({ github, azdo });
+        });
+      });
+    } catch {
+      resolve(empty);
     }
   });
 }
@@ -114,9 +165,10 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // notifications, tableau de bord). Exiger une PR ici laissait l'extension
   // intégralement inactive — aucun adaptateur choisi, donc aucun observateur armé — tant
   // qu'un rechargement complet ne la relançait pas directement sur l'URL de la PR.
+  const extraHosts = await readExtraHostsByPlatform();
   const adapters: (PlatformAdapter & { matchesHost(url: URL): boolean })[] = [
-    new GithubClientAdapter({ documentRef: doc }),
-    new AzdoClientAdapter({ documentRef: doc }),
+    new GithubClientAdapter({ documentRef: doc, extraHosts: extraHosts.github }),
+    new AzdoClientAdapter({ documentRef: doc, extraHosts: extraHosts.azdo }),
   ];
   const adapter = adapters.find((a) => a.matchesHost(url));
   if (!adapter) return () => {};

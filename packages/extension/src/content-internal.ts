@@ -302,11 +302,17 @@ async function renderPrChrome(
     if (isCurrent()) clearStaleBanner();
     return true; // désactivé : un état délibéré, pas un chargement encore en cours
   }
-  const published = adapter.readPublishedResult();
   const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
   const profile = adapter.platformProfile();
 
   const threads = await adapter.getThreads();
+  // Lu APRÈS le dernier `await`, jamais avant : `isCurrent()` ne protège que contre un
+  // changement de PR (§ observePrChromeNavigation), pas contre un second changement du
+  // résumé publié survenant PENDANT ces résolutions asynchrones sur la MÊME PR — une
+  // lecture faite plus tôt écrirait alors un résumé déjà périmé. Aucun `await` ne sépare
+  // plus cette lecture de son utilisation : rien ne peut plus s'intercaler avant l'écriture
+  // (§5.5, CA-03).
+  const published = adapter.readPublishedResult();
   if (!isCurrent()) return true; // supplanté entre-temps : la navigation suivante prend le relais
   clearStaleBanner(); // efface le bandeau d'un contexte précédent avant d'insérer le sien
   const model = buildBannerModel(

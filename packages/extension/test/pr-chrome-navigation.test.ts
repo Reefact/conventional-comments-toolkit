@@ -488,6 +488,56 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     expect(control.element.classList.contains('cct-merge-blocked')).toBe(false);
     expect(control.element.hasAttribute('title')).toBe(false);
   });
+
+  it('un second changement du résumé publié pendant un rendu en vol n’écrit jamais un résultat périmé', async () => {
+    // Revue adversariale (session du 2026-08-24) : `isCurrent()` ne protège que contre un
+    // changement de PR, pas contre un second changement du résumé publié survenant sur la
+    // MÊME PR pendant que le rendu déclenché par le premier changement est encore en vol.
+    // Avant correctif, `published` était lu tout en haut de `renderPrChrome`, avant deux
+    // `await` supplémentaires — le rendu pouvait donc écrire dans le DOM une valeur déjà
+    // périmée au moment de l'écriture.
+    const doc = document;
+    const current = pr(17);
+    let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
+    let releaseSecondRender: (() => void) | null = null;
+    const gate = new Promise<void>((resolve) => {
+      releaseSecondRender = resolve;
+    });
+    let getThreadsCalls = 0;
+    const adapter = makeAdapter(() => current, () => currentPublished, {
+      getThreads: async () => {
+        getThreadsCalls++;
+        if (getThreadsCalls === 2) await gate; // bloque le rendu déclenché par le 1er changement
+        return [];
+      },
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+    expect(bannerTitles(doc)[0]).toContain('1');
+
+    // Premier changement : déclenche un rendu qui se bloque sur getThreads() (la porte).
+    currentPublished = publishedSummary({ state: 'failure', unresolvedBlockingCount: 3 });
+    doc.body.appendChild(doc.createElement('span'));
+    await flush(); // laisse ce rendu démarrer et se bloquer
+    expect(getThreadsCalls).toBe(2);
+
+    // Second changement, PENDANT que ce rendu est encore en vol : coalescé (missedMutation),
+    // pas un rendu concurrent.
+    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    doc.body.appendChild(doc.createElement('span'));
+    await flush();
+
+    // Le rendu en vol se termine : sans le correctif, il écrirait « 3 » (valeur lue tout en
+    // haut de la fonction, au début de SON exécution) au lieu de « 0 » (valeur réelle au
+    // moment où il écrit effectivement dans le DOM).
+    releaseSecondRender!();
+    await flushAll();
+
+    expect(bannerTitles(doc)[0]).not.toContain('3'); // jamais la valeur périmée
+    expect(bannerTitles(doc)[0]).toContain('0'); // la valeur réelle au moment de l'écriture
+  });
 });
 
 describe('applyCompletionState — le titre n’est retiré que s’il a été posé par le §6.5', () => {

@@ -56,9 +56,37 @@ function floorWarning(message: string, ref: string): Notice {
  * faute de frappe y produit donc le maximum d'effet, et la réparer en silence la
  * rendrait invisible à qui a écrit la politique. */
 function asStringArray(value: unknown, ref: string, notices: Notice[]): string[] {
-  if (Array.isArray(value)) return value.filter((e): e is string => typeof e === 'string');
-  notices.push(floorWarning('floor key ignored: expected an array of strings', ref));
-  return [];
+  if (!Array.isArray(value)) {
+    notices.push(floorWarning('floor key ignored: expected an array of strings', ref));
+    return [];
+  }
+  const kept = value.filter((e): e is string => typeof e === 'string');
+  // Signaler AUSSI le tri à l'intérieur du tableau, et pas seulement le tableau absent :
+  // `["org/securite", 42]` perd son 42 sans que personne ne l'apprenne, alors que le
+  // contrat annoncé est « écartée ET signalée ». Une politique d'entreprise à moitié
+  // appliquée en silence est précisément ce que cette passe existe pour empêcher.
+  if (kept.length !== value.length) {
+    notices.push(
+      floorWarning(`floor: ${value.length - kept.length} non-string entr${value.length - kept.length > 1 ? 'ies' : 'y'} ignored`, ref)
+    );
+  }
+  return kept;
+}
+
+/** `closed` d'une règle de liste (§8.1.1). Absent vaut `false` — c'est le défaut du
+ * schéma. Présent mais pas booléen est une FAUTE, signalée, et résolue en `true`.
+ *
+ * Le sens de ce repli n'est pas indifférent, et `=== true` le prenait à l'envers :
+ * `"closed": "true"` — la coquille JSON la plus banale — devenait `false` et ROUVRAIT la
+ * liste, alors que `applyFloor()` la tenait fermée avant cette passe par un simple test
+ * de véracité. C'était une régression, et dans le sens permissif : un dépôt regagnait des
+ * exemptions que l'administration croyait avoir fermées. Tout le reste de cette
+ * vérification ne se trompe que dans le sens durcissant ; `closed` doit s'y tenir. */
+function asClosed(value: unknown, ref: string, notices: Notice[]): boolean {
+  if (value === undefined) return false;
+  if (typeof value === 'boolean') return value;
+  notices.push(floorWarning('floor rule "closed" is not a boolean: the list is kept closed', ref));
+  return true;
 }
 
 export function vetFloor(floor: Floor | null | undefined): VettedFloor {
@@ -108,7 +136,7 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
     // débogue sa politique lirait un avertissement identique à celui d'un fichier de
     // dépôt et chercherait au mauvais endroit.
     for (const n of filtered) notices.push({ ...n, message: `floor: ${n.message}` });
-    out[key] = { minimum: kept, closed: rule?.closed === true };
+    out[key] = { minimum: kept, closed: asClosed(rule?.closed, `${key}.closed`, notices) };
   }
 
   if (out.resolverOverrideGroup !== undefined) {

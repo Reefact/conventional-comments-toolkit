@@ -462,6 +462,33 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     expect(notices.some((n) => n.ref === 'labels.minimum')).toBe(true);
   });
 
+  it('un `closed` non booléen garde la liste FERMÉE, et le signale', () => {
+    // `"closed": "true"` est la coquille JSON la plus banale. `=== true` la résolvait en
+    // `false` et ROUVRAIT la liste : le dépôt regagnait des exemptions que l'administration
+    // croyait avoir fermées. Régression dans le sens permissif — le seul interdit ici.
+    const floor = { exemptUsers: { minimum: ['ci[bot]'], closed: 'true' } } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, found({ exemptUsers: ['moi'] }), null, false);
+    expect(config.exemptUsers).toEqual(['ci[bot]']); // fermée : l'ajout du dépôt est écarté
+    expect(notices.some((n) => n.ref === 'exemptUsers.closed')).toBe(true);
+  });
+
+  it('`closed` absent laisse la liste ouverte, sans avertissement', () => {
+    // Contre-épreuve du précédent : l'absence est le défaut du schéma, pas une faute.
+    const floor: Floor = { exemptUsers: { minimum: ['ci[bot]'] } };
+    const { config, notices } = resolveConfig(floor, absent, found({ exemptUsers: ['moi'] }), null, false);
+    expect(config.exemptUsers).toEqual(expect.arrayContaining(['ci[bot]', 'moi']));
+    expect(notices.some((n) => n.ref === 'exemptUsers.closed')).toBe(false);
+  });
+
+  it('une entrée non textuelle DANS le tableau est écartée et signalée', () => {
+    // Le contrat annoncé est « écartée ET signalée ». Ne signaler que le tableau absent
+    // laissait une politique à moitié appliquée en silence.
+    const floor = { resolverOverrideGroup: ['org/securite', 42] } as unknown as Floor;
+    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    expect(config.resolverOverrideGroup).toEqual(['org/securite']);
+    expect(notices.some((n) => n.ref === 'resolverOverrideGroup' && n.message.includes('non-string'))).toBe(true);
+  });
+
   it('contre-épreuve : un plancher bien formé s’applique intégralement', () => {
     const floor: Floor = {
       minimumMode: 'enforce',

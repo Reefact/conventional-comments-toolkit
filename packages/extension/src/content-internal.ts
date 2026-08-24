@@ -210,13 +210,21 @@ export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
  * champ se fige (`'?'`), et seuls le résumé publié et les fils/commentaires — sans effet de
  * bord, `queryChainAll` ne journalise rien — restent surveillés indéfiniment. */
 function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boolean): string {
-  const withRendered = adapter as PlatformAdapter & { getRenderedComments?: () => unknown[] };
+  const withRendered = adapter as PlatformAdapter & {
+    getRenderedCommentCount?: () => number;
+    getRenderedComments?: () => unknown[];
+  };
   const published = publishedSignatureOf(adapter) ?? '';
   const completion = probeCompletionControl ? (adapter.getCompletionControl() !== null ? '1' : '0') : '?';
   const threadIds = renderedThreadsOf(adapter)
     .map((t) => t.id)
     .join(',');
-  const commentCount = withRendered.getRenderedComments?.().length ?? 0;
+  // Sonde le COMPTE, jamais getRenderedComments() : cette dernière calcule bodyText (clone
+  // du sous-arbre dès qu'un badge est posé) pour chaque commentaire, un coût proportionnel
+  // à tout le DOM des commentaires rendus, à chaque mutation, pour la durée de vie de
+  // l'onglet — alors que seul le compte importe ici. Repli sur getRenderedComments().length
+  // pour les adaptateurs (de test) qui n'exposent pas la sonde dédiée.
+  const commentCount = withRendered.getRenderedCommentCount?.() ?? withRendered.getRenderedComments?.().length ?? 0;
   return `${published}|${completion}|${threadIds}|${commentCount}`;
 }
 
@@ -258,6 +266,10 @@ export function observePrChromeNavigation(
   let inFlight = false;
   let missedMutation = false;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  // Filtre par label choisi par l'utilisateur (§5.5) — vit ICI, pas dans renderPrChrome (qui
+  // reconstruit le bandeau à chaque appel, y compris sur la MÊME PR une fois D3 en jeu) : sans
+  // cet état, chaque rendu répété repartirait sur « tous », perdant la sélection.
+  let selectedLabel: string | null = null;
 
   const run = (): void => {
     if (inFlight) {
@@ -272,6 +284,7 @@ export function observePrChromeNavigation(
       lastPrKey = key;
       showedSomething = false;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
+      selectedLabel = null; // nouveau contexte de PR : le filtre repart à zéro
     }
     // Sonde le bouton de complétion (chromeSignatureOf) seulement dans la fenêtre
     // d'hydratation de CETTE PR — jamais indéfiniment (§9.4, cf. chromeSignatureOf).
@@ -288,7 +301,12 @@ export function observePrChromeNavigation(
     inFlight = true;
     // Une navigation peut survenir pendant les lectures asynchrones : le rendu vérifie
     // alors qu'il porte toujours sur la PR affichée avant d'écrire quoi que ce soit.
-    void renderPrChrome(adapter, resolver, doc, () => key === prKeyFor(currentPrOf(adapter)))
+    void renderPrChrome(adapter, resolver, doc, () => key === prKeyFor(currentPrOf(adapter)), {
+      get: () => selectedLabel,
+      set: (label) => {
+        selectedLabel = label;
+      },
+    })
       .then((showed) => {
         if (key === lastPrKey) showedSomething = showed;
       })
@@ -327,7 +345,14 @@ async function renderPrChrome(
   // Une navigation plus récente peut avoir supplanté celle-ci pendant les résolutions
   // asynchrones ci-dessous (§ observePrChromeNavigation) : par défaut (appel direct, hors
   // navigation observée) toujours actuel.
-  isCurrent: () => boolean = () => true
+  isCurrent: () => boolean = () => true,
+  // Filtre par label persistant à travers les rendus répétés sur la MÊME PR (§5.5) — porté
+  // par observePrChromeNavigation, jamais par cette fonction qui reconstruit le bandeau (et
+  // son `<select>`) depuis rien à chaque appel.
+  filterState: { get: () => string | null; set: (label: string | null) => void } = {
+    get: () => null,
+    set: () => {},
+  }
 ): Promise<boolean> {
   const clearStaleBanner = () => {
     // Un fil masqué par le filtre local du §5.5 (applyLabelFilter) porte un `display:
@@ -414,10 +439,18 @@ async function renderPrChrome(
     }
     // Fils rendus sur la page — surface d'affichage, hors contrat §9.2.3 : le filtre les
     // masque AUSSI, pas seulement les ancres du bandeau (§5.5).
+    const selectedLabel = filterState.get();
     const banner = renderBanner(model, published, lang, {
       filterLabels: enabledLabels(resolved.config).map((l) => l.id),
-      onFilter: (labelId) => applyLabelFilter(banner, renderedThreadsOf(adapter), labelOfThread, labelId),
+      selectedLabel,
+      onFilter: (labelId) => {
+        filterState.set(labelId);
+        applyLabelFilter(banner, renderedThreadsOf(adapter), labelOfThread, labelId);
+      },
     });
+    // Réapplique le filtre restauré aux fils de PAGE — renderBanner n'a positionné que le
+    // `<select>` lui-même, pas le `display` des fils/ancres (§5.5).
+    if (selectedLabel !== null) applyLabelFilter(banner, renderedThreadsOf(adapter), labelOfThread, selectedLabel);
     doc.body.insertAdjacentElement('afterbegin', banner);
   }
 
@@ -435,12 +468,15 @@ async function renderPrChrome(
   return hasSomethingToShow;
 }
 
-/** Porte le `title` NATIF du bouton (branche protégée, revue requise…) capturé juste avant
- * de le remplacer par notre propre infobulle — jamais réappliqué tant que la classe posée
- * par nous est déjà là, sous peine d'écraser la valeur capturée par notre PROPRE infobulle
- * lors d'un second cycle échec→échec. Chaîne vide = pas de title natif (absence et title=""
- * se restaurent de la même façon : retrait de l'attribut). */
+/** Porte le `title`/`aria-disabled` NATIFS du bouton (branche protégée, revue requise…)
+ * capturés juste avant de les écraser par notre propre grisage — jamais réappliqués tant
+ * que la classe posée par nous est déjà là, sous peine d'écraser la valeur capturée par
+ * notre PROPRE écriture lors d'un second cycle échec→échec. Chaîne vide = attribut natif
+ * absent (absence et valeur `""` se restaurent de la même façon : retrait de l'attribut) —
+ * un `aria-disabled="true"` natif préexistant serait sinon indiscernable du nôtre, qu'on
+ * pose avec la MÊME valeur, et se ferait retirer avec lui au dégrisage. */
 const NATIVE_TITLE_MARKER = 'cctNativeTitle';
+const NATIVE_ARIA_DISABLED_MARKER = 'cctNativeAriaDisabled';
 
 /** §6.5 : grise le bouton de complétion si et seulement si PublishedSummary.state vaut
  * 'failure' — jamais à partir des compteurs. Visuel : le clic n'est PAS intercepté. */
@@ -453,19 +489,20 @@ export function applyCompletionState(
   if (published?.state === 'failure') {
     if (!control.element.classList.contains('cct-merge-blocked')) {
       (control.element as HTMLElement).dataset[NATIVE_TITLE_MARKER] = control.element.getAttribute('title') ?? '';
+      (control.element as HTMLElement).dataset[NATIVE_ARIA_DISABLED_MARKER] =
+        control.element.getAttribute('aria-disabled') ?? '';
     }
     control.element.setAttribute('aria-disabled', 'true');
     control.element.classList.add('cct-merge-blocked');
     control.element.setAttribute('title', ui(lang, 'merge.blocked'));
   } else if (control.element.classList.contains('cct-merge-blocked')) {
-    // Ne retirer aria-disabled que si c'est bien nous qui l'avons posé (marqué par la
-    // présence de la classe, jamais réappliquée sans elle) : la plateforme peut porter son
-    // PROPRE aria-disabled natif sur ce bouton — branche protégée, revue requise, PR
-    // verrouillée — pour des raisons sans rapport avec le §6.5, que nous ne devons jamais
-    // effacer à sa place. Le title, lui, est restauré à sa valeur NATIVE capturée plus
-    // haut, jamais simplement retiré — sinon un title natif préexistant disparaît pour de
-    // bon après un seul cycle de grisage.
-    control.element.removeAttribute('aria-disabled');
+    // aria-disabled et title sont tous deux restaurés à leur valeur NATIVE capturée plus
+    // haut, jamais simplement retirés — sinon un état natif préexistant (branche protégée,
+    // revue requise…) disparaît pour de bon après un seul cycle de grisage.
+    const nativeAriaDisabled = (control.element as HTMLElement).dataset[NATIVE_ARIA_DISABLED_MARKER];
+    if (nativeAriaDisabled) control.element.setAttribute('aria-disabled', nativeAriaDisabled);
+    else control.element.removeAttribute('aria-disabled');
+    delete (control.element as HTMLElement).dataset[NATIVE_ARIA_DISABLED_MARKER];
     const nativeTitle = (control.element as HTMLElement).dataset[NATIVE_TITLE_MARKER];
     if (nativeTitle) control.element.setAttribute('title', nativeTitle);
     else control.element.removeAttribute('title');

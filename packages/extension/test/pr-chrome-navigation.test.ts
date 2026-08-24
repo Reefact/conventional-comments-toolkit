@@ -522,9 +522,12 @@ describe('D3 — le résumé publié arrivé après coup est adopté, même une 
     expect(control.element.getAttribute('aria-disabled')).toBe('true');
     expect(control.element.classList.contains('cct-merge-blocked')).toBe(true);
     expect(control.element.hasAttribute('title')).toBe(true);
-    // Le nouveau bandeau reconstruit son filtre à « tous » : le fil masqué par l'ancien
-    // filtre ne doit pas rester orphelin, caché pour rien.
-    expect(renderedThreadEl.style.display).toBe('');
+    // Le nouveau bandeau reconstruit un nouveau `<select>`, mais la SÉLECTION elle-même
+    // (§5.5, revue Codex round 4) survit à un rendu répété sur la MÊME PR — jamais
+    // réinitialisée à « tous » tant que le contexte de PR ne change pas.
+    const selectAfterRerender = doc.querySelector('.cct-banner select') as HTMLSelectElement;
+    expect(selectAfterRerender.value).toBe('praise');
+    expect(renderedThreadEl.style.display).toBe('none');
 
     // Le check redevient vert (dernier fil résolu, nouveau commit) : le grisage se
     // retire, ainsi que l'infobulle posée ci-dessus — jamais laissée mensongère.
@@ -823,6 +826,17 @@ describe('applyCompletionState — le titre n’est retiré que s’il a été p
     applyCompletionState(control, publishedSummary({ state: 'success' }), 'en');
     expect(control.element.getAttribute('title')).toBe('Merge pull request');
   });
+
+  it('restaure l’aria-disabled NATIF après un cycle de grisage/dégrisage, ne le retire jamais (revue Codex, round 4)', () => {
+    // Même défaut que le title (round 3), sur aria-disabled cette fois : un aria-disabled
+    // natif PRÉEXISTANT porte la MÊME valeur ("true") que celle que nous posons nous-mêmes
+    // pendant le grisage — indiscernable une fois écrit, donc capturé AVANT, comme le title.
+    const control: SubmitControl = { element: document.createElement('button'), kind: 'complete-pr' };
+    control.element.setAttribute('aria-disabled', 'true'); // état natif de la plateforme
+    applyCompletionState(control, publishedSummary({ state: 'failure' }), 'en'); // nous grisons AUSSI
+    applyCompletionState(control, publishedSummary({ state: 'success' }), 'en'); // nous dégrisons
+    expect(control.element.getAttribute('aria-disabled')).toBe('true'); // toujours natif, pas retiré
+  });
 });
 
 describe('Codex round 2 #2 — le display d’origine est restauré, jamais une chaîne vide (§5.5)', () => {
@@ -928,5 +942,102 @@ describe('Codex round 2 #7 — les badges posés pendant que le mode était acti
     await flushAll();
 
     expect(commentEl.querySelector('.cct-badge')).toBeNull();
+  });
+});
+
+describe('Codex round 4 — le filtre par label survit à un rendu répété sur la MÊME PR (§5.5)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('reste actif quand le résumé publié change, repart à zéro sur une nouvelle PR', async () => {
+    const doc = document;
+    let current = pr(27);
+    const thread: ThreadInfo = {
+      id: 't1',
+      pr: current,
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'issue: quelque chose ne va pas',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution: 'unknown',
+      canCarryBlockingState: true,
+    };
+    const renderedThreadEl = doc.createElement('div');
+    let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
+    const adapter = makeAdapter(() => current, () => currentPublished, {
+      getThreads: async () => [thread],
+      getRenderedThreadElements: () => [{ id: 't1', element: renderedThreadEl }],
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+
+    const select = doc.querySelector('.cct-banner select') as HTMLSelectElement;
+    select.value = 'praise';
+    select.dispatchEvent(new Event('change'));
+    expect(renderedThreadEl.style.display).toBe('none');
+
+    // Rendu répété sur la MÊME PR (résumé publié changé, §5.5, D3) : avant ce correctif, le
+    // nouveau `<select>` reconstruit repartait toujours sur « tous », perdant la sélection.
+    currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+    const selectAfterRerender = doc.querySelector('.cct-banner select') as HTMLSelectElement;
+    expect(selectAfterRerender.value).toBe('praise');
+    expect(renderedThreadEl.style.display).toBe('none');
+
+    // Navigation vers une AUTRE PR : le filtre, lui, repart bien à zéro.
+    current = pr(28);
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+    const selectOnNewPr = doc.querySelector('.cct-banner select') as HTMLSelectElement;
+    expect(selectOnNewPr).not.toBeNull();
+    expect(selectOnNewPr.value).toBe('');
+  });
+});
+
+describe('Codex round 4 — la signature de reprise sonde le COMPTE de commentaires, jamais leur corps (§9.4)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('utilise getRenderedCommentCount() quand l’adaptateur l’expose, jamais getRenderedComments()', async () => {
+    const doc = document;
+    const current = pr(29);
+    let commentsCalls = 0;
+    let countCalls = 0;
+    const commentEl = doc.createElement('div');
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+      getRenderedComments: () => {
+        commentsCalls++; // ne DOIT jamais être appelé ici : bodyText coûte un clone par commentaire
+        return [{ element: commentEl, bodyText: 'issue: x' }];
+      },
+    }) as PlatformAdapter & { currentPr(): PrRef | null; getRenderedCommentCount?: () => number };
+    adapter.getRenderedCommentCount = () => {
+      countCalls++;
+      return 1;
+    };
+    const resolver = new ClientConfigResolver(async () => null);
+
+    observePrChromeNavigation(adapter, resolver, doc);
+    await flushAll();
+    for (let i = 0; i < 5; i++) {
+      doc.body.appendChild(doc.createElement('span'));
+      await flushAll();
+    }
+
+    expect(countCalls).toBeGreaterThan(0);
+    // getRenderedComments() n'est appelée QUE par le rendu réel (décoration des badges,
+    // renderPrChrome), jamais par la signature de reprise (chromeSignatureOf) — ici la PR
+    // ne change jamais de signature après le premier rendu, donc aucun second rendu réel.
+    expect(commentsCalls).toBe(1);
   });
 });

@@ -221,6 +221,15 @@ export class GithubClientAdapter implements PlatformAdapter {
     }));
   }
 
+  /** Sonde bon marché du nombre de commentaires rendus, pour la signature de reprise du
+   * bandeau (content-internal.ts, chromeSignatureOf) — jamais `getRenderedComments()` pour
+   * ça : cette dernière calcule `commentBodyText` (clone du sous-arbre dès qu'un badge est
+   * posé) pour CHAQUE commentaire, alors que seul le compte importe à un observateur qui
+   * tourne à chaque mutation, pour toute la durée de vie de l'onglet. */
+  getRenderedCommentCount(): number {
+    return queryChainAll(this.#doc, selectors.commentBody).length;
+  }
+
   /** Conteneurs de fils rendus, pour le filtre local du §5.5 — même dérivation
    * d'identifiant que getThreads(), même surface d'affichage hors contrat. */
   getRenderedThreadElements(): { id: string; element: Element }[] {

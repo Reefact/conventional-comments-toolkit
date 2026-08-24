@@ -6,6 +6,7 @@ import {
   analyze,
   encodeSummary,
   evaluate,
+  looksLikeToolCommand,
   parseConfigDocument,
   resolveConfig,
   SUPPORTED_FLOOR_VERSION,
@@ -178,7 +179,14 @@ export class Orchestrator {
       // Étape 12 : seconde passe sans cache avant un rejet dépendant de la configuration
       // (§8.1.3, règle 3) — seul ce second verdict compte.
       const needsRefresh = evaluation.result.formatDiagnostics.some(
-        (d) => d.code === 'E-UNKNOWN-LABEL' || d.code === 'E-UNKNOWN-DECORATION'
+        (d) =>
+          d.code === 'E-UNKNOWN-LABEL' ||
+          d.code === 'E-UNKNOWN-DECORATION' ||
+          // Troisième déclencheur, QUALIFIÉ (§8.1.3 r.3) : une entrée `toolCommands`
+          // manquante ne produit pas de code propre mais un `E-NO-LABEL`, le diagnostic
+          // le plus courant. Seul un corps qui ressemble à une commande paie la seconde
+          // passe ; une remarque ordinaire sans label ne déclenche rien.
+          (d.code === 'E-NO-LABEL' && looksLikeToolCommand(d.comment.body))
       );
       if (needsRefresh) {
         repoRead = await cache.read(`repo:${rKey}`, ttl, true, () =>

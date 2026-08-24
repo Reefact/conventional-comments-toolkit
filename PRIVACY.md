@@ -25,10 +25,12 @@ plateforme.
 
 | Donnée | Où elle vit | Sort-elle du navigateur ? |
 |---|---|---|
-| Réglages utilisateur (langue, dépôts autorisés, domaines Azure DevOps activés) | `chrome.storage` local, sur votre appareil | Non |
-| Configuration `.conventional-comments.json` du dépôt affiché | lue depuis la page déjà chargée par votre session, mise en cache localement | Non — lecture seule, via la route web que votre session autorise déjà, jamais par un jeton détenu par l'extension |
+| Langue d'interface et raccourcis clavier directs | `chrome.storage.sync` | **Se synchronise entre les appareils de votre compte Chrome si la synchronisation est activée** — c'est le mécanisme natif de Chrome, pas un serveur propre à l'extension. Contenu limité à ces deux préférences, jamais de contenu de commentaire ou de code. |
+| État dégradé courant et journal local de dégradation de sélecteurs (diagnostic) | `chrome.storage.local`, sur votre appareil | Non |
+| Domaines optionnels activés (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, géré par Chrome | Non — c'est Chrome, pas l'extension, qui tient cette liste |
+| Configuration `.conventional-comments.json` du dépôt affiché | lue depuis la page déjà chargée par votre session, mise en cache en mémoire (perdue à chaque redémarrage du navigateur) | Non — lecture seule, via la route web que votre session autorise déjà, jamais par un jeton détenu par l'extension |
 | Contenu des commentaires, du code et des diffs que vous consultez ou rédigez | reste dans la page et dans l'éditeur natif de la plateforme | **Jamais transmis nulle part par l'extension** |
-| Télémétrie d'usage (label utilisé, code d'erreur, mode, dépôt — jamais de texte libre) | serveur de télémétrie de l'organisation, si configuré | Uniquement si activée explicitement (**opt-in, désactivée par défaut**) |
+| Télémétrie d'usage | — | **Aucune actuellement : cette version ne collecte ni n'émet de télémétrie.** |
 | Journal d'exemption de PR (identifiant de PR, auteur, horodatage) — mécanisme de gouvernance distinct de la télémétrie ci-dessus, propre au composant serveur de l'organisation, pas à cette extension | serveur de l'organisation, si le mécanisme est déployé et activé | Uniquement si l'organisation a déployé et configuré ce mécanisme ; destination et durée de conservation sont sous son contrôle |
 
 L'extension ne stocke **aucun jeton d'authentification ni secret**. Elle
@@ -94,10 +96,12 @@ visual feedback inside the platform's native comment editor.
 
 | Data | Where it lives | Does it leave the browser? |
 |---|---|---|
-| User settings (language, allowed repositories, enabled Azure DevOps domains) | local `chrome.storage`, on your device | No |
-| The displayed repository's `.conventional-comments.json` configuration | read from the page already loaded by your session, cached locally | No — read-only, via the web route your session already authorizes, never via a token held by the extension |
+| Interface language and direct keyboard shortcuts | `chrome.storage.sync` | **Syncs across your Chrome account's devices if sync is enabled** — that's Chrome's own native mechanism, not a server run by the extension. Limited to these two preferences, never comment or code content. |
+| Current degraded state and local selector-degradation log (diagnostics) | `chrome.storage.local`, on your device | No |
+| Enabled optional domains (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, managed by Chrome | No — Chrome holds this list, not the extension |
+| The displayed repository's `.conventional-comments.json` configuration | read from the page already loaded by your session, cached in memory (lost on every browser restart) | No — read-only, via the web route your session already authorizes, never via a token held by the extension |
 | Comment, code, and diff content you view or write | stays in the page and the platform's native editor | **Never transmitted anywhere by the extension** |
-| Usage telemetry (label used, error code, mode, repository — never free text) | your organization's telemetry server, if configured | Only if explicitly enabled (**opt-in, off by default**) |
+| Usage telemetry | — | **None currently: this version collects and emits no telemetry.** |
 | PR exemption log (PR id, author, timestamp) — a governance mechanism distinct from the telemetry above, owned by the organization's server component, not by this extension | your organization's server, if that mechanism is deployed and enabled | Only if the organization has deployed and configured that mechanism; destination and retention are under its control |
 
 The extension stores **no authentication token or secret**. It does not

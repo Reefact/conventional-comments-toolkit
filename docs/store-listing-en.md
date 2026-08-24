@@ -22,8 +22,13 @@ tools.
 > **Conventional Comments Toolkit** helps teams write clear code review
 > comments that follow the
 > [Conventional Comments](https://conventionalcomments.org/) convention,
-> right inside GitHub's native editor (github.com, GitHub Enterprise
-> Cloud and Server) — and, optionally, Azure DevOps.
+> right inside GitHub's native editor on github.com — and, optionally,
+> Azure DevOps Services.
+>
+> **⚠️ Not yet true of the shipped build — see the note at the end of this
+> file:** support for GitHub Enterprise Server and Azure DevOps Server
+> (self-hosted) is designed for but not wired end to end. Do not list
+> them in the store submission until that's fixed.
 >
 > **What the extension brings**
 > - A toolbar to insert standard labels
@@ -52,6 +57,18 @@ tools.
 >
 > Public source code under the Apache-2.0 license:
 > https://github.com/reefact/conventional-comments-toolkit
+
+## Known gap blocking the "Enterprise Server" claim
+
+Verified against the code (`content-internal.ts`, `bootstrap()`):
+granting the optional host permission on a GitHub Enterprise Server or
+self-hosted Azure DevOps Server domain injects the content script, but
+`bootstrap()` never passes the granted `extraHosts` into
+`GithubClientAdapter` / `AzdoClientAdapter`, so `matchesHost()` still only
+recognizes `github.com` / `dev.azure.com` — no UI ever appears on those
+self-hosted domains. Fix that wiring (or scope this listing down to
+github.com + Azure DevOps Services) before submitting with any
+self-hosted claim.
 
 ## Release notes for the first submission
 

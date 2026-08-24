@@ -27,8 +27,13 @@ soumission. Variante conforme :)
 > **Conventional Comments Toolkit** aide les équipes à écrire des
 > commentaires de revue de code clairs et conformes à la convention
 > [Conventional Comments](https://conventionalcomments.org/), directement
-> dans l'éditeur natif de GitHub (github.com, GitHub Enterprise Cloud et
-> Server) — et, en option, Azure DevOps.
+> dans l'éditeur natif de GitHub (github.com) — et, en option, Azure
+> DevOps Services.
+>
+> **⚠️ Pas encore vrai du build actuel — voir la note en fin de fichier :**
+> le support de GitHub Enterprise Server et d'Azure DevOps Server
+> (auto-hébergé) est conçu mais pas câblé de bout en bout. Ne pas les
+> lister à la soumission tant que ce n'est pas corrigé.
 >
 > **Ce que l'extension apporte**
 > - Une barre d'outils pour insérer les labels standards
@@ -56,6 +61,18 @@ soumission. Variante conforme :)
 >
 > Code source public sous licence Apache-2.0 :
 > https://github.com/reefact/conventional-comments-toolkit
+
+## Écart connu qui bloque la mention « Enterprise Server »
+
+Vérifié dans le code (`content-internal.ts`, `bootstrap()`) : accorder la
+permission d'hôte optionnelle sur un domaine GitHub Enterprise Server ou
+Azure DevOps Server auto-hébergé injecte bien le script de contenu, mais
+`bootstrap()` ne transmet jamais les `extraHosts` accordés à
+`GithubClientAdapter` / `AzdoClientAdapter` : `matchesHost()` ne reconnaît
+donc toujours que `github.com` / `dev.azure.com`, et aucune interface
+n'apparaît sur ces domaines auto-hébergés. Corriger ce câblage (ou
+restreindre la fiche à github.com + Azure DevOps Services) avant de
+soumettre avec une mention self-hosted.
 
 ## Notes de version pour la première soumission
 

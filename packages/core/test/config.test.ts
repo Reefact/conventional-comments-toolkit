@@ -362,6 +362,16 @@ describe('§9.2.2 — empreinte de configuration', () => {
     expect(fingerprint(a)).toBe(fingerprint(b));
   });
 
+  it('exemptUsers : un doublon de casse ne fabrique pas de désaccord non plus (§4.2)', () => {
+    // `exemptUsers` est l'AUTRE membre du domaine dont la comparaison est insensible à la
+    // casse : il court exactement le même risque, et le corrige de la même façon.
+    const server = defaultConfig();
+    server.exemptUsers = ['Dependabot[bot]', 'dependabot[bot]'];
+    const extension = defaultConfig();
+    extension.exemptUsers = ['dependabot[bot]'];
+    expect(fingerprint(server)).toBe(fingerprint(extension));
+  });
+
   it('CA-40 : un doublon de casse ne fabrique pas de désaccord (§8.1.3, règle 2)', () => {
     // Ce que l’union du §8.1.4 produit après une correction de casse sur une PR épinglée :
     // le serveur porte les deux orthographes, l’extension une seule. Les deux exemptent

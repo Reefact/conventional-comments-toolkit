@@ -262,6 +262,71 @@ describe('§6.4 — cycle d’évaluation', () => {
     expect(status.state).toBe('success');
   });
 
+  it('CA-40 : un contournement stérile ne se répète pas à chaque réévaluation (§8.1.3 r.3)', async () => {
+    // `@alice peux-tu regarder ça ?` a la forme d'une commande sans en être une : le rejet
+    // ne disparaîtra jamais. Sans étranglement, chaque webhook et chaque réconciliation
+    // — 60 s sur Azure DevOps — relanceraient la double lecture, annulant le TTL pour ce
+    // dépôt aussi longtemps que le commentaire y reste.
+    const env = makeEnv({
+      repoConfig: enforceConfig({ formatSeverity: 'error' }),
+      threads: [thread(comment('@alice peux-tu regarder ça ?'))],
+    });
+    let bypasses = 0;
+    const adapterAny = env.adapter;
+    const originalFetch = adapterAny.fetchConfigFile.bind(adapterAny);
+    adapterAny.fetchConfigFile = async (pr, opts) => {
+      if (opts?.bypassCache) bypasses += 1;
+      return originalFetch(pr, opts);
+    };
+
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(bypasses).toBe(1); // le premier contournement est légitime : on ne sait pas encore
+
+    // Réévaluations suivantes : le contournement précédent n'avait rien changé.
+    env.adapter.state.headSha = 'sha-2';
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    env.adapter.state.headSha = 'sha-3';
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(bypasses).toBe(1);
+
+    // Passé le TTL, une nouvelle tentative est de nouveau permise : l'étranglement borne
+    // la répétition, il ne ferme jamais la porte.
+    env.clock.now = new Date(env.clock.now.getTime() + 3601 * 1000);
+    env.adapter.state.headSha = 'sha-4';
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(bypasses).toBe(2);
+  });
+
+  it('CA-40 : un contournement FRUCTUEUX n’est jamais étranglé (§8.1.3 r.3)', async () => {
+    // Contre-épreuve : l'étranglement ne doit mordre que sur les contournements stériles.
+    const env = makeEnv({
+      repoConfig: enforceConfig({ formatSeverity: 'error' }),
+      threads: [thread(comment('@alice peux-tu regarder ça ?'))],
+    });
+    let bypasses = 0;
+    const original = env.adapter.state.repoConfig;
+    const adapterAny = env.adapter;
+    const originalFetch = adapterAny.fetchConfigFile.bind(adapterAny);
+    adapterAny.fetchConfigFile = async (pr, opts) => {
+      if (opts?.bypassCache) {
+        bypasses += 1;
+        return {
+          status: 'found',
+          text: JSON.stringify({
+            ...(JSON.parse((original as { text: string }).text) as object),
+            allowlistPatterns: [`^ignore-${bypasses}$`], // la configuration change à chaque fois
+          }),
+        };
+      }
+      return originalFetch(pr, opts);
+    };
+
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    env.adapter.state.headSha = 'sha-2';
+    await env.orchestrator.evaluatePr(PR, nextSeq());
+    expect(bypasses).toBe(2); // jamais étranglé tant qu'il apprend quelque chose
+  });
+
   it('CA-40 : un E-NO-LABEL ordinaire ne déclenche RIEN — le discriminant borne le coût', async () => {
     // Contre-épreuve indispensable : sans qualification, le déclencheur contournerait le
     // cache sur la quasi-totalité des commentaires non conformes.

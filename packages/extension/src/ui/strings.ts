@@ -17,8 +17,9 @@ const fr: Record<string, string> = {
   'alias.rewrite': 'Réécrire « {from} » en « {to} »',
   'banner.count': '{count} fil(s) bloquant(s)',
   'banner.hint': 'à résoudre avant de fusionner',
+  'banner.hint.informative': 'signalé à titre informatif, ne bloque pas la fusion',
   'banner.count.local': '{count} fil(s) bloquant(s) ouvert(s) sur cette page',
-  'banner.hint.local': 'vue locale : la conformité n’est pas vérifiée sur ce dépôt',
+  'banner.hint.local': 'vue locale — aucun résultat publié pour cette PR',
   'banner.unlocated':
     '{missing} fil(s) compté(s) par la vérification, absent(s) de cette page — voir le détail du check',
   'banner.untitled': '(sans sujet)',
@@ -71,8 +72,9 @@ const en: Record<string, string> = {
   'alias.rewrite': 'Rewrite "{from}" as "{to}"',
   'banner.count': '{count} blocking thread(s)',
   'banner.hint': 'to resolve before merging',
+  'banner.hint.informative': 'shown for information, does not block merging',
   'banner.count.local': '{count} blocking thread(s) open on this page',
-  'banner.hint.local': 'local view: compliance is not checked on this repository',
+  'banner.hint.local': 'local view — no published result for this PR',
   'banner.unlocated':
     '{missing} thread(s) counted by the check, not found on this page — see the check for details',
   'banner.untitled': '(no subject)',

@@ -172,6 +172,43 @@ describe('§5.5 / §10 — le bandeau accompagne le check, il ne le rejoue pas',
   });
 });
 
-function publishedSummary(count: number): PublishedSummary {
-  return published(count);
+describe('§6.2.2 / §6.2.4 — un résumé publié n’est pas toujours un préalable au merge (revue Codex, PR #26)', () => {
+  const threads = [thread('issue: a\n\nd', 'unresolved', 't1')];
+
+  it('mode warn (jamais en échec) : les fils sont réels, mais informatifs — pas « à résoudre avant de fusionner »', () => {
+    // §6.2.2 : « warn » publie un statut jamais en échec, décompte informatif.
+    const pub = publishedSummary(2, { mode: 'warn', state: 'success' });
+    const el = renderBanner(model(pub, threads), pub, 'fr');
+    expect(el.textContent).not.toContain('à résoudre avant de fusionner');
+    expect(el.textContent).toContain('à titre informatif');
+    expect((el as HTMLDetailsElement).open).toBe(false); // rien n'y presse
+  });
+
+  it('PR en brouillon (toujours informatif, §6.2.4) : même verdict que warn, quel que soit le mode configuré', () => {
+    const pub = publishedSummary(3, { mode: 'enforce', state: 'success', isDraft: true });
+    const el = renderBanner(model(pub, threads), pub, 'fr');
+    expect(el.textContent).not.toContain('à résoudre avant de fusionner');
+    expect((el as HTMLDetailsElement).open).toBe(false);
+  });
+
+  it('enforce + échec réel : seul ce cas dit « à résoudre avant de fusionner » et se déplie', () => {
+    const pub = publishedSummary(1, { mode: 'enforce', state: 'failure' });
+    const el = renderBanner(model(pub, threads), pub, 'fr');
+    expect(el.textContent).toContain('à résoudre avant de fusionner');
+    expect((el as HTMLDetailsElement).open).toBe(true);
+  });
+
+  it('vue locale : n’affirme pas que la conformité est desactivée sur ce dépôt — l’absence peut être une évaluation en vol', () => {
+    // `published === null` ne distingue pas « composant B non déployé » de « première
+    // évaluation encore en cours, pas encore rendue dans le DOM » (§5.5) : le texte ne doit
+    // trancher ni l'un ni l'autre.
+    const el = renderBanner(model(null, threads), null, 'fr');
+    expect(el.textContent).not.toMatch(/n.est pas vérifiée|désactivée|non vérifiée/);
+    expect(el.textContent).toContain('vue locale');
+    expect(el.textContent).toContain('aucun résultat publié');
+  });
+});
+
+function publishedSummary(count: number, overrides: Partial<PublishedSummary> = {}): PublishedSummary {
+  return { ...published(count), ...overrides };
 }

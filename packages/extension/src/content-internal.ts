@@ -15,6 +15,7 @@ import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage } from './config-resolver.js';
+import { EMPTY_EXTRA_HOSTS, EXTRA_HOSTS_KEY, type ExtraHostsByPlatform } from './host-platform.js';
 import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
 import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
@@ -31,7 +32,6 @@ declare const chrome: {
     };
   };
   runtime?: { sendMessage?: (msg: unknown) => Promise<unknown> };
-  permissions?: { getAll: (cb: (perms: { origins?: string[] }) => void) => void };
 } | undefined;
 
 /** §9.2.3 — l'état dégradé se signale « dans les options ET dans son indicateur » : la
@@ -61,49 +61,28 @@ async function readManagedFloor(): Promise<Floor | null> {
   });
 }
 
-/** Hostname d'une origine accordée (`"https://ghes.example.corp/*"`) — `null` si l'entrée
- * n'est pas une URL exploitable (défensif : `chrome.permissions` reste hors du contrôle
- * de ce module). */
-export function hostnameOfOrigin(origin: string): string | null {
-  try {
-    return new URL(origin.replace(/\*$/, '')).hostname;
-  } catch {
-    return null;
-  }
-}
-
-/** Hôtes accordés via `optional_host_permissions` (§2, §A.4, §B.4), triés par plateforme
- * grâce à l'étiquette posée dans la page d'options (`hostPlatforms`, `chrome.storage.local`).
+/** Hôtes accordés via `optional_host_permissions` (§2, §A.4, §B.4), déjà répartis par
+ * plateforme — LU, jamais calculé ici.
  *
- * `chrome.permissions.getAll()` seul ne suffit pas : la page d'options laisse saisir
- * n'importe quel domaine dans un champ libre, sans savoir s'il sert GitHub Enterprise
- * Server ou Azure DevOps Server — remonter la même liste aux deux adaptateurs ferait
- * gagner `GithubClientAdapter` à chaque fois (premier de la liste dans `bootstrap()`),
- * cassant la reconnaissance d'un domaine Azure DevOps Server auto-hébergé. Un hôte
- * accordé mais non étiqueté (grant fait avant l'ajout de cette étiquette, ou jamais
- * confirmé dans les réglages) n'est transmis à AUCUN adaptateur plutôt que deviné : la
- * page d'options invite alors à le confirmer. */
-export async function readExtraHostsByPlatform(): Promise<{ github: string[]; azdo: string[] }> {
-  const empty = { github: [], azdo: [] };
+ * Ce module est bundlé dans `content.js` et s'exécute comme script de contenu, où Chrome
+ * n'expose PAS `chrome.permissions` : y croiser les origines accordées avec leurs
+ * étiquettes rendrait toujours des listes vides, sans erreur visible (revue Codex, PR
+ * #29). Le calcul vit donc dans `background.ts`, qui publie son résultat sous
+ * `EXTRA_HOSTS_KEY` dans `chrome.storage.local` — accessible, lui, depuis un script de
+ * contenu — et le republie à chaque changement de permission ou d'étiquette. */
+export async function readExtraHostsByPlatform(): Promise<ExtraHostsByPlatform> {
   return new Promise((resolve) => {
     try {
-      if (!chrome?.permissions?.getAll || !chrome?.storage?.local?.get) return resolve(empty);
-      chrome.permissions.getAll((perms) => {
-        chrome!.storage!.local!.get!(['hostPlatforms'], (items) => {
-          const tags = (items?.['hostPlatforms'] as Record<string, string> | undefined) ?? {};
-          const github: string[] = [];
-          const azdo: string[] = [];
-          for (const origin of perms.origins ?? []) {
-            const host = hostnameOfOrigin(origin);
-            if (!host) continue;
-            if (tags[host] === 'github') github.push(host);
-            else if (tags[host] === 'azdo') azdo.push(host);
-          }
-          resolve({ github, azdo });
+      if (!chrome?.storage?.local?.get) return resolve(EMPTY_EXTRA_HOSTS);
+      chrome.storage.local.get([EXTRA_HOSTS_KEY], (items) => {
+        const stored = items?.[EXTRA_HOSTS_KEY] as Partial<ExtraHostsByPlatform> | undefined;
+        resolve({
+          github: Array.isArray(stored?.github) ? stored.github : [],
+          azdo: Array.isArray(stored?.azdo) ? stored.azdo : [],
         });
       });
     } catch {
-      resolve(empty);
+      resolve(EMPTY_EXTRA_HOSTS);
     }
   });
 }

@@ -2,6 +2,8 @@
 // limitées (§8.1.2 — jamais le mode ni les labels), affichage de l'état dégradé (§5.4)
 // et du journal local de dégradation de sélecteurs (§9.4).
 
+import { HOST_PLATFORMS_KEY, hostnameOf, type HostPlatform } from '../host-platform.js';
+
 interface ChromePermissions {
   request: (perms: { origins: string[] }, cb: (granted: boolean) => void) => void;
   getAll: (cb: (perms: { origins?: string[] }) => void) => void;
@@ -16,44 +18,44 @@ declare const chrome: {
     };
     local?: {
       get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
-      set: (items: Record<string, unknown>) => void;
+      set: (items: Record<string, unknown>, cb?: () => void) => void;
     };
   };
 } | undefined;
 
-const PLATFORM_LABELS: Record<string, string> = {
+const PLATFORM_LABELS: Record<HostPlatform, string> = {
   github: 'GitHub Enterprise Server / GHE Cloud',
   azdo: 'Azure DevOps Server',
+  config: "Configuration d'organisation uniquement",
 };
 
-function hostnameOfOrigin(origin: string): string | null {
-  try {
-    return new URL(origin.replace(/\*$/, '')).hostname;
-  } catch {
-    return null;
-  }
-}
-
-function readHostPlatforms(): Promise<Record<string, string>> {
+function readHostPlatforms(): Promise<Record<string, HostPlatform>> {
   return new Promise((resolve) => {
     if (!chrome?.storage?.local) return resolve({});
-    chrome.storage.local.get(['hostPlatforms'], (items) => {
-      resolve((items['hostPlatforms'] as Record<string, string> | undefined) ?? {});
+    chrome.storage.local.get([HOST_PLATFORMS_KEY], (items) => {
+      resolve((items[HOST_PLATFORMS_KEY] as Record<string, HostPlatform> | undefined) ?? {});
     });
   });
 }
 
-function setHostPlatform(host: string, platform: string): Promise<void> {
-  return new Promise((resolve) => {
-    if (!chrome?.storage?.local) return resolve();
-    readHostPlatforms().then((tags) => {
-      const next = { ...tags };
-      if (platform) next[host] = platform;
-      else delete next[host];
-      chrome!.storage!.local!.set({ hostPlatforms: next });
-      resolve();
+/** File d'attente d'un seul écrivain : deux classements enchaînés sans attendre auraient
+ * chacun lu la même carte d'origine puis écrit leur propre copie, la seconde écrasant la
+ * première (revue Codex, PR #29). Sérialiser sur une promesse partagée garantit que
+ * chaque lecture-modification-écriture voit le résultat de la précédente. */
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+function setHostPlatform(host: string, platform: HostPlatform): Promise<void> {
+  const next = writeQueue.then(async () => {
+    if (!chrome?.storage?.local) return;
+    const tags = await readHostPlatforms();
+    await new Promise<void>((resolve) => {
+      chrome!.storage!.local!.set({ [HOST_PLATFORMS_KEY]: { ...tags, [host]: platform } }, () =>
+        resolve()
+      );
     });
   });
+  writeQueue = next.catch(() => undefined);
+  return next;
 }
 
 /** github.com est couvert par `content_scripts` (§2) et jamais renvoyé par
@@ -67,7 +69,7 @@ async function refreshHosts(): Promise<void> {
   ]);
   list.textContent = '';
   for (const origin of perms.origins ?? []) {
-    const host = hostnameOfOrigin(origin);
+    const host = hostnameOf(origin);
     const li = document.createElement('li');
     if (!host) {
       li.textContent = origin;
@@ -76,6 +78,8 @@ async function refreshHosts(): Promise<void> {
     }
     const known = tags[host];
     if (known) {
+      // `config` est une classification délibérée, pas une absence : l'afficher comme
+      // telle, sans la renvoyer au rattrapage à chaque rafraîchissement (revue Codex).
       li.textContent = `${host} — ${PLATFORM_LABELS[known] ?? known}`;
       list.appendChild(li);
       continue;
@@ -95,7 +99,7 @@ async function refreshHosts(): Promise<void> {
     confirm.type = 'button';
     confirm.textContent = 'Confirmer';
     confirm.addEventListener('click', () => {
-      void setHostPlatform(host, select.value).then(() => void refreshHosts());
+      void setHostPlatform(host, select.value as HostPlatform).then(() => void refreshHosts());
     });
     li.append(select, confirm);
     list.appendChild(li);
@@ -105,11 +109,15 @@ async function refreshHosts(): Promise<void> {
 document.getElementById('host-add')?.addEventListener('click', () => {
   const input = document.getElementById('host-input') as HTMLInputElement | null;
   const platformSelect = document.getElementById('host-platform') as HTMLSelectElement | null;
-  const host = input?.value.trim();
+  // Canonicaliser AVANT de demander la permission ET d'écrire l'étiquette : le navigateur
+  // normalise l'origine accordée (casse, IDN), et une clé stockée sous la saisie brute
+  // (`GHES.Example.Corp`) ne serait plus jamais retrouvée (revue Codex, PR #29).
+  const host = hostnameOf(input?.value ?? '');
   if (!host || !chrome?.permissions) return;
+  const platform = (platformSelect?.value || 'config') as HostPlatform;
   chrome.permissions.request({ origins: [`https://${host}/*`] }, (granted) => {
     if (!granted) return;
-    void setHostPlatform(host, platformSelect?.value ?? '').then(() => void refreshHosts());
+    void setHostPlatform(host, platform).then(() => void refreshHosts());
   });
 });
 

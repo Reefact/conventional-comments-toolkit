@@ -21,6 +21,7 @@ import {
 import {
   closestChain,
   commentBodyText,
+  hostMatchesAny,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -61,8 +62,11 @@ export class AzdoClientAdapter implements PlatformAdapter {
    * DevOps étant entièrement SPA, la navigation vers une PR depuis les vues « Pull
    * requests » ou « Mes demandes » arrive après l'injection du script, jamais avant. */
   matchesHost(url: URL): boolean {
+    // `hostMatchesAny` et non une égalité stricte : un hôte accordé peut être un joker
+    // (§B.6). `*.visualstudio.com` reste en dur — c'est un domaine du produit, reconnu
+    // sans qu'aucune permission optionnelle ait à le nommer.
     const host = url.hostname;
-    return this.#hosts.some((h) => host === h) || host.endsWith('.visualstudio.com');
+    return hostMatchesAny(host, this.#hosts) || host.endsWith('.visualstudio.com');
   }
 
   matches(url: URL): boolean {

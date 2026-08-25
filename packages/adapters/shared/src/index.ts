@@ -51,6 +51,30 @@ export interface PlatformAdapter {
   readPublishedResult(): PublishedSummary | null;
 }
 
+// ————— Reconnaissance d'hôte (§2, §A.4, §B.4) —————
+// Un hôte autorisé via `optional_host_permissions` peut être un JOKER : le §A.4 nomme
+// `*.ghe.com` (GitHub Enterprise Cloud with data residency, sous-domaine dédié par client,
+// inconnu à la compilation) et le §B.6 `*.visualstudio.com`. Chrome accorde bien
+// `https://*.ghe.com/*` et injecte le script sur `acme.ghe.com` ; une comparaison par
+// égalité stricte, elle, ne reconnaîtrait jamais cet hôte concret et laisserait
+// l'extension inerte sur la page (revue Codex, PR #29). Les deux adaptateurs partagent
+// donc cette fonction plutôt que de réinventer chacun sa règle.
+//
+// `*.exemple.com` couvre les sous-domaines (`acme.exemple.com`) mais PAS le domaine nu
+// (`exemple.com`) — c'est la sémantique des motifs de correspondance de Chrome, et une
+// organisation qui veut les deux accorde les deux.
+
+/** L'hôte `host` est-il couvert par l'entrée `pattern` — nom exact, ou joker `*.suffixe` ? */
+export function hostMatchesPattern(host: string, pattern: string): boolean {
+  if (pattern.startsWith('*.')) return host.endsWith(pattern.slice(1));
+  return host === pattern;
+}
+
+/** L'hôte est-il couvert par au moins une des entrées (noms exacts et jokers mêlés) ? */
+export function hostMatchesAny(host: string, patterns: readonly string[]): boolean {
+  return patterns.some((p) => hostMatchesPattern(host, p));
+}
+
 // ————— Stratégie d'écriture programmatique (§9.3) —————
 // Les éditeurs pilotés par un état applicatif absorbent l'affectation directe de `value` :
 // le champ paraît modifié, mais le contenu soumis ne l'est pas (§A.2, §B.2). La méthode

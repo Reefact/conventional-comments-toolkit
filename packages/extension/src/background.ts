@@ -21,9 +21,11 @@
 // bien ici que dans la page d'options et le script de contenu.
 
 import {
+  EMPTY_EXTRA_HOSTS,
   EXTRA_HOSTS_KEY,
   HOST_PLATFORMS_KEY,
   hostnameOf,
+  parseManagedHostTags,
   type ExtraHostsByPlatform,
   type HostPlatform,
 } from './host-platform.js';
@@ -167,23 +169,7 @@ async function readPlatformTags(): Promise<Record<string, HostPlatform>> {
   const managed = await new Promise<Record<string, HostPlatform>>((resolve) => {
     if (!chrome?.storage?.managed) return resolve({});
     try {
-      chrome.storage.managed.get((items) => {
-        const raw = items?.['allowedHosts'];
-        const tags: Record<string, HostPlatform> = {};
-        for (const entry of Array.isArray(raw) ? raw : []) {
-          if (typeof entry === 'string') {
-            const host = hostnameOf(entry);
-            if (host) tags[host] = 'github';
-          } else if (entry && typeof entry === 'object') {
-            const { host: rawHost, platform } = entry as { host?: unknown; platform?: unknown };
-            const host = typeof rawHost === 'string' ? hostnameOf(rawHost) : null;
-            if (host && (platform === 'github' || platform === 'azdo' || platform === 'config')) {
-              tags[host] = platform;
-            }
-          }
-        }
-        resolve(tags);
-      });
+      chrome.storage.managed.get((items) => resolve(parseManagedHostTags(items?.['allowedHosts'])));
     } catch {
       resolve({});
     }
@@ -192,8 +178,15 @@ async function readPlatformTags(): Promise<Record<string, HostPlatform>> {
 }
 
 /** Croise les origines réellement accordées avec leur étiquette de plateforme et publie
- * le résultat pour le script de contenu, qui ne peut pas le calculer lui-même. */
-export async function publishExtraHostsByPlatform(): Promise<ExtraHostsByPlatform> {
+ * le résultat pour le script de contenu, qui ne peut pas le calculer lui-même.
+ *
+ * **Sérialisée** (voir `publishExtraHostsByPlatform`) : autoriser un hôte puis l'étiqueter
+ * déclenche coup sur coup `permissions.onAdded` et `storage.onChanged`. Lancées librement,
+ * la première publication peut lire l'ancienne carte d'étiquettes et n'écrire qu'APRÈS la
+ * seconde, réinstallant une liste périmée d'où le nouvel hôte est absent — le script de
+ * contenu le rejetterait alors jusqu'au prochain événement ou redémarrage du worker
+ * (revue Codex, PR #29). */
+async function computeAndStoreExtraHosts(): Promise<ExtraHostsByPlatform> {
   const result: ExtraHostsByPlatform = { github: [], azdo: [] };
   if (!chrome?.permissions || !chrome?.storage?.local) return result;
   const [origins, tags] = await Promise.all([
@@ -215,6 +208,17 @@ export async function publishExtraHostsByPlatform(): Promise<ExtraHostsByPlatfor
     chrome!.storage!.local!.set({ [EXTRA_HOSTS_KEY]: result }, () => resolve());
   });
   return result;
+}
+
+/** File d'attente d'un seul écrivain — même motif que la page d'options. Chaque appel
+ * attend l'achèvement du précédent : la dernière publication est donc toujours celle qui
+ * a lu l'état le plus récent, et c'est elle qui reste écrite. */
+let publishQueue: Promise<ExtraHostsByPlatform> = Promise.resolve(EMPTY_EXTRA_HOSTS);
+
+export function publishExtraHostsByPlatform(): Promise<ExtraHostsByPlatform> {
+  const next = publishQueue.then(computeAndStoreExtraHosts, computeAndStoreExtraHosts);
+  publishQueue = next.catch(() => EMPTY_EXTRA_HOSTS);
+  return next;
 }
 
 chrome?.permissions?.onAdded?.addListener((perms) => {

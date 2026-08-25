@@ -277,3 +277,135 @@ describe('C — bootstrap() transmet bien la répartition lue aux deux construct
     vi.doUnmock('@cct/adapter-azdo');
   });
 });
+
+// ————— D — trois défauts relevés au second passage de la revue Codex sur cette PR —————
+// Chacun rendait le correctif inopérant sur un chemin réel, sans faire rougir un test.
+
+describe('D1 — un octroi JOKER couvre les sous-domaines concrets (§A.4, §B.6)', () => {
+  // `*.ghe.com` est le cas nommé par le §A.4 : GitHub Enterprise Cloud with data
+  // residency donne à chaque client un sous-domaine de ghe.com, inconnu à la compilation.
+  // Chrome accorde `https://*.ghe.com/*` et injecte le script sur `acme.ghe.com` ; une
+  // égalité stricte ne reconnaissait jamais cet hôte concret.
+  it('hostnameOf CONSERVE le joker plutôt que de le réduire au domaine nu', () => {
+    expect(hostnameOf('https://*.ghe.com/*')).toBe('*.ghe.com');
+    expect(hostnameOf('https://*.GHE.com/*')).toBe('*.ghe.com');
+  });
+
+  it('GithubClientAdapter reconnaît un sous-domaine concret couvert par le joker', () => {
+    const adapter = new GithubClientAdapter({ extraHosts: ['*.ghe.com'] });
+    expect(adapter.matchesHost(new URL('https://acme.ghe.com/acme/demo/pull/1'))).toBe(true);
+    expect(adapter.matchesHost(new URL('https://autre.ghe.com/'))).toBe(true);
+  });
+
+  it('AzdoClientAdapter en fait autant pour un joker d’entreprise', () => {
+    const adapter = new AzdoClientAdapter({ extraHosts: ['*.azdo.example.corp'] });
+    expect(adapter.matchesHost(new URL('https://eu.azdo.example.corp/'))).toBe(true);
+  });
+
+  it('le joker ne couvre PAS le domaine nu — sémantique des motifs Chrome', () => {
+    const adapter = new GithubClientAdapter({ extraHosts: ['*.ghe.com'] });
+    expect(adapter.matchesHost(new URL('https://ghe.com/'))).toBe(false);
+    // ...ni un domaine qui se termine par la même chaîne sans en être un sous-domaine.
+    expect(adapter.matchesHost(new URL('https://evilghe.com/'))).toBe(false);
+  });
+});
+
+describe('D2 — les publications concurrentes sont sérialisées (service worker)', () => {
+  // Autoriser un hôte puis l'étiqueter déclenche coup sur coup `permissions.onAdded` et
+  // `storage.onChanged`. Lancées librement, la première publication pouvait lire
+  // l'ancienne carte d'étiquettes et n'écrire qu'APRÈS la seconde, réinstallant une liste
+  // périmée d'où le nouvel hôte était absent.
+  //
+  // Ce test EXIGE un stockage asynchrone, et à latence DÉCROISSANTE. Une première version
+  // employait le faux synchrone des sections B/C : la course n'y était pas représentable,
+  // et le test passait aussi bien avec que sans la sérialisation — il ne prouvait donc
+  // rien. Le premier `get` est ici le plus lent, de sorte qu'une publication non
+  // sérialisée termine dans le désordre et écrase le bon résultat par le périmé.
+  it('la publication lente lancée en premier n’écrase pas le résultat de la plus récente', async () => {
+    const store: Record<string, unknown> = {};
+    // `null` tant que la course n'est pas armée : `background.js` publie DÉJÀ une fois à
+    // l'import (rattrapage au démarrage du worker). Une première version indexait le délai
+    // sur un simple compteur d'appels — cette publication de démarrage consommait alors le
+    // `get` lent, les deux appels du test devenaient rapides, et il passait aussi bien avec
+    // que sans la sérialisation. Le délai est donc armé APRÈS que l'import est retombé.
+    let delays: number[] | null = null;
+    (globalThis as { chrome?: unknown }).chrome = {
+      runtime: { onMessage: { addListener: vi.fn() }, lastError: null, openOptionsPage: vi.fn() },
+      action: { onClicked: { addListener: vi.fn() } },
+      permissions: {
+        getAll: (cb: (perms: { origins: string[] }) => void) =>
+          void setTimeout(() => cb({ origins: ['https://ghes.example.corp/*'] }), 0),
+        onAdded: { addListener: vi.fn() },
+        onRemoved: { addListener: vi.fn() },
+      },
+      scripting: {
+        registerContentScripts: vi.fn((_s: unknown, cb: () => void) => cb()),
+        unregisterContentScripts: vi.fn((_f: unknown, cb: () => void) => cb()),
+      },
+      storage: {
+        local: {
+          get: (keys: string[], cb: (items: Record<string, unknown>) => void) => {
+            // L'instantané est pris MAINTENANT, la livraison est différée : c'est ce qui
+            // fait qu'une publication lente rend un état déjà périmé à son écriture.
+            const picked: Record<string, unknown> = {};
+            for (const k of keys) if (k in store) picked[k] = store[k];
+            setTimeout(() => cb(picked), delays?.shift() ?? 0);
+          },
+          set: (items: Record<string, unknown>, cb?: () => void) => {
+            Object.assign(store, items);
+            cb?.();
+          },
+        },
+        managed: { get: (cb: (items: Record<string, unknown>) => void) => cb({}) },
+        onChanged: { addListener: vi.fn() },
+      },
+    };
+    const { publishExtraHostsByPlatform } = await import('../src/background.js');
+    await new Promise((r) => setTimeout(r, 10)); // laisse la publication de démarrage finir
+    delays = [30, 0]; // la lecture de la PREMIÈRE des deux publications ci-dessous traîne
+
+    // Première publication lancée alors qu'aucune étiquette n'existe encore...
+    const first = publishExtraHostsByPlatform();
+    // ...et seconde lancée aussitôt après que l'étiquette a été posée.
+    store[HOST_PLATFORMS_KEY] = { 'ghes.example.corp': 'github' };
+    const second = publishExtraHostsByPlatform();
+
+    await Promise.all([first, second]);
+    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: ['ghes.example.corp'], azdo: [] });
+  });
+});
+
+describe('D3 — une étiquette de politique d’entreprise est reconnue sans geste local', () => {
+  it('la forme objet {host, platform} classe un Azure DevOps Server', async () => {
+    const store = installServiceWorkerChrome(
+      ['https://azdo.example.corp/*'],
+      {},
+      { allowedHosts: [{ host: 'azdo.example.corp', platform: 'azdo' }] }
+    ).local;
+    const { publishExtraHostsByPlatform } = await import('../src/background.js');
+    await publishExtraHostsByPlatform();
+    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: ['azdo.example.corp'] });
+  });
+
+  it('la forme historique — une chaîne nue — vaut github, plateforme du domaine pré-déclarable', async () => {
+    const store = installServiceWorkerChrome(
+      ['https://ghes.example.corp/*'],
+      {},
+      { allowedHosts: ['ghes.example.corp'] }
+    ).local;
+    const { publishExtraHostsByPlatform } = await import('../src/background.js');
+    await publishExtraHostsByPlatform();
+    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: ['ghes.example.corp'], azdo: [] });
+  });
+
+  it('la politique PRIME sur une étiquette locale divergente', async () => {
+    const store = installServiceWorkerChrome(
+      ['https://host.example.corp/*'],
+      { [HOST_PLATFORMS_KEY]: { 'host.example.corp': 'github' } },
+      { allowedHosts: [{ host: 'host.example.corp', platform: 'azdo' }] }
+    ).local;
+    const { publishExtraHostsByPlatform } = await import('../src/background.js');
+    await publishExtraHostsByPlatform();
+    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: ['host.example.corp'] });
+  });
+});

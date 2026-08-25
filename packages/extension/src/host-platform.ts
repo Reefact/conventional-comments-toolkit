@@ -34,7 +34,14 @@ export const EMPTY_EXTRA_HOSTS: ExtraHostsByPlatform = { github: [], azdo: [] };
  * (revue Codex : une saisie `GHES.Example.Corp` stockée telle quelle ne matchait plus
  * jamais l'origine accordée, normalisée en minuscules par le navigateur). `null` si
  * l'entrée n'est pas exploitable — défensif, `chrome.permissions` reste hors du contrôle
- * de ce module. */
+ * de ce module.
+ *
+ * **Un joker de tête est CONSERVÉ** : `https://*.ghe.com/*` rend `*.ghe.com`, et c'est
+ * voulu. Chrome accorde des permissions sur ce motif (§A.4 — GitHub Enterprise Cloud with
+ * data residency donne à chaque client un sous-domaine de `ghe.com`, inconnu à la
+ * compilation), et `hostMatchesAny()` d'`@cct/adapter-shared` sait le confronter à un
+ * hôte concret. Le réduire à `ghe.com` ferait reconnaître le domaine nu et lui seul,
+ * c'est-à-dire l'exact inverse de ce que l'octroi couvre. */
 export function hostnameOf(input: string): string | null {
   const bare = input.trim().replace(/\/\*$/, '').replace(/^https?:\/\//, '');
   if (bare === '') return null;
@@ -43,4 +50,32 @@ export function hostnameOf(input: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** Étiquettes de plateforme poussées par la politique d'entreprise (`allowedHosts` de
+ * `chrome.storage.managed`, §10, §A.4, §B.4). Lue à l'identique par le service worker
+ * — qui publie la répartition — et par la page d'options, qui doit afficher un hôte
+ * classé par la politique comme tel, et non comme « à classer » : elle proposerait sinon
+ * une correction locale que `readPlatformTags()` laisse justement la politique écraser,
+ * donc restant sans effet (revue Codex, PR #29).
+ *
+ * Forme historique acceptée — une liste de noms d'hôtes sans plateforme — valant alors
+ * `github`, la plateforme du domaine pré-déclarable et le cas que cette clé sert en
+ * premier. Une entreprise qui déploie de l'Azure DevOps Server emploie la forme objet
+ * `{host, platform}`, qui porte la plateforme explicitement. */
+export function parseManagedHostTags(raw: unknown): Record<string, HostPlatform> {
+  const tags: Record<string, HostPlatform> = {};
+  for (const entry of Array.isArray(raw) ? raw : []) {
+    if (typeof entry === 'string') {
+      const host = hostnameOf(entry);
+      if (host) tags[host] = 'github';
+    } else if (entry && typeof entry === 'object') {
+      const { host: rawHost, platform } = entry as { host?: unknown; platform?: unknown };
+      const host = typeof rawHost === 'string' ? hostnameOf(rawHost) : null;
+      if (host && (platform === 'github' || platform === 'azdo' || platform === 'config')) {
+        tags[host] = platform;
+      }
+    }
+  }
+  return tags;
 }

@@ -2,7 +2,12 @@
 // limitées (§8.1.2 — jamais le mode ni les labels), affichage de l'état dégradé (§5.4)
 // et du journal local de dégradation de sélecteurs (§9.4).
 
-import { HOST_PLATFORMS_KEY, hostnameOf, type HostPlatform } from '../host-platform.js';
+import {
+  HOST_PLATFORMS_KEY,
+  hostnameOf,
+  parseManagedHostTags,
+  type HostPlatform,
+} from '../host-platform.js';
 
 interface ChromePermissions {
   request: (perms: { origins: string[] }, cb: (granted: boolean) => void) => void;
@@ -20,6 +25,7 @@ declare const chrome: {
       get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
       set: (items: Record<string, unknown>, cb?: () => void) => void;
     };
+    managed?: { get: (cb: (items: Record<string, unknown>) => void) => void };
   };
 } | undefined;
 
@@ -35,6 +41,22 @@ function readHostPlatforms(): Promise<Record<string, HostPlatform>> {
     chrome.storage.local.get([HOST_PLATFORMS_KEY], (items) => {
       resolve((items[HOST_PLATFORMS_KEY] as Record<string, HostPlatform> | undefined) ?? {});
     });
+  });
+}
+
+/** Étiquettes poussées par la politique d'entreprise. Cette page DOIT les lire — et pas
+ * seulement la carte locale : un hôte classé par la politique s'afficherait sinon comme
+ * « plateforme non précisée », et le sélecteur de rattrapage proposé n'écrirait qu'une
+ * valeur locale que `readPlatformTags()` (background.ts) laisse justement la politique
+ * écraser. La correction offerte serait donc sans effet (revue Codex, PR #29). */
+function readManagedHostPlatforms(): Promise<Record<string, HostPlatform>> {
+  return new Promise((resolve) => {
+    if (!chrome?.storage?.managed) return resolve({});
+    try {
+      chrome.storage.managed.get((items) => resolve(parseManagedHostTags(items?.['allowedHosts'])));
+    } catch {
+      resolve({});
+    }
   });
 }
 
@@ -63,9 +85,10 @@ function setHostPlatform(host: string, platform: HostPlatform): Promise<void> {
 async function refreshHosts(): Promise<void> {
   const list = document.getElementById('host-list');
   if (!list || !chrome?.permissions) return;
-  const [perms, tags] = await Promise.all([
+  const [perms, localTags, managedTags] = await Promise.all([
     new Promise<{ origins?: string[] }>((resolve) => chrome!.permissions!.getAll(resolve)),
     readHostPlatforms(),
+    readManagedHostPlatforms(),
   ]);
   list.textContent = '';
   for (const origin of perms.origins ?? []) {
@@ -76,7 +99,15 @@ async function refreshHosts(): Promise<void> {
       list.appendChild(li);
       continue;
     }
-    const known = tags[host];
+    // Même préséance qu'au calcul de la répartition (background.ts) : la politique prime.
+    // L'afficher en lecture seule, car aucune correction locale ne pourrait la changer.
+    const fromPolicy = managedTags[host];
+    if (fromPolicy) {
+      li.textContent = `${host} — ${PLATFORM_LABELS[fromPolicy] ?? fromPolicy} (politique d'entreprise)`;
+      list.appendChild(li);
+      continue;
+    }
+    const known = localTags[host];
     if (known) {
       // `config` est une classification délibérée, pas une absence : l'afficher comme
       // telle, sans la renvoyer au rattrapage à chaque rafraîchissement (revue Codex).

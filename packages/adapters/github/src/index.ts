@@ -16,6 +16,7 @@ import {
 import {
   closestChain,
   commentBodyText,
+  hostMatchesAny,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -59,7 +60,9 @@ export class GithubClientAdapter implements PlatformAdapter {
    * l'extension intégralement inactive tant qu'un rechargement complet ne la relance pas
    * directement sur l'URL de la PR. */
   matchesHost(url: URL): boolean {
-    return this.#hosts.some((h) => url.hostname === h);
+    // `hostMatchesAny` et non une égalité stricte : un hôte accordé peut être un joker
+    // `*.ghe.com` (§A.4 — sous-domaine dédié par client, inconnu à la compilation).
+    return hostMatchesAny(url.hostname, this.#hosts);
   }
 
   matches(url: URL): boolean {

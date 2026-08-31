@@ -66,7 +66,8 @@ jobs:
       # une croyance plutôt qu'à un navigateur. Ce test charge l'extension EMPAQUETÉE dans
       # un vrai Chromium et vérifie les prémisses de l'architecture, pas le code.
       - name: Construire le bundle MV3
-        run: npm run build:extension
+        # `build` d'abord : esbuild résout `@cct/*` vers les `dist/` des paquets workspace.
+        run: npm run build && npm run build:extension
 
       - name: Fumée MV3 — l'extension empaquetée dans un vrai Chromium
         run: npm run smoke:mv3

@@ -53,7 +53,11 @@ jobs:
       # vide, donc aucune activation sur un domaine d'entreprise. Le contrôle porte sur le
       # bundle livré, seul artefact que le navigateur charge réellement.
       - name: Aucune API hors de son contexte d'exécution
-        run: npm run build:extension && npm run check:context-apis
+        # `build` d'abord : le bundler résout `@cct/*` vers les `dist/` des paquets
+        # workspace, que `tsc -b` produit. Sans lui, esbuild échoue sur un clone frais —
+        # ce qui est arrivé ici, la vérification locale ayant été faite dans un
+        # environnement déjà compilé, donc dans un monde qui n'était pas celui de la CI.
+        run: npm run build && npm run build:extension && npm run check:context-apis
 
       # `specifications-fr.md` est la référence NORMATIVE : elle ne se modifie pas pour
       # correspondre au code. Un changement délibéré de la spécification reste possible —

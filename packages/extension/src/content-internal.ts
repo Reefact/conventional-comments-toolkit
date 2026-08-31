@@ -164,7 +164,15 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     new AzdoClientAdapter({ documentRef: doc, extraHosts: extraHosts.azdo }),
   ];
   const adapter = adapters.find((a) => a.matchesHost(url));
-  if (!adapter) return () => {};
+  if (!adapter) {
+    // §2 — AUCUN adaptateur pour l'instant, mais l'hôte peut le devenir : la répartition
+    // n'est peut-être pas encore publiée (le script de contenu s'exécute avant que le
+    // service worker n'ait fini son croisement, au tout premier octroi), ou l'hôte sera
+    // classé depuis la page d'options alors que cet onglet est DÉJÀ ouvert. Sans ce
+    // guet, l'onglet resterait mort jusqu'à un rechargement : le sens « sortie » de la
+    // permission était câblé (révocation), pas le sens « entrée » (revue Codex, PR #29).
+    return watchUntilActivated(url, doc);
+  }
 
   const resolver = new ClientConfigResolver(readManagedFloor);
   const currentUser = await adapter.getCurrentUser();
@@ -173,6 +181,12 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // déconnecter l'observateur ne suffit pas — un `attach()` déjà parti traverse plusieurs
   // `await` avant d'installer quoi que ce soit, et aboutirait après la révocation.
   let disposed = false;
+  // ...et les contrôleurs DÉJÀ attachés doivent être défaits, pas seulement empêchés :
+  // chacun a posé une barre d'outils, une saisie rapide et des écouteurs clavier/clic que
+  // seul son `dispose()` retire. Une première version ne coupait que les deux
+  // observations, laissant toute cette surface vivante sur un hôte devenu non autorisé
+  // jusqu'au rechargement de la page (revue Codex, PR #29).
+  const attached = new Set<EditorController>();
 
   const attach = async (editor: Parameters<Parameters<PlatformAdapter['observeEditors']>[0]>[0]) => {
     if (disposed) return;
@@ -193,6 +207,7 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     });
     if (disposed) return; // révoqué pendant les lectures ci-dessus : ne rien installer
     controller.attach();
+    attached.add(controller);
   };
 
   const editors = adapter.observeEditors((editor) => void attach(editor));
@@ -207,6 +222,8 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     disposed = true;
     editors.dispose();
     stopPrChrome();
+    for (const controller of attached) controller.dispose();
+    attached.clear();
   };
 
   // §2 — RETRAIT de la permission d'hôte, l'onglet restant ouvert. Désenregistrer le
@@ -215,26 +232,35 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // bouton d'envoi sur un hôte qui n'est plus autorisé, jusqu'au rechargement de la page
   // (revue Codex, PR #29). La répartition publiée est donc SUIVIE, pas seulement lue au
   // démarrage : dès que plus aucun adaptateur ne reconnaît l'hôte courant, tout est rendu.
-  const stopWatch = watchExtraHostsRevocation(url, doc, revoke);
+  const stopWatch = watchExtraHosts(url, doc, (matched) => {
+    if (!matched) revoke();
+  });
   return () => {
     stopWatch();
     revoke();
   };
 }
 
-/** Surveille la répartition publiée et appelle `onRevoked()` dès que l'hôte courant n'est
- * plus reconnu par aucun adaptateur. Les hôtes par défaut (github.com, dev.azure.com,
- * *.visualstudio.com) vivent dans les adaptateurs et ne dépendent d'aucune permission
- * optionnelle : reconstruire les deux adaptateurs avec les nouvelles listes suffit donc à
- * distinguer « hôte devenu non autorisé » de « hôte intégré au produit ». */
-function watchExtraHostsRevocation(url: URL, doc: Document, onRevoked: () => void): () => void {
+/** Surveille la répartition publiée et signale, à chaque publication, si l'hôte courant
+ * est reconnu par l'un des deux adaptateurs. Les hôtes par défaut (github.com,
+ * dev.azure.com, *.visualstudio.com) vivent dans les adaptateurs et ne dépendent d'aucune
+ * permission optionnelle : reconstruire les deux adaptateurs avec les nouvelles listes
+ * suffit donc à distinguer « hôte devenu (non) autorisé » de « hôte intégré au produit ».
+ *
+ * Un seul guet pour les DEUX sens : la révocation (reconnu → plus reconnu) et
+ * l'activation (pas reconnu → reconnu). Le second manquait — voir `watchUntilActivated`. */
+function watchExtraHosts(
+  url: URL,
+  doc: Document,
+  onPublished: (matched: boolean) => void
+): () => void {
   const listener = (changes: Record<string, { newValue?: unknown }>, areaName: string) => {
     if (areaName !== 'local' || !(EXTRA_HOSTS_KEY in changes)) return;
     const next = normalizeExtraHosts(changes[EXTRA_HOSTS_KEY]?.newValue);
-    const stillMatched =
+    onPublished(
       new GithubClientAdapter({ documentRef: doc, extraHosts: next.github }).matchesHost(url) ||
-      new AzdoClientAdapter({ documentRef: doc, extraHosts: next.azdo }).matchesHost(url);
-    if (!stillMatched) onRevoked();
+        new AzdoClientAdapter({ documentRef: doc, extraHosts: next.azdo }).matchesHost(url)
+    );
   };
   try {
     if (!chrome?.storage?.onChanged?.addListener) return () => {};
@@ -243,6 +269,29 @@ function watchExtraHostsRevocation(url: URL, doc: Document, onRevoked: () => voi
   } catch {
     return () => {};
   }
+}
+
+/** Aucun adaptateur ne reconnaît l'hôte : attendre une publication qui le reconnaisse, et
+ * relancer `bootstrap()` à ce moment-là. Rend le disposer de l'amorçage qui aura fini par
+ * démarrer, ou de rien du tout si aucun n'a démarré. */
+function watchUntilActivated(url: URL, doc: Document): () => void {
+  let live = true;
+  let started: (() => void) | null = null;
+  const stop = watchExtraHosts(url, doc, (matched) => {
+    if (!matched || !live || started) return;
+    stop(); // `bootstrap()` réinstalle son propre guet, celui-ci a fini son office
+    // `started` est posé APRÈS l'await : si le disposer est appelé entre-temps, `live`
+    // est déjà faux et l'amorçage tout juste terminé est défait aussitôt.
+    void bootstrap(doc).then((dispose) => {
+      started = dispose;
+      if (!live) dispose();
+    });
+  });
+  return () => {
+    live = false;
+    stop();
+    started?.();
+  };
 }
 
 function currentPrOf(adapter: PlatformAdapter): PrRef | null {

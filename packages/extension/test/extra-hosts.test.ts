@@ -26,6 +26,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
+import { hostMatchesAny, hostMatchesPattern } from '@cct/adapter-shared';
 import { EXTRA_HOSTS_KEY, HOST_PLATFORMS_KEY, hostnameOf } from '../src/host-platform.js';
 import { readExtraHostsByPlatform } from '../src/content-internal.js';
 
@@ -307,10 +308,18 @@ describe('D1 — un octroi JOKER couvre les sous-domaines concrets (§A.4, §B.6
     expect(adapter.matchesHost(new URL('https://eu.azdo.example.corp/'))).toBe(true);
   });
 
-  it('le joker ne couvre PAS le domaine nu — sémantique des motifs Chrome', () => {
+  // Ce test affirmait l'INVERSE — que le joker ne couvre pas le domaine nu — en invoquant
+  // « la sémantique des motifs Chrome ». C'était faux, et le verrouiller par un test était
+  // pire que ne pas le tester : la documentation des motifs WebExtension donne
+  // explicitement `https://mozilla.org/` comme correspondant à `*://*.mozilla.org/*`.
+  // Chrome injectait donc le script sur le domaine nu, que l'adaptateur refusait ensuite.
+  it('le joker couvre AUSSI le domaine nu, comme l’octroi que Chrome accorde', () => {
     const adapter = new GithubClientAdapter({ extraHosts: ['*.ghe.com'] });
-    expect(adapter.matchesHost(new URL('https://ghe.com/'))).toBe(false);
-    // ...ni un domaine qui se termine par la même chaîne sans en être un sous-domaine.
+    expect(adapter.matchesHost(new URL('https://ghe.com/'))).toBe(true);
+  });
+
+  it('mais pas un domaine qui se termine par la même chaîne sans en être un sous-domaine', () => {
+    const adapter = new GithubClientAdapter({ extraHosts: ['*.ghe.com'] });
     expect(adapter.matchesHost(new URL('https://evilghe.com/'))).toBe(false);
   });
 });
@@ -591,5 +600,206 @@ describe('E2 — un port non standard survit jusqu’aux URL de configuration (�
       configurable: true,
     });
     expect(new GithubClientAdapter({ documentRef: doc }).currentPr()?.host).toBe('github.com');
+  });
+});
+
+// ————— F — trois défauts relevés au troisième passage de la revue Codex —————
+
+describe('F1 — le joker suit la sémantique réelle des motifs WebExtension', () => {
+  // Voir D1 : le test qui suivait affirmait l'inverse, en invoquant à tort « la sémantique
+  // des motifs Chrome ». Ce bloc-ci exerce la fonction partagée directement, pour que la
+  // règle soit lisible sans passer par un adaptateur.
+  it('couvre le domaine nu ET ses sous-domaines', () => {
+    expect(hostMatchesPattern('ghe.com', '*.ghe.com')).toBe(true);
+    expect(hostMatchesPattern('acme.ghe.com', '*.ghe.com')).toBe(true);
+    expect(hostMatchesPattern('eu.acme.ghe.com', '*.ghe.com')).toBe(true);
+  });
+
+  it('ne couvre pas un voisin qui se termine par la même chaîne', () => {
+    expect(hostMatchesPattern('evilghe.com', '*.ghe.com')).toBe(false);
+    expect(hostMatchesPattern('ghe.com.evil.test', '*.ghe.com')).toBe(false);
+  });
+
+  it('une entrée sans joker reste une égalité stricte', () => {
+    expect(hostMatchesPattern('ghes.example.corp', 'ghes.example.corp')).toBe(true);
+    expect(hostMatchesPattern('sub.ghes.example.corp', 'ghes.example.corp')).toBe(false);
+  });
+
+  it('hostMatchesAny mêle entrées exactes et jokers', () => {
+    const patterns = ['ghes.example.corp', '*.ghe.com'];
+    expect(hostMatchesAny('ghe.com', patterns)).toBe(true);
+    expect(hostMatchesAny('ghes.example.corp', patterns)).toBe(true);
+    expect(hostMatchesAny('autre.example.corp', patterns)).toBe(false);
+  });
+});
+
+/** Adaptateur factice livrant UN éditeur à l'observation, pour que `bootstrap()` construise
+ * réellement un contrôleur — ce que les tests E1 ne faisaient pas. */
+function mockGithubAdapterDeliveringOneEditor(disposeEditors: () => void): void {
+  vi.doMock('@cct/adapter-github', () => ({
+    GithubClientAdapter: class {
+      #hosts: string[];
+      constructor(opts: { extraHosts?: string[] } = {}) {
+        this.#hosts = ['github.com', ...(opts.extraHosts ?? [])];
+      }
+      matchesHost(url: URL): boolean {
+        return this.#hosts.includes(url.hostname);
+      }
+      async getCurrentUser() {
+        return { login: 'someone' };
+      }
+      async getRepoConfig() {
+        return { status: 'absent' };
+      }
+      async getOrgConfig() {
+        return { status: 'absent' };
+      }
+      observeEditors(cb: (editor: unknown) => void) {
+        cb({
+          element: document.createElement('textarea'),
+          context: { pr: { host: 'ghes.example.corp', scope: ['acme', 'demo'], number: 1 } },
+        });
+        return { dispose: disposeEditors };
+      }
+      currentPr() {
+        return null;
+      }
+      readPublishedResult() {
+        return null;
+      }
+    },
+  }));
+  vi.doMock('@cct/adapter-azdo', () => ({
+    AzdoClientAdapter: class {
+      matchesHost(): boolean {
+        return false;
+      }
+    },
+  }));
+}
+
+describe('F2 — la révocation DÉFAIT les contrôleurs déjà attachés, pas seulement l’observation', () => {
+  // `EditorController.dispose()` est le seul à retirer la barre d'outils, la saisie rapide
+  // et les écouteurs clavier/clic. Une première version du correctif de révocation ne
+  // coupait que les deux observations : toute cette surface restait vivante sur un hôte
+  // devenu non autorisé, jusqu'au rechargement de la page.
+  it('chaque contrôleur attaché reçoit dispose() quand l’hôte quitte la répartition', async () => {
+    let listener:
+      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
+      | null = null;
+    const controllerDispose = vi.fn();
+    const controllerAttach = vi.fn();
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (_k: string[], cb: (items: Record<string, unknown>) => void) =>
+            cb({ [EXTRA_HOSTS_KEY]: { github: ['ghes.example.corp'], azdo: [] } }),
+          set: vi.fn(),
+        },
+        sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}) },
+        onChanged: {
+          addListener: (cb: typeof listener) => {
+            listener = cb;
+          },
+          removeListener: vi.fn(),
+        },
+      },
+    };
+    mockGithubAdapterDeliveringOneEditor(vi.fn());
+    vi.doMock('../src/editor-controller.js', () => ({
+      DEFAULT_DIRECT_SHORTCUTS: {},
+      EditorController: class {
+        attach = controllerAttach;
+        dispose = controllerDispose;
+      },
+    }));
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://ghes.example.corp/acme/demo'),
+      configurable: true,
+    });
+    await bootstrap(document);
+    await new Promise((r) => setTimeout(r, 0)); // `attach()` traverse plusieurs await
+    expect(controllerAttach).toHaveBeenCalledTimes(1);
+    expect(controllerDispose).not.toHaveBeenCalled();
+
+    listener!({ [EXTRA_HOSTS_KEY]: { newValue: { github: [], azdo: [] } } }, 'local');
+    expect(controllerDispose).toHaveBeenCalledTimes(1);
+
+    vi.doUnmock('../src/editor-controller.js');
+    vi.doUnmock('@cct/adapter-github');
+    vi.doUnmock('@cct/adapter-azdo');
+  });
+});
+
+describe('F3 — un hôte classé APRÈS l’ouverture de l’onglet finit par s’activer', () => {
+  // Le sens « sortie » de la permission était câblé (révocation), pas le sens « entrée ».
+  // Deux chemins réels y menaient : le script de contenu s'exécute avant que le service
+  // worker n'ait publié sa première répartition, ou l'hôte est classé depuis la page
+  // d'options alors que l'onglet est déjà ouvert.
+  it('bootstrap() sort sans adaptateur, puis démarre à la publication qui reconnaît l’hôte', async () => {
+    let listener:
+      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
+      | null = null;
+    const disposeEditors = vi.fn();
+    const controllerAttach = vi.fn();
+    // Le stockage est un VRAI état mutable ici : `chrome.storage.onChanged` ne se déclenche
+    // qu'APRÈS l'écriture, donc une relecture voit forcément la nouvelle valeur. Un faux
+    // qui notifierait sans que `get` change mentirait sur l'ordre réel des événements.
+    const store: Record<string, unknown> = {}; // répartition PAS ENCORE publiée
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (keys: string[], cb: (items: Record<string, unknown>) => void) => {
+            const picked: Record<string, unknown> = {};
+            for (const k of keys) if (k in store) picked[k] = store[k];
+            cb(picked);
+          },
+          set: vi.fn(),
+        },
+        sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}) },
+        onChanged: {
+          addListener: (cb: typeof listener) => {
+            listener = cb;
+          },
+          removeListener: vi.fn(),
+        },
+      },
+    };
+    mockGithubAdapterDeliveringOneEditor(disposeEditors);
+    vi.doMock('../src/editor-controller.js', () => ({
+      DEFAULT_DIRECT_SHORTCUTS: {},
+      EditorController: class {
+        attach = controllerAttach;
+        dispose = vi.fn();
+      },
+    }));
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://ghes.example.corp/acme/demo'),
+      configurable: true,
+    });
+    const dispose = await bootstrap(document);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(controllerAttach).not.toHaveBeenCalled(); // rien pour l'instant, c'est normal
+    expect(listener).toBeTypeOf('function'); // ...mais le guet est bien armé
+
+    // Le service worker publie enfin, et l'hôte y est classé : l'écriture d'abord, la
+    // notification ensuite — l'ordre que Chrome garantit.
+    const published = { github: ['ghes.example.corp'], azdo: [] };
+    store[EXTRA_HOSTS_KEY] = published;
+    listener!({ [EXTRA_HOSTS_KEY]: { newValue: published } }, 'local');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(controllerAttach).toHaveBeenCalledTimes(1);
+
+    // Et le disposer rendu à l'appelant défait bien l'amorçage tardif.
+    dispose();
+    expect(disposeEditors).toHaveBeenCalledTimes(1);
+
+    vi.doUnmock('../src/editor-controller.js');
+    vi.doUnmock('@cct/adapter-github');
+    vi.doUnmock('@cct/adapter-azdo');
   });
 });

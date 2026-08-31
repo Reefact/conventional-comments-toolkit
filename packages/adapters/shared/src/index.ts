@@ -60,13 +60,23 @@ export interface PlatformAdapter {
 // l'extension inerte sur la page (revue Codex, PR #29). Les deux adaptateurs partagent
 // donc cette fonction plutôt que de réinventer chacun sa règle.
 //
-// `*.exemple.com` couvre les sous-domaines (`acme.exemple.com`) mais PAS le domaine nu
-// (`exemple.com`) — c'est la sémantique des motifs de correspondance de Chrome, et une
-// organisation qui veut les deux accorde les deux.
+// `*.exemple.com` couvre le domaine nu (`exemple.com`) ET ses sous-domaines
+// (`acme.exemple.com`). C'est bien la sémantique des motifs WebExtension — la
+// documentation donne `https://mozilla.org/` comme correspondant à `*://*.mozilla.org/*`.
+// Une version antérieure de cette fonction excluait le domaine nu, en affirmant l'inverse,
+// et un test verrouillait cette croyance (revue Codex, PR #29) : Chrome injectait donc le
+// script sur le domaine nu couvert par l'octroi, et l'adaptateur refusait ensuite de le
+// reconnaître.
+//
+// Le suffixe est comparé PRÉCÉDÉ DE SON POINT pour les sous-domaines : sans lui,
+// `evilghe.com` passerait pour un sous-domaine de `ghe.com`.
 
 /** L'hôte `host` est-il couvert par l'entrée `pattern` — nom exact, ou joker `*.suffixe` ? */
 export function hostMatchesPattern(host: string, pattern: string): boolean {
-  if (pattern.startsWith('*.')) return host.endsWith(pattern.slice(1));
+  if (pattern.startsWith('*.')) {
+    const suffix = pattern.slice(2);
+    return host === suffix || host.endsWith(`.${suffix}`);
+  }
   return host === pattern;
 }
 

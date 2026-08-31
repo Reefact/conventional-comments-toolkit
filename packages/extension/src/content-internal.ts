@@ -15,7 +15,12 @@ import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage } from './config-resolver.js';
-import { EMPTY_EXTRA_HOSTS, EXTRA_HOSTS_KEY, type ExtraHostsByPlatform } from './host-platform.js';
+import {
+  EMPTY_EXTRA_HOSTS,
+  EXTRA_HOSTS_KEY,
+  selectPlatform,
+  type ExtraHostsByPlatform,
+} from './host-platform.js';
 import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
 import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
@@ -159,20 +164,49 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // intégralement inactive — aucun adaptateur choisi, donc aucun observateur armé — tant
   // qu'un rechargement complet ne la relançait pas directement sur l'URL de la PR.
   const extraHosts = await readExtraHostsByPlatform();
-  const adapters: (PlatformAdapter & { matchesHost(url: URL): boolean })[] = [
-    new GithubClientAdapter({ documentRef: doc, extraHosts: extraHosts.github }),
-    new AzdoClientAdapter({ documentRef: doc, extraHosts: extraHosts.azdo }),
-  ];
-  const adapter = adapters.find((a) => a.matchesHost(url));
-  if (!adapter) {
-    // §2 — AUCUN adaptateur pour l'instant, mais l'hôte peut le devenir : la répartition
-    // n'est peut-être pas encore publiée (le script de contenu s'exécute avant que le
-    // service worker n'ait fini son croisement, au tout premier octroi), ou l'hôte sera
-    // classé depuis la page d'options alors que cet onglet est DÉJÀ ouvert. Sans ce
-    // guet, l'onglet resterait mort jusqu'à un rechargement : le sens « sortie » de la
-    // permission était câblé (révocation), pas le sens « entrée » (revue Codex, PR #29).
-    return watchUntilActivated(url, doc);
-  }
+  // L'activation se décide sur la RÉPARTITION PUBLIÉE (`selectPlatform`), pas sur le
+  // `matchesHost()` des adaptateurs : celui-ci dit « je sais parler à cet hôte », jamais
+  // « j'ai le droit d'y être ». Les faire coïncider laissait `dev.azure.com` et
+  // `*.visualstudio.com` — défauts en dur des adaptateurs, mais bel et bien soumis à une
+  // permission optionnelle — actifs après révocation (revue Codex, PR #29).
+  const platform = selectPlatform(url.hostname, extraHosts);
+
+  // Un seul guet pour les TROIS transitions, parce que ce sont trois cas d'une même
+  // question — « quelle plateforme sert cet hôte, maintenant ? » :
+  //   • plus aucune  → révocation (l'onglet doit être rendu)
+  //   • une, alors qu'il n'y en avait pas → activation tardive (répartition pas encore
+  //     publiée à l'injection, ou hôte classé depuis les réglages, onglet déjà ouvert)
+  //   • une AUTRE → reclassement : l'onglet tournait sur le mauvais adaptateur
+  // Un booléen « un adaptateur matche » ne distinguait pas le troisième cas du statu quo.
+  let live = true;
+  let replacement: (() => void) | null = null;
+  let teardown = () => {};
+  let stopWatch = () => {};
+  const restart = () => {
+    stopWatch();
+    teardown();
+    void bootstrap(doc).then((dispose) => {
+      replacement = dispose;
+      if (!live) dispose(); // défait entre-temps : ne rien laisser derrière
+    });
+  };
+  stopWatch = watchExtraHosts(url, (next) => {
+    if (!live || selectPlatform(url.hostname, next) === platform) return;
+    restart();
+  });
+  const disposeAll = () => {
+    live = false;
+    stopWatch();
+    teardown();
+    replacement?.();
+  };
+
+  if (!platform) return disposeAll;
+
+  const adapter: PlatformAdapter & { matchesHost(url: URL): boolean } =
+    platform === 'github'
+      ? new GithubClientAdapter({ documentRef: doc, extraHosts: extraHosts.github })
+      : new AzdoClientAdapter({ documentRef: doc, extraHosts: extraHosts.azdo });
 
   const resolver = new ClientConfigResolver(readManagedFloor);
   const currentUser = await adapter.getCurrentUser();
@@ -230,37 +264,17 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // script de contenu (background.ts) n'empêche que les injections FUTURES : celui déjà
   // en place continue sinon d'observer le DOM, de poser la barre d'outils et de griser le
   // bouton d'envoi sur un hôte qui n'est plus autorisé, jusqu'au rechargement de la page
-  // (revue Codex, PR #29). La répartition publiée est donc SUIVIE, pas seulement lue au
-  // démarrage : dès que plus aucun adaptateur ne reconnaît l'hôte courant, tout est rendu.
-  const stopWatch = watchExtraHosts(url, doc, (matched) => {
-    if (!matched) revoke();
-  });
-  return () => {
-    stopWatch();
-    revoke();
-  };
+  // (revue Codex, PR #29). C'est `teardown` que le guet armé plus haut appellera.
+  teardown = revoke;
+  return disposeAll;
 }
 
-/** Surveille la répartition publiée et signale, à chaque publication, si l'hôte courant
- * est reconnu par l'un des deux adaptateurs. Les hôtes par défaut (github.com,
- * dev.azure.com, *.visualstudio.com) vivent dans les adaptateurs et ne dépendent d'aucune
- * permission optionnelle : reconstruire les deux adaptateurs avec les nouvelles listes
- * suffit donc à distinguer « hôte devenu (non) autorisé » de « hôte intégré au produit ».
- *
- * Un seul guet pour les DEUX sens : la révocation (reconnu → plus reconnu) et
- * l'activation (pas reconnu → reconnu). Le second manquait — voir `watchUntilActivated`. */
-function watchExtraHosts(
-  url: URL,
-  doc: Document,
-  onPublished: (matched: boolean) => void
-): () => void {
+/** Livre chaque nouvelle répartition publiée. Ne juge de rien : c'est `selectPlatform()`
+ * qui décide, chez l'appelant, si quelque chose a changé pour l'hôte courant. */
+function watchExtraHosts(url: URL, onPublished: (next: ExtraHostsByPlatform) => void): () => void {
   const listener = (changes: Record<string, { newValue?: unknown }>, areaName: string) => {
     if (areaName !== 'local' || !(EXTRA_HOSTS_KEY in changes)) return;
-    const next = normalizeExtraHosts(changes[EXTRA_HOSTS_KEY]?.newValue);
-    onPublished(
-      new GithubClientAdapter({ documentRef: doc, extraHosts: next.github }).matchesHost(url) ||
-        new AzdoClientAdapter({ documentRef: doc, extraHosts: next.azdo }).matchesHost(url)
-    );
+    onPublished(normalizeExtraHosts(changes[EXTRA_HOSTS_KEY]?.newValue));
   };
   try {
     if (!chrome?.storage?.onChanged?.addListener) return () => {};
@@ -269,29 +283,6 @@ function watchExtraHosts(
   } catch {
     return () => {};
   }
-}
-
-/** Aucun adaptateur ne reconnaît l'hôte : attendre une publication qui le reconnaisse, et
- * relancer `bootstrap()` à ce moment-là. Rend le disposer de l'amorçage qui aura fini par
- * démarrer, ou de rien du tout si aucun n'a démarré. */
-function watchUntilActivated(url: URL, doc: Document): () => void {
-  let live = true;
-  let started: (() => void) | null = null;
-  const stop = watchExtraHosts(url, doc, (matched) => {
-    if (!matched || !live || started) return;
-    stop(); // `bootstrap()` réinstalle son propre guet, celui-ci a fini son office
-    // `started` est posé APRÈS l'await : si le disposer est appelé entre-temps, `live`
-    // est déjà faux et l'amorçage tout juste terminé est défait aussitôt.
-    void bootstrap(doc).then((dispose) => {
-      started = dispose;
-      if (!live) dispose();
-    });
-  });
-  return () => {
-    live = false;
-    stop();
-    started?.();
-  };
 }
 
 function currentPrOf(adapter: PlatformAdapter): PrRef | null {

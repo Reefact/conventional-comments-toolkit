@@ -24,16 +24,25 @@
       <label>
         Ajouter un domaine :
         <input type="text" id="host-input" placeholder="ghes.example.interne" />
-        <select id="host-platform">
+        <select id="host-platform" required>
+          <!-- Aucune plateforme pré-choisie : `github` en tête était sélectionné par
+               défaut, et autoriser un domaine Azure DevOps sans toucher au menu
+               l'étiquetait silencieusement GitHub — sur dev.azure.com les deux
+               adaptateurs correspondaient alors, et bootstrap() prenait GitHub en
+               premier. Le cas Azure documenté était donc cassé par défaut. -->
+          <option value="" selected>— choisir la plateforme —</option>
           <option value="github">GitHub Enterprise Server / GHE Cloud (résidence)</option>
           <option value="azdo">Azure DevOps Server</option>
           <option value="config">Autre (hôte de configuration d'organisation uniquement)</option>
         </select>
         <button id="host-add" type="button">Autoriser</button>
+        <span id="host-add-state" aria-live="polite"></span>
       </label>
       <p>
         La plateforme choisie détermine quel adaptateur reconnaît ce domaine — un domaine
-        autorisé mais non associé n'active aucune interface (§2).
+        autorisé mais non associé n'active aucune interface (§2). Elle est pré-remplie pour
+        les domaines de produit connus (<code>dev.azure.com</code>,
+        <code>*.visualstudio.com</code>, <code>*.ghe.com</code>), à confirmer ou corriger.
       </p>
       <ul id="host-list" aria-live="polite"></ul>
     </fieldset>

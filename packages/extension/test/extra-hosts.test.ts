@@ -27,7 +27,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { hostMatchesAny, hostMatchesPattern } from '@cct/adapter-shared';
-import { EXTRA_HOSTS_KEY, HOST_PLATFORMS_KEY, hostnameOf } from '../src/host-platform.js';
+import {
+  EMPTY_EXTRA_HOSTS,
+  EXTRA_HOSTS_KEY,
+  HOST_PLATFORMS_KEY,
+  hostnameOf,
+  inferPlatform,
+  selectPlatform,
+} from '../src/host-platform.js';
 import { readExtraHostsByPlatform } from '../src/content-internal.js';
 
 /** Contexte d'un SCRIPT DE CONTENU : `chrome.storage.local` seul, jamais
@@ -240,21 +247,40 @@ describe('B3 — le SCRIPT DE CONTENU lit la valeur publiée, sans jamais touche
   });
 });
 
-describe('C — bootstrap() transmet bien la répartition lue aux deux constructeurs', () => {
-  it('les hôtes atteignent le bon adaptateur, ceux de l’autre plateforme n’y apparaissent pas', async () => {
-    installContentScriptChrome({
-      [EXTRA_HOSTS_KEY]: { github: ['ghes.example.corp'], azdo: ['azdo.example.corp'] },
-    });
+describe('C — bootstrap() construit LE bon adaptateur, avec les hôtes de sa plateforme', () => {
+  // Ce bloc vérifiait auparavant que les DEUX constructeurs étaient appelés : bootstrap()
+  // les instanciait tous les deux pour interroger leur `matchesHost()`. L'activation se
+  // décidant désormais sur la répartition publiée (`selectPlatform`, voir G1), un seul
+  // adaptateur est construit — celui qui sert. L'intention du test ne change pas : chaque
+  // plateforme reçoit ses hôtes, et jamais ceux de l'autre.
+  const split = { github: ['ghes.example.corp'], azdo: ['azdo.example.corp'] };
 
-    const githubCtorArgs: unknown[] = [];
-    const azdoCtorArgs: unknown[] = [];
+  function mockBothAdapters(githubCtorArgs: unknown[], azdoCtorArgs: unknown[]): void {
+    const inert = {
+      async getCurrentUser() {
+        return { login: 'someone' };
+      },
+      async getRepoConfig() {
+        return { status: 'absent' };
+      },
+      async getOrgConfig() {
+        return { status: 'absent' };
+      },
+      observeEditors() {
+        return { dispose: () => {} };
+      },
+      currentPr() {
+        return null;
+      },
+      readPublishedResult() {
+        return null;
+      },
+    };
     vi.doMock('@cct/adapter-github', () => ({
       GithubClientAdapter: class {
         constructor(opts: unknown) {
           githubCtorArgs.push(opts);
-        }
-        matchesHost(): boolean {
-          return false; // aucun ne matche : le test s'arrête avant tout rendu
+          Object.assign(this, inert);
         }
       },
     }));
@@ -262,12 +288,57 @@ describe('C — bootstrap() transmet bien la répartition lue aux deux construct
       AzdoClientAdapter: class {
         constructor(opts: unknown) {
           azdoCtorArgs.push(opts);
-        }
-        matchesHost(): boolean {
-          return false;
+          Object.assign(this, inert);
         }
       },
     }));
+  }
+
+  it('sur un hôte GitHub, seul GithubClientAdapter est construit, avec les hôtes github', async () => {
+    installContentScriptChrome({ [EXTRA_HOSTS_KEY]: split });
+    const githubCtorArgs: unknown[] = [];
+    const azdoCtorArgs: unknown[] = [];
+    mockBothAdapters(githubCtorArgs, azdoCtorArgs);
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://ghes.example.corp/acme/demo'),
+      configurable: true,
+    });
+    await bootstrap(document);
+
+    expect(githubCtorArgs).toEqual([{ documentRef: document, extraHosts: ['ghes.example.corp'] }]);
+    expect(azdoCtorArgs).toEqual([]);
+
+    vi.doUnmock('@cct/adapter-github');
+    vi.doUnmock('@cct/adapter-azdo');
+  });
+
+  it('sur un hôte Azure DevOps, seul AzdoClientAdapter est construit, avec les hôtes azdo', async () => {
+    installContentScriptChrome({ [EXTRA_HOSTS_KEY]: split });
+    const githubCtorArgs: unknown[] = [];
+    const azdoCtorArgs: unknown[] = [];
+    mockBothAdapters(githubCtorArgs, azdoCtorArgs);
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://azdo.example.corp/acme/demo'),
+      configurable: true,
+    });
+    await bootstrap(document);
+
+    expect(azdoCtorArgs).toEqual([{ documentRef: document, extraHosts: ['azdo.example.corp'] }]);
+    expect(githubCtorArgs).toEqual([]);
+
+    vi.doUnmock('@cct/adapter-github');
+    vi.doUnmock('@cct/adapter-azdo');
+  });
+
+  it('sur un hôte qu’aucune plateforme ne sert, AUCUN adaptateur n’est construit', async () => {
+    installContentScriptChrome({ [EXTRA_HOSTS_KEY]: split });
+    const githubCtorArgs: unknown[] = [];
+    const azdoCtorArgs: unknown[] = [];
+    mockBothAdapters(githubCtorArgs, azdoCtorArgs);
 
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', {
@@ -276,16 +347,13 @@ describe('C — bootstrap() transmet bien la répartition lue aux deux construct
     });
     await bootstrap(document);
 
-    expect(githubCtorArgs).toEqual([{ documentRef: document, extraHosts: ['ghes.example.corp'] }]);
-    expect(azdoCtorArgs).toEqual([{ documentRef: document, extraHosts: ['azdo.example.corp'] }]);
+    expect(githubCtorArgs).toEqual([]);
+    expect(azdoCtorArgs).toEqual([]);
 
     vi.doUnmock('@cct/adapter-github');
     vi.doUnmock('@cct/adapter-azdo');
   });
 });
-
-// ————— D — trois défauts relevés au second passage de la revue Codex sur cette PR —————
-// Chacun rendait le correctif inopérant sur un chemin réel, sans faire rougir un test.
 
 describe('D1 — un octroi JOKER couvre les sous-domaines concrets (§A.4, §B.6)', () => {
   // `*.ghe.com` est le cas nommé par le §A.4 : GitHub Enterprise Cloud with data
@@ -801,5 +869,218 @@ describe('F3 — un hôte classé APRÈS l’ouverture de l’onglet finit par s
     vi.doUnmock('../src/editor-controller.js');
     vi.doUnmock('@cct/adapter-github');
     vi.doUnmock('@cct/adapter-azdo');
+  });
+});
+
+// ————— G — trois défauts relevés au quatrième passage de la revue Codex —————
+
+describe('G1 — l’activation se décide sur la répartition publiée, pas sur matchesHost()', () => {
+  // `dev.azure.com` et `*.visualstudio.com` sont des défauts EN DUR des adaptateurs, mais
+  // `content_scripts` du manifeste ne couvre statiquement que github.com : ces hôtes
+  // dépendent donc bel et bien d'une permission optionnelle. Un commentaire de ce dépôt
+  // affirmait l'inverse, et la révocation était de fait muette sur toute la famille Azure.
+  it('seul github.com est actif sans figurer dans la répartition', () => {
+    expect(selectPlatform('github.com', EMPTY_EXTRA_HOSTS)).toBe('github');
+  });
+
+  it('dev.azure.com et *.visualstudio.com ne s’activent PAS sur leur seul défaut d’adaptateur', () => {
+    expect(selectPlatform('dev.azure.com', EMPTY_EXTRA_HOSTS)).toBeNull();
+    expect(selectPlatform('acme.visualstudio.com', EMPTY_EXTRA_HOSTS)).toBeNull();
+  });
+
+  it('...mais s’activent dès que la répartition les porte', () => {
+    const extra = { github: [], azdo: ['dev.azure.com', '*.visualstudio.com'] };
+    expect(selectPlatform('dev.azure.com', extra)).toBe('azdo');
+    expect(selectPlatform('acme.visualstudio.com', extra)).toBe('azdo');
+  });
+
+  it('rend la plateforme, pas un booléen : c’est ce qui rend un reclassement visible', () => {
+    const host = 'host.example.corp';
+    expect(selectPlatform(host, { github: [host], azdo: [] })).toBe('github');
+    expect(selectPlatform(host, { github: [], azdo: [host] })).toBe('azdo');
+  });
+});
+
+describe('G2 — la page d’options n’étiquette rien sans choix explicite', () => {
+  it('ne devine pas un domaine auto-hébergé — le cas courant', () => {
+    expect(inferPlatform('ghes.example.corp')).toBeNull();
+    expect(inferPlatform('azdo.example.corp')).toBeNull();
+  });
+
+  it('pré-remplit les domaines de produit connus, Azure comme GitHub', () => {
+    expect(inferPlatform('dev.azure.com')).toBe('azdo');
+    expect(inferPlatform('acme.visualstudio.com')).toBe('azdo');
+    expect(inferPlatform('acme.ghe.com')).toBe('github');
+    expect(inferPlatform('github.com')).toBe('github');
+  });
+});
+
+describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur', () => {
+  // Le guet ne rendait qu'un booléen « un adaptateur matche » : reclasser un hôte
+  // github → azdo le laissait à `true`, donc rien ne bougeait et l'onglet continuait avec
+  // l'ancien adaptateur — ses observateurs, ses sélecteurs DOM et ses URL de config.
+  it('révoque l’ancien adaptateur et réamorce quand la plateforme de l’hôte change', async () => {
+    let listener:
+      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
+      | null = null;
+    const githubDispose = vi.fn();
+    const azdoDispose = vi.fn();
+    const store: Record<string, unknown> = {
+      [EXTRA_HOSTS_KEY]: { github: ['host.example.corp'], azdo: [] },
+    };
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (keys: string[], cb: (items: Record<string, unknown>) => void) => {
+            const picked: Record<string, unknown> = {};
+            for (const k of keys) if (k in store) picked[k] = store[k];
+            cb(picked);
+          },
+          set: vi.fn(),
+        },
+        sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}) },
+        onChanged: {
+          addListener: (cb: typeof listener) => {
+            listener = cb;
+          },
+          removeListener: vi.fn(),
+        },
+      },
+    };
+    const mkAdapter = (dispose: () => void) =>
+      class {
+        matchesHost(): boolean {
+          return true;
+        }
+        async getCurrentUser() {
+          return { login: 'someone' };
+        }
+        async getRepoConfig() {
+          return { status: 'absent' };
+        }
+        async getOrgConfig() {
+          return { status: 'absent' };
+        }
+        observeEditors() {
+          return { dispose };
+        }
+        currentPr() {
+          return null;
+        }
+        readPublishedResult() {
+          return null;
+        }
+      };
+    vi.doMock('@cct/adapter-github', () => ({ GithubClientAdapter: mkAdapter(githubDispose) }));
+    vi.doMock('@cct/adapter-azdo', () => ({ AzdoClientAdapter: mkAdapter(azdoDispose) }));
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://host.example.corp/acme/demo'),
+      configurable: true,
+    });
+    await bootstrap(document);
+    expect(githubDispose).not.toHaveBeenCalled();
+    expect(azdoDispose).not.toHaveBeenCalled();
+
+    // L'hôte est reclassé en Azure DevOps : écriture d'abord, notification ensuite.
+    const reclassified = { github: [], azdo: ['host.example.corp'] };
+    store[EXTRA_HOSTS_KEY] = reclassified;
+    listener!({ [EXTRA_HOSTS_KEY]: { newValue: reclassified } }, 'local');
+    await new Promise((r) => setTimeout(r, 0));
+
+    // L'adaptateur GitHub est défait, et le réamorçage a armé celui d'Azure DevOps.
+    expect(githubDispose).toHaveBeenCalledTimes(1);
+    expect(azdoDispose).not.toHaveBeenCalled(); // vivant : c'est lui qui sert désormais
+
+    vi.doUnmock('@cct/adapter-github');
+    vi.doUnmock('@cct/adapter-azdo');
+  });
+});
+
+describe('G2bis — la page d’options REFUSE d’étiqueter sans choix explicite', () => {
+  // Le test G2 ci-dessus ne couvre que la règle d'inférence. Le défaut réellement buggé
+  // était ailleurs : `<option value="github">` en tête était sélectionné d'office, et
+  // `platformSelect?.value || 'config'` fournissait en plus un repli implicite. Ce bloc-ci
+  // exerce donc la page elle-même, en montant le DOM qu'elle attend.
+  function mountOptionsDom(): void {
+    document.body.innerHTML = `
+      <input type="text" id="host-input" />
+      <select id="host-platform">
+        <option value="" selected>— choisir la plateforme —</option>
+        <option value="github">GitHub</option>
+        <option value="azdo">Azure DevOps Server</option>
+        <option value="config">Autre</option>
+      </select>
+      <button id="host-add" type="button"></button>
+      <span id="host-add-state"></span>
+      <ul id="host-list"></ul>
+      <select id="language"></select>
+      <textarea id="direct-shortcuts"></textarea>
+      <button id="direct-shortcuts-save"></button>
+      <span id="direct-shortcuts-state"></span>
+      <p id="degraded-state"></p>
+      <p id="selector-log"></p>`;
+  }
+
+  function installOptionsChrome(request: (o: { origins: string[] }, cb: (g: boolean) => void) => void) {
+    const stored: Record<string, unknown> = {};
+    (globalThis as { chrome?: unknown }).chrome = {
+      permissions: {
+        request,
+        getAll: (cb: (p: { origins?: string[] }) => void) => cb({ origins: [] }),
+      },
+      storage: {
+        local: {
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb(stored),
+          set: (items: Record<string, unknown>, cb?: () => void) => {
+            Object.assign(stored, items);
+            cb?.();
+          },
+        },
+        sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}), set: vi.fn() },
+        managed: { get: (cb: (i: Record<string, unknown>) => void) => cb({}) },
+      },
+    };
+    return stored;
+  }
+
+  it('sans plateforme choisie, aucune permission n’est demandée et rien n’est étiqueté', async () => {
+    mountOptionsDom();
+    const request = vi.fn();
+    const stored = installOptionsChrome(request);
+    await import('../src/options/options.js');
+
+    (document.getElementById('host-input') as HTMLInputElement).value = 'azdo.example.corp';
+    (document.getElementById('host-add') as HTMLButtonElement).click();
+
+    expect(request).not.toHaveBeenCalled();
+    expect(stored[HOST_PLATFORMS_KEY]).toBeUndefined();
+    expect(document.getElementById('host-add-state')?.textContent).toMatch(/plateforme/i);
+  });
+
+  it('un domaine Azure connu pré-remplit le menu, au lieu de le laisser sur GitHub', async () => {
+    mountOptionsDom();
+    installOptionsChrome(vi.fn());
+    await import('../src/options/options.js');
+
+    const input = document.getElementById('host-input') as HTMLInputElement;
+    input.value = 'dev.azure.com';
+    input.dispatchEvent(new Event('input'));
+
+    expect((document.getElementById('host-platform') as HTMLSelectElement).value).toBe('azdo');
+  });
+
+  it('une fois la plateforme choisie, l’étiquette écrite est bien celle-là', async () => {
+    mountOptionsDom();
+    const stored = installOptionsChrome((_o, cb) => cb(true));
+    await import('../src/options/options.js');
+
+    (document.getElementById('host-input') as HTMLInputElement).value = 'azdo.example.corp';
+    (document.getElementById('host-platform') as HTMLSelectElement).value = 'azdo';
+    (document.getElementById('host-add') as HTMLButtonElement).click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(stored[HOST_PLATFORMS_KEY]).toEqual({ 'azdo.example.corp': 'azdo' });
   });
 });

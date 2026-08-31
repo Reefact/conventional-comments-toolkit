@@ -6,6 +6,8 @@
 // résultat déjà calculé par background.ts dans `chrome.storage.local`, seule API des
 // trois accessible dans les trois contextes.
 
+import { hostMatchesAny as matchesAnyHostPattern } from '@cct/adapter-shared';
+
 /** Clé `chrome.storage.local` où la page d'options associe un hôte accordé à la
  * plateforme qui le sert. */
 export const HOST_PLATFORMS_KEY = 'hostPlatforms';
@@ -50,6 +52,49 @@ export function hostnameOf(input: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** Le SEUL hôte que `content_scripts` du manifeste injecte statiquement, et donc le seul
+ * qui ne dépende d'aucune permission optionnelle. `dev.azure.com` et `*.visualstudio.com`
+ * sont des défauts codés en dur DANS LES ADAPTATEURS, ce qui est une tout autre chose :
+ * ils ne sont injectés que si l'utilisateur a accordé la permission d'hôte, et la
+ * révocation doit donc les désactiver comme n'importe quel domaine auto-hébergé. Un
+ * commentaire de ce dépôt affirmait le contraire — « les hôtes par défaut […] ne dépendent
+ * d'aucune permission optionnelle » — et la révocation était de fait inopérante sur toute
+ * la famille Azure (revue Codex, PR #29). */
+export const STATICALLY_INJECTED_HOST = 'github.com';
+
+/** Plateforme évidente pour un domaine de PRODUIT connu — pré-remplissage de la page
+ * d'options, jamais une décision prise à la place de la personne : le menu reste
+ * modifiable, et un domaine auto-hébergé (le cas courant ici) n'est pas devinable, ce qui
+ * laisse le menu vide plutôt que de risquer une étiquette fausse.
+ *
+ * Vit ici, et non dans la page d'options, parce que c'est une règle sur les hôtes — et
+ * parce que `options.ts` touche `chrome` au chargement du module, donc ne s'importe pas
+ * hors du contexte d'une page d'extension. */
+export function inferPlatform(host: string): HostPlatform | null {
+  if (host === 'dev.azure.com' || host.endsWith('.visualstudio.com')) return 'azdo';
+  if (host === 'github.com' || host === 'ghe.com' || host.endsWith('.ghe.com')) return 'github';
+  return null;
+}
+
+/** Quelle plateforme doit servir cet hôte, au vu de la répartition publiée — ou `null` si
+ * aucune ne le doit.
+ *
+ * C'est ici, et pas dans `matchesHost()` des adaptateurs, que se décide l'activation :
+ * l'adaptateur répond « je sais parler à cet hôte », question utile une fois qu'il est
+ * choisi, mais qui ne dit rien du DROIT d'y être. Réduire les deux à un booléen
+ * « un adaptateur matche » perdait justement les deux informations qui comptent — par quel
+ * droit, et lequel — d'où une révocation muette sur les hôtes Azure intégrés, et un
+ * reclassement d'hôte qui laissait l'onglet sur l'ancien adaptateur. */
+export function selectPlatform(
+  hostname: string,
+  extra: ExtraHostsByPlatform
+): 'github' | 'azdo' | null {
+  if (hostname === STATICALLY_INJECTED_HOST) return 'github';
+  if (matchesAnyHostPattern(hostname, extra.github)) return 'github';
+  if (matchesAnyHostPattern(hostname, extra.azdo)) return 'azdo';
+  return null;
 }
 
 /** Étiquettes de plateforme poussées par la politique d'entreprise (`allowedHosts` de

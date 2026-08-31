@@ -5,6 +5,7 @@
 import {
   HOST_PLATFORMS_KEY,
   hostnameOf,
+  inferPlatform,
   parseManagedHostTags,
   type HostPlatform,
 } from '../host-platform.js';
@@ -137,18 +138,44 @@ async function refreshHosts(): Promise<void> {
   }
 }
 
+const hostInput = document.getElementById('host-input') as HTMLInputElement | null;
+const platformSelect = document.getElementById('host-platform') as HTMLSelectElement | null;
+const addState = document.getElementById('host-add-state');
+
+hostInput?.addEventListener('input', () => {
+  if (!platformSelect || platformSelect.value !== '') return; // ne pas écraser un choix fait
+  const inferred = inferPlatform(hostnameOf(hostInput.value) ?? '');
+  if (inferred) platformSelect.value = inferred;
+});
+
 document.getElementById('host-add')?.addEventListener('click', () => {
-  const input = document.getElementById('host-input') as HTMLInputElement | null;
-  const platformSelect = document.getElementById('host-platform') as HTMLSelectElement | null;
   // Canonicaliser AVANT de demander la permission ET d'écrire l'étiquette : le navigateur
   // normalise l'origine accordée (casse, IDN), et une clé stockée sous la saisie brute
   // (`GHES.Example.Corp`) ne serait plus jamais retrouvée (revue Codex, PR #29).
-  const host = hostnameOf(input?.value ?? '');
-  if (!host || !chrome?.permissions) return;
-  const platform = (platformSelect?.value || 'config') as HostPlatform;
+  const host = hostnameOf(hostInput?.value ?? '');
+  if (!chrome?.permissions) return;
+  if (!host) {
+    if (addState) addState.textContent = 'Domaine invalide.';
+    return;
+  }
+  // Aucun repli implicite : sans choix explicite, on ne devine pas. Un défaut silencieux
+  // étiquetait un domaine Azure DevOps en `github`, et un repli sur `config` n'activerait
+  // aucun adaptateur — deux façons de casser l'installation sans rien dire.
+  const platform = platformSelect?.value as HostPlatform | '' | undefined;
+  if (!platform) {
+    if (addState) addState.textContent = 'Choisissez la plateforme servie par ce domaine.';
+    platformSelect?.focus();
+    return;
+  }
   chrome.permissions.request({ origins: [`https://${host}/*`] }, (granted) => {
-    if (!granted) return;
-    void setHostPlatform(host, platform).then(() => void refreshHosts());
+    if (!granted) {
+      if (addState) addState.textContent = 'Permission refusée.';
+      return;
+    }
+    void setHostPlatform(host, platform).then(() => {
+      if (addState) addState.textContent = '';
+      void refreshHosts();
+    });
   });
 });
 

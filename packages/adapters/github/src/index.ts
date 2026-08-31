@@ -37,15 +37,20 @@ export interface GithubClientOptions {
    * service worker : une fonction ne franchit pas la frontière des contextes d'une
    * extension. Pour cela, voir `readOrgConfig` ci-dessous. */
   fetchImpl?: typeof fetch;
-  /** Lecture du `configUrl` d'organisation, quand l'appelant en détient un chemin que cet
-   * adaptateur n'a pas. Dans l'extension, c'est le cas : le script de contenu émet ses
-   * requêtes au nom de l'origine de la page et reste soumis à sa politique CORS, quelle que
-   * soit la permission d'hôte accordée (doc Chrome, « Cross-origin network requests ») ; un
-   * `configUrl` hébergé hors de la plateforme affichée n'y est donc pas lisible. Le service
-   * worker le lit à sa place et le résultat arrive par ici. Absent — usage hors extension,
-   * tests — le repli est le `fetch` direct ci-dessous, qui reste correct là où l'origine
-   * appelante a le droit de lire. */
-  readOrgConfig?: (url: string) => Promise<ConfigRead>;
+  /** Lecture du `configUrl` d'organisation par un chemin que cet adaptateur n'a pas. Dans
+   * l'extension, c'est le service worker : le script de contenu émet ses requêtes au nom de
+   * l'origine de la page et reste soumis à sa politique CORS, quelle que soit la permission
+   * d'hôte accordée (doc Chrome, « Cross-origin network requests ») ; un `configUrl` hébergé
+   * hors de la plateforme affichée n'y est donc pas lisible.
+   *
+   * **Rendre `null` signifie « lis-le toi-même »**, et cette troisième réponse est
+   * nécessaire : l'appelant est seul à savoir si l'URL est de MÊME origine que la page, cas
+   * où la lecture directe fonctionne — et où le détour par le worker échouerait, faute d'une
+   * permission d'hôte sur le domaine de plateforme que le manifeste ne déclare plus (revue
+   * Codex, PR #30). La décision est donc prise par URL, pas une fois pour toutes.
+   *
+   * Absent — usage hors extension, tests — le `fetch` direct ci-dessous s'applique de même. */
+  readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
   documentRef?: Document;
   log?: SelectorLog;
 }
@@ -54,7 +59,7 @@ export class GithubClientAdapter implements PlatformAdapter {
   #hosts: string[];
   #fetch: typeof fetch;
   #doc: Document;
-  #readOrgConfig?: (url: string) => Promise<ConfigRead>;
+  #readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
   readonly log: SelectorLog;
   #editorSeq = 0;
 
@@ -104,7 +109,10 @@ export class GithubClientAdapter implements PlatformAdapter {
 
   async getOrgConfig(url: string | null): Promise<ConfigRead> {
     if (url === null) return { status: 'absent' };
-    if (this.#readOrgConfig) return this.#readOrgConfig(url);
+    // `null` : l'appelant décline pour CETTE url (même origine que la page) — la lecture
+    // directe ci-dessous est alors la bonne, et la seule qui aboutisse.
+    const relayed = this.#readOrgConfig?.(url);
+    if (relayed) return relayed;
     try {
       const res = await this.#fetch(url, { credentials: 'include' });
       if (res.status === 404) return { status: 'absent' };

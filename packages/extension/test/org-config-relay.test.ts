@@ -92,6 +92,38 @@ describe('A — les adaptateurs délèguent la lecture d’ORGANISATION, jamais 
     ]);
   });
 
+  // La troisième réponse du relais : « lis-le toi-même ». L'appelant est seul à savoir si
+  // l'URL est de même origine que la page — cas où la lecture directe marche, et où le
+  // détour par le worker échouerait (revue Codex, PR #30).
+  it('un relais qui DÉCLINE (null) renvoie l’adaptateur à sa lecture directe', async () => {
+    const fetched: string[] = [];
+    const adapter = new GithubClientAdapter({
+      fetchImpl: (async (url: string) => {
+        fetched.push(String(url));
+        return new Response('{"mode":"advisory"}', { status: 200 });
+      }) as unknown as typeof fetch,
+      readOrgConfig: () => null,
+    });
+    expect(await adapter.getOrgConfig(ORG_URL)).toEqual({
+      status: 'found',
+      text: '{"mode":"advisory"}',
+    });
+    expect(fetched).toEqual([ORG_URL]);
+
+    // Les deux adaptateurs portent le même correctif : le vérifier sur un seul laisserait
+    // l'autre libre de diverger, ce qui est justement comment `extraHosts` s'était perdu.
+    const azdoFetched: string[] = [];
+    const azdo = new AzdoClientAdapter({
+      fetchImpl: (async (url: string) => {
+        azdoFetched.push(String(url));
+        return new Response('{"mode":"advisory"}', { status: 200 });
+      }) as unknown as typeof fetch,
+      readOrgConfig: () => null,
+    });
+    expect((await azdo.getOrgConfig(ORG_URL)).status).toBe('found');
+    expect(azdoFetched).toEqual([ORG_URL]);
+  });
+
   // Hors extension (composant serveur, tests) il n'y a pas de relais : le `fetch` direct
   // reste le comportement correct là où l'origine appelante a le droit de lire.
   it('sans readOrgConfig, la lecture directe subsiste', async () => {
@@ -274,6 +306,119 @@ describe('C — bootstrap() met le relais entre les mains de l’adaptateur', ()
     await bootstrap(document);
     const opts = ctorArgs[0] as { readOrgConfig?: unknown };
     expect(opts.readOrgConfig).toBeUndefined();
+
+    vi.doUnmock('@cct/adapter-github');
+  });
+});
+
+describe('E — le relais ne sert QUE les origines tierces (revue Codex, PR #30)', () => {
+  // Le motif du correctif est l'absence de privilège d'origine croisée dans un script de
+  // contenu. Il ne dit rien d'une lecture de MÊME origine, qui fonctionne depuis la page —
+  // et que le worker, lui, ne peut PAS faire : le manifeste ne déclare plus aucune
+  // permission d'hôte sur le domaine de plateforme (PR #28). Tout relayer transformait donc
+  // un `configUrl` posé sur github.com, jusque-là lisible, en configuration dégradée.
+  const PAGE = new URL('https://github.com/acme/demo/pull/42');
+
+  function installRelay(): { sent: unknown[] } {
+    const sent: unknown[] = [];
+    (globalThis as { chrome?: unknown }).chrome = {
+      runtime: {
+        sendMessage: (msg: unknown, cb?: (r: unknown) => void) => {
+          sent.push(msg);
+          cb?.({ status: 'found', text: '{}' });
+          return undefined;
+        },
+        lastError: null,
+      },
+    };
+    return { sent };
+  }
+
+  it('un configUrl de MÊME origine que la page est décliné — l’adaptateur le lira lui-même', async () => {
+    const { sent } = installRelay();
+    const { relayableFrom } = await import('../src/content-internal.js');
+    expect(relayableFrom(PAGE)('https://github.com/acme/config/raw/HEAD/cc.json')).toBeNull();
+    expect(sent).toEqual([]);
+  });
+
+  it('un configUrl d’une AUTRE origine passe par le relais', async () => {
+    const { sent } = installRelay();
+    const { relayableFrom } = await import('../src/content-internal.js');
+    const read = relayableFrom(PAGE)(ORG_URL);
+    expect(read).not.toBeNull();
+    expect(await read!).toEqual({ status: 'found', text: '{}' });
+    expect(sent).toEqual([{ kind: 'cct-fetch-config', url: ORG_URL }]);
+  });
+
+  it('même nom d’hôte mais port différent : origines distinctes, donc relais', async () => {
+    const { sent } = installRelay();
+    const { relayableFrom } = await import('../src/content-internal.js');
+    const onPort = 'https://github.com:8443/cc.json';
+    expect(relayableFrom(PAGE)(onPort)).not.toBeNull();
+    expect(sent).toEqual([{ kind: 'cct-fetch-config', url: onPort }]);
+  });
+
+  // Une URL qu'on ne sait pas lire n'est pas déclarée de même origine : elle part au relais,
+  // qui la confrontera au plancher et la refusera. Un refus explicite vaut mieux qu'un
+  // privilège accordé par erreur de parsage.
+  it('une URL illisible part au relais, qui la refusera, plutôt que de passer pour locale', async () => {
+    const { sent } = installRelay();
+    const { relayableFrom } = await import('../src/content-internal.js');
+    expect(relayableFrom(PAGE)('pas une url')).not.toBeNull();
+    expect(sent).toHaveLength(1);
+  });
+
+  it('bootstrap() installe CETTE fonction-là, pas le relais nu', async () => {
+    const { sent } = installRelay();
+    (globalThis as { chrome?: unknown }).chrome = {
+      ...(globalThis as { chrome?: Record<string, unknown> }).chrome,
+      storage: {
+        local: {
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) =>
+            cb({ [EXTRA_HOSTS_KEY]: { github: [], azdo: [] } }),
+        },
+      },
+    };
+    const ctorArgs: unknown[] = [];
+    vi.doMock('@cct/adapter-github', () => ({
+      GithubClientAdapter: class {
+        constructor(opts: unknown) {
+          ctorArgs.push(opts);
+          Object.assign(this, {
+            async getCurrentUser() {
+              return { login: 'someone' };
+            },
+            async getRepoConfig() {
+              return { status: 'absent' };
+            },
+            async getOrgConfig() {
+              return { status: 'absent' };
+            },
+            observeEditors() {
+              return { dispose: () => {} };
+            },
+            currentPr() {
+              return null;
+            },
+            readPublishedResult() {
+              return null;
+            },
+          });
+        }
+      },
+    }));
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: PAGE, configurable: true });
+    await bootstrap(document);
+
+    const readOrgConfig = (ctorArgs[0] as { readOrgConfig?: (u: string) => unknown })
+      .readOrgConfig!;
+    // github.com est la page : décliné, aucun message émis.
+    expect(readOrgConfig('https://github.com/acme/config/raw/HEAD/cc.json')).toBeNull();
+    expect(sent).toEqual([]);
+    // Un domaine interne : relayé.
+    expect(readOrgConfig(ORG_URL)).not.toBeNull();
+    expect(sent).toEqual([{ kind: 'cct-fetch-config', url: ORG_URL }]);
 
     vi.doUnmock('@cct/adapter-github');
   });

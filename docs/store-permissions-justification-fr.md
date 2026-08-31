@@ -168,9 +168,11 @@ permanent. La lecture passe maintenant par le service worker
 
 Deux précisions utiles si le reviewer interroge ce point :
 
-- **Seul le document d'organisation est relayé.** Le fichier
+- **Le relais ne sert que les origines tierces.** Le fichier
   `.conventional-comments.json` du dépôt affiché vit sur l'origine de la
-  page : il est lu directement, sans permission d'hôte ni relais.
+  page : il est lu directement, sans permission d'hôte ni relais. Il en
+  va de même d'un `configUrl` posé sur le domaine de la plateforme
+  elle-même — la page sait le lire, et le worker ne le pourrait pas.
 - **Le worker ne suit pas l'URL qu'on lui soumet, il la confronte.**
   `configUrl` provient exclusivement du canal de politique d'entreprise
   (`chrome.storage.managed`), que le worker relit pour son propre

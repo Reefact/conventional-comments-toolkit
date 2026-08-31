@@ -37,13 +37,6 @@ contenu, qui elle tient sans condition.
 > GitHub Enterprise Cloud) — et, en option, Azure DevOps (Services et
 > Server auto-hébergé).
 >
-> **⚠️ Une limite reste vraie du build actuel — voir la note en fin de
-> fichier :** quand une organisation référence un fichier de
-> configuration hébergé sur un domaine distinct de la plateforme
-> (`configUrl`), sa lecture échoue encore. La reconnaissance de
-> l'interface elle-même sur un domaine auto-hébergé, en revanche, est
-> corrigée et testée.
->
 > **Ce que l'extension apporte**
 > - Une barre d'outils pour insérer les labels standards
 >   (`issue`, `suggestion`, `question`, `nitpick`...) sans les retaper.
@@ -90,8 +83,9 @@ au CORS de la page hôte — une permission d'hôte n'y change rien, la
 requête est émise au nom de l'origine de la page. La lecture d'un
 `configUrl` d'organisation hébergé sur un **domaine distinct** de la
 plateforme passe désormais par le service worker (`cct-fetch-config`).
-La lecture du `.conventional-comments.json` du dépôt affiché reste
-directe : elle vise l'origine de la page et n'a besoin d'aucun relais.
+Les lectures de même origine que la page — le `.conventional-comments.json`
+du dépôt affiché, et un `configUrl` posé sur le domaine de la plateforme
+lui-même — restent directes : elles n'ont besoin d'aucun relais.
 
 ## Notes de version pour la première soumission
 

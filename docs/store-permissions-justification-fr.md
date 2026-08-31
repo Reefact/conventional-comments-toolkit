@@ -188,14 +188,31 @@ mécanique de messagerie est vérifiée dans un vrai Chromium par
 
 - Aucun contenu de commentaire, de code ou de diff ne quitte le
   navigateur (§10, "Confidentialité").
-- **Télémétrie : pas encore câblée dans le code livré.** `telemetry.enabled`
-  et `telemetry.endpoint` existent dans le schéma de configuration
-  (`packages/core`), mais aucun code de l'extension ne les lit ni
-  n'émet quoi que ce soit — `SelectorLog` (le seul journal candidat) est
-  toujours construit sans callback de télémétrie. **Pour cette
-  soumission : répondre qu'aucune télémétrie n'est collectée**, plutôt
-  que de décrire un mécanisme opt-in configurable qui n'existe pas
-  encore côté extension.
+- **Télémétrie : câblée, désactivée par défaut, triple opt-in.** Ce
+  point a changé — le formulaire doit maintenant le décrire, et non plus
+  répondre « aucune collecte ». Rien n'est émis tant que les trois
+  conditions suivantes ne sont pas réunies : la configuration de
+  l'organisation active `telemetry.enabled`, elle désigne un point de
+  collecte `https:`, **et** la personne coche la case dédiée dans la
+  page d'options, qui affiche ce point de collecte à côté d'elle. La
+  troisième condition n'est pas décorative : `telemetry.*` étant une clé
+  de configuration ordinaire, le fichier d'un dépôt peut l'écrire, et
+  sans consentement local un dépôt désignerait lui-même le collecteur.
+
+  **Ce qui part**, à la vidange périodique et jamais à la frappe : le
+  dépôt affiché (`hôte/portée`), le mode, et des compteurs
+  d'identifiants — labels employés, codes de diagnostic, chaînes de
+  sélecteurs dégradées (§10, §9.4). Le vocabulaire est fermé par une
+  expression régulière : une valeur qui n'a pas la forme d'un
+  identifiant est **abandonnée**, jamais tronquée ni assainie, de sorte
+  qu'aucun fragment de texte saisi ne puisse suivre ce chemin. Aucun
+  cookie n'est joint (`credentials: 'omit'`).
+
+  **Aucune permission supplémentaire n'est demandée pour cela** : le
+  POST est émis en `no-cors`, dont la réponse n'est pas lue —
+  comportement mesuré dans un vrai navigateur par `npm run check:beacon`,
+  et non supposé. À la différence de la lecture du `configUrl`, qui a
+  besoin de la réponse et passe donc par le service worker.
 - Aucun jeton d'authentification (PAT) ni secret n'est stocké par
   l'extension, et elle ne s'authentifie à aucune API à jeton. **Elle
   émet en revanche des requêtes réseau**, et il faut le dire tel quel :

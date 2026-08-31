@@ -18,6 +18,7 @@ import { buildToolbar } from './ui/toolbar.js';
 import { attachQuickInput } from './ui/quickinput.js';
 import { FeedbackView } from './ui/feedback.js';
 import type { ResolvedClientConfig } from './config-resolver.js';
+import type { TelemetryEvent } from './telemetry.js';
 
 export const VALIDATION_DEBOUNCE_MS = 150; // §5.3
 
@@ -31,6 +32,11 @@ export interface ControllerDeps {
   /** Raccourcis directs (§5.2, ex. Alt+I → issue) — préférences locales de l'utilisateur
    * (§8.2), clé « Alt+<lettre> » → id de label. */
   directShortcuts?: Record<string, string>;
+  /** Compteurs agrégés (§10) — absent hors extension et dans les tests qui ne s'y
+   * intéressent pas. L'émetteur décide seul s'il a le droit d'émettre ; ce contrôleur
+   * compte sans se poser la question, et sans jamais lui passer autre chose qu'un
+   * identifiant. */
+  telemetry?: (event: TelemetryEvent) => void;
 }
 
 /** Table par défaut des raccourcis directs (§5.2) — surchargable par les préférences. */
@@ -52,6 +58,11 @@ export class EditorController {
   #lastAnalysis: CommentAnalysis | null = null;
   #lastDecision: GuardDecision | null = null;
   #disposers: (() => void)[] = [];
+  /** Codes déjà comptés pour l'état COURANT de l'éditeur. `refresh()` s'exécute à chaque
+   * frappe débattue : compter à chaque passage ferait d'un « code d'erreur » (§10) un
+   * compteur de frappes, ce qui n'est plus un agrégat et en dit bien plus long. Seule
+   * l'APPARITION d'un code est comptée ; sa disparition puis son retour en recomptent un. */
+  #countedCodes = new Set<string>();
 
   constructor(deps: ControllerDeps) {
     this.deps = deps;
@@ -200,6 +211,7 @@ export class EditorController {
   refresh(): void {
     const decision = this.evaluateNow();
     const analysis = this.#lastAnalysis!;
+    this.#countCodes(analysis.diagnostics);
     this.#feedback?.render({
       state: feedbackState(analysis.diagnostics, decision, this.deps.resolved.degraded),
       diagnostics: analysis.diagnostics, // tous, dans l'ordre du §3.5.1 (§5.3)
@@ -212,6 +224,16 @@ export class EditorController {
       if (decision.block) control.element.setAttribute('aria-disabled', 'true');
       else control.element.removeAttribute('aria-disabled');
     }
+  }
+
+  /** Compte l'apparition d'un code de diagnostic (§10, « code d'erreur »). */
+  #countCodes(diagnostics: readonly { code: string }[]): void {
+    const present = new Set(diagnostics.map((d) => d.code));
+    for (const code of present) {
+      if (this.#countedCodes.has(code)) continue;
+      this.deps.telemetry?.({ kind: 'validation-code', code });
+    }
+    this.#countedCodes = present;
   }
 
   /** §5.1 — insertion/remplacement du préfixe, sélection restaurée décalée (CA-02). */
@@ -228,6 +250,10 @@ export class EditorController {
       { label: effectiveLabel, decorations },
       { toggle }
     );
+    // « label utilisé » (§10) : l'identifiant du label effectivement posé, jamais la ligne
+    // écrite. Compté ici, à l'insertion, et non à la lecture d'un préfixe déjà saisi — ce
+    // qui compterait le même commentaire à chaque frappe.
+    this.deps.telemetry?.({ kind: 'label-used', label: effectiveLabel });
     this.deps.adapter.writeValue(this.deps.editor, nextValue, hasSelection ? undefined : caret);
     if (hasSelection) {
       // Le texte sélectionné n'est pas remplacé ; la sélection est restaurée, décalée de

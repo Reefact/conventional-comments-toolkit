@@ -72,5 +72,11 @@ jobs:
       - name: Fumée MV3 — l'extension empaquetée dans un vrai Chromium
         run: npm run smoke:mv3
 
+      # La télémétrie (§10) repose sur une affirmation à propos du navigateur : un POST
+      # `no-cors` vers une autre origine part et arrive, sans permission d'hôte. Un faux
+      # `fetch` ne dirait que ce qu'on a cru ; ce test sert deux vraies origines et regarde.
+      - name: Transport de la télémétrie — POST no-cors vers une autre origine (§10)
+        run: npm run check:beacon
+
       - name: Smoke test de sélecteurs (§9.4)
         run: node spikes/p1-prime/smoke.mjs

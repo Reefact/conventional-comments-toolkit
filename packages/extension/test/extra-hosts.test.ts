@@ -307,7 +307,11 @@ describe('C — bootstrap() construit LE bon adaptateur, avec les hôtes de sa p
     });
     await bootstrap(document);
 
-    expect(githubCtorArgs).toEqual([{ documentRef: document, extraHosts: ['ghes.example.corp'] }]);
+    expect(githubCtorArgs).toEqual([
+      // `objectContaining` : le constructeur reçoit aussi un journal de sélecteurs et le
+      // relais de configuration, sans rapport avec ce que ce test établit.
+      expect.objectContaining({ documentRef: document, extraHosts: ['ghes.example.corp'] }),
+    ]);
     expect(azdoCtorArgs).toEqual([]);
 
     vi.doUnmock('@cct/adapter-github');
@@ -327,7 +331,11 @@ describe('C — bootstrap() construit LE bon adaptateur, avec les hôtes de sa p
     });
     await bootstrap(document);
 
-    expect(azdoCtorArgs).toEqual([{ documentRef: document, extraHosts: ['azdo.example.corp'] }]);
+    expect(azdoCtorArgs).toEqual([
+      // `objectContaining` : le constructeur reçoit aussi un journal de sélecteurs et le
+      // relais de configuration, sans rapport avec ce que ce test établit.
+      expect.objectContaining({ documentRef: document, extraHosts: ['azdo.example.corp'] }),
+    ]);
     expect(githubCtorArgs).toEqual([]);
 
     vi.doUnmock('@cct/adapter-github');

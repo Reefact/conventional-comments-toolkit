@@ -69,6 +69,21 @@
     </fieldset>
 
     <fieldset>
+      <legend>Télémétrie (§10)</legend>
+      <p>
+        Désactivée par défaut. Elle n'émet que des <strong>compteurs agrégés</strong> —
+        label utilisé, code d'erreur, mode, dépôt — jamais le texte d'un commentaire, d'un
+        code ou d'un diff. Elle ne s'active que si votre organisation a configuré un point
+        de collecte <em>et</em> que vous cochez cette case.
+      </p>
+      <label>
+        <input id="telemetry-opt-in" type="checkbox" />
+        Autoriser l'envoi de compteurs agrégés à mon organisation
+      </label>
+      <p id="telemetry-endpoint" aria-live="polite">—</p>
+    </fieldset>
+
+    <fieldset>
       <legend>État</legend>
       <p id="degraded-state" aria-live="polite">—</p>
       <p id="selector-log">—</p>

@@ -105,9 +105,10 @@ npm run checks                  # gardes du repo (matrice CA, invisibles, CSS, A
 npm run spike                   # spike P1' dans Chromium (§9.3)
 npm run smoke:mv3               # extension empaquetée dans un vrai Chromium (prémisses MV3)
 npm run check:github-theme-vars # variables Primer de styles.css toujours présentes sur github.com
+npm run check:beacon            # un POST no-cors cross-origin part et arrive (transport de la télémétrie)
 ```
 
-`spike`, `smoke:mv3` et `check:github-theme-vars` pilotent un vrai Chromium via
+`spike`, `smoke:mv3`, `check:beacon` et `check:github-theme-vars` pilotent un vrai Chromium via
 `playwright-core`, qui ne le télécharge pas à l'install : une fois par machine, `npx
 playwright-core install chromium` (comme le fait la CI avant ces commandes). `smoke:mv3`
 charge `packages/extension/dist-ext/` : lancer `npm run build:extension` d'abord.
@@ -115,7 +116,7 @@ charge `packages/extension/dist-ext/` : lancer `npm run build:extension` d'abord
 La CI rejoue ces commandes (`.github/workflows/`) : `ci.yml` (build + tests, Node 20 et
 22), `conformance.yml` (les gardes ci-dessus + spécification non modifiée par une PR de
 code), `extension-package.yml` (bundle MV3, aucun code distant), `browser-smoke.yml`
-(spike + fumée MV3 dans Chromium, quotidiennement et sur toute PR touchant
+(spike + fumée MV3 + transport de la télémétrie dans Chromium, quotidiennement et sur toute PR touchant
 `packages/extension/` ou `packages/adapters/`), `theme-vars-canary.yml` (variables de
 thème GitHub hebdomadaire, ouvre une issue en cas d'échec). Les faire passer en local
 avant de pousser.

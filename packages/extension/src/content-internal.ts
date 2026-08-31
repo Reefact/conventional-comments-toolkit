@@ -9,7 +9,7 @@
 // Ce module peut exporter librement pour les tests ; content.ts, lui, ne doit rien
 // exporter.
 
-import type { Floor, PrRef, PublishedSummary } from '@cct/core';
+import type { ConfigRead, Floor, PrRef, PublishedSummary } from '@cct/core';
 import type { PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
@@ -44,8 +44,86 @@ declare const chrome: {
       ) => void;
     };
   };
-  runtime?: { sendMessage?: (msg: unknown) => Promise<unknown> };
+  runtime?: {
+    // Rappel ET promesse : les deux formes répondent dans le Chromium sur lequel tourne
+    // `npm run smoke:mv3`, qui interroge le relais sous chacune et journalise ce qu'elle a
+    // rendu. La doc de Chrome décrit la forme promesse sans se prononcer sur le devenir du
+    // rappel — d'où la mesure plutôt que le pari, ici comme dans `relayOrgConfigRead()`.
+    sendMessage?: (msg: unknown, cb?: (response: unknown) => void) => unknown;
+    lastError?: { message?: string } | null;
+  };
 } | undefined;
+
+/** Forme sûre d'une réponse du relais : elle vient d'un autre contexte d'exécution, donc
+ * de l'extérieur de ce module. Tout ce qui n'est pas un `ConfigRead` reconnaissable vaut
+ * `unreachable` — jamais `absent`, qui affirmerait qu'aucun document n'existe alors qu'on
+ * n'en sait rien, et ferait taire l'état dégradé du §5.4. */
+function asConfigRead(value: unknown, fallbackReason: string): ConfigRead {
+  const read = value as ConfigRead | undefined;
+  if (read?.status === 'absent') return { status: 'absent' };
+  if (read?.status === 'found' && typeof read.text === 'string') return read;
+  if (read?.status === 'unreachable') return { status: 'unreachable', reason: String(read.reason) };
+  return { status: 'unreachable', reason: fallbackReason };
+}
+
+/** Y a-t-il un service worker à qui parler ?
+ *
+ * `chrome` est ici un `declare const`, pas une propriété : hors contexte d'extension, la
+ * seule mention de l'identifiant lève une `ReferenceError` — l'optionnel `?.` ne protège
+ * que d'un `undefined`, pas d'une liaison absente. C'est le même piège que les autres
+ * lectures de ce module contournent par un `try`. */
+function hasExtensionRelay(): boolean {
+  try {
+    return typeof chrome?.runtime?.sendMessage === 'function';
+  } catch {
+    return false;
+  }
+}
+
+/** Lecture du `configUrl` d'organisation PAR LE SERVICE WORKER (§8.1.1).
+ *
+ * Un script de contenu « initiate requests on behalf of the web origin that the content
+ * script has been injected into and therefore [is] also subject to the same origin policy »
+ * (doc Chrome, « Cross-origin network requests ») : la permission d'hôte accordée pour
+ * l'hôte du `configUrl` ne lui sert à RIEN, et un document d'organisation hébergé hors de
+ * la plateforme affichée restait illisible — état dégradé permanent, empreintes de
+ * configuration durablement divergentes entre A et B (§8.1.3, règle 2). Le worker, lui,
+ * émet depuis l'origine de l'extension, où cette permission porte.
+ *
+ * Seul le document d'ORGANISATION passe par ici. Le fichier de dépôt vit sur l'origine de
+ * la page affichée : le lire directement est correct, et le relayer exigerait au contraire
+ * une permission d'hôte sur github.com que le manifeste ne déclare plus (PR #28). */
+export function relayOrgConfigRead(url: string): Promise<ConfigRead> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (value: unknown, reason: string): void => {
+      if (settled) return;
+      settled = true;
+      resolve(asConfigRead(value, reason));
+    };
+    try {
+      const runtime = chrome?.runtime;
+      if (!runtime?.sendMessage) return settle(undefined, 'no extension relay');
+      const returned = runtime.sendMessage({ kind: 'cct-fetch-config', url }, (response) => {
+        // Lire `lastError` est ce qui l'ACQUITTE : sans cette lecture, un worker endormi
+        // ou une réponse perdue laisse un « Unchecked runtime.lastError » en console. Sa
+        // valeur ne change rien ici — pas de réponse exploitable vaut `unreachable`.
+        void runtime.lastError;
+        settle(response, 'no response from relay');
+      });
+      // Forme promesse (aucun rappel appelé) : le premier des deux qui arrive tranche.
+      const thenable = returned as Promise<unknown> | undefined;
+      if (typeof thenable?.then === 'function') {
+        thenable.then(
+          (response) => settle(response, 'no response from relay'),
+          (e) => settle(undefined, String(e))
+        );
+      }
+    } catch (e) {
+      settle(undefined, String(e));
+    }
+  });
+}
 
 /** §9.2.3 — l'état dégradé se signale « dans les options ET dans son indicateur » : la
  * page d'options lit `degradedState` dans chrome.storage.local ; c'est ici qu'il s'écrit,
@@ -203,10 +281,16 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
 
   if (!platform) return disposeAll;
 
+  // Hors contexte d'extension (aucun `chrome.runtime`), il n'y a pas de relais à employer :
+  // laisser l'adaptateur lire par lui-même, ce qui est le comportement correct partout où
+  // l'origine appelante a le droit de lire. Ne jamais imposer un relais absent, qui rendrait
+  // toute configuration d'organisation `unreachable`.
+  const readOrgConfig = hasExtensionRelay() ? relayOrgConfigRead : undefined;
+
   const adapter: PlatformAdapter & { matchesHost(url: URL): boolean } =
     platform === 'github'
-      ? new GithubClientAdapter({ documentRef: doc, extraHosts: extraHosts.github })
-      : new AzdoClientAdapter({ documentRef: doc, extraHosts: extraHosts.azdo });
+      ? new GithubClientAdapter({ documentRef: doc, extraHosts: extraHosts.github, readOrgConfig })
+      : new AzdoClientAdapter({ documentRef: doc, extraHosts: extraHosts.azdo, readOrgConfig });
 
   const resolver = new ClientConfigResolver(readManagedFloor);
   const currentUser = await adapter.getCurrentUser();

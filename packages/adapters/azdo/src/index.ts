@@ -36,6 +36,15 @@ import { selectors } from './selectors.js';
 export interface AzdoClientOptions {
   extraHosts?: string[];
   fetchImpl?: typeof fetch;
+  /** Lecture du `configUrl` d'organisation, quand l'appelant en détient un chemin que cet
+   * adaptateur n'a pas. Dans l'extension, c'est le cas : le script de contenu émet ses
+   * requêtes au nom de l'origine de la page et reste soumis à sa politique CORS, quelle que
+   * soit la permission d'hôte accordée (doc Chrome, « Cross-origin network requests ») ; un
+   * `configUrl` hébergé hors de la plateforme affichée n'y est donc pas lisible. Le service
+   * worker le lit à sa place et le résultat arrive par ici. Absent — usage hors extension,
+   * tests — le repli est le `fetch` direct ci-dessous, qui reste correct là où l'origine
+   * appelante a le droit de lire. */
+  readOrgConfig?: (url: string) => Promise<ConfigRead>;
   documentRef?: Document;
   log?: SelectorLog;
 }
@@ -44,6 +53,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
   #hosts: string[];
   #fetch: typeof fetch;
   #doc: Document;
+  #readOrgConfig?: (url: string) => Promise<ConfigRead>;
   readonly log: SelectorLog;
   #editorSeq = 0;
   /** Préfixe de chemin devant l'organisation/collection pour les routes d'API, établi par
@@ -55,6 +65,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
     this.#hosts = ['dev.azure.com', ...(opts.extraHosts ?? [])];
     this.#fetch = opts.fetchImpl ?? fetch;
     this.#doc = opts.documentRef ?? document;
+    this.#readOrgConfig = opts.readOrgConfig;
     this.log = opts.log ?? new SelectorLog();
   }
 
@@ -109,6 +120,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
 
   async getOrgConfig(url: string | null): Promise<ConfigRead> {
     if (url === null) return { status: 'absent' };
+    if (this.#readOrgConfig) return this.#readOrgConfig(url);
     try {
       const res = await this.#fetch(url, { credentials: 'include' });
       if (res.status === 404) return { status: 'absent' };

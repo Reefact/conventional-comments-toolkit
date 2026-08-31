@@ -20,6 +20,7 @@
 // dépose le résultat dans `chrome.storage.local`, la seule des trois API accessible aussi
 // bien ici que dans la page d'options et le script de contenu.
 
+import { vetFloor, vettedConfigUrl, type Floor } from '@cct/core';
 import {
   EMPTY_EXTRA_HOSTS,
   EXTRA_HOSTS_KEY,
@@ -32,6 +33,9 @@ import {
 
 interface FetchConfigRequest {
   kind: 'cct-fetch-config';
+  /** L'URL que l'appelant croit devoir lire. Elle est CONFRONTÉE au `configUrl` que ce
+   * worker dérive lui-même du canal de plancher, jamais fetchée sur parole — voir le
+   * gestionnaire ci-dessous. */
   url: string;
 }
 
@@ -79,12 +83,59 @@ declare const chrome: {
   };
 } | undefined;
 
+/** Plancher poussé par la politique d'entreprise (§8.1.1) — MÊME source que celle que lit
+ * le script de contenu (`readManagedFloor()` de content-internal.ts). Le worker la relit
+ * pour son propre compte plutôt que de faire confiance au message reçu. */
+async function readManagedFloor(): Promise<Floor | null> {
+  return new Promise((resolve) => {
+    try {
+      if (!chrome?.storage?.managed) return resolve(null);
+      chrome.storage.managed.get((items) => {
+        const floor = items?.['floor'];
+        resolve(floor && typeof floor === 'object' ? (floor as Floor) : null);
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/** Lecture du `configUrl` d'organisation POUR le script de contenu (§8.1.1, §10).
+ *
+ * Ce relais n'est pas une commodité : c'est le SEUL chemin qui fonctionne. « Content
+ * scripts initiate requests on behalf of the web origin that the content script has been
+ * injected into and therefore content scripts are also subject to the same origin policy »
+ * (doc Chrome, « Cross-origin network requests ») — une permission d'hôte ne change rien à
+ * cela. Un `configUrl` hébergé ailleurs que sur la plateforme affichée est donc
+ * inaccessible depuis le script de contenu, quelle que soit la permission accordée, et
+ * échouait en pratique en état dégradé permanent. Le fetch se fait ici, où l'origine est
+ * celle de l'extension et où la permission d'hôte porte réellement.
+ *
+ * `getRepoConfig()` reste appelée directement par les adaptateurs, et DOIT le rester :
+ * elle vise l'origine de la page affichée, donc ne pose aucune question de CORS — et la
+ * passer par ici exigerait une permission d'hôte sur github.com que le manifeste ne
+ * déclare plus (PR #28).
+ *
+ * **L'URL reçue est confrontée, pas suivie.** La même doc conseille de ne pas laisser un
+ * script de contenu désigner la cible d'une requête privilégiée. `configUrl` provient
+ * exclusivement du canal de plancher (§8.1.1), que ce worker sait lire : il dérive donc la
+ * cible lui-même et n'accepte le message que si les deux coïncident. Sans ce contrôle, un
+ * script de contenu injecté sur un hôte accordé pourrait employer le worker comme relais
+ * authentifié vers n'importe quel autre hôte accordé. La comparaison est une égalité de
+ * chaînes : les deux côtés lisent la MÊME valeur au même endroit, toute divergence est un
+ * défaut et non une variante d'écriture à rattraper. */
 chrome?.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const req = message as FetchConfigRequest;
   if (req?.kind !== 'cct-fetch-config') return;
   void (async () => {
     try {
-      const res = await fetch(req.url, { credentials: 'include' });
+      // Le plancher VÉRIFIÉ, comme côté script de contenu : un plancher de version non
+      // supportée ne désigne aucun document d'organisation (§8.1.5).
+      const vetted = vettedConfigUrl(vetFloor(await readManagedFloor()));
+      if (vetted === null || vetted !== req.url) {
+        return sendResponse({ status: 'unreachable', reason: 'url not vetted by floor' });
+      }
+      const res = await fetch(vetted, { credentials: 'include' });
       if (res.status === 404) return sendResponse({ status: 'absent' });
       if (!res.ok) return sendResponse({ status: 'unreachable', reason: `HTTP ${res.status}` });
       sendResponse({ status: 'found', text: await res.text() });

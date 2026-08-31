@@ -147,6 +147,56 @@ try {
     options.platform === '' && options.hasHostInput,
     `valeur du sélecteur : "${options.platform}"`
   );
+
+  // 6. Le RELAIS de configuration d'organisation répond. C'est la prémisse du correctif du
+  //    `configUrl` : un script de contenu reste soumis au CORS de sa page (doc Chrome) et
+  //    ne peut pas lire un document hébergé hors de la plateforme affichée ; il passe donc
+  //    par `chrome.runtime.sendMessage` et le worker lit à sa place.
+  //
+  //    Ce qui se vérifie ici est le PROTOCOLE — le listener renvoie bien `true` et répond
+  //    de façon asynchrone, et la réponse arrive — sous les deux formes de `sendMessage`,
+  //    parce que la documentation de Chrome ne dit PAS laquelle est disponible ici : elle
+  //    décrit la forme promesse sans se prononcer sur le devenir du rappel. `relayOrgConfig
+  //    Read()` gère donc les deux, et cette assertion dit laquelle a effectivement répondu
+  //    plutôt que de le supposer.
+  //
+  //    CE QUE CE N'EST PAS : une vérification du CORS. La page d'options est une page
+  //    d'extension, pas un script de contenu ; le monde isolé reste inatteignable ici (voir
+  //    l'en-tête). L'URL sondée n'est désignée par aucun plancher — le worker doit donc la
+  //    refuser sans la lire, ce qui teste aussi ce contrôle-là, et sans toucher au réseau.
+  const probeUrl = 'https://relay-probe.invalid/organisation.json';
+  const relay = await page.evaluate(async (url) => {
+    const withCallback = await new Promise((res) => {
+      const timer = setTimeout(() => res({ answered: false }), 8000);
+      try {
+        chrome.runtime.sendMessage({ kind: 'cct-fetch-config', url }, (response) => {
+          void chrome.runtime.lastError;
+          clearTimeout(timer);
+          res({ answered: true, status: response?.status ?? null });
+        });
+      } catch (e) {
+        clearTimeout(timer);
+        res({ answered: false, threw: String(e) });
+      }
+    });
+    let withPromise = { answered: false };
+    try {
+      const returned = chrome.runtime.sendMessage({ kind: 'cct-fetch-config', url });
+      if (returned && typeof returned.then === 'function') {
+        const response = await returned;
+        withPromise = { answered: true, status: response?.status ?? null };
+      }
+    } catch (e) {
+      withPromise = { answered: false, threw: String(e) };
+    }
+    return { withCallback, withPromise };
+  }, probeUrl);
+  assert(
+    'le relais cct-fetch-config répond, et refuse une URL qu’aucun plancher ne désigne',
+    (relay.withCallback.answered && relay.withCallback.status === 'unreachable') ||
+      (relay.withPromise.answered && relay.withPromise.status === 'unreachable'),
+    JSON.stringify(relay)
+  );
 } finally {
   await context.close();
   rmSync(profile, { recursive: true, force: true });

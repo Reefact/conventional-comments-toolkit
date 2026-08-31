@@ -31,12 +31,6 @@ guarantee, which does hold unconditionally.
 > Server, GitHub Enterprise Cloud) — and, optionally, Azure DevOps
 > (Services and self-hosted Server).
 >
-> **⚠️ One limitation still holds for the shipped build — see the note
-> at the end of this file:** when an organization references a
-> configuration file hosted on a domain distinct from the platform
-> (`configUrl`), reading it still fails. Recognizing the UI itself on a
-> self-hosted domain, however, is fixed and tested.
->
 > **What the extension brings**
 > - A toolbar to insert standard labels
 >   (`issue`, `suggestion`, `question`, `nitpick`...) without retyping
@@ -84,8 +78,9 @@ to the host page's CORS — a host permission changes nothing there,
 since the request is issued on behalf of the page's origin. Reading an
 organization `configUrl` hosted on a domain **distinct** from the
 platform now goes through the service worker (`cct-fetch-config`).
-Reading the displayed repository's `.conventional-comments.json` stays
-direct: it targets the page's own origin and needs no relay.
+Same-origin reads — the displayed repository's
+`.conventional-comments.json`, and a `configUrl` hosted on the platform's
+own domain — stay direct: they need no relay.
 
 ## Release notes for the first submission
 

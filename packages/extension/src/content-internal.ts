@@ -80,6 +80,36 @@ function hasExtensionRelay(): boolean {
   }
 }
 
+/** Le relais, restreint aux origines que le script de contenu ne peut PAS lire lui-même.
+ *
+ * Rend une fonction qui décline (`null`) pour une URL de même origine que la page. Le motif
+ * du correctif — le script de contenu n'a aucun privilège d'origine croisée — ne dit rien
+ * d'une lecture de MÊME origine, qui, elle, fonctionne parfaitement depuis la page. La lui
+ * retirer était une régression : le worker, lui, n'a aucune permission d'hôte sur le domaine
+ * de plateforme (le manifeste n'en déclare plus depuis la PR #28), si bien qu'un `configUrl`
+ * posé sur `https://github.com/...` devenait illisible alors qu'il se lisait avant — la
+ * configuration d'organisation tombait en état dégradé (revue Codex, PR #30). C'est
+ * exactement l'argument qui garde `getRepoConfig()` en lecture directe, appliqué à l'autre
+ * document.
+ *
+ * Une URL illisible n'est pas déclarée de même origine : elle part au relais, qui la
+ * confrontera au plancher et la refusera. Mieux vaut un refus explicite qu'un privilège
+ * accordé par erreur de parsage. */
+export function relayableFrom(page: URL): (url: string) => Promise<ConfigRead> | null {
+  return (url) => {
+    let target: URL | null = null;
+    try {
+      target = new URL(url);
+    } catch {
+      target = null;
+    }
+    // `origin` et non `hostname` : un port ou un schéma différents font une origine
+    // différente pour la politique du navigateur, donc une lecture que la page ne peut pas
+    // faire — c'est le critère qui décide, pas la ressemblance des noms d'hôte.
+    return target?.origin === page.origin ? null : relayOrgConfigRead(url);
+  };
+}
+
 /** Lecture du `configUrl` d'organisation PAR LE SERVICE WORKER (§8.1.1).
  *
  * Un script de contenu « initiate requests on behalf of the web origin that the content
@@ -285,7 +315,9 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // laisser l'adaptateur lire par lui-même, ce qui est le comportement correct partout où
   // l'origine appelante a le droit de lire. Ne jamais imposer un relais absent, qui rendrait
   // toute configuration d'organisation `unreachable`.
-  const readOrgConfig = hasExtensionRelay() ? relayOrgConfigRead : undefined;
+  //
+  // Et même avec un relais, il ne sert QUE les origines tierces : voir `relayableFrom()`.
+  const readOrgConfig = hasExtensionRelay() ? relayableFrom(url) : undefined;
 
   const adapter: PlatformAdapter & { matchesHost(url: URL): boolean } =
     platform === 'github'

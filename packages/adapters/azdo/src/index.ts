@@ -87,7 +87,9 @@ export class AzdoClientAdapter implements PlatformAdapter {
    * virtuel (`/tfs`) précède la collection ; `#apiPrefix` vient de currentPr(). */
   async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
     const [org, project, repo] = pr.scope;
-    const base = pr.host.endsWith('.visualstudio.com')
+    // `pr.host` peut porter un port (§B.4, instance auto-hébergée) : comparer sur le seul
+    // nom d'hôte, sans quoi un `*.visualstudio.com:443` explicite manquerait la branche.
+    const base = pr.host.replace(/:\d+$/, '').endsWith('.visualstudio.com')
       ? `https://${pr.host}${this.#apiPrefix}/${project}`
       : `https://${pr.host}${this.#apiPrefix}/${org}/${project}`;
     const url = `${base}/_apis/git/repositories/${repo}/items?path=${encodeURIComponent('/.conventional-comments.json')}&api-version=7.1`;
@@ -266,7 +268,12 @@ export class AzdoClientAdapter implements PlatformAdapter {
       return {
         platform: 'azdo',
         createdAt: element?.getAttribute('datetime') ?? '',
-        host: loc.hostname,
+        // `host` et non `hostname` : il PORTE LE PORT quand il est non standard. `pr.host`
+        // bâtit les URL d'API (`https://${pr.host}${apiPrefix}/…`) ; un Azure DevOps Server
+        // servi sur un port non standard verrait sinon ses appels partir au port 443
+        // (revue Codex, PR #29). La reconnaissance d'hôte reste sur `hostname` — les motifs
+        // de correspondance de Chrome ignorent le port.
+        host: loc.host,
         scope,
         number: Number(number),
       };

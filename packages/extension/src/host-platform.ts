@@ -59,22 +59,30 @@ export function hostnameOf(input: string): string | null {
  * une correction locale que `readPlatformTags()` laisse justement la politique écraser,
  * donc restant sans effet (revue Codex, PR #29).
  *
- * Forme historique acceptée — une liste de noms d'hôtes sans plateforme — valant alors
- * `github`, la plateforme du domaine pré-déclarable et le cas que cette clé sert en
- * premier. Une entreprise qui déploie de l'Azure DevOps Server emploie la forme objet
- * `{host, platform}`, qui porte la plateforme explicitement. */
+ * **Seule la forme `{host, platform}` est reconnue, et deux raisons l'imposent** (revue
+ * Codex, PR #29) :
+ *
+ * 1. Le validateur de schéma de politique de Chrome exige que « chaque schéma porte un
+ *    `$ref` ou exactement un `type` » (doc « Manifest for managed storage »). Un `items`
+ *    en `anyOf`, sans `type`, viole cette règle : le schéma peut être rejeté, et
+ *    `allowedHosts` n'être jamais publié — voire la politique entière de l'extension.
+ *    Une seule forme est donc déclarable, pas deux.
+ * 2. Faire valoir `github` à une chaîne nue RÉÉCRIRAIT le sens des politiques existantes :
+ *    le schéma d'avant décrivait déjà ce tableau comme contenant « domaines GHES / Azure
+ *    DevOps Server et hôte de configUrl ». Une entrée Azure DevOps Server s'y retrouverait
+ *    classée GitHub — et, GitHub étant consulté en premier, l'adaptateur GitHub gagnerait
+ *    sur une page Azure DevOps.
+ *
+ * Une entrée sans plateforme explicite reste donc NON CLASSÉE — jamais devinée, comme un
+ * hôte accordé sans étiquette côté utilisateur. */
 export function parseManagedHostTags(raw: unknown): Record<string, HostPlatform> {
   const tags: Record<string, HostPlatform> = {};
   for (const entry of Array.isArray(raw) ? raw : []) {
-    if (typeof entry === 'string') {
-      const host = hostnameOf(entry);
-      if (host) tags[host] = 'github';
-    } else if (entry && typeof entry === 'object') {
-      const { host: rawHost, platform } = entry as { host?: unknown; platform?: unknown };
-      const host = typeof rawHost === 'string' ? hostnameOf(rawHost) : null;
-      if (host && (platform === 'github' || platform === 'azdo' || platform === 'config')) {
-        tags[host] = platform;
-      }
+    if (!entry || typeof entry !== 'object') continue;
+    const { host: rawHost, platform } = entry as { host?: unknown; platform?: unknown };
+    const host = typeof rawHost === 'string' ? hostnameOf(rawHost) : null;
+    if (host && (platform === 'github' || platform === 'azdo' || platform === 'config')) {
+      tags[host] = platform;
     }
   }
   return tags;

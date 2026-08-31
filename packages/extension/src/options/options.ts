@@ -2,6 +2,7 @@
 // limitées (§8.1.2 — jamais le mode ni les labels), affichage de l'état dégradé (§5.4)
 // et du journal local de dégradation de sélecteurs (§9.4).
 
+import { TELEMETRY_OPT_IN_KEY } from '../telemetry.js';
 import {
   HOST_PLATFORMS_KEY,
   hostnameOf,
@@ -233,6 +234,28 @@ document.getElementById('direct-shortcuts-save')?.addEventListener('click', () =
         ? 'Enregistré.'
         : `Enregistré — lignes ignorées : ${rejected.join(' ; ')}`;
   }
+});
+
+// Télémétrie (§10) — le troisième verrou décrit en tête de `telemetry.ts` : la case est le
+// consentement de la PERSONNE, que la configuration d'un dépôt ne peut pas donner à sa
+// place. Le point de collecte est affiché À CÔTÉ, parce qu'un consentement à « de la
+// télémétrie » sans savoir vers où ne vaut pas grand-chose ; il vient de la dernière
+// configuration résolue, déposée par le script de contenu (`telemetryEndpoint`).
+const telemetryOptIn = document.getElementById('telemetry-opt-in') as HTMLInputElement | null;
+chrome?.storage?.sync?.get([TELEMETRY_OPT_IN_KEY], (items) => {
+  if (telemetryOptIn) telemetryOptIn.checked = items[TELEMETRY_OPT_IN_KEY] === true;
+});
+telemetryOptIn?.addEventListener('change', () => {
+  chrome?.storage?.sync?.set({ [TELEMETRY_OPT_IN_KEY]: telemetryOptIn.checked === true });
+});
+chrome?.storage?.local?.get(['telemetryEndpoint'], (items) => {
+  const line = document.getElementById('telemetry-endpoint');
+  if (!line) return;
+  const endpoint = items['telemetryEndpoint'];
+  line.textContent =
+    typeof endpoint === 'string' && endpoint !== ''
+      ? `Point de collecte configuré par votre organisation : ${endpoint}`
+      : "Aucun point de collecte configuré : même cochée, la case n'enverra rien.";
 });
 
 // État dégradé (§5.4, §9.2.3) et journal de dégradation de sélecteurs (§9.4).

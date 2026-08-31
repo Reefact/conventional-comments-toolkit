@@ -10,7 +10,7 @@
 // exporter.
 
 import type { ConfigRead, Floor, PrRef, PublishedSummary } from '@cct/core';
-import type { PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import { SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { analyze, enabledLabels } from '@cct/core';
@@ -22,6 +22,12 @@ import {
   type ExtraHostsByPlatform,
 } from './host-platform.js';
 import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
+import {
+  TELEMETRY_OPT_IN_KEY,
+  TelemetryCounters,
+  telemetryTarget,
+  type TelemetryEvent,
+} from './telemetry.js';
 import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
 import { decorateComment } from './ui/badges.js';
@@ -214,6 +220,56 @@ export async function readExtraHostsByPlatform(): Promise<ExtraHostsByPlatform> 
   });
 }
 
+/** Opt-in de télémétrie (§10) — préférence LOCALE de la personne (§8.1.2), à côté de
+ * `language` : c'est le troisième verrou décrit en tête de `telemetry.ts`, celui qu'aucune
+ * configuration de dépôt ne peut ouvrir à sa place. */
+async function readTelemetryOptIn(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      if (!chrome?.storage?.sync) return resolve(false);
+      chrome.storage.sync.get([TELEMETRY_OPT_IN_KEY], (items) =>
+        resolve(items?.[TELEMETRY_OPT_IN_KEY] === true)
+      );
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/** Journal LOCAL des dégradations de sélecteurs (§9.4, CA-11). « Toujours », dit le CA —
+ * sans condition, là où la remontée télémétrique, elle, est conditionnée. La page d'options
+ * lisait déjà `selectorFailures` ; rien ne l'écrivait, et le journal y était donc
+ * perpétuellement vide. Borné aux 50 dernières : c'est un journal de diagnostic, pas une
+ * archive, et `chrome.storage.local` est une ressource partagée. */
+const SELECTOR_LOG_LIMIT = 50;
+
+/** Dépose le point de collecte effectif à l'usage de la page d'options (§10). Vide quand
+ * la télémétrie n'est pas configurée, pour que la page puisse le dire plutôt que de laisser
+ * croire qu'une case cochée enverrait quelque chose. */
+function publishTelemetryEndpoint(config: {
+  telemetry: { enabled: boolean; endpoint: string | null };
+}): void {
+  try {
+    chrome?.storage?.local?.set?.({
+      telemetryEndpoint: config.telemetry.enabled ? (config.telemetry.endpoint ?? '') : '',
+    });
+  } catch {
+    // Hors contexte d'extension : sans conséquence.
+  }
+}
+
+/** Période de vidange des compteurs (§10). Assez longue pour que ce qui part soit un
+ * agrégat et non une trace d'activité minute par minute. */
+export const TELEMETRY_FLUSH_MS = 5 * 60_000;
+
+function persistSelectorFailures(failures: readonly { chain: string; at: string }[]): void {
+  try {
+    chrome?.storage?.local?.set?.({ selectorFailures: failures.slice(-SELECTOR_LOG_LIMIT) });
+  } catch {
+    // Hors contexte d'extension : le journal reste en mémoire, comme avant.
+  }
+}
+
 async function readUserLanguage(): Promise<string | null> {
   return new Promise((resolve) => {
     try {
@@ -319,10 +375,24 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // Et même avec un relais, il ne sert QUE les origines tierces : voir `relayableFrom()`.
   const readOrgConfig = hasExtensionRelay() ? relayableFrom(url) : undefined;
 
+  // Un émetteur par onglet, DÉSARMÉ : il ne comptera rien tant que la configuration
+  // résolue n'aura pas dit qu'on en a le droit (§10, voir telemetry.ts). Il est construit
+  // ici, avant l'adaptateur, parce que `SelectorLog` reçoit son rappel à la construction.
+  const telemetry = new TelemetryCounters();
+  const count = (event: TelemetryEvent): void => telemetry.count(event);
+
+  // Un seul rappel, deux effets, et c'est voulu : la dégradation de sélecteur se journalise
+  // LOCALEMENT dans tous les cas (§9.4, CA-11) et ne se remonte que si la télémétrie est
+  // armée. Le tri entre les deux vit dans l'émetteur, pas ici.
+  const log = new SelectorLog((event) => {
+    persistSelectorFailures(log.failures);
+    count(event);
+  });
+
   const adapter: PlatformAdapter & { matchesHost(url: URL): boolean } =
     platform === 'github'
-      ? new GithubClientAdapter({ documentRef: doc, extraHosts: extraHosts.github, readOrgConfig })
-      : new AzdoClientAdapter({ documentRef: doc, extraHosts: extraHosts.azdo, readOrgConfig });
+      ? new GithubClientAdapter({ documentRef: doc, extraHosts: extraHosts.github, readOrgConfig, log })
+      : new AzdoClientAdapter({ documentRef: doc, extraHosts: extraHosts.azdo, readOrgConfig, log });
 
   const resolver = new ClientConfigResolver(readManagedFloor);
   const currentUser = await adapter.getCurrentUser();
@@ -365,6 +435,17 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     if (resolved.config.mode === 'off') return; // §7 — extension inactive
     const published = adapter.readPublishedResult();
     const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
+    // Armement (ou désarmement) à CHAQUE résolution : le mode, le point de collecte et
+    // jusqu'au droit d'émettre viennent de la configuration effective, qui peut changer
+    // d'une PR à l'autre dans le même onglet.
+    const pr = editor.context.pr;
+    // Ce que la page d'options affichera à côté de la case : le point de collecte que la
+    // configuration désigne, indépendamment de l'opt-in — c'est précisément ce qu'il faut
+    // voir AVANT de cocher. Écrit à chaque résolution, comme `degradedState`.
+    publishTelemetryEndpoint(resolved.config);
+    telemetry.arm(
+      telemetryTarget(resolved.config, await readTelemetryOptIn(), `${pr.host}/${pr.scope.join('/')}`)
+    );
     const controller = new EditorController({
       adapter,
       editor,
@@ -373,6 +454,7 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
       lang,
       currentUserLogin: currentUser.login,
       directShortcuts: await readDirectShortcuts(), // §5.2 — préférence locale (§8.1.2)
+      telemetry: count,
     });
     if (disposed) return; // révoqué pendant les lectures ci-dessus : ne rien installer
     controller.attach();
@@ -388,8 +470,21 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // barre reste absente d'une PR atteinte par un lien interne tant qu'un rechargement
   // complet ne relance pas bootstrap().
   const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc);
+  // Vidange : périodique, et à la fermeture de l'onglet. `pagehide` et non `unload` —
+  // celui-ci empêche la mise en cache arrière/avant et n'est plus fiable ; `keepalive`
+  // (telemetry.ts) est ce qui laisse la dernière requête partir malgré la fermeture.
+  const flushTimer = setInterval(() => telemetry.flush(), TELEMETRY_FLUSH_MS);
+  const flushOnHide = () => telemetry.flush();
+  doc.defaultView?.addEventListener('pagehide', flushOnHide);
+
   const revoke = () => {
     disposed = true;
+    clearInterval(flushTimer);
+    doc.defaultView?.removeEventListener('pagehide', flushOnHide);
+    // Une dernière vidange AVANT de désarmer : les compteurs de la session comptent autant
+    // que les autres, et `arm(null)` les jette.
+    telemetry.flush();
+    telemetry.arm(null);
     editors.dispose();
     stopPrChrome();
     for (const { controller } of attached) controller.dispose();

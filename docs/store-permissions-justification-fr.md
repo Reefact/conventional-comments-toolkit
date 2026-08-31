@@ -153,24 +153,34 @@ associé n'active toujours aucun adaptateur plutôt que d'être deviné —
 et `bootstrap()` transmet la liste correspondante en `extraHosts` au
 bon constructeur. Testé (`packages/extension/test/extra-hosts.test.ts`).
 
-**⚠️ Un écart reste confirmé dans le code actuel, à régler avant de
-s'appuyer sur cette permission en soumission :**
-**`configUrl` sur un domaine tiers ne se lit pas depuis un script de
-contenu.** `getRepoConfig()`/`getOrgConfig()` des deux adaptateurs
-appellent `fetch` directement dans le contexte du script de contenu ;
-ces requêtes restent soumises à la politique CORS de la page hôte. Le
-message `cct-fetch-config` que `background.ts` sait traiter existe
-déjà pour ce cas précis, mais rien dans les adaptateurs ne l'envoie —
-la lecture d'un `configUrl` distinct du domaine de plateforme échoue
-donc en pratique et bascule l'extension en état dégradé.
+**✅ Le `configUrl` d'organisation se lit désormais réellement.**
+Corrigé : `getOrgConfig()` des deux adaptateurs appelait `fetch`
+directement depuis le script de contenu, contexte qui émet ses requêtes
+au nom de l'origine de la page et reste soumis à sa politique CORS
+(« Content scripts initiate requests on behalf of the web origin that
+the content script has been injected into and therefore content scripts
+are also subject to the same origin policy », doc Chrome, *Cross-origin
+network requests*). La permission d'hôte accordée pour ce domaine n'y
+changeait rien : un document d'organisation hébergé hors du domaine de
+plateforme restait illisible, et l'extension basculait en état dégradé
+permanent. La lecture passe maintenant par le service worker
+(message `cct-fetch-config`), seul contexte où cette permission porte.
 
-Tant que ce point n'est pas corrigé, ne pas décrire dans le formulaire
-de soumission une résolution complète de la configuration
-d'organisation sur un domaine distinct de la plateforme : cette
-permission optionnelle reste correctement scoping-justifiée, et
-l'activation de l'interface sur un domaine auto-hébergé fonctionne
-désormais de bout en bout, mais la lecture du `configUrl` d'entreprise
-ne l'est pas encore.
+Deux précisions utiles si le reviewer interroge ce point :
+
+- **Seul le document d'organisation est relayé.** Le fichier
+  `.conventional-comments.json` du dépôt affiché vit sur l'origine de la
+  page : il est lu directement, sans permission d'hôte ni relais.
+- **Le worker ne suit pas l'URL qu'on lui soumet, il la confronte.**
+  `configUrl` provient exclusivement du canal de politique d'entreprise
+  (`chrome.storage.managed`), que le worker relit pour son propre
+  compte ; une URL qui ne correspond pas est refusée sans être lue. Un
+  script de contenu ne peut donc pas employer le worker comme relais
+  authentifié vers un autre domaine accordé.
+
+Testé dans `packages/extension/test/org-config-relay.test.ts`, et la
+mécanique de messagerie est vérifiée dans un vrai Chromium par
+`npm run smoke:mv3`.
 
 ## Ce que l'extension ne fait pas (à rappeler en cas de question du reviewer)
 

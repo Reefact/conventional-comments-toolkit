@@ -76,16 +76,16 @@ page, now correctly activates the UI — `bootstrap()` passes the granted
 `extraHosts` into the matching adapter. The "GitHub Enterprise Server /
 Azure DevOps Server" claim can stay in the listing.
 
-## Remaining gap, narrower: `configUrl` on a third-party domain
+## Gap fixed — `configUrl` on a third-party domain
 
-Both adapters' `getRepoConfig()`/`getOrgConfig()` call `fetch` directly
-from the content script, subject to the host page's CORS. That doesn't
-block reading the displayed repository's own
-`.conventional-comments.json` (same origin as the page): only reading
-an organization `configUrl` hosted on a domain **distinct** from the
-platform still fails. The `cct-fetch-config` message that
-`background.ts` already knows how to handle for this case is never
-sent by either adapter.
+Fixed and tested (`packages/extension/test/org-config-relay.test.ts`):
+`getOrgConfig()` used to call `fetch` from the content script, subject
+to the host page's CORS — a host permission changes nothing there,
+since the request is issued on behalf of the page's origin. Reading an
+organization `configUrl` hosted on a domain **distinct** from the
+platform now goes through the service worker (`cct-fetch-config`).
+Reading the displayed repository's `.conventional-comments.json` stays
+direct: it targets the page's own origin and needs no relay.
 
 ## Release notes for the first submission
 

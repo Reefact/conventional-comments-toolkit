@@ -32,9 +32,20 @@ export interface GithubClientOptions {
   /** Hôtes autorisés par l'utilisateur ou la politique (§2, §A.4) — github.com n'est que
    * le domaine pré-déclarable ; GHES et ghe.com passent par optional_host_permissions. */
   extraHosts?: string[];
-  /** Fetch à employer pour la configuration — celui du contexte qui détient la
-   * permission d'hôte (service worker de l'extension). */
+  /** Fetch à employer pour les lectures faites par cet adaptateur — substitution de test,
+   * ou contexte d'exécution qui n'a pas de `fetch` global. Ce n'est PAS le chemin vers le
+   * service worker : une fonction ne franchit pas la frontière des contextes d'une
+   * extension. Pour cela, voir `readOrgConfig` ci-dessous. */
   fetchImpl?: typeof fetch;
+  /** Lecture du `configUrl` d'organisation, quand l'appelant en détient un chemin que cet
+   * adaptateur n'a pas. Dans l'extension, c'est le cas : le script de contenu émet ses
+   * requêtes au nom de l'origine de la page et reste soumis à sa politique CORS, quelle que
+   * soit la permission d'hôte accordée (doc Chrome, « Cross-origin network requests ») ; un
+   * `configUrl` hébergé hors de la plateforme affichée n'y est donc pas lisible. Le service
+   * worker le lit à sa place et le résultat arrive par ici. Absent — usage hors extension,
+   * tests — le repli est le `fetch` direct ci-dessous, qui reste correct là où l'origine
+   * appelante a le droit de lire. */
+  readOrgConfig?: (url: string) => Promise<ConfigRead>;
   documentRef?: Document;
   log?: SelectorLog;
 }
@@ -43,6 +54,7 @@ export class GithubClientAdapter implements PlatformAdapter {
   #hosts: string[];
   #fetch: typeof fetch;
   #doc: Document;
+  #readOrgConfig?: (url: string) => Promise<ConfigRead>;
   readonly log: SelectorLog;
   #editorSeq = 0;
 
@@ -50,6 +62,7 @@ export class GithubClientAdapter implements PlatformAdapter {
     this.#hosts = ['github.com', ...(opts.extraHosts ?? [])];
     this.#fetch = opts.fetchImpl ?? fetch;
     this.#doc = opts.documentRef ?? document;
+    this.#readOrgConfig = opts.readOrgConfig;
     this.log = opts.log ?? new SelectorLog();
   }
 
@@ -91,6 +104,7 @@ export class GithubClientAdapter implements PlatformAdapter {
 
   async getOrgConfig(url: string | null): Promise<ConfigRead> {
     if (url === null) return { status: 'absent' };
+    if (this.#readOrgConfig) return this.#readOrgConfig(url);
     try {
       const res = await this.#fetch(url, { credentials: 'include' });
       if (res.status === 404) return { status: 'absent' };

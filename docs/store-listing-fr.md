@@ -82,16 +82,16 @@ correctement l'interface — `bootstrap()` transmet les `extraHosts`
 accordés au bon adaptateur. La mention « GitHub Enterprise Server /
 Azure DevOps Server » peut rester dans la fiche.
 
-## Écart restant, plus étroit : `configUrl` sur un domaine tiers
+## Écart résolu — `configUrl` sur un domaine tiers
 
-`getRepoConfig()`/`getOrgConfig()` des deux adaptateurs appellent
-`fetch` directement depuis le script de contenu, soumis au CORS de la
-page hôte. Cela ne bloque pas la lecture du fichier `.conventional-comments.json`
-du dépôt affiché (même origine que la page) : seule la lecture d'un
+Corrigé et testé (`packages/extension/test/org-config-relay.test.ts`) :
+`getOrgConfig()` appelait `fetch` depuis le script de contenu, soumis
+au CORS de la page hôte — une permission d'hôte n'y change rien, la
+requête est émise au nom de l'origine de la page. La lecture d'un
 `configUrl` d'organisation hébergé sur un **domaine distinct** de la
-plateforme échoue encore. Le message `cct-fetch-config`, que
-`background.ts` sait déjà traiter pour ce cas, n'est envoyé par aucun
-adaptateur.
+plateforme passe désormais par le service worker (`cct-fetch-config`).
+La lecture du `.conventional-comments.json` du dépôt affiché reste
+directe : elle vise l'origine de la page et n'a besoin d'aucun relais.
 
 ## Notes de version pour la première soumission
 

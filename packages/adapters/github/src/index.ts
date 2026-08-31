@@ -259,7 +259,13 @@ export class GithubClientAdapter implements PlatformAdapter {
     return {
       platform: 'github',
       createdAt,
-      host: loc!.hostname,
+      // `host` et non `hostname` : il PORTE LE PORT quand il est non standard. `pr.host`
+      // sert à bâtir les URL de lecture de configuration (`https://${pr.host}/…`) ; une
+      // instance GHES servie sur `ghes.corp:8443` verrait sinon sa configuration demandée
+      // au port 443, donc jamais lue, et l'extension basculerait en état dégradé (revue
+      // Codex, PR #29). La reconnaissance d'hôte, elle, reste sur `hostname` : les motifs
+      // de correspondance de Chrome ignorent le port.
+      host: loc!.host,
       scope: [m[1]!, m[2]!],
       number: Number(m[3]),
     };

@@ -185,12 +185,17 @@ describe('B2 — le SERVICE WORKER calcule la répartition (seul contexte à voi
     installServiceWorkerChrome(
       ['https://ghes.example.corp/*', 'https://azdo.example.corp/*'],
       {},
-      { allowedHosts: ['ghes.example.corp', { host: 'azdo.example.corp', platform: 'azdo' }] }
+      {
+        allowedHosts: [
+          { host: 'ghes.example.corp', platform: 'github' },
+          { host: 'azdo.example.corp', platform: 'azdo' },
+        ],
+      }
     );
     const { publishExtraHostsByPlatform } = await import('../src/background.js');
     expect(await publishExtraHostsByPlatform()).toEqual({
-      github: ['ghes.example.corp'], // forme chaîne : GitHub, la plateforme pré-déclarable (§A.4)
-      azdo: ['azdo.example.corp'], // forme objet : plateforme explicite
+      github: ['ghes.example.corp'],
+      azdo: ['azdo.example.corp'],
     });
   });
 
@@ -387,15 +392,23 @@ describe('D3 — une étiquette de politique d’entreprise est reconnue sans ge
     expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: ['azdo.example.corp'] });
   });
 
-  it('la forme historique — une chaîne nue — vaut github, plateforme du domaine pré-déclarable', async () => {
+  it('une entrée SANS plateforme explicite reste non classée — jamais rabattue sur github', async () => {
+    // Deux raisons, toutes deux relevées par la revue Codex :
+    // 1. Le validateur de schéma de Chrome exige « un $ref ou exactement un type » par
+    //    schéma : `items` ne peut pas déclarer deux formes, la forme objet est donc la
+    //    seule publiable — une chaîne nue n'arrive plus par ce canal.
+    // 2. Surtout, le schéma d'AVANT décrivait ce tableau comme contenant « domaines GHES /
+    //    Azure DevOps Server et hôte de configUrl » : rabattre ses chaînes sur `github`
+    //    aurait réécrit le sens d'une politique existante, et fait gagner l'adaptateur
+    //    GitHub (consulté en premier) sur une page Azure DevOps.
     const store = installServiceWorkerChrome(
       ['https://ghes.example.corp/*'],
       {},
-      { allowedHosts: ['ghes.example.corp'] }
+      { allowedHosts: ['ghes.example.corp', { host: 'sans-plateforme.corp' }] }
     ).local;
     const { publishExtraHostsByPlatform } = await import('../src/background.js');
     await publishExtraHostsByPlatform();
-    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: ['ghes.example.corp'], azdo: [] });
+    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: [] });
   });
 
   it('la politique PRIME sur une étiquette locale divergente', async () => {
@@ -407,5 +420,176 @@ describe('D3 — une étiquette de politique d’entreprise est reconnue sans ge
     const { publishExtraHostsByPlatform } = await import('../src/background.js');
     await publishExtraHostsByPlatform();
     expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: ['host.example.corp'] });
+  });
+});
+
+// ————— E — trois défauts relevés au troisième passage de la revue Codex —————
+
+describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif dans l’onglet', () => {
+  // Désenregistrer le script de contenu n'empêche que les injections futures : celui déjà
+  // en place continuerait d'observer le DOM et de poser sa barre d'outils sur un hôte qui
+  // n'est plus autorisé, jusqu'au rechargement de la page.
+  it('bootstrap() se révoque lui-même quand son hôte disparaît de la répartition publiée', async () => {
+    let listener:
+      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
+      | null = null;
+    const disposeEditors = vi.fn();
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (_k: string[], cb: (items: Record<string, unknown>) => void) =>
+            cb({ [EXTRA_HOSTS_KEY]: { github: ['ghes.example.corp'], azdo: [] } }),
+        },
+        onChanged: {
+          addListener: (cb: typeof listener) => {
+            listener = cb;
+          },
+          removeListener: vi.fn(),
+        },
+      },
+    };
+    vi.doMock('@cct/adapter-github', () => ({
+      GithubClientAdapter: class {
+        #hosts: string[];
+        constructor(opts: { extraHosts?: string[] } = {}) {
+          this.#hosts = ['github.com', ...(opts.extraHosts ?? [])];
+        }
+        matchesHost(url: URL): boolean {
+          return this.#hosts.includes(url.hostname);
+        }
+        async getCurrentUser() {
+          return { login: 'someone' };
+        }
+        observeEditors() {
+          return { dispose: disposeEditors };
+        }
+        currentPr() {
+          return null;
+        }
+        readPublishedResult() {
+          return null;
+        }
+      },
+    }));
+    vi.doMock('@cct/adapter-azdo', () => ({
+      AzdoClientAdapter: class {
+        matchesHost(): boolean {
+          return false;
+        }
+      },
+    }));
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://ghes.example.corp/acme/demo'),
+      configurable: true,
+    });
+    await bootstrap(document);
+    expect(disposeEditors).not.toHaveBeenCalled();
+    expect(listener).toBeTypeOf('function');
+
+    // La permission est retirée : background.ts republie une répartition sans cet hôte.
+    listener!({ [EXTRA_HOSTS_KEY]: { newValue: { github: [], azdo: [] } } }, 'local');
+    expect(disposeEditors).toHaveBeenCalledTimes(1);
+
+    vi.doUnmock('@cct/adapter-github');
+    vi.doUnmock('@cct/adapter-azdo');
+  });
+
+  it('une republication qui CONSERVE l’hôte ne révoque rien', async () => {
+    let listener:
+      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
+      | null = null;
+    const disposeEditors = vi.fn();
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (_k: string[], cb: (items: Record<string, unknown>) => void) =>
+            cb({ [EXTRA_HOSTS_KEY]: { github: ['ghes.example.corp'], azdo: [] } }),
+        },
+        onChanged: {
+          addListener: (cb: typeof listener) => {
+            listener = cb;
+          },
+          removeListener: vi.fn(),
+        },
+      },
+    };
+    vi.doMock('@cct/adapter-github', () => ({
+      GithubClientAdapter: class {
+        #hosts: string[];
+        constructor(opts: { extraHosts?: string[] } = {}) {
+          this.#hosts = ['github.com', ...(opts.extraHosts ?? [])];
+        }
+        matchesHost(url: URL): boolean {
+          return this.#hosts.includes(url.hostname);
+        }
+        async getCurrentUser() {
+          return { login: 'someone' };
+        }
+        observeEditors() {
+          return { dispose: disposeEditors };
+        }
+        currentPr() {
+          return null;
+        }
+        readPublishedResult() {
+          return null;
+        }
+      },
+    }));
+    vi.doMock('@cct/adapter-azdo', () => ({
+      AzdoClientAdapter: class {
+        matchesHost(): boolean {
+          return false;
+        }
+      },
+    }));
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://ghes.example.corp/acme/demo'),
+      configurable: true,
+    });
+    await bootstrap(document);
+
+    // Un autre hôte est ajouté ; celui-ci reste autorisé.
+    listener!(
+      { [EXTRA_HOSTS_KEY]: { newValue: { github: ['ghes.example.corp', 'autre.corp'], azdo: [] } } },
+      'local'
+    );
+    expect(disposeEditors).not.toHaveBeenCalled();
+
+    vi.doUnmock('@cct/adapter-github');
+    vi.doUnmock('@cct/adapter-azdo');
+  });
+});
+
+describe('E2 — un port non standard survit jusqu’aux URL de configuration (§A.4, §B.4)', () => {
+  // La reconnaissance d'hôte ignore le port (les motifs de Chrome aussi), mais `pr.host`
+  // sert à BÂTIR les URL de lecture de configuration : le perdre faisait interroger le
+  // port 443 d'une instance servie ailleurs — configuration jamais lue, état dégradé.
+  it('GithubClientAdapter.currentPr() retient l’autorité complète, port compris', () => {
+    const doc = document.implementation.createHTMLDocument();
+    Object.defineProperty(doc, 'location', {
+      value: new URL('https://ghes.example.corp:8443/acme/demo/pull/42'),
+      configurable: true,
+    });
+    const pr = new GithubClientAdapter({ documentRef: doc, extraHosts: ['ghes.example.corp'] }).currentPr();
+    expect(pr?.host).toBe('ghes.example.corp:8443');
+  });
+
+  it('la reconnaissance d’hôte, elle, reste indifférente au port', () => {
+    const adapter = new GithubClientAdapter({ extraHosts: ['ghes.example.corp'] });
+    expect(adapter.matchesHost(new URL('https://ghes.example.corp:8443/acme/demo/pull/1'))).toBe(true);
+  });
+
+  it('un hôte sans port explicite n’en gagne pas — github.com reste github.com', () => {
+    const doc = document.implementation.createHTMLDocument();
+    Object.defineProperty(doc, 'location', {
+      value: new URL('https://github.com/acme/demo/pull/7'),
+      configurable: true,
+    });
+    expect(new GithubClientAdapter({ documentRef: doc }).currentPr()?.host).toBe('github.com');
   });
 });

@@ -53,3 +53,49 @@ describe('§8.1.1 — le schéma de politique managée porte tout le document de
     expect(extra).toEqual([]);
   });
 });
+
+// ————— Contraintes de forme imposées par Chrome au schéma lui-même —————
+// La doc « Manifest for managed storage » les énonce en trois points : le schéma de tête
+// est un `object`, il ne porte pas d'`additionalProperties`, et **chaque schéma porte un
+// `$ref` ou exactement un `type`**. Un `items` en `anyOf` (donc sans `type`) viole le
+// troisième : Chrome peut alors rejeter `managed-schema.json`, et ne publier NI la clé
+// fautive ni le reste de la politique de l'extension. C'est arrivé dans la PR #29, où
+// `allowedHosts` acceptait deux formes via `anyOf` ; aucun test ne pouvait le voir, le
+// JSON étant par ailleurs parfaitement valide.
+//
+// Ce garde vaut donc pour tout le fichier, pas pour la seule clé qui a fauté.
+
+interface SchemaNode {
+  type?: unknown;
+  $ref?: unknown;
+  properties?: Record<string, SchemaNode>;
+  items?: SchemaNode;
+}
+
+/** Chemins de tous les nœuds de schéma qui ne portent ni `$ref` ni exactement un `type`. */
+function nodesWithoutSingleType(node: SchemaNode, path = '(racine)'): string[] {
+  const faults: string[] = [];
+  const hasRef = typeof node.$ref === 'string';
+  const hasOneType = typeof node.type === 'string';
+  if (!hasRef && !hasOneType) faults.push(path);
+  for (const [key, child] of Object.entries(node.properties ?? {})) {
+    faults.push(...nodesWithoutSingleType(child, `${path}.${key}`));
+  }
+  if (node.items) faults.push(...nodesWithoutSingleType(node.items, `${path}[]`));
+  return faults;
+}
+
+const wholeSchema = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../src/managed-schema.json', import.meta.url)), 'utf8')
+) as SchemaNode & { additionalProperties?: unknown };
+
+describe('contraintes de Chrome sur la forme du schéma de politique managée', () => {
+  it('chaque schéma porte un $ref ou exactement un type — jamais anyOf/oneOf/allOf', () => {
+    expect(nodesWithoutSingleType(wholeSchema)).toEqual([]);
+  });
+
+  it('le schéma de tête est un object, sans additionalProperties', () => {
+    expect(wholeSchema.type).toBe('object');
+    expect(wholeSchema.additionalProperties).toBeUndefined();
+  });
+});

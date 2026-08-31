@@ -30,6 +30,14 @@ declare const chrome: {
       get?: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
       set?: (items: Record<string, unknown>) => void;
     };
+    onChanged?: {
+      addListener: (
+        cb: (changes: Record<string, { newValue?: unknown }>, areaName: string) => void
+      ) => void;
+      removeListener?: (
+        cb: (changes: Record<string, { newValue?: unknown }>, areaName: string) => void
+      ) => void;
+    };
   };
   runtime?: { sendMessage?: (msg: unknown) => Promise<unknown> };
 } | undefined;
@@ -61,6 +69,16 @@ async function readManagedFloor(): Promise<Floor | null> {
   });
 }
 
+/** Forme sûre de la valeur publiée : elle vient du stockage, donc de l'extérieur de ce
+ * module — une entrée absente ou malformée vaut liste vide, jamais une exception. */
+function normalizeExtraHosts(stored: unknown): ExtraHostsByPlatform {
+  const value = stored as Partial<ExtraHostsByPlatform> | undefined;
+  return {
+    github: Array.isArray(value?.github) ? value.github : [],
+    azdo: Array.isArray(value?.azdo) ? value.azdo : [],
+  };
+}
+
 /** Hôtes accordés via `optional_host_permissions` (§2, §A.4, §B.4), déjà répartis par
  * plateforme — LU, jamais calculé ici.
  *
@@ -75,11 +93,7 @@ export async function readExtraHostsByPlatform(): Promise<ExtraHostsByPlatform> 
     try {
       if (!chrome?.storage?.local?.get) return resolve(EMPTY_EXTRA_HOSTS);
       chrome.storage.local.get([EXTRA_HOSTS_KEY], (items) => {
-        const stored = items?.[EXTRA_HOSTS_KEY] as Partial<ExtraHostsByPlatform> | undefined;
-        resolve({
-          github: Array.isArray(stored?.github) ? stored.github : [],
-          azdo: Array.isArray(stored?.azdo) ? stored.azdo : [],
-        });
+        resolve(normalizeExtraHosts(items?.[EXTRA_HOSTS_KEY]));
       });
     } catch {
       resolve(EMPTY_EXTRA_HOSTS);
@@ -189,11 +203,46 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // barre reste absente d'une PR atteinte par un lien interne tant qu'un rechargement
   // complet ne relance pas bootstrap().
   const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc);
-  return () => {
+  const revoke = () => {
     disposed = true;
     editors.dispose();
     stopPrChrome();
   };
+
+  // §2 — RETRAIT de la permission d'hôte, l'onglet restant ouvert. Désenregistrer le
+  // script de contenu (background.ts) n'empêche que les injections FUTURES : celui déjà
+  // en place continue sinon d'observer le DOM, de poser la barre d'outils et de griser le
+  // bouton d'envoi sur un hôte qui n'est plus autorisé, jusqu'au rechargement de la page
+  // (revue Codex, PR #29). La répartition publiée est donc SUIVIE, pas seulement lue au
+  // démarrage : dès que plus aucun adaptateur ne reconnaît l'hôte courant, tout est rendu.
+  const stopWatch = watchExtraHostsRevocation(url, doc, revoke);
+  return () => {
+    stopWatch();
+    revoke();
+  };
+}
+
+/** Surveille la répartition publiée et appelle `onRevoked()` dès que l'hôte courant n'est
+ * plus reconnu par aucun adaptateur. Les hôtes par défaut (github.com, dev.azure.com,
+ * *.visualstudio.com) vivent dans les adaptateurs et ne dépendent d'aucune permission
+ * optionnelle : reconstruire les deux adaptateurs avec les nouvelles listes suffit donc à
+ * distinguer « hôte devenu non autorisé » de « hôte intégré au produit ». */
+function watchExtraHostsRevocation(url: URL, doc: Document, onRevoked: () => void): () => void {
+  const listener = (changes: Record<string, { newValue?: unknown }>, areaName: string) => {
+    if (areaName !== 'local' || !(EXTRA_HOSTS_KEY in changes)) return;
+    const next = normalizeExtraHosts(changes[EXTRA_HOSTS_KEY]?.newValue);
+    const stillMatched =
+      new GithubClientAdapter({ documentRef: doc, extraHosts: next.github }).matchesHost(url) ||
+      new AzdoClientAdapter({ documentRef: doc, extraHosts: next.azdo }).matchesHost(url);
+    if (!stillMatched) onRevoked();
+  };
+  try {
+    if (!chrome?.storage?.onChanged?.addListener) return () => {};
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome?.storage?.onChanged?.removeListener?.(listener);
+  } catch {
+    return () => {};
+  }
 }
 
 function currentPrOf(adapter: PlatformAdapter): PrRef | null {

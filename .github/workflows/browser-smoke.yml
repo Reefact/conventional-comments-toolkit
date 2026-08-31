@@ -20,6 +20,10 @@ on:
     paths:
       - 'spikes/**'
       - 'packages/adapters/**'
+      # L'extension elle-même : c'est son bundle que la fumée MV3 charge. Sans ce chemin,
+      # une PR qui ne touche que packages/extension/ passerait sans jamais voir un vrai
+      # navigateur — précisément le trou par lequel la PR #29 a livré quatre défauts.
+      - 'packages/extension/**'
       - '.github/workflows/browser-smoke.yml'
   workflow_dispatch:
 
@@ -55,6 +59,17 @@ jobs:
 
       - name: Spike P1' — la stratégie d'écriture du §9.3 tient toujours
         run: npm run spike
+
+      # Quatre défauts consécutifs de la PR #29 avaient la même forme : « le navigateur ne
+      # se comporte pas comme le code le suppose ». Aucun test unitaire ne pouvait les
+      # voir — ils confrontent le code à des faux `chrome` écrits par la même main, donc à
+      # une croyance plutôt qu'à un navigateur. Ce test charge l'extension EMPAQUETÉE dans
+      # un vrai Chromium et vérifie les prémisses de l'architecture, pas le code.
+      - name: Construire le bundle MV3
+        run: npm run build:extension
+
+      - name: Fumée MV3 — l'extension empaquetée dans un vrai Chromium
+        run: npm run smoke:mv3
 
       - name: Smoke test de sélecteurs (§9.4)
         run: node spikes/p1-prime/smoke.mjs

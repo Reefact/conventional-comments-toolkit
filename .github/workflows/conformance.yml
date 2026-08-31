@@ -44,6 +44,17 @@ jobs:
       - name: Chaque règle de styles.css survit au parseur CSS
         run: npm run check:extension-css
 
+      # Un appel à une API que le CONTEXTE d'exécution n'expose pas ne lève pas : l'objet
+      # est `undefined`, l'optional chaining rend `undefined`, et la fonction retourne une
+      # valeur vide — silencieusement. Le typage l'accepte (`declare const chrome` décrit
+      # ce qu'on croit disponible) et un test qui installe un faux `chrome` complet le
+      # confirme, puisqu'il teste un monde inventé. C'est arrivé à `chrome.permissions`
+      # appelé depuis le script de contenu : la répartition des hôtes y était TOUJOURS
+      # vide, donc aucune activation sur un domaine d'entreprise. Le contrôle porte sur le
+      # bundle livré, seul artefact que le navigateur charge réellement.
+      - name: Aucune API hors de son contexte d'exécution
+        run: npm run build:extension && npm run check:context-apis
+
       # `specifications-fr.md` est la référence NORMATIVE : elle ne se modifie pas pour
       # correspondre au code. Un changement délibéré de la spécification reste possible —
       # il se fait alors sur une PR qui ne touche qu'elle, et cette garde le signale.

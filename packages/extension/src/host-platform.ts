@@ -6,7 +6,7 @@
 // résultat déjà calculé par background.ts dans `chrome.storage.local`, seule API des
 // trois accessible dans les trois contextes.
 
-import { hostMatchesAny as matchesAnyHostPattern } from '@cct/adapter-shared';
+import { hostMatchesPattern as matchesHostPattern } from '@cct/adapter-shared';
 
 /** Clé `chrome.storage.local` où la page d'options associe un hôte accordé à la
  * plateforme qui le sert. */
@@ -45,7 +45,13 @@ export const EMPTY_EXTRA_HOSTS: ExtraHostsByPlatform = { github: [], azdo: [] };
  * hôte concret. Le réduire à `ghe.com` ferait reconnaître le domaine nu et lui seul,
  * c'est-à-dire l'exact inverse de ce que l'octroi couvre. */
 export function hostnameOf(input: string): string | null {
-  const bare = input.trim().replace(/\/\*$/, '').replace(/^https?:\/\//, '');
+  // Le retrait du schéma est INSENSIBLE À LA CASSE : un schéma est valide en majuscules, et
+  // une saisie collée depuis une barre d'adresse peut l'être. Sans le drapeau `i`, le
+  // schéma survivait, `new URL('https://HTTPS://GHES.Example.Corp')` parsait `https`
+  // comme nom d'hôte, et la page d'options demandait la permission pour `https://https/*`
+  // en l'étiquetant — un échec qui rend un résultat plausible plutôt que de lever (revue
+  // Codex, PR #29).
+  const bare = input.trim().replace(/\/\*$/, '').replace(/^https?:\/\//i, '');
   if (bare === '') return null;
   try {
     return new URL(`https://${bare}`).hostname || null;
@@ -92,9 +98,41 @@ export function selectPlatform(
   extra: ExtraHostsByPlatform
 ): 'github' | 'azdo' | null {
   if (hostname === STATICALLY_INJECTED_HOST) return 'github';
-  if (matchesAnyHostPattern(hostname, extra.github)) return 'github';
-  if (matchesAnyHostPattern(hostname, extra.azdo)) return 'azdo';
-  return null;
+  const github = matchScore(hostname, extra.github);
+  const azdo = matchScore(hostname, extra.azdo);
+  if (github === azdo) return null; // aucun des deux, ou égalité : voir ci-dessous
+  return github > azdo ? 'github' : 'azdo';
+}
+
+/** Force de la meilleure correspondance de `hostname` dans `patterns` ; `0` si aucune.
+ *
+ * **Règle de CE produit, pas une sémantique du navigateur** — la distinction compte, et
+ * ce fichier a déjà porté une règle inventée présentée comme une règle de Chrome. Chrome,
+ * lui, ne classe pas ses motifs par spécificité : il répond oui ou non, motif par motif.
+ * Le besoin d'un départage naît d'ici, parce que deux plateformes peuvent revendiquer le
+ * même hôte.
+ *
+ * Le départage : une entrée EXACTE l'emporte sur un joker, et entre deux jokers le suffixe
+ * le plus long gagne. Autrement dit, la classification la plus précise l'emporte sur la
+ * plus large — sans quoi un `*.corp.example` étiqueté GitHub écrasait un
+ * `azdo.corp.example` explicitement étiqueté Azure DevOps, simplement parce que la liste
+ * GitHub était consultée en premier (revue Codex, PR #29).
+ *
+ * À égalité stricte, `selectPlatform` ne tranche pas et rend `null` : deux plateformes
+ * revendiquant un hôte avec la même précision est une configuration contradictoire, et la
+ * règle de ce dépôt est de ne jamais deviner — un hôte non classé n'active rien, ce qui se
+ * voit et se corrige, là où un choix arbitraire se manifesterait par une interface
+ * subtilement fausse. */
+function matchScore(hostname: string, patterns: readonly string[]): number {
+  let best = 0;
+  for (const pattern of patterns) {
+    if (!matchesHostPattern(hostname, pattern)) continue;
+    // Exact : score maximal, indépendant de la longueur. Joker : longueur du suffixe, de
+    // sorte que `*.a.b.example` batte `*.b.example` sur un hôte que les deux couvrent.
+    const score = pattern.startsWith('*.') ? pattern.length - 2 : Number.MAX_SAFE_INTEGER;
+    if (score > best) best = score;
+  }
+  return best;
 }
 
 /** Étiquettes de plateforme poussées par la politique d'entreprise (`allowedHosts` de

@@ -142,10 +142,25 @@ const hostInput = document.getElementById('host-input') as HTMLInputElement | nu
 const platformSelect = document.getElementById('host-platform') as HTMLSelectElement | null;
 const addState = document.getElementById('host-add-state');
 
+// Dernière valeur POSÉE PAR L'INFÉRENCE, pour la distinguer d'un choix humain. Sans cette
+// distinction, la première version ne ré-inférait plus dès que le menu n'était plus vide :
+// saisir `dev.azure.com` puis le remplacer par `acme.ghe.com` laissait `azdo` sélectionné,
+// et l'hôte GitHub partait au mauvais adaptateur (revue Codex, PR #29). Une valeur inférée
+// se corrige à chaque frappe ; une valeur choisie ne se touche plus.
+let inferredValue: string | null = null;
+
+platformSelect?.addEventListener('change', () => {
+  inferredValue = null; // choix explicite : l'inférence ne reprend plus la main
+});
+
 hostInput?.addEventListener('input', () => {
-  if (!platformSelect || platformSelect.value !== '') return; // ne pas écraser un choix fait
+  if (!platformSelect) return;
+  if (platformSelect.value !== '' && platformSelect.value !== inferredValue) return;
   const inferred = inferPlatform(hostnameOf(hostInput.value) ?? '');
-  if (inferred) platformSelect.value = inferred;
+  // `''` quand plus rien n'est inférable : mieux vaut revenir au placeholder, qui force un
+  // choix, que laisser l'inférence d'un hôte qu'on vient d'effacer.
+  platformSelect.value = inferred ?? '';
+  inferredValue = inferred;
 });
 
 document.getElementById('host-add')?.addEventListener('click', () => {

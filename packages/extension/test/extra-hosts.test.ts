@@ -1084,3 +1084,213 @@ describe('G2bis — la page d’options REFUSE d’étiqueter sans choix explici
     expect(stored[HOST_PLATFORMS_KEY]).toEqual({ 'azdo.example.corp': 'azdo' });
   });
 });
+
+// ————— H — quatre défauts relevés au cinquième passage de la revue Codex —————
+
+describe('H1 — le schéma est retiré sans égard à la casse', () => {
+  // Un schéma en majuscules est valide, et une saisie collée depuis une barre d'adresse
+  // peut l'être. Sans le drapeau `i`, le schéma survivait au retrait et `new URL()`
+  // parsait `https` comme nom d'hôte : la page d'options demandait alors la permission
+  // pour `https://https/*` et l'étiquetait. Un échec qui rend un résultat plausible.
+  it('HTTPS:// en majuscules donne le vrai hôte, pas "https"', () => {
+    expect(hostnameOf('HTTPS://GHES.Example.Corp')).toBe('ghes.example.corp');
+    expect(hostnameOf('HTTP://ghes.example.corp')).toBe('ghes.example.corp');
+    expect(hostnameOf('HtTpS://ghes.example.corp/*')).toBe('ghes.example.corp');
+  });
+
+  it('donne le même hôte quelle que soit la casse du schéma', () => {
+    expect(hostnameOf('HTTPS://ghes.example.corp')).toBe(hostnameOf('https://ghes.example.corp'));
+  });
+});
+
+describe('H2 — la classification la plus PRÉCISE l’emporte, pas la première listée', () => {
+  // Règle de ce produit, pas une sémantique du navigateur : Chrome répond oui ou non motif
+  // par motif. Le départage naît de ce que deux plateformes peuvent revendiquer un hôte.
+  it('une entrée exacte bat un joker de l’autre plateforme', () => {
+    expect(
+      selectPlatform('azdo.corp.example', {
+        github: ['*.corp.example'],
+        azdo: ['azdo.corp.example'],
+      })
+    ).toBe('azdo');
+  });
+
+  it('...dans les deux sens, l’ordre des listes ne décide de rien', () => {
+    expect(
+      selectPlatform('ghes.corp.example', {
+        github: ['ghes.corp.example'],
+        azdo: ['*.corp.example'],
+      })
+    ).toBe('github');
+  });
+
+  it('entre deux jokers, le suffixe le plus long gagne', () => {
+    expect(
+      selectPlatform('eu.azdo.corp.example', {
+        github: ['*.corp.example'],
+        azdo: ['*.azdo.corp.example'],
+      })
+    ).toBe('azdo');
+  });
+
+  it('à précision égale, ne tranche pas — un hôte non classé n’active rien', () => {
+    // Configuration contradictoire : la deviner produirait une interface subtilement
+    // fausse, là où ne rien activer se voit et se corrige.
+    expect(
+      selectPlatform('host.corp.example', {
+        github: ['host.corp.example'],
+        azdo: ['host.corp.example'],
+      })
+    ).toBeNull();
+  });
+});
+
+describe('H3 — l’inférence se recalcule tant que personne n’a choisi', () => {
+  function mountAndLoad() {
+    document.body.innerHTML = `
+      <input type="text" id="host-input" />
+      <select id="host-platform">
+        <option value="" selected>—</option>
+        <option value="github">GitHub</option>
+        <option value="azdo">Azure DevOps Server</option>
+        <option value="config">Autre</option>
+      </select>
+      <button id="host-add" type="button"></button>
+      <span id="host-add-state"></span>
+      <ul id="host-list"></ul>
+      <select id="language"></select>
+      <textarea id="direct-shortcuts"></textarea>
+      <button id="direct-shortcuts-save"></button>
+      <span id="direct-shortcuts-state"></span>
+      <p id="degraded-state"></p><p id="selector-log"></p>`;
+    (globalThis as { chrome?: unknown }).chrome = {
+      permissions: {
+        request: vi.fn(),
+        getAll: (cb: (p: { origins?: string[] }) => void) => cb({ origins: [] }),
+      },
+      storage: {
+        local: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}), set: vi.fn() },
+        sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}), set: vi.fn() },
+        managed: { get: (cb: (i: Record<string, unknown>) => void) => cb({}) },
+      },
+    };
+  }
+  const type = (value: string) => {
+    const input = document.getElementById('host-input') as HTMLInputElement;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+  };
+  const platform = () => (document.getElementById('host-platform') as HTMLSelectElement).value;
+
+  it('remplacer un hôte Azure par un hôte GitHub recalcule la plateforme', async () => {
+    mountAndLoad();
+    await import('../src/options/options.js');
+    type('dev.azure.com');
+    expect(platform()).toBe('azdo');
+    type('acme.ghe.com');
+    expect(platform()).toBe('github'); // restait 'azdo' avant ce correctif
+  });
+
+  it('effacer vers un hôte non inférable revient au placeholder, qui force un choix', async () => {
+    mountAndLoad();
+    await import('../src/options/options.js');
+    type('dev.azure.com');
+    type('ghes.example.corp');
+    expect(platform()).toBe('');
+  });
+
+  it('un choix EXPLICITE n’est plus jamais écrasé par l’inférence', async () => {
+    mountAndLoad();
+    await import('../src/options/options.js');
+    const select = document.getElementById('host-platform') as HTMLSelectElement;
+    select.value = 'config';
+    select.dispatchEvent(new Event('change'));
+    type('dev.azure.com');
+    expect(platform()).toBe('config');
+  });
+});
+
+describe('H4 — un contrôleur dont l’éditeur a quitté le document est libéré', () => {
+  // Le `Set` introduit pour que la révocation défasse les contrôleurs retenait aussi les
+  // contrôleurs MORTS — avec leur DOM détaché, leur configuration et l'adaptateur —
+  // jusqu'à la fermeture de l'onglet. Sur une page de revue en SPA on ouvre et referme des
+  // éditeurs en continu : le correctif de la révocation avait créé une fuite.
+  //
+  // Le test retire RÉELLEMENT le nœud du document, plutôt que d'employer un faux qui se
+  // déclarerait détaché : c'est `isConnected` du vrai DOM qui doit trancher.
+  it('l’éditeur retiré du DOM voit son contrôleur détruit à l’attachement suivant', async () => {
+    const disposes: number[] = [];
+    let emit: ((editor: unknown) => void) | null = null;
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) =>
+            cb({ [EXTRA_HOSTS_KEY]: { github: ['ghes.example.corp'], azdo: [] } }),
+          set: vi.fn(),
+        },
+        sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}) },
+        onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
+      },
+    };
+    vi.doMock('@cct/adapter-github', () => ({
+      GithubClientAdapter: class {
+        async getCurrentUser() {
+          return { login: 'someone' };
+        }
+        async getRepoConfig() {
+          return { status: 'absent' };
+        }
+        async getOrgConfig() {
+          return { status: 'absent' };
+        }
+        observeEditors(cb: (editor: unknown) => void) {
+          emit = cb;
+          return { dispose: vi.fn() };
+        }
+        currentPr() {
+          return null;
+        }
+        readPublishedResult() {
+          return null;
+        }
+      },
+    }));
+    vi.doMock('@cct/adapter-azdo', () => ({ AzdoClientAdapter: class {} }));
+    let seq = 0;
+    vi.doMock('../src/editor-controller.js', () => ({
+      DEFAULT_DIRECT_SHORTCUTS: {},
+      EditorController: class {
+        #id = seq++;
+        attach = vi.fn();
+        dispose = () => disposes.push(this.#id);
+      },
+    }));
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://ghes.example.corp/acme/demo'),
+      configurable: true,
+    });
+    await bootstrap(document);
+
+    const openEditor = async () => {
+      const el = document.createElement('textarea');
+      document.body.appendChild(el);
+      emit!({ element: el, context: { pr: { host: 'ghes.example.corp', scope: ['a', 'b'], number: 1 } } });
+      await new Promise((r) => setTimeout(r, 0));
+      return el;
+    };
+
+    const first = await openEditor();
+    expect(disposes).toEqual([]);
+
+    first.remove(); // l'éditeur quitte le document, comme en navigation SPA
+    await openEditor(); // le suivant apparaît : c'est là qu'on récolte
+
+    expect(disposes).toEqual([0]); // le contrôleur mort a bien été défait
+
+    vi.doUnmock('../src/editor-controller.js');
+    vi.doUnmock('@cct/adapter-github');
+    vi.doUnmock('@cct/adapter-azdo');
+  });
+});

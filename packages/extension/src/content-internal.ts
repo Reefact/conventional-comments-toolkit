@@ -220,7 +220,26 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // seul son `dispose()` retire. Une première version ne coupait que les deux
   // observations, laissant toute cette surface vivante sur un hôte devenu non autorisé
   // jusqu'au rechargement de la page (revue Codex, PR #29).
-  const attached = new Set<EditorController>();
+  const attached = new Set<{ controller: EditorController; element: Element }>();
+
+  /** Libère les contrôleurs dont l'éditeur a quitté le document.
+   *
+   * Sans cela, le `Set` ci-dessus — introduit pour que la révocation défasse les
+   * contrôleurs — retenait aussi tous les contrôleurs MORTS, avec leur DOM détaché, leur
+   * configuration et l'adaptateur, jusqu'à la fermeture de l'onglet. Sur une page de revue
+   * en SPA, où l'on ouvre et referme des éditeurs en continu, cela grossit sans borne.
+   * Avant l'introduction du `Set` ces objets étaient collectables : le correctif de la
+   * révocation avait donc créé une fuite (revue Codex, PR #29).
+   *
+   * Le nettoyage se fait à chaque attachement plutôt que sur un minuteur : c'est le seul
+   * instant où l'on sait qu'un éditeur vient d'apparaître, donc qu'un autre a pu partir. */
+  const releaseDetached = (): void => {
+    for (const entry of attached) {
+      if (entry.element.isConnected) continue;
+      entry.controller.dispose();
+      attached.delete(entry);
+    }
+  };
 
   const attach = async (editor: Parameters<Parameters<PlatformAdapter['observeEditors']>[0]>[0]) => {
     if (disposed) return;
@@ -241,7 +260,8 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     });
     if (disposed) return; // révoqué pendant les lectures ci-dessus : ne rien installer
     controller.attach();
-    attached.add(controller);
+    releaseDetached();
+    attached.add({ controller, element: editor.element });
   };
 
   const editors = adapter.observeEditors((editor) => void attach(editor));
@@ -256,7 +276,7 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     disposed = true;
     editors.dispose();
     stopPrChrome();
-    for (const controller of attached) controller.dispose();
+    for (const { controller } of attached) controller.dispose();
     attached.clear();
   };
 

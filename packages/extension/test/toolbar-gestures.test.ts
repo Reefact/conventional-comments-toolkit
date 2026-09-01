@@ -481,3 +481,50 @@ describe('§5.1 — effacer un label et décorer dans la foulée', () => {
     expect(textarea.value).toBe('suggestion (perf): le nom est ambigu');
   });
 });
+
+describe('§5.1 — deux intentions contraires dans le même geste', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  // « Décore » et « retire » ne peuvent pas être le même clic. Décidée avant que la
+  // décoration en attente soit lue, la bascule l'emportait : écrire `perf` puis cliquer le
+  // label DÉJÀ actif retirait le préfixe et jetait la décoration — un geste qui ajoute en
+  // enlevait deux (revue Codex, PR #35).
+  it('écrire une décoration puis cliquer le label ACTIF décore, ne retire pas', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'issue: le nom est ambigu');
+
+    const free = freeField();
+    free.value = 'perf';
+    // Le focus part vers le bouton : le champ s'abstient, c'est le clic qui pose.
+    free.dispatchEvent(new FocusEvent('blur', { relatedTarget: document.querySelector('.cct-label-button[data-label="issue"]') }));
+    clickLabel('issue');
+
+    expect(textarea.value).toBe('issue (perf): le nom est ambigu');
+  });
+
+  // Et sans décoration en attente, la bascule reste la bascule.
+  it('sans rien en attente, cliquer le label actif retire toujours', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'issue: le nom est ambigu');
+
+    clickLabel('issue');
+    expect(textarea.value).toBe('le nom est ambigu');
+  });
+
+  // La sélection de la barre est tantôt une INTENTION, tantôt un REFLET du texte. Sans
+  // porter d'où elle vient, le reflet d'un commentaire dont le label a disparu se réinsérait
+  // au clic suivant — la décoration effacée revenait (revue Codex, PR #35).
+  it('la décoration LUE d’un label effacé ne revient pas', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'issue (blocking): le nom est ambigu');
+    expect(checkedSegment()).toBe('(blocking)');
+
+    await typeByHand(textarea, 'le nom est ambigu'); // préfixe effacé, validation passée
+    expect(checkedSegment()).toBe('aucune');
+
+    clickLabel('todo');
+    expect(textarea.value).toBe('todo: le nom est ambigu');
+  });
+});

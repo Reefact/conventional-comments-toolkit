@@ -116,6 +116,17 @@ d'aucun chemin identifié.
   aboutir sur les dépôts publics ; un dépôt privé rend 403 et l'extension
   affiche l'état dégradé, faute de pouvoir lire. Le mécanisme est mesuré
   par `npm run check:content-script-cors`, pas déduit.
+- **Sur cette route, et sur elle seule.** Le choix est fait par URL
+  (`configCredentials()`) : hôte `github.com` **et** chemin `/raw/`. Les
+  deux lectures y passent — celle du dépôt, et celle du `configUrl`
+  d'organisation quand il désigne cette même route, cas où le relais par
+  le service worker décline à raison (URL de même origine que la page).
+  Partout ailleurs, `include` reste la règle : sur un GitHub Enterprise
+  Server accepté par `extraHosts`, aucune redirection hors origine n'a
+  été observée, et la session est précisément ce qui rend lisible la
+  configuration d'un dépôt privé. Retirer les cookies là où rien n'a été
+  mesuré ferait perdre un accès qui fonctionne — l'absence de mesure est
+  ici un argument pour ne rien changer, pas pour généraliser.
 - **Conséquence sur la permission** : lire la configuration d'un dépôt
   **privé** exigerait une permission d'hôte sur `github.com` et un passage
   par le service worker. Ce n'est pas demandé aujourd'hui — l'extension

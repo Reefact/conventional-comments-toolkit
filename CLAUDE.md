@@ -88,6 +88,13 @@ Deux gardes mécanisent la part mécanisable :
   de son contexte d'exécution. C'est ce garde qui aurait attrapé
   `chrome.permissions` dans `content.js` en une seconde. Sa liste d'API interdites
   est elle-même une affirmation sur le navigateur : `smoke:mv3` la contrôle.
+- `npm run check:content-script-cors` — ce qu'un script de contenu a le droit de **lire**.
+  Trois documents de ce dépôt ont affirmé que la lecture de configuration était « une requête
+  same-origin », donc sans frontière CORS. Vrai de la REQUÊTE, faux de la REDIRECTION : la
+  route `raw` de github.com redirige vers `raw.githubusercontent.com`, qui répond `ACAO: *`,
+  et le joker est refusé dès que la requête porte des cookies. Le niveau « dépôt » du §8.2
+  n'a donc jamais fonctionné sur GitHub, et le bandeau dégradé s'affichait exactement sur les
+  dépôts qui avaient une configuration à lire. Trois affirmations successives, aucune mesurée.
 - `npm run smoke:mv3` — l'extension **empaquetée** chargée dans un vrai Chromium,
   qui vérifie les prémisses de l'architecture (le service worker voit bien
   `chrome.permissions`, il publie bien la répartition, la page d'options n'impose
@@ -106,6 +113,7 @@ npm run spike                   # spike P1' dans Chromium (§9.3)
 npm run smoke:mv3               # extension empaquetée dans un vrai Chromium (prémisses MV3)
 npm run check:github-theme-vars # variables Primer de styles.css toujours présentes sur github.com
 npm run check:beacon            # un POST no-cors cross-origin part et arrive, sans referer ni cookie
+npm run check:content-script-cors # ce qu'un script de contenu a le droit de LIRE (redirections, cookies)
 ```
 
 `spike`, `smoke:mv3`, `check:beacon` et `check:github-theme-vars` pilotent un vrai Chromium via

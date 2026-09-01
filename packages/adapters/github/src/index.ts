@@ -92,13 +92,34 @@ export class GithubClientAdapter implements PlatformAdapter {
     return { id: 'github', suggestionInfoString: 'suggestion' };
   }
 
-  /** Route web `raw`, servie sur la session de l'utilisateur, sans jeton (§A.4) —
-   * fonctionne sur les dépôts privés accessibles, ce que raw.githubusercontent.com ne
-   * permettrait pas. */
+  /** Route web `raw` — et SANS cookies, ce qui demande une explication, parce que le
+   * contraire semble évident et ne marche pas.
+   *
+   * La route `raw` de github.com **redirige** vers `raw.githubusercontent.com` dès que le
+   * fichier existe (302 ; un fichier absent rend 404 sans redirection). La requête part de
+   * l'origine de la page, mais la réponse vient d'une AUTRE origine, qui répond
+   * `Access-Control-Allow-Origin: *`. Or le navigateur refuse le joker `*` quand la requête
+   * porte `credentials: 'include'` : « the value of the Access-Control-Allow-Origin header
+   * must not be the wildcard '*' when the request's credentials mode is 'include' ». Le
+   * `fetch` LÈVE, la lecture rend `unreachable`, et l'extension affiche l'état dégradé du
+   * §5.4 sur tout dépôt qui possède une configuration — c'est-à-dire précisément ceux qui en
+   * ont une à lire. Le niveau « dépôt » du §8.2 n'a donc jamais été lisible sur GitHub.
+   *
+   * MESURÉ, pas déduit : `npm run check:content-script-cors` reproduit les quatre cas dans un
+   * vrai Chromium (même origine, redirection vers une cible sans CORS, vers une cible en
+   * `ACAO: *` avec et sans cookies). Deux documents de ce dépôt affirmaient à l'inverse que
+   * cette lecture était « une requête same-origin » sans frontière CORS : vrai de la requête,
+   * faux de la redirection.
+   *
+   * Conséquence assumée du `'omit'` : sur un dépôt PRIVÉ, la route rend 403 faute de session
+   * — donc `unreachable`, et l'état dégradé. C'est le comportement honnête : l'extension dit
+   * qu'elle n'a pas pu lire, au lieu de prétendre qu'il n'y a pas de fichier. La lecture
+   * authentifiée des dépôts privés demande une permission d'hôte et passe par le service
+   * worker ; elle n'est pas dans ce correctif. */
   async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
     const url = `https://${pr.host}/${pr.scope.join('/')}/raw/HEAD/.conventional-comments.json`;
     try {
-      const res = await this.#fetch(url, { credentials: 'include' });
+      const res = await this.#fetch(url, { credentials: 'omit' });
       if (res.status === 404) return { status: 'absent' };
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
       return { status: 'found', text: await res.text() };

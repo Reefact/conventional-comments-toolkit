@@ -106,13 +106,22 @@ listing:
 Chrome Web Store recommended format: 1280×800 or 640×400, PNG or JPEG,
 up to 5 screenshots.
 
-**If the "Configuration unread" banner shows up in a screenshot**, it is
-**not** because the repository lacks a `.conventional-comments.json`.
-`ClientConfigResolver` enters the degraded state (§5.4) only when a read
-returns `unreachable`; a **missing** file returns `absent` with
-`degraded: false` and shows no banner — per §10 ("a simply absent file
-is a nominal case, not a degradation"). The banner therefore means a
-`fetch` genuinely failed against
-`https://{host}/{owner}/{repo}/raw/HEAD/.conventional-comments.json`
-(network error, or an HTTP status other than 404): inspect that request
-in the network tab — **adding a config file will not make it go away**.
+**If the "Configuration unread" banner shows up in a screenshot**: the
+diagnosis written here for several versions was right about its premise
+and wrong about its conclusion, and it is worth correcting rather than
+replacing. Right: a **missing** file returns `absent` with
+`degraded: false` and shows no banner (§10, "a simply absent file is a
+nominal case, not a degradation"). Wrong: "adding a config file will not
+make it go away". It was the opposite — the banner appeared **because
+there was a file**. The `raw` route on github.com redirects to
+`raw.githubusercontent.com` as soon as the file exists, that origin
+answers `Access-Control-Allow-Origin: *`, and the browser rejects the
+wildcard whenever the request carries credentials: the `fetch` threw, the
+read returned `unreachable`, and the banner appeared on precisely those
+repositories that had a configuration to read.
+
+Fixed: the read is sent without cookies. On a **public** repository it
+succeeds and the banner disappears. On a **private** one the route
+returns 403 without a session, so the banner stays — and now says
+something true: the extension could not read. Take screenshots on a
+public repository, or on one with no configuration file.

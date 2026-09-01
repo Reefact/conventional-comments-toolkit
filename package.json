@@ -28,7 +28,8 @@
     "smoke:mv3": "node spikes/mv3-smoke.mjs",
     "check:beacon": "node spikes/beacon-transport.mjs",
     "check:content-script-io": "node scripts/check-content-script-io.mjs",
-    "check:managed-keys": "node scripts/check-managed-keys.mjs"
+    "check:managed-keys": "node scripts/check-managed-keys.mjs",
+    "check:content-script-cors": "node spikes/content-script-cors.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

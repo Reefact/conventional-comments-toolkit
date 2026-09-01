@@ -104,9 +104,23 @@ d'aucun chemin identifié.
   suffit à lui seul en MV3 — sans entrée correspondante dans
   `host_permissions`.
 - La lecture de `.conventional-comments.json`
-  (`getRepoConfig()`/`getOrgConfig()`) est une requête **same-origin**
-  (le script de contenu tourne déjà sur `github.com` et interroge
-  `github.com`) : elle ne franchit aucune frontière CORS.
+  (`getRepoConfig()`/`getOrgConfig()`) part bien vers `github.com`,
+  l'origine de la page. **Correction d'une affirmation qui était fausse
+  ici pendant plusieurs versions** : « donc elle ne franchit aucune
+  frontière CORS » ne suit pas. La route `raw` **redirige** vers
+  `raw.githubusercontent.com` dès que le fichier existe, et cette
+  origine répond `Access-Control-Allow-Origin: *` — un joker que le
+  navigateur refuse dès que la requête porte des cookies. La lecture
+  levait donc sur tout dépôt possédant une configuration. Elle part
+  désormais **sans cookies** (`credentials: 'omit'`), ce qui la fait
+  aboutir sur les dépôts publics ; un dépôt privé rend 403 et l'extension
+  affiche l'état dégradé, faute de pouvoir lire. Le mécanisme est mesuré
+  par `npm run check:content-script-cors`, pas déduit.
+- **Conséquence sur la permission** : lire la configuration d'un dépôt
+  **privé** exigerait une permission d'hôte sur `github.com` et un passage
+  par le service worker. Ce n'est pas demandé aujourd'hui — l'extension
+  préfère afficher qu'elle n'a pas pu lire plutôt qu'exiger un accès à
+  l'installation.
 - `registerContentScriptForOrigin()` (`background.ts`) **exclut
   explicitement** `https://github.com/*` de son mécanisme d'activation
   dynamique.

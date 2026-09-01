@@ -7,6 +7,12 @@ import { ui } from './strings.js';
 
 /** Ce que le commentaire porte à cet instant, tel que `core/` le lit (§3.4.1). */
 export interface PosedPrefix {
+  /** Une ligne de préfixe est RECONNUE par la regex de référence (§3.4.2) — même si son
+   * label n'appartient pas à la configuration. `riskk (blocking): x` a un préfixe et pas de
+   * label ; un commentaire nu n'a ni l'un ni l'autre. La barre doit les traiter
+   * différemment : sur le premier elle ne peut rien affirmer, sur le second elle affiche ce
+   * qui est en attente. */
+  hasPrefix: boolean;
   /** L'id CANONIQUE du label (§8.2), alias résolu et casse de la configuration conservée —
    * jamais ce qui est littéralement écrit. */
   label: string | null;
@@ -250,9 +256,17 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     // issue » — et le parcours ne marchait que si aucune n'arrivait, ce que mon test ne
     // faisait justement pas arriver (revue Codex, PR #35).
     if (posed.label === null) {
-      // Le label a disparu : ce que la barre avait LU du commentaire ne décrit plus rien, et
-      // le garder le faisait réapparaître au clic suivant. Un choix EN ATTENTE, lui, survit —
-      // c'est une intention que personne n'a annulée (revue Codex, PR #35).
+      // Un préfixe est écrit, mais son label n'est pas de la configuration : la barre ne
+      // peut rien en dire. Elle ne coche donc RIEN — surtout pas « aucune », qui nierait la
+      // décoration écrite juste à côté — et ne montre pas non plus une sélection en attente,
+      // qui ne décrirait pas ce commentaire-là.
+      if (posed.hasPrefix) {
+        checkSegment(null);
+        return;
+      }
+      // Aucun préfixe du tout : ce que la barre avait LU du commentaire ne décrit plus rien,
+      // et le garder le faisait réapparaître au clic suivant. Un choix EN ATTENTE, lui,
+      // survit — c'est une intention que personne n'a annulée (revue Codex, PR #35).
       if (decoration.origin === 'posed') decoration = { origin: 'pending', ids: [] };
       checkSegment(segmentButtons.get(decoration.ids[0] ?? null) ?? null);
       return;

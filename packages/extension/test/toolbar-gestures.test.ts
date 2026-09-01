@@ -528,3 +528,37 @@ describe('§5.1 — deux intentions contraires dans le même geste', () => {
     expect(textarea.value).toBe('todo: le nom est ambigu');
   });
 });
+
+describe('§3.2 — un préfixe écrit dont le label est INCONNU de la configuration', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  // `riskk (blocking): x` : la regex de référence reconnaît le préfixe, la configuration ne
+  // reconnaît pas le label (`E-UNKNOWN-LABEL`). Confondre ce cas avec « aucun préfixe »
+  // faisait cocher « aucune » devant une décoration bien visible (revue Codex, PR #35).
+  it('la barre ne coche RIEN plutôt que d’affirmer « aucune »', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'riskk (blocking): le nom est ambigu');
+    expect(checkedSegment()).toBeNull();
+  });
+
+  // Et une sélection en attente ne doit pas s'afficher non plus : elle ne décrit pas CE
+  // commentaire, qui porte déjà un préfixe.
+  it('une sélection en attente ne s’affiche pas devant un préfixe écrit', async () => {
+    const { textarea } = setup();
+    clickDecoration('blocking'); // en attente, aucun label posé
+    await typeByHand(textarea, 'riskk: le nom est ambigu');
+    expect(checkedSegment()).toBeNull();
+  });
+
+  // L'orthographe écrite est conservée : décorer reste possible, et n'impose pas un label
+  // que la personne n'a pas choisi.
+  it('décorer un label inconnu garde son orthographe', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'riskk (blocking): le nom est ambigu');
+
+    clickDecoration('non-blocking');
+    expect(textarea.value).toBe('riskk (non-blocking): le nom est ambigu');
+  });
+});

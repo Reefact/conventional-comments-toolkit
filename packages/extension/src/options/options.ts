@@ -2,7 +2,7 @@
 // limitées (§8.1.2 — jamais le mode ni les labels), affichage de l'état dégradé (§5.4)
 // et du journal local de dégradation de sélecteurs (§9.4).
 
-import { TELEMETRY_OPT_IN_KEY } from '../telemetry.js';
+import { TELEMETRY_CONSENT_KEY, parseConsent } from '../telemetry.js';
 import {
   HOST_PLATFORMS_KEY,
   hostnameOf,
@@ -236,26 +236,55 @@ document.getElementById('direct-shortcuts-save')?.addEventListener('click', () =
   }
 });
 
-// Télémétrie (§10) — le troisième verrou décrit en tête de `telemetry.ts` : la case est le
-// consentement de la PERSONNE, que la configuration d'un dépôt ne peut pas donner à sa
-// place. Le point de collecte est affiché À CÔTÉ, parce qu'un consentement à « de la
-// télémétrie » sans savoir vers où ne vaut pas grand-chose ; il vient de la dernière
-// configuration résolue, déposée par le script de contenu (`telemetryEndpoint`).
+// Télémétrie (§10) — le troisième verrou décrit en tête de `telemetry.ts` : le consentement
+// de la PERSONNE, que la configuration d'un dépôt ne peut pas donner à sa place.
+//
+// **La case ne stocke pas un booléen, elle stocke le POINT DE COLLECTE affiché.** Un booléen
+// valait pour n'importe quelle destination : il suffisait de visiter un dépôt dont la
+// configuration en désigne une autre pour que les compteurs y partent, sans que cette
+// destination ait jamais été montrée (revue Codex, PR #31). Cocher, c'est donc consentir à
+// CETTE URL-là ; une autre demande un nouveau geste, devant elle.
+//
+// Sans point de collecte connu, la case est désactivée : il n'y a rien à quoi consentir, et
+// une case cochable qui n'enverrait rien serait un consentement dans le vide.
 const telemetryOptIn = document.getElementById('telemetry-opt-in') as HTMLInputElement | null;
-chrome?.storage?.sync?.get([TELEMETRY_OPT_IN_KEY], (items) => {
-  if (telemetryOptIn) telemetryOptIn.checked = items[TELEMETRY_OPT_IN_KEY] === true;
+const telemetryLine = document.getElementById('telemetry-endpoint');
+
+function renderTelemetry(endpoint: string, consented: string | null): void {
+  if (telemetryOptIn) {
+    telemetryOptIn.checked = endpoint !== '' && consented === endpoint;
+    telemetryOptIn.disabled = endpoint === '';
+  }
+  if (!telemetryLine) return;
+  if (endpoint === '') {
+    telemetryLine.textContent =
+      "Aucun point de collecte configuré par votre organisation : il n'y a rien à autoriser.";
+  } else if (consented !== null && consented !== endpoint) {
+    // Cas à dire explicitement plutôt qu'à faire disparaître : l'accord existe, mais il
+    // portait sur une autre destination, et il ne vaut pas pour celle-ci.
+    telemetryLine.textContent =
+      `Point de collecte : ${endpoint} — votre accord précédent portait sur ${consented}, ` +
+      `il ne s'y applique pas. Cochez pour autoriser cette destination.`;
+  } else {
+    telemetryLine.textContent = `Point de collecte configuré par votre organisation : ${endpoint}`;
+  }
+}
+
+chrome?.storage?.local?.get([TELEMETRY_CONSENT_KEY, 'telemetryEndpoint'], (items) => {
+  const endpoint = typeof items['telemetryEndpoint'] === 'string' ? items['telemetryEndpoint'] : '';
+  renderTelemetry(endpoint, parseConsent(items[TELEMETRY_CONSENT_KEY])?.endpoint ?? null);
 });
+
 telemetryOptIn?.addEventListener('change', () => {
-  chrome?.storage?.sync?.set({ [TELEMETRY_OPT_IN_KEY]: telemetryOptIn.checked === true });
-});
-chrome?.storage?.local?.get(['telemetryEndpoint'], (items) => {
-  const line = document.getElementById('telemetry-endpoint');
-  if (!line) return;
-  const endpoint = items['telemetryEndpoint'];
-  line.textContent =
-    typeof endpoint === 'string' && endpoint !== ''
-      ? `Point de collecte configuré par votre organisation : ${endpoint}`
-      : "Aucun point de collecte configuré : même cochée, la case n'enverra rien.";
+  chrome?.storage?.local?.get(['telemetryEndpoint'], (items) => {
+    const endpoint = typeof items['telemetryEndpoint'] === 'string' ? items['telemetryEndpoint'] : '';
+    // `null` et non un booléen à `false` : retirer son accord, c'est effacer à quoi on avait
+    // consenti. Les onglets ouverts écoutent cette clé et se désarment aussitôt.
+    chrome?.storage?.local?.set({
+      [TELEMETRY_CONSENT_KEY]: telemetryOptIn.checked && endpoint !== '' ? { endpoint } : null,
+    });
+    renderTelemetry(endpoint, telemetryOptIn.checked && endpoint !== '' ? endpoint : null);
+  });
 });
 
 // État dégradé (§5.4, §9.2.3) et journal de dégradation de sélecteurs (§9.4).

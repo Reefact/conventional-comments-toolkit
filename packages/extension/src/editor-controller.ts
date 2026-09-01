@@ -133,6 +133,9 @@ export class EditorController {
       adapter: this.deps.adapter,
       config: this.config,
       lang: this.deps.lang,
+      // Même compteur que `insertPrefix()` : « label utilisé » ne doit pas dépendre du
+      // chemin par lequel la personne l'a posé (§10, revue Codex PR #31).
+      onLabelAccepted: (id) => this.deps.telemetry?.({ kind: 'label-used', label: id }),
     });
     this.#disposers.push(quick.dispose);
 

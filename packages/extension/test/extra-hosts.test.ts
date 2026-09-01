@@ -515,9 +515,17 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
   // en place continuerait d'observer le DOM et de poser sa barre d'outils sur un hôte qui
   // n'est plus autorisé, jusqu'au rechargement de la page.
   it('bootstrap() se révoque lui-même quand son hôte disparaît de la répartition publiée', async () => {
-    let listener:
-      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
-      | null = null;
+    // `chrome.storage.onChanged` accepte PLUSIEURS écouteurs et les appelle TOUS. Un faux
+    // qui n'en retient qu'un affirme le contraire, et devient faux le jour où le code en
+    // enregistre un second : `bootstrap()` en pose maintenant deux — la répartition des
+    // hôtes et le consentement de télémétrie —, et le dernier inscrit masquait le premier.
+    const listeners: ((
+      changes: Record<string, { newValue?: unknown }>,
+      areaName: string
+    ) => void)[] = [];
+    const notify = (changes: Record<string, { newValue?: unknown }>, areaName: string): void => {
+      for (const listener of [...listeners]) listener(changes, areaName);
+    };
     const disposeEditors = vi.fn();
     (globalThis as { chrome?: unknown }).chrome = {
       storage: {
@@ -526,8 +534,8 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
             cb({ [EXTRA_HOSTS_KEY]: { github: ['ghes.example.corp'], azdo: [] } }),
         },
         onChanged: {
-          addListener: (cb: typeof listener) => {
-            listener = cb;
+          addListener: (cb: (typeof listeners)[number]) => {
+            listeners.push(cb);
           },
           removeListener: vi.fn(),
         },
@@ -571,10 +579,10 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
     });
     await bootstrap(document);
     expect(disposeEditors).not.toHaveBeenCalled();
-    expect(listener).toBeTypeOf('function');
+    expect(listeners.length).toBeGreaterThan(0);
 
     // La permission est retirée : background.ts republie une répartition sans cet hôte.
-    listener!({ [EXTRA_HOSTS_KEY]: { newValue: { github: [], azdo: [] } } }, 'local');
+    notify({ [EXTRA_HOSTS_KEY]: { newValue: { github: [], azdo: [] } } }, 'local');
     expect(disposeEditors).toHaveBeenCalledTimes(1);
 
     vi.doUnmock('@cct/adapter-github');
@@ -582,9 +590,17 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
   });
 
   it('une republication qui CONSERVE l’hôte ne révoque rien', async () => {
-    let listener:
-      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
-      | null = null;
+    // `chrome.storage.onChanged` accepte PLUSIEURS écouteurs et les appelle TOUS. Un faux
+    // qui n'en retient qu'un affirme le contraire, et devient faux le jour où le code en
+    // enregistre un second : `bootstrap()` en pose maintenant deux — la répartition des
+    // hôtes et le consentement de télémétrie —, et le dernier inscrit masquait le premier.
+    const listeners: ((
+      changes: Record<string, { newValue?: unknown }>,
+      areaName: string
+    ) => void)[] = [];
+    const notify = (changes: Record<string, { newValue?: unknown }>, areaName: string): void => {
+      for (const listener of [...listeners]) listener(changes, areaName);
+    };
     const disposeEditors = vi.fn();
     (globalThis as { chrome?: unknown }).chrome = {
       storage: {
@@ -593,8 +609,8 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
             cb({ [EXTRA_HOSTS_KEY]: { github: ['ghes.example.corp'], azdo: [] } }),
         },
         onChanged: {
-          addListener: (cb: typeof listener) => {
-            listener = cb;
+          addListener: (cb: (typeof listeners)[number]) => {
+            listeners.push(cb);
           },
           removeListener: vi.fn(),
         },
@@ -639,7 +655,7 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
     await bootstrap(document);
 
     // Un autre hôte est ajouté ; celui-ci reste autorisé.
-    listener!(
+    notify(
       { [EXTRA_HOSTS_KEY]: { newValue: { github: ['ghes.example.corp', 'autre.corp'], azdo: [] } } },
       'local'
     );
@@ -760,9 +776,17 @@ describe('F2 — la révocation DÉFAIT les contrôleurs déjà attachés, pas s
   // coupait que les deux observations : toute cette surface restait vivante sur un hôte
   // devenu non autorisé, jusqu'au rechargement de la page.
   it('chaque contrôleur attaché reçoit dispose() quand l’hôte quitte la répartition', async () => {
-    let listener:
-      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
-      | null = null;
+    // `chrome.storage.onChanged` accepte PLUSIEURS écouteurs et les appelle TOUS. Un faux
+    // qui n'en retient qu'un affirme le contraire, et devient faux le jour où le code en
+    // enregistre un second : `bootstrap()` en pose maintenant deux — la répartition des
+    // hôtes et le consentement de télémétrie —, et le dernier inscrit masquait le premier.
+    const listeners: ((
+      changes: Record<string, { newValue?: unknown }>,
+      areaName: string
+    ) => void)[] = [];
+    const notify = (changes: Record<string, { newValue?: unknown }>, areaName: string): void => {
+      for (const listener of [...listeners]) listener(changes, areaName);
+    };
     const controllerDispose = vi.fn();
     const controllerAttach = vi.fn();
     (globalThis as { chrome?: unknown }).chrome = {
@@ -774,8 +798,8 @@ describe('F2 — la révocation DÉFAIT les contrôleurs déjà attachés, pas s
         },
         sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}) },
         onChanged: {
-          addListener: (cb: typeof listener) => {
-            listener = cb;
+          addListener: (cb: (typeof listeners)[number]) => {
+            listeners.push(cb);
           },
           removeListener: vi.fn(),
         },
@@ -800,7 +824,7 @@ describe('F2 — la révocation DÉFAIT les contrôleurs déjà attachés, pas s
     expect(controllerAttach).toHaveBeenCalledTimes(1);
     expect(controllerDispose).not.toHaveBeenCalled();
 
-    listener!({ [EXTRA_HOSTS_KEY]: { newValue: { github: [], azdo: [] } } }, 'local');
+    notify({ [EXTRA_HOSTS_KEY]: { newValue: { github: [], azdo: [] } } }, 'local');
     expect(controllerDispose).toHaveBeenCalledTimes(1);
 
     vi.doUnmock('../src/editor-controller.js');
@@ -815,9 +839,17 @@ describe('F3 — un hôte classé APRÈS l’ouverture de l’onglet finit par s
   // worker n'ait publié sa première répartition, ou l'hôte est classé depuis la page
   // d'options alors que l'onglet est déjà ouvert.
   it('bootstrap() sort sans adaptateur, puis démarre à la publication qui reconnaît l’hôte', async () => {
-    let listener:
-      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
-      | null = null;
+    // `chrome.storage.onChanged` accepte PLUSIEURS écouteurs et les appelle TOUS. Un faux
+    // qui n'en retient qu'un affirme le contraire, et devient faux le jour où le code en
+    // enregistre un second : `bootstrap()` en pose maintenant deux — la répartition des
+    // hôtes et le consentement de télémétrie —, et le dernier inscrit masquait le premier.
+    const listeners: ((
+      changes: Record<string, { newValue?: unknown }>,
+      areaName: string
+    ) => void)[] = [];
+    const notify = (changes: Record<string, { newValue?: unknown }>, areaName: string): void => {
+      for (const listener of [...listeners]) listener(changes, areaName);
+    };
     const disposeEditors = vi.fn();
     const controllerAttach = vi.fn();
     // Le stockage est un VRAI état mutable ici : `chrome.storage.onChanged` ne se déclenche
@@ -836,8 +868,8 @@ describe('F3 — un hôte classé APRÈS l’ouverture de l’onglet finit par s
         },
         sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}) },
         onChanged: {
-          addListener: (cb: typeof listener) => {
-            listener = cb;
+          addListener: (cb: (typeof listeners)[number]) => {
+            listeners.push(cb);
           },
           removeListener: vi.fn(),
         },
@@ -860,13 +892,13 @@ describe('F3 — un hôte classé APRÈS l’ouverture de l’onglet finit par s
     const dispose = await bootstrap(document);
     await new Promise((r) => setTimeout(r, 0));
     expect(controllerAttach).not.toHaveBeenCalled(); // rien pour l'instant, c'est normal
-    expect(listener).toBeTypeOf('function'); // ...mais le guet est bien armé
+    expect(listeners.length).toBeGreaterThan(0); // ...mais le guet est bien armé
 
     // Le service worker publie enfin, et l'hôte y est classé : l'écriture d'abord, la
     // notification ensuite — l'ordre que Chrome garantit.
     const published = { github: ['ghes.example.corp'], azdo: [] };
     store[EXTRA_HOSTS_KEY] = published;
-    listener!({ [EXTRA_HOSTS_KEY]: { newValue: published } }, 'local');
+    notify({ [EXTRA_HOSTS_KEY]: { newValue: published } }, 'local');
     await new Promise((r) => setTimeout(r, 0));
     expect(controllerAttach).toHaveBeenCalledTimes(1);
 
@@ -928,9 +960,17 @@ describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur'
   // github → azdo le laissait à `true`, donc rien ne bougeait et l'onglet continuait avec
   // l'ancien adaptateur — ses observateurs, ses sélecteurs DOM et ses URL de config.
   it('révoque l’ancien adaptateur et réamorce quand la plateforme de l’hôte change', async () => {
-    let listener:
-      | ((changes: Record<string, { newValue?: unknown }>, areaName: string) => void)
-      | null = null;
+    // `chrome.storage.onChanged` accepte PLUSIEURS écouteurs et les appelle TOUS. Un faux
+    // qui n'en retient qu'un affirme le contraire, et devient faux le jour où le code en
+    // enregistre un second : `bootstrap()` en pose maintenant deux — la répartition des
+    // hôtes et le consentement de télémétrie —, et le dernier inscrit masquait le premier.
+    const listeners: ((
+      changes: Record<string, { newValue?: unknown }>,
+      areaName: string
+    ) => void)[] = [];
+    const notify = (changes: Record<string, { newValue?: unknown }>, areaName: string): void => {
+      for (const listener of [...listeners]) listener(changes, areaName);
+    };
     const githubDispose = vi.fn();
     const azdoDispose = vi.fn();
     const store: Record<string, unknown> = {
@@ -948,8 +988,8 @@ describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur'
         },
         sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}) },
         onChanged: {
-          addListener: (cb: typeof listener) => {
-            listener = cb;
+          addListener: (cb: (typeof listeners)[number]) => {
+            listeners.push(cb);
           },
           removeListener: vi.fn(),
         },
@@ -994,7 +1034,7 @@ describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur'
     // L'hôte est reclassé en Azure DevOps : écriture d'abord, notification ensuite.
     const reclassified = { github: [], azdo: ['host.example.corp'] };
     store[EXTRA_HOSTS_KEY] = reclassified;
-    listener!({ [EXTRA_HOSTS_KEY]: { newValue: reclassified } }, 'local');
+    notify({ [EXTRA_HOSTS_KEY]: { newValue: reclassified } }, 'local');
     await new Promise((r) => setTimeout(r, 0));
 
     // L'adaptateur GitHub est défait, et le réamorçage a armé celui d'Azure DevOps.

@@ -11,6 +11,11 @@ export interface QuickInputOptions {
   adapter: PlatformAdapter;
   config: EffectiveConfig;
   lang: string;
+  /** Label effectivement posé par la complétion. La saisie rapide écrit le préfixe
+   * elle-même, sans passer par `insertPrefix()` du contrôleur : sans ce rappel, le compteur
+   * « label utilisé » (§10) dépendait du chemin d'interaction — la barre d'outils et les
+   * raccourcis directs comptaient, la complétion `/` ou `:` non (revue Codex, PR #31). */
+  onLabelAccepted?: (id: string) => void;
 }
 
 export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void } {
@@ -61,6 +66,7 @@ export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void
     const value = element.value;
     const next = value.replace(/^[/:][A-Za-z]*/, `${id}: `);
     opts.adapter.writeValue(opts.editor, next, `${id}: `.length);
+    opts.onLabelAccepted?.(id);
     closeList();
   };
 

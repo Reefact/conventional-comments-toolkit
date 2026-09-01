@@ -105,7 +105,7 @@ npm run checks                  # gardes du repo (matrice CA, invisibles, CSS, A
 npm run spike                   # spike P1' dans Chromium (§9.3)
 npm run smoke:mv3               # extension empaquetée dans un vrai Chromium (prémisses MV3)
 npm run check:github-theme-vars # variables Primer de styles.css toujours présentes sur github.com
-npm run check:beacon            # un POST no-cors cross-origin part et arrive (transport de la télémétrie)
+npm run check:beacon            # un POST no-cors cross-origin part et arrive, sans referer ni cookie
 ```
 
 `spike`, `smoke:mv3`, `check:beacon` et `check:github-theme-vars` pilotent un vrai Chromium via

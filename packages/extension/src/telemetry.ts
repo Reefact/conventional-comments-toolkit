@@ -33,8 +33,33 @@ export interface TelemetryTarget {
   repo: string;
 }
 
-/** Clé `chrome.storage.sync` de l'opt-in local (§8.1.2 — préférence de la personne). */
-export const TELEMETRY_OPT_IN_KEY = 'telemetryOptIn';
+/** Clé `chrome.storage.local` du consentement (§8.1.2 — décision de la personne).
+ *
+ * **`local` et non `sync`**, et **un point de collecte et non un booléen** : deux
+ * corrections d'une même erreur de modélisation (revue Codex, PR #31).
+ *
+ * `sync` propagerait le consentement aux autres appareils du compte Chrome, où personne n'a
+ * rien coché — et `PRIVACY.md` affirmait par ailleurs que la synchronisation se limite à la
+ * langue et aux raccourcis. Un consentement se donne sur l'appareil où on le donne.
+ *
+ * Un booléen, lui, ne dit pas À QUOI l'on a consenti. Il suffisait alors de visiter un dépôt
+ * dont la configuration désigne un AUTRE point de collecte pour que les compteurs y partent,
+ * sans que cette destination ait jamais été montrée. Le consentement porte donc l'URL qui
+ * était affichée au moment où la case a été cochée, et ne vaut que pour elle. */
+export const TELEMETRY_CONSENT_KEY = 'telemetryConsent';
+
+/** Ce qui est stocké sous cette clé. `endpoint` est l'URL exacte qui a été présentée. */
+export interface TelemetryConsent {
+  endpoint: string;
+}
+
+/** Forme sûre de la valeur stockée — elle vient du stockage, donc de l'extérieur. */
+export function parseConsent(raw: unknown): TelemetryConsent | null {
+  const value = raw as Partial<TelemetryConsent> | undefined;
+  return typeof value?.endpoint === 'string' && value.endpoint !== ''
+    ? { endpoint: value.endpoint }
+    : null;
+}
 
 /** Vocabulaire fermé, appliqué à la CLÉ COMPLÈTE du compteur. Un identifiant de label ou
  * un code hors de cette forme n'est pas assaini pour être envoyé quand même : il est
@@ -60,10 +85,15 @@ function counterKey(event: TelemetryEvent): string | null {
  * ne pas prétendre le contraire. */
 export function telemetryTarget(
   config: { mode: string; telemetry: { enabled: boolean; endpoint: string | null } },
-  optIn: boolean,
+  consent: TelemetryConsent | null,
   repo: string
 ): TelemetryTarget | null {
-  if (!optIn || !config.telemetry.enabled || !config.telemetry.endpoint) return null;
+  // `off` : l'extension est inactive (§7). Rien de ce qu'elle observerait alors n'a de sens
+  // à compter, et une première version armait quand même l'onglet parce que la sortie
+  // anticipée du mode `off` passait AVANT l'armement (revue Codex, PR #31). La règle vit
+  // ici, où aucun ordre d'appel ne peut la contourner.
+  if (config.mode === 'off') return null;
+  if (!consent || !config.telemetry.enabled || !config.telemetry.endpoint) return null;
   let endpoint: URL;
   try {
     endpoint = new URL(config.telemetry.endpoint);
@@ -71,6 +101,10 @@ export function telemetryTarget(
     return null;
   }
   if (endpoint.protocol !== 'https:') return null;
+  // LE point du correctif : le consentement vaut pour CETTE destination, pas pour l'idée de
+  // télémétrie. Un dépôt qui en désigne une autre n'hérite pas de l'accord donné pour la
+  // première — il faut le redonner, devant la nouvelle URL affichée.
+  if (consent.endpoint !== endpoint.href) return null;
   return { endpoint: endpoint.href, mode: config.mode, repo };
 }
 
@@ -164,6 +198,12 @@ function beacon(endpoint: string, body: string): void {
     mode: 'no-cors',
     keepalive: true,
     credentials: 'omit',
+    // Une requête emporte plus que son corps. Sans cette ligne, le `Referer` par défaut
+    // porte l'URL COMPLÈTE de la page de revue — identifiant de PR compris — au point de
+    // collecte, et la phrase de `PRIVACY.md` (« seuls les compteurs listés quittent le
+    // navigateur ») était fausse. Elle avait été écrite de mémoire, jamais mesurée ; elle
+    // l'est désormais par `npm run check:beacon`, qui lit les en-têtes reçus.
+    referrerPolicy: 'no-referrer',
     // Un type de contenu « simple » : c'est ce qui garde la requête hors de la préflight
     // CORS, laquelle échouerait faute de réponse autorisante.
     headers: { 'Content-Type': 'text/plain;charset=UTF-8' },

@@ -23,11 +23,14 @@ import {
 } from './host-platform.js';
 import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
 import {
-  TELEMETRY_OPT_IN_KEY,
+  TELEMETRY_CONSENT_KEY,
   TelemetryCounters,
+  parseConsent,
   telemetryTarget,
+  type TelemetryConsent,
   type TelemetryEvent,
 } from './telemetry.js';
+import { appendToJournal, writeCurrentState } from './storage.js';
 import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
 import { decorateComment } from './ui/badges.js';
@@ -165,11 +168,7 @@ export function relayOrgConfigRead(url: string): Promise<ConfigRead> {
  * page d'options lit `degradedState` dans chrome.storage.local ; c'est ici qu'il s'écrit,
  * à chaque résolution de configuration. */
 export function writeDegradedState(degraded: boolean): void {
-  try {
-    chrome?.storage?.local?.set?.({ degradedState: degraded ? 'unreachable' : false });
-  } catch {
-    // Hors contexte d'extension (tests) : sans conséquence.
-  }
+  writeCurrentState({ degradedState: degraded ? 'unreachable' : false });
 }
 
 /** Plancher côté A : politique d'entreprise poussée par le navigateur —
@@ -220,18 +219,18 @@ export async function readExtraHostsByPlatform(): Promise<ExtraHostsByPlatform> 
   });
 }
 
-/** Opt-in de télémétrie (§10) — préférence LOCALE de la personne (§8.1.2), à côté de
- * `language` : c'est le troisième verrou décrit en tête de `telemetry.ts`, celui qu'aucune
- * configuration de dépôt ne peut ouvrir à sa place. */
-async function readTelemetryOptIn(): Promise<boolean> {
+/** Consentement de télémétrie (§10) — décision LOCALE de la personne (§8.1.2), portant sur
+ * un point de collecte PRÉCIS : c'est le troisième verrou décrit en tête de `telemetry.ts`,
+ * celui qu'aucune configuration de dépôt ne peut ouvrir à sa place. */
+async function readTelemetryConsent(): Promise<TelemetryConsent | null> {
   return new Promise((resolve) => {
     try {
-      if (!chrome?.storage?.sync) return resolve(false);
-      chrome.storage.sync.get([TELEMETRY_OPT_IN_KEY], (items) =>
-        resolve(items?.[TELEMETRY_OPT_IN_KEY] === true)
+      if (!chrome?.storage?.local?.get) return resolve(null);
+      chrome.storage.local.get([TELEMETRY_CONSENT_KEY], (items) =>
+        resolve(parseConsent(items?.[TELEMETRY_CONSENT_KEY]))
       );
     } catch {
-      resolve(false);
+      resolve(null);
     }
   });
 }
@@ -249,25 +248,31 @@ const SELECTOR_LOG_LIMIT = 50;
 function publishTelemetryEndpoint(config: {
   telemetry: { enabled: boolean; endpoint: string | null };
 }): void {
-  try {
-    chrome?.storage?.local?.set?.({
-      telemetryEndpoint: config.telemetry.enabled ? (config.telemetry.endpoint ?? '') : '',
-    });
-  } catch {
-    // Hors contexte d'extension : sans conséquence.
-  }
+  writeCurrentState({
+    telemetryEndpoint: config.telemetry.enabled ? (config.telemetry.endpoint ?? '') : '',
+  });
+}
+
+/** Le « dépôt » du §10, tel qu'il part dans les compteurs : hôte et portée, rien d'autre.
+ * UNE définition, parce que l'armement et le réarmement doivent produire exactement la même
+ * chaîne — sinon un simple changement de forme passerait pour un changement de dépôt. */
+function prTelemetryKey(pr: PrRef): string {
+  return `${pr.host}/${pr.scope.join('/')}`;
 }
 
 /** Période de vidange des compteurs (§10). Assez longue pour que ce qui part soit un
  * agrégat et non une trace d'activité minute par minute. */
 export const TELEMETRY_FLUSH_MS = 5 * 60_000;
 
-function persistSelectorFailures(failures: readonly { chain: string; at: string }[]): void {
-  try {
-    chrome?.storage?.local?.set?.({ selectorFailures: failures.slice(-SELECTOR_LOG_LIMIT) });
-  } catch {
-    // Hors contexte d'extension : le journal reste en mémoire, comme avant.
-  }
+/** Ajoute UNE dégradation au journal partagé.
+ *
+ * La première version écrivait le journal en mémoire de CET onglet par-dessus la clé
+ * entière : la première dégradation après un rechargement effaçait tout l'historique, et
+ * deux onglets s'effaçaient l'un l'autre — le « 50 dernières » annoncé n'était que les 50
+ * dernières du dernier onglet à avoir écrit (revue Codex, PR #31). D'où le passage par
+ * `appendToJournal`, qui relit avant d'écrire, et l'ajout de la SEULE entrée nouvelle. */
+function persistSelectorFailure(entry: { chain: string; at: string }): void {
+  void appendToJournal('selectorFailures', [entry], SELECTOR_LOG_LIMIT);
 }
 
 async function readUserLanguage(): Promise<string | null> {
@@ -385,7 +390,7 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // LOCALEMENT dans tous les cas (§9.4, CA-11) et ne se remonte que si la télémétrie est
   // armée. Le tri entre les deux vit dans l'émetteur, pas ici.
   const log = new SelectorLog((event) => {
-    persistSelectorFailures(log.failures);
+    persistSelectorFailure({ chain: event.chain, at: new Date().toISOString() });
     count(event);
   });
 
@@ -435,17 +440,6 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     if (resolved.config.mode === 'off') return; // §7 — extension inactive
     const published = adapter.readPublishedResult();
     const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
-    // Armement (ou désarmement) à CHAQUE résolution : le mode, le point de collecte et
-    // jusqu'au droit d'émettre viennent de la configuration effective, qui peut changer
-    // d'une PR à l'autre dans le même onglet.
-    const pr = editor.context.pr;
-    // Ce que la page d'options affichera à côté de la case : le point de collecte que la
-    // configuration désigne, indépendamment de l'opt-in — c'est précisément ce qu'il faut
-    // voir AVANT de cocher. Écrit à chaque résolution, comme `degradedState`.
-    publishTelemetryEndpoint(resolved.config);
-    telemetry.arm(
-      telemetryTarget(resolved.config, await readTelemetryOptIn(), `${pr.host}/${pr.scope.join('/')}`)
-    );
     const controller = new EditorController({
       adapter,
       editor,
@@ -464,12 +458,59 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
 
   const editors = adapter.observeEditors((editor) => void attach(editor));
 
+  /** L'armement de la télémétrie vit au niveau de la PR AFFICHÉE, pas de la découverte d'un
+   * éditeur — trois raisons, toutes constatées en revue (PR #31) :
+   *
+   * 1. `observePrChromeNavigation` sonde les sélecteurs dès l'injection, indépendamment des
+   *    éditeurs : les dégradations qui précèdent le premier éditeur étaient perdues.
+   * 2. Une PR sans composeur rendu (droits de commentaire absents, composeur replié) n'arme
+   *    JAMAIS — la remontée de CA-11 y était absente alors que tout l'autorisait.
+   * 3. Deux attachements concurrents armaient chacun de leur côté, et une résolution
+   *    PÉRIMÉE, revenue après une navigation, réétiquetait l'onglet sur l'ancien dépôt.
+   *
+   * Un seul point d'armement, appelé sur changement de PR et sur changement de
+   * consentement, supprime les trois d'un coup. */
+  let armedFor: { pr: PrRef; key: string } | null = null;
+
+  const armFor = async (pr: PrRef | null): Promise<void> => {
+    if (disposed) return;
+    if (!pr) {
+      armedFor = null;
+      telemetry.arm(null);
+      return;
+    }
+    const key = prTelemetryKey(pr);
+    armedFor = { pr, key };
+    const resolved = await resolver.resolve(adapter, pr); // en cache le plus souvent
+    // La PR a pu changer pendant la résolution : un résultat périmé ne doit pas réarmer.
+    if (disposed || armedFor?.key !== key) return;
+    publishTelemetryEndpoint(resolved.config);
+    telemetry.arm(telemetryTarget(resolved.config, await readTelemetryConsent(), key));
+  };
+
+  // Le consentement peut être RETIRÉ pendant que l'onglet vit. Sans cette écoute, la case
+  // décochée ne changeait rien pour les onglets déjà ouverts : ils continuaient à vidanger
+  // toutes les cinq minutes et à la fermeture, jusqu'au rechargement (revue Codex, PR #31).
+  // On désarme immédiatement — donc en jetant ce qui était compté — puis on réévalue.
+  const onConsentChanged = (changes: Record<string, { newValue?: unknown }>, area: string): void => {
+    if (area !== 'local' || !(TELEMETRY_CONSENT_KEY in changes)) return;
+    telemetry.arm(null);
+    void armFor(armedFor?.pr ?? null);
+  };
+  try {
+    chrome?.storage?.onChanged?.addListener(onConsentChanged);
+  } catch {
+    // Hors contexte d'extension : rien à écouter.
+  }
+
   // Bandeau (§5.5) et grisage du bouton de complétion (§6.5) — ré-armés à chaque
   // navigation SPA vers un contexte de PR différent, pas seulement au chargement initial
   // du script : Turbo/React ne rechargent pas le document, donc sans ce ré-armement la
   // barre reste absente d'une PR atteinte par un lien interne tant qu'un rechargement
   // complet ne relance pas bootstrap().
-  const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc);
+  const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc, Date.now, (pr) =>
+    void armFor(pr)
+  );
   // Vidange : périodique, et à la fermeture de l'onglet. `pagehide` et non `unload` —
   // celui-ci empêche la mise en cache arrière/avant et n'est plus fiable ; `keepalive`
   // (telemetry.ts) est ce qui laisse la dernière requête partir malgré la fermeture.
@@ -479,6 +520,11 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
 
   const revoke = () => {
     disposed = true;
+    try {
+      chrome?.storage?.onChanged?.removeListener?.(onConsentChanged);
+    } catch {
+      // Hors contexte d'extension : rien à retirer.
+    }
     clearInterval(flushTimer);
     doc.defaultView?.removeEventListener('pagehide', flushOnHide);
     // Une dernière vidange AVANT de désarmer : les compteurs de la session comptent autant
@@ -681,7 +727,12 @@ export function observePrChromeNavigation(
   doc: Document,
   // Horloge injectable — même convention que ClientConfigResolver (config-resolver.ts) —
   // pour tester la fenêtre RENDER_RETRY_WINDOW_MS sans dépendre d'une attente réelle.
-  now: () => number = Date.now
+  now: () => number = Date.now,
+  /** Appelé à chaque changement de la PR AFFICHÉE, `null` quand la page n'en montre plus.
+   * C'est le seul signal de ce module qui soit lié à la PR et non à un éditeur : la
+   * télémétrie s'y arme (voir `armFor`), parce qu'une PR sans composeur rendu doit pouvoir
+   * remonter ses dégradations de sélecteurs comme les autres (CA-11, revue Codex PR #31). */
+  onPrChange: (pr: PrRef | null) => void = () => {}
   /** Révoque l'observation : déconnecte l'observateur et annule un rattrapage en attente.
    * Sans emploi en production — l'observateur vit le temps de l'onglet — mais nécessaire à
    * tout appelant qui n'est PAS un onglet : deux observations concurrentes sur le même
@@ -725,6 +776,9 @@ export function observePrChromeNavigation(
     if (navigated) {
       hasRendered = true;
       lastPrKey = key;
+      // AVANT tout rendu : c'est ici que la PR affichée change, et l'armement de la
+      // télémétrie doit suivre ce changement-là, pas celui d'un éditeur.
+      onPrChange(currentPrOf(adapter));
       showedSomething = false;
       lastOwnSig = null;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;

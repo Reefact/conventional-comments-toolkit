@@ -47,6 +47,83 @@ export interface ToolbarOptions {
   currentPrefix: () => PosedPrefix;
 }
 
+/** Ce que la barre sait de la décoration, et surtout D'OÙ elle le sait.
+ *
+ * `pending` : choisie dans la barre, pas encore posée — elle attend un label.
+ * `posed`   : lue dans le commentaire, donc un simple reflet du texte.
+ *
+ * La provenance est portée explicitement parce que son absence a produit deux défauts
+ * opposés (PR #35) : écraser un choix en attente avec le texte, puis conserver un reflet
+ * devenu faux quand le label disparaît. */
+export interface DecorationState {
+  origin: 'pending' | 'posed';
+  ids: string[];
+}
+
+/** Ce que le radiogroup doit montrer. Trois cas NOMMÉS, parce que deux d'entre eux se
+ * ressemblent assez pour qu'un `null` les confonde — ce qui est exactement l'erreur que
+ * cette barre a produite six fois. */
+export type SegmentToCheck =
+  | { kind: 'none' } // le segment « aucune » : le commentaire ne porte AUCUNE décoration
+  | { kind: 'segment'; id: string } // la décoration écrite, qui a un segment
+  | { kind: 'nothing' }; // la barre ne peut RIEN affirmer : elle ne coche pas
+
+/** L'état du sélecteur, calculé en UN SEUL endroit à partir de ce que le commentaire porte
+ * et de ce que la barre savait.
+ *
+ * Cette fonction existe pour une raison précise. `sync()` avait trois branches, et chacune
+ * était responsable de mettre à jour la provenance : deux le faisaient, la troisième — la
+ * plus récente — sortait par un `return` sans y toucher, et le défaut que les deux autres
+ * corrigeaient revenait par elle (revue Codex, PR #35, sept rounds). L'invariant tenait par
+ * convention, donc jusqu'à la prochaine branche ajoutée.
+ *
+ * Ici il tient par CONSTRUCTION : il n'y a qu'un endroit où l'état s'écrit, et tout cas
+ * d'affichage nouveau devra en sortir. `sync()` n'a plus qu'à peindre.
+ *
+ * `hasSegment` dit quels segments la barre porte — elle n'en a que pour les décorations
+ * PORTEUSES de la configuration (§5.1). */
+export function selectorFor(
+  posed: PosedPrefix,
+  previous: DecorationState,
+  config: EffectiveConfig,
+  hasSegment: (id: string) => boolean
+): { state: DecorationState; checked: SegmentToCheck } {
+  // 1. Aucun préfixe écrit : le texte n'a rien à dire de la décoration. Un reflet ne décrit
+  //    donc plus rien et se jette ; une intention en attente survit, personne ne l'a annulée.
+  if (!posed.hasPrefix) {
+    const state: DecorationState = previous.origin === 'posed' ? { origin: 'pending', ids: [] } : previous;
+    const id = state.ids[0];
+    if (id === undefined) return { state, checked: { kind: 'none' } };
+    return { state, checked: hasSegment(id) ? { kind: 'segment', id } : { kind: 'nothing' } };
+  }
+
+  // À partir d'ici un préfixe est écrit : ce qu'il porte fait foi, et c'est un REFLET —
+  // l'effacer devra donc l'emporter avec lui, y compris quand son label est inconnu.
+  const state: DecorationState = { origin: 'posed', ids: posed.decorations };
+
+  // 2. Préfixe écrit dont le label n'est pas de la configuration : la barre ne peut rien en
+  //    dire, mais elle a bien LU sa décoration.
+  if (posed.label === null) return { state, checked: { kind: 'nothing' } };
+
+  // 3. Préfixe reconnu. La casse d'un id configuré est libre : c'est `core/` qui apparie.
+  const carriers = posed.decorations
+    .map((d) => resolveDecoration(d, config))
+    .filter((d): d is NonNullable<typeof d> => d !== null && d.forces !== null);
+  // §3.3, règle 2 : deux porteuses aux effets opposés sont un `E-CONFLICT`, et `core/` les
+  // ignore TOUTES LES DEUX — « aucune règle de la première gagne n'est définie, précisément
+  // parce qu'un tel commentaire traduit une intention ambiguë ». En cocher une présenterait
+  // un côté du conflit comme le choix actif.
+  if (new Set(carriers.map((d) => d.forces)).size > 1) return { state, checked: { kind: 'nothing' } };
+  // Des parenthèses illégales ne sont pas une absence de décoration : le validateur signale
+  // `E-DECORATION-SYNTAX` au même instant.
+  if (posed.malformedDecorations) return { state, checked: { kind: 'nothing' } };
+  if (posed.decorations.length === 0) return { state, checked: { kind: 'none' } };
+  const carried = carriers.find((d) => hasSegment(d.id))?.id;
+  // Une décoration purement descriptive (`(perf)`) n'a pas de segment : ne rien cocher,
+  // surtout pas « aucune », qui nierait la décoration écrite.
+  return { state, checked: carried === undefined ? { kind: 'nothing' } : { kind: 'segment', id: carried } };
+}
+
 export interface Toolbar {
   element: HTMLElement;
   /** Réaligne ce que la barre AFFICHE sur ce que le commentaire porte. Appelée à chaque
@@ -64,18 +141,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   root.setAttribute('role', 'toolbar');
   root.setAttribute('aria-label', ui(opts.lang, 'toolbar.aria'));
 
-  /** Ce que la barre sait de la décoration, et surtout D'OÙ elle le sait.
-   *
-   * `pending` : choisie dans la barre, pas encore posée — elle attend un label.
-   * `posed`   : lue dans le commentaire, donc un simple reflet du texte.
-   *
-   * La provenance est portée explicitement parce que son absence a produit deux défauts
-   * opposés en deux rounds de revue (PR #35) : écraser un choix en attente avec le texte,
-   * puis conserver un reflet devenu faux quand le label disparaît, et le RÉINSÉRER au clic
-   * suivant. Une même variable ne peut pas être à la fois une intention et une observation ;
-   * c'est la troisième fois sur cette barre qu'une valeur portait deux sens, après `[]` pour
-   * les décorations et `null` pour le label. */
-  type DecorationState = { origin: 'pending' | 'posed'; ids: string[] };
+  // Le SEUL état de la barre. Il ne s'écrit qu'en un endroit : `selectorFor()`.
   let decoration: DecorationState = { origin: 'pending', ids: [] };
 
   // Un bouton par label, avec icône, libellé et couleur distincts (§5.1).
@@ -255,55 +321,15 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       const id = (b as HTMLElement).dataset['label'];
       b.setAttribute('aria-pressed', id !== undefined && id === posed.label ? 'true' : 'false');
     }
-    // Le sélecteur ne porte QUE les décorations porteuses : une décoration purement
-    // descriptive (`(perf)`) n'a pas de segment, et n'en fait donc cocher aucun — pas même
-    // « aucune », qui affirmerait faussement qu'il n'y en a pas.
-    // SANS label posé, le texte n'a rien à dire de la décoration : ce que la barre montre
-    // est alors la sélection EN ATTENTE. L'écraser avec le `[]` du texte effaçait le choix
-    // dès qu'une revalidation s'intercalait entre « je clique (blocking) » et « je clique
-    // issue » — et le parcours ne marchait que si aucune n'arrivait, ce que mon test ne
-    // faisait justement pas arriver (revue Codex, PR #35).
-    if (posed.label === null) {
-      // Un préfixe est écrit, mais son label n'est pas de la configuration : la barre ne
-      // peut rien en dire. Elle ne coche donc RIEN — surtout pas « aucune », qui nierait la
-      // décoration écrite juste à côté — et ne montre pas non plus une sélection en attente,
-      // qui ne décrirait pas ce commentaire-là.
-      if (posed.hasPrefix) {
-        checkSegment(null);
-        return;
-      }
-      // Aucun préfixe du tout : ce que la barre avait LU du commentaire ne décrit plus rien,
-      // et le garder le faisait réapparaître au clic suivant. Un choix EN ATTENTE, lui,
-      // survit — c'est une intention que personne n'a annulée (revue Codex, PR #35).
-      if (decoration.origin === 'posed') decoration = { origin: 'pending', ids: [] };
-      checkSegment(segmentButtons.get(decoration.ids[0] ?? null) ?? null);
-      return;
-    }
-    decoration = { origin: 'posed', ids: posed.decorations };
-    // La casse d'un id de décoration configuré est libre, comme celle d'un label : c'est
-    // `core/` qui apparie, sans en tenir compte. Comparer les chaînes laissait un segment
-    // `Blocking` éteint sur un commentaire qui le porte — le défaut corrigé pour les labels,
-    // laissé ici (revue Codex, PR #35).
-    const carriers = posed.decorations
-      .map((d) => resolveDecoration(d, opts.config))
-      .filter((d): d is NonNullable<typeof d> => d !== null && d.forces !== null);
-    // §3.3, règle 2 : deux porteuses aux effets opposés sont un `E-CONFLICT`, et `core/`
-    // les ignore TOUTES LES DEUX pour décider du caractère bloquant — « aucune règle de
-    // la première gagne n'est définie, précisément parce qu'un tel commentaire traduit une
-    // intention ambiguë ». En cocher une présentait un côté du conflit comme le choix
-    // actif (revue Codex, PR #35).
-    const conflicting = new Set(carriers.map((d) => d.forces)).size > 1;
-    const carried = carriers.find((d) => segmentButtons.has(d.id))?.id;
-    // La barre ne peut RIEN affirmer dans trois cas : parenthèses illégales, porteuses
-    // contradictoires, décoration sans segment (une descriptive comme `(perf)`). Elle ne
-    // coche alors rien — pas même « aucune », qui nierait la décoration présente.
-    const target =
-      posed.malformedDecorations || conflicting || (posed.decorations.length > 0 && carried === undefined)
+    const view = selectorFor(posed, decoration, opts.config, (id) => segmentButtons.has(id));
+    decoration = view.state;
+    checkSegment(
+      view.checked.kind === 'nothing'
         ? null
-        : posed.decorations.length === 0
+        : view.checked.kind === 'none'
           ? segmentButtons.get(null) ?? null
-          : segmentButtons.get(carried ?? null) ?? null;
-    checkSegment(target ?? null);
+          : segmentButtons.get(view.checked.id) ?? null
+    );
   };
   sync();
 

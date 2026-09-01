@@ -58,15 +58,19 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   root.setAttribute('role', 'toolbar');
   root.setAttribute('aria-label', ui(opts.lang, 'toolbar.aria'));
 
-  // Décoration choisie DANS LA BARRE, en attente d'un label : elle ne sert qu'au prochain
-  // clic de label sur un commentaire qui n'en porte pas encore. Dès qu'un label est posé,
-  // c'est le texte qui fait foi.
-  //
-  // C'est le SEUL état que la barre garde. Une première version retenait aussi le dernier
-  // label cliqué et s'en servait pour décider ; trois gestes sur quatre s'appuyaient alors
-  // sur une mémoire que la validation débattue (150 ms) ne rafraîchit qu'après coup, donc
-  // en retard sur le texte dès qu'on tape vite (revue Codex, PR #35). Chaque geste relit.
-  let selectedDecorations: string[] = [];
+  /** Ce que la barre sait de la décoration, et surtout D'OÙ elle le sait.
+   *
+   * `pending` : choisie dans la barre, pas encore posée — elle attend un label.
+   * `posed`   : lue dans le commentaire, donc un simple reflet du texte.
+   *
+   * La provenance est portée explicitement parce que son absence a produit deux défauts
+   * opposés en deux rounds de revue (PR #35) : écraser un choix en attente avec le texte,
+   * puis conserver un reflet devenu faux quand le label disparaît, et le RÉINSÉRER au clic
+   * suivant. Une même variable ne peut pas être à la fois une intention et une observation ;
+   * c'est la troisième fois sur cette barre qu'une valeur portait deux sens, après `[]` pour
+   * les décorations et `null` pour le label. */
+  type DecorationState = { origin: 'pending' | 'posed'; ids: string[] };
+  let decoration: DecorationState = { origin: 'pending', ids: [] };
 
   // Un bouton par label, avec icône, libellé et couleur distincts (§5.1).
   for (const label of enabledLabels(opts.config)) {
@@ -87,16 +91,24 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       // Le second clic RETIRE (§5.1). Ce qui décide est donc le label que le commentaire
       // porte à cet instant, lu dans le texte — pas celui qu'on se souvient d'avoir cliqué.
       const posed = opts.currentPrefix();
-      const toggle = posed.label === label.id;
       // Une décoration en attente dans le champ libre appartient à CE geste : la personne
       // l'a tapée puis a cliqué un label. Sans cela, le `blur` la posait avec le label de
       // repli et le clic retirait aussitôt le préfixe ainsi créé — la séquence la plus
       // naturelle du champ libre laissait le commentaire sans label (revue Codex, PR #35).
-      const pending = takePendingFreeDecoration();
-      // Sinon : la sélection de la barre ne vaut que pour un commentaire qui ne porte AUCUN
-      // label. Sur un commentaire déjà labellisé, c'est le texte qui dit la décoration, et
-      // s'en remettre à la sélection mémorisée restaurait ce qu'on venait d'effacer.
-      const chosen = pending !== null ? [pending] : posed.label === null ? selectedDecorations : [];
+      const pendingFree = takePendingFreeDecoration();
+      // Elle est lue AVANT de décider de la bascule, et l'empêche : « décore » et « retire »
+      // sont deux intentions contraires, et l'ordre inverse faisait qu'écrire une décoration
+      // puis cliquer le label déjà actif retirait le préfixe ET jetait la décoration — un
+      // geste qui ajoute en enlevait deux (revue Codex, PR #35).
+      const toggle = pendingFree === null && posed.label === label.id;
+      // Sinon : la sélection de la barre ne vaut que si elle est EN ATTENTE et que le
+      // commentaire ne porte aucun label. Un reflet du texte n'a rien à réinsérer.
+      const chosen =
+        pendingFree !== null
+          ? [pendingFree]
+          : posed.label === null && decoration.origin === 'pending'
+            ? decoration.ids
+            : [];
       opts.onLabel(label.id, chosen.length > 0 ? chosen : undefined, toggle);
       for (const b of root.querySelectorAll('.cct-label-button')) {
         b.setAttribute('aria-pressed', b === button && !toggle ? 'true' : 'false');
@@ -126,14 +138,14 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-checked', segment.id === null ? 'true' : 'false');
     b.addEventListener('click', () => {
-      selectedDecorations = segment.id === null ? [] : [segment.id];
+      decoration = { origin: 'pending', ids: segment.id === null ? [] : [segment.id] };
       checkSegment(b);
       // Le label sur lequel agir est celui que le COMMENTAIRE porte, et il est réinséré
       // TEL QU'IL EST ÉCRIT : ce geste-ci porte sur la décoration, pas sur l'orthographe.
       const label = opts.currentPrefix().writtenLabel;
-      // `selectedDecorations` est passé tel quel, tableau vide compris : c'est ici, et
+      // La sélection est passée telle quelle, tableau vide compris : c'est ici, et
       // seulement ici, que « aucune » veut dire « retire-la ».
-      if (label) opts.onLabel(label, selectedDecorations, false);
+      if (label) opts.onLabel(label, decoration.ids, false);
     });
     segmentButtons.set(segment.id, b);
     group.appendChild(b);
@@ -238,10 +250,14 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     // issue » — et le parcours ne marchait que si aucune n'arrivait, ce que mon test ne
     // faisait justement pas arriver (revue Codex, PR #35).
     if (posed.label === null) {
-      checkSegment(segmentButtons.get(selectedDecorations[0] ?? null) ?? null);
+      // Le label a disparu : ce que la barre avait LU du commentaire ne décrit plus rien, et
+      // le garder le faisait réapparaître au clic suivant. Un choix EN ATTENTE, lui, survit —
+      // c'est une intention que personne n'a annulée (revue Codex, PR #35).
+      if (decoration.origin === 'posed') decoration = { origin: 'pending', ids: [] };
+      checkSegment(segmentButtons.get(decoration.ids[0] ?? null) ?? null);
       return;
     }
-    selectedDecorations = posed.decorations;
+    decoration = { origin: 'posed', ids: posed.decorations };
     // La casse d'un id de décoration configuré est libre, comme celle d'un label : c'est
     // `core/` qui apparie, sans en tenir compte. Comparer les chaînes laissait un segment
     // `Blocking` éteint sur un commentaire qui le porte — le défaut corrigé pour les labels,

@@ -45,14 +45,21 @@ import type { TelemetryEvent } from './telemetry.js';
 function prefixPosedIn(value: string, config: EffectiveConfig): PosedPrefix {
   const prefixLine = splitBody(value).prefixLine;
   const posed = prefixLine === null ? null : matchPrefix(prefixLine);
-  if (posed === null) return { label: null, decorations: [], malformedDecorations: false };
+  if (posed === null) {
+    return { label: null, writtenLabel: null, decorations: [], malformedDecorations: false };
+  }
   const resolved = resolveLabel(posed.label, config);
+  // L'id canonique sert à COMPARER (bouton, bascule, comptage) ; l'orthographe écrite sert à
+  // RÉÉCRIRE. Les confondre imposait la forme canonique au premier geste venu (§3.2).
+  const label = resolved?.label.id ?? null;
+  const writtenLabel = resolved === null ? null : posed.label;
   if (posed.decorations === null) {
-    return { label: resolved?.label.id ?? null, decorations: [], malformedDecorations: false };
+    return { label, writtenLabel, decorations: [], malformedDecorations: false };
   }
   const parsed = parseDecorations(posed.decorations);
   return {
-    label: resolved?.label.id ?? null,
+    label,
+    writtenLabel,
     decorations: parsed.canonical,
     malformedDecorations: parsed.syntaxIssues.length > 0,
   };
@@ -315,12 +322,17 @@ export class EditorController {
     // casse de la configuration (§3.2). Deux décisions en dépendent : retirer ou remplacer,
     // et compter ou non un « label utilisé ».
     const posedBefore = prefixPosedIn(value, this.config).label;
+    // Ce qu'on INSÈRE peut être un alias — un geste de décoration réécrit le préfixe tel
+    // qu'il est écrit. Les deux décisions ci-dessus portent sur le label, pas sur son
+    // orthographe : elles se prennent donc sur la forme canonique, sans quoi décorer
+    // `bug: x` compterait un usage de label et casserait la bascule.
+    const canonicalEffective = resolveLabel(effectiveLabel, this.config)?.label.id ?? effectiveLabel;
     const { nextValue, caret, delta, changedAt, removed } = computePrefixInsertion(
       value,
       { label: effectiveLabel, decorations },
       // `sameLabel` se décide ICI, où la configuration est disponible : `posedBefore` est
       // déjà l'id canonique rendu par `resolveLabel()`, alias résolu (§3.2).
-      { toggle, sameLabel: posedBefore === effectiveLabel }
+      { toggle, sameLabel: posedBefore === canonicalEffective }
     );
     // « label utilisé » (§10) : l'identifiant du label effectivement POSÉ, jamais la ligne
     // écrite, et jamais un label qu'on vient de RETIRER. Cliquer deux fois le même bouton
@@ -334,8 +346,10 @@ export class EditorController {
     // `false` et chacune de ces retouches recomptait le même label. L'agrégat aurait mesuré
     // les modifications de décoration, pas les labels posés (revue Codex, PR #31) — et
     // d'autant plus fort que la personne hésite, ce qui n'a aucun sens à remonter.
-    if (!removed && posedBefore !== effectiveLabel) {
-      this.deps.telemetry?.({ kind: 'label-used', label: effectiveLabel });
+    // Et compté sous l'id CANONIQUE : « l'alias n'est pas un label distinct […] il est
+    // comptabilisé sous son label canonique » (§3.2).
+    if (!removed && posedBefore !== canonicalEffective) {
+      this.deps.telemetry?.({ kind: 'label-used', label: canonicalEffective });
     }
     this.deps.adapter.writeValue(this.deps.editor, nextValue, hasSelection ? undefined : caret);
     if (hasSelection) {

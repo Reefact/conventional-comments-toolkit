@@ -188,23 +188,28 @@ mécanique de messagerie est vérifiée dans un vrai Chromium par
 
 - Aucun contenu de commentaire, de code ou de diff ne quitte le
   navigateur (§10, "Confidentialité").
-- **Télémétrie : câblée, désactivée par défaut, triple opt-in.** Ce
+- **Télémétrie : câblée, désactivée par défaut, triple verrou.** Ce
   point a changé — le formulaire doit maintenant le décrire, et non plus
   répondre « aucune collecte ». Rien n'est émis tant que les trois
-  conditions suivantes ne sont pas réunies : la configuration de
-  l'organisation active `telemetry.enabled`, elle désigne un point de
-  collecte `https:`, **et** la personne coche la case dédiée dans la
-  page d'options, qui affiche ce point de collecte à côté d'elle. La
-  troisième condition n'est pas décorative : `telemetry.*` étant une clé
-  de configuration ordinaire, le fichier d'un dépôt peut l'écrire, et
-  sans consentement local un dépôt désignerait lui-même le collecteur.
+  conditions suivantes ne sont pas réunies : la **politique d'entreprise**
+  poussée par le navigateur déclare `telemetry.enabled`, elle déclare un
+  point de collecte `https:`, **et** la personne coche la case dédiée
+  dans la page d'options, qui affiche cette adresse à côté d'elle.
 
-  **L'accord porte sur UNE destination**, celle qui était affichée : un
-  dépôt qui en désigne une autre n'en hérite pas, il faut consentir à
-  nouveau devant la nouvelle adresse. Il est stocké sur l'appareil
-  (`chrome.storage.local`), **ne se synchronise pas** vers les autres
-  appareils du compte, et le retirer **désarme immédiatement les onglets
-  déjà ouverts** — ils écoutent cette clé.
+  **Le point de collecte vient de ce seul canal**, jamais de la
+  configuration résolue. C'est le raisonnement que le §8.1.1 tient déjà
+  pour `configUrl` — un dépôt ne doit pas désigner le document censé le
+  contraindre — appliqué au collecteur : le fichier
+  `.conventional-comments.json` d'un dépôt ne peut ni activer la
+  télémétrie, ni choisir où elle part. À un reviewer qui poserait la
+  question : **aucun dépôt tiers ne peut faire émettre l'extension.**
+
+  **L'accord porte sur UNE destination**, celle qui était affichée. Il
+  est stocké sur l'appareil (`chrome.storage.local`), **ne se
+  synchronise pas** vers les autres appareils du compte, **désarme
+  immédiatement les onglets déjà ouverts** quand on le retire, et reste
+  révocable même si la politique a cessé de déclarer un point de
+  collecte.
 
   **Ce qui part**, à la vidange périodique et jamais à la frappe : le
   dépôt affiché (`hôte/portée`), le mode, et des compteurs

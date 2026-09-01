@@ -25,7 +25,7 @@ import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.
 import {
   TELEMETRY_CONSENT_KEY,
   TelemetryCounters,
-  canonicalEndpoint,
+  managedEndpoint,
   parseConsent,
   telemetryTarget,
   type TelemetryConsent,
@@ -243,19 +243,20 @@ async function readTelemetryConsent(): Promise<TelemetryConsent | null> {
  * archive, et `chrome.storage.local` est une ressource partagée. */
 const SELECTOR_LOG_LIMIT = 50;
 
-/** Dépose le point de collecte effectif à l'usage de la page d'options (§10). Vide quand
- * la télémétrie n'est pas configurée, pour que la page puisse le dire plutôt que de laisser
- * croire qu'une case cochée enverrait quelque chose. */
-function publishTelemetryEndpoint(config: {
-  telemetry: { enabled: boolean; endpoint: string | null };
-}): void {
-  // CANONIQUE, comme partout ailleurs : c'est cette chaîne que la page d'options affiche,
-  // puis stocke comme consentement, puis que `telemetryTarget()` compare. Publier la forme
-  // brute ici suffisait à ce que le consentement ne coïncide jamais.
-  writeCurrentState({
-    telemetryEndpoint: config.telemetry.enabled
-      ? (canonicalEndpoint(config.telemetry.endpoint) ?? '')
-      : '',
+/** Le point de collecte déclaré par la politique d'entreprise (§10).
+ *
+ * Il ne transite plus par une clé partagée que chaque onglet réécrivait : la page d'options
+ * lit la MÊME politique, au même endroit. Une valeur relayée d'onglet en onglet faisait que
+ * la case pouvait consentir à autre chose que ce qu'elle affichait, et qu'un onglet dont la
+ * télémétrie était désactivée effaçait l'adresse pour tous les autres (revue Codex, PR #31). */
+async function readManagedEndpoint(): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      if (!chrome?.storage?.managed) return resolve(null);
+      chrome.storage.managed.get((items) => resolve(managedEndpoint(items?.['telemetry'])));
+    } catch {
+      resolve(null);
+    }
   });
 }
 
@@ -390,7 +391,7 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // résolue n'aura pas dit qu'on en a le droit (§10, voir telemetry.ts). Il est construit
   // ici, avant l'adaptateur, parce que `SelectorLog` reçoit son rappel à la construction.
   const telemetry = new TelemetryCounters();
-  const count = (event: TelemetryEvent): void => telemetry.count(event);
+  const count = (event: TelemetryEvent): boolean => telemetry.count(event);
 
   // Un seul rappel, deux effets, et c'est voulu : la dégradation de sélecteur se journalise
   // LOCALEMENT dans tous les cas (§9.4, CA-11) et ne se remonte que si la télémétrie est
@@ -464,78 +465,80 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
 
   const editors = adapter.observeEditors((editor) => void attach(editor));
 
-  /** L'armement de la télémétrie vit au niveau de la PR AFFICHÉE, pas de la découverte d'un
-   * éditeur — trois raisons, toutes constatées en revue (PR #31) :
+  /** L'armement vit au niveau de la PR AFFICHÉE, pas de la découverte d'un éditeur —
+   * `observePrChromeNavigation` sonde les sélecteurs dès l'injection, une PR sans composeur
+   * rendu doit remonter ses dégradations comme les autres (CA-11), et deux attachements
+   * concurrents armaient chacun de leur côté (revue Codex, PR #31).
    *
-   * 1. `observePrChromeNavigation` sonde les sélecteurs dès l'injection, indépendamment des
-   *    éditeurs : les dégradations qui précèdent le premier éditeur étaient perdues.
-   * 2. Une PR sans composeur rendu (droits de commentaire absents, composeur replié) n'arme
-   *    JAMAIS — la remontée de CA-11 y était absente alors que tout l'autorisait.
-   * 3. Deux attachements concurrents armaient chacun de leur côté, et une résolution
-   *    PÉRIMÉE, revenue après une navigation, réétiquetait l'onglet sur l'ancien dépôt.
-   *
-   * Un seul point d'armement, appelé sur changement de PR et sur changement de
-   * consentement, supprime les trois d'un coup. */
+   * DEUX raisons de réarmer, et elles ne se traitent pas pareil :
+   *   • la PR affichée CHANGE — il faut désarmer tout de suite, avant la moindre lecture
+   *     asynchrone, sinon ce qui est compté sur la nouvelle part au nom de l'ancienne ;
+   *   • la même PR est RÉSOLUE À NOUVEAU (expiration du TTL, changement de politique ou de
+   *     consentement) — désarmer serait ici gratuit et ferait perdre l'agrégat en cours ;
+   *     on recalcule, et `arm()` ne vidange que si la cible a effectivement changé. */
   let armedFor: { pr: PrRef; key: string } | null = null;
+  /** Génération : toute invocation en vol est invalidée par la suivante.
+   *
+   * La clé de PR ne suffit pas — c'était le défaut restant. Sur un RETRAIT DE CONSENTEMENT,
+   * la PR ne change pas : une invocation partie avant le retrait, avec l'ancien
+   * consentement en main, passait donc les deux contrôles de clé et réarmait après que le
+   * retrait avait désarmé. L'onglet reprenait ses envois (revue Codex, PR #31). Un compteur
+   * incrémenté à CHAQUE appel invalide les précédentes quelle qu'en soit la cause. */
+  let armGeneration = 0;
 
-  const armFor = async (pr: PrRef | null): Promise<void> => {
+  const armFor = async (pr: PrRef | null, reason: 'pr' | 'refresh'): Promise<void> => {
     if (disposed) return;
-    // DÉSARMER D'ABORD, avant la moindre lecture asynchrone. Entre l'instant où la PR change
-    // et celui où sa configuration est résolue, l'onglet restait armé sur la PRÉCÉDENTE :
-    // `observePrChromeNavigation` sonde ses sélecteurs immédiatement, et une dégradation
-    // rencontrée sur la nouvelle PR était comptée — puis émise — au nom de l'ancienne, même
-    // quand la nouvelle se résout en `off` ou vers un point de collecte non consenti (revue
-    // Codex, PR #31).
-    //
-    // Vidanger AVANT de désarmer, et non l'inverse : `arm(null)` jette, et ce qui a été
-    // compté pour la PR précédente lui appartient légitimement. Le désarmement protège de
-    // la mauvaise attribution, il n'est pas une raison de perdre la mesure. Sur retrait du
-    // consentement, `onConsentChanged` a déjà jeté les compteurs avant d'appeler ici : cette
-    // vidange n'a alors rien à émettre, ce qui est exactement voulu.
-    telemetry.flush();
-    telemetry.arm(null);
-    if (!pr) {
+    const generation = ++armGeneration;
+    const key = pr === null ? null : prTelemetryKey(pr);
+    if (reason === 'pr' && key !== armedFor?.key) {
+      // Vidanger AVANT de désarmer : `arm(null)` jette, et ce qui a été compté pour la PR
+      // précédente lui appartient légitimement. Le désarmement protège d'une mauvaise
+      // attribution, il n'est pas une raison de perdre la mesure.
+      telemetry.flush();
+      telemetry.arm(null);
+    }
+    if (pr === null || key === null) {
       armedFor = null;
+      telemetry.arm(null);
       return;
     }
-    const key = prTelemetryKey(pr);
     armedFor = { pr, key };
     const resolved = await resolver.resolve(adapter, pr); // en cache le plus souvent
-    // La PR a pu changer pendant la résolution : un résultat périmé ne doit pas réarmer.
-    if (disposed || armedFor?.key !== key) return;
-    // ...et elle a pu changer PENDANT LA LECTURE DU CONSENTEMENT, qui est un second aller-
-    // retour asynchrone. Une première version ne vérifiait qu'avant celui-ci : l'invocation
-    // partie pour l'ancienne PR pouvait réarmer après que la nouvelle avait désarmé (revue
-    // Codex, PR #31). Toute frontière asynchrone se re-vérifie, pas seulement la première.
-    const consent = await readTelemetryConsent();
-    if (disposed || armedFor?.key !== key) return;
-    publishTelemetryEndpoint(resolved.config);
-    telemetry.arm(telemetryTarget(resolved.config, consent, key));
+    if (disposed || generation !== armGeneration) return;
+    // Toute frontière asynchrone se re-vérifie, pas seulement la première.
+    const [endpoint, consent] = await Promise.all([readManagedEndpoint(), readTelemetryConsent()]);
+    if (disposed || generation !== armGeneration) return;
+    telemetry.arm(telemetryTarget(resolved.config, endpoint, consent, key));
   };
 
-  // Le consentement peut être RETIRÉ pendant que l'onglet vit. Sans cette écoute, la case
-  // décochée ne changeait rien pour les onglets déjà ouverts : ils continuaient à vidanger
-  // toutes les cinq minutes et à la fermeture, jusqu'au rechargement (revue Codex, PR #31).
-  // On désarme immédiatement — donc en jetant ce qui était compté — puis on réévalue.
-  const onConsentChanged = (changes: Record<string, { newValue?: unknown }>, area: string): void => {
-    if (area !== 'local' || !(TELEMETRY_CONSENT_KEY in changes)) return;
+  /** Le consentement peut être RETIRÉ, et la politique d'entreprise peut changer, pendant
+   * que l'onglet vit. Sans ces écoutes, la case décochée ne changeait rien pour les onglets
+   * déjà ouverts : ils continuaient à vidanger jusqu'au rechargement (revue Codex, PR #31).
+   * On désarme immédiatement — donc en jetant ce qui était compté, puisqu'on vient
+   * d'apprendre qu'on n'avait peut-être plus le droit d'émettre — puis on réévalue. */
+  const onTelemetryInputChanged = (
+    changes: Record<string, { newValue?: unknown }>,
+    area: string
+  ): void => {
+    const consentChanged = area === 'local' && TELEMETRY_CONSENT_KEY in changes;
+    if (!consentChanged && area !== 'managed') return;
     telemetry.arm(null);
-    void armFor(armedFor?.pr ?? null);
+    void armFor(armedFor?.pr ?? null, 'refresh');
   };
   try {
-    chrome?.storage?.onChanged?.addListener(onConsentChanged);
+    chrome?.storage?.onChanged?.addListener(onTelemetryInputChanged);
   } catch {
     // Hors contexte d'extension : rien à écouter.
   }
 
-  // Bandeau (§5.5) et grisage du bouton de complétion (§6.5) — ré-armés à chaque
-  // navigation SPA vers un contexte de PR différent, pas seulement au chargement initial
-  // du script : Turbo/React ne rechargent pas le document, donc sans ce ré-armement la
-  // barre reste absente d'une PR atteinte par un lien interne tant qu'un rechargement
-  // complet ne relance pas bootstrap().
-  const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc, Date.now, (pr) =>
-    void armFor(pr)
+  // `onPrChange` porte les DEUX cas : un changement de PR (désarmement immédiat) et une
+  // simple ré-résolution de la même PR après expiration du TTL — l'onglet restait sinon armé
+  // sur l'ancienne configuration alors que l'interface adoptait la nouvelle (revue Codex,
+  // PR #31).
+  const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc, Date.now, (pr, changed) =>
+    void armFor(pr, changed ? 'pr' : 'refresh')
   );
+
   // Vidange : périodique, et à la fermeture de l'onglet. `pagehide` et non `unload` —
   // celui-ci empêche la mise en cache arrière/avant et n'est plus fiable ; `keepalive`
   // (telemetry.ts) est ce qui laisse la dernière requête partir malgré la fermeture.
@@ -546,7 +549,7 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   const revoke = () => {
     disposed = true;
     try {
-      chrome?.storage?.onChanged?.removeListener?.(onConsentChanged);
+      chrome?.storage?.onChanged?.removeListener?.(onTelemetryInputChanged);
     } catch {
       // Hors contexte d'extension : rien à retirer.
     }
@@ -753,11 +756,15 @@ export function observePrChromeNavigation(
   // Horloge injectable — même convention que ClientConfigResolver (config-resolver.ts) —
   // pour tester la fenêtre RENDER_RETRY_WINDOW_MS sans dépendre d'une attente réelle.
   now: () => number = Date.now,
-  /** Appelé à chaque changement de la PR AFFICHÉE, `null` quand la page n'en montre plus.
-   * C'est le seul signal de ce module qui soit lié à la PR et non à un éditeur : la
-   * télémétrie s'y arme (voir `armFor`), parce qu'une PR sans composeur rendu doit pouvoir
-   * remonter ses dégradations de sélecteurs comme les autres (CA-11, revue Codex PR #31). */
-  onPrChange: (pr: PrRef | null) => void = () => {}
+  /** Appelé quand une configuration effective est adoptée pour la PR affichée — `changed`
+   * distingue une NAVIGATION (`true`, la PR n'est plus la même) d'une simple ré-résolution
+   * de la même PR (`false`, expiration du TTL). `null` quand la page ne montre plus de PR.
+   *
+   * C'est le seul signal de ce module lié à la PR et non à un éditeur : la télémétrie s'y
+   * arme (voir `armFor`), parce qu'une PR sans composeur rendu doit remonter ses
+   * dégradations comme les autres (CA-11), et parce qu'un onglet restait armé sur l'ancienne
+   * configuration quand celle-ci se rafraîchissait sans navigation (revue Codex, PR #31). */
+  onPrChange: (pr: PrRef | null, changed: boolean) => void = () => {}
   /** Révoque l'observation : déconnecte l'observateur et annule un rattrapage en attente.
    * Sans emploi en production — l'observateur vit le temps de l'onglet — mais nécessaire à
    * tout appelant qui n'est PAS un onglet : deux observations concurrentes sur le même
@@ -803,7 +810,7 @@ export function observePrChromeNavigation(
       lastPrKey = key;
       // AVANT tout rendu : c'est ici que la PR affichée change, et l'armement de la
       // télémétrie doit suivre ce changement-là, pas celui d'un éditeur.
-      onPrChange(currentPrOf(adapter));
+      onPrChange(currentPrOf(adapter), true);
       showedSomething = false;
       lastOwnSig = null;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
@@ -863,6 +870,10 @@ export function observePrChromeNavigation(
     })
       .then((showed) => {
         if (key !== lastPrKey) return; // supplanté par une navigation : ce rendu ne fait plus foi
+        // Ce rendu a résolu la configuration effective — éventuellement une NOUVELLE, le
+        // cache du résolveur ayant expiré. La télémétrie doit s'aligner sur celle-là, sans
+        // désarmer : `changed: false` recalcule la cible et ne vidange que si elle diffère.
+        if (!navigated) onPrChange(currentPrOf(adapter), false);
         showedSomething = showed;
         // Photo prise ICI, une fois nos badges posés et nos surfaces montées : c'est ce que
         // la page doit encore porter au prochain réveil. Toute différence constatée ensuite

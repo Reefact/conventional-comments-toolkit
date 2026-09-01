@@ -3,19 +3,35 @@
 // libre » (§10). Tout ce module existe pour rendre cette phrase mécanique plutôt que
 // déclarative : rien ne sort d'ici qui ne soit un identifiant d'un vocabulaire fermé.
 //
-// TROIS conditions doivent être réunies pour qu'un octet parte, et la troisième n'est pas
-// dans la spécification — elle en découle :
+// D'OÙ VIENT LE POINT DE COLLECTE — c'est la décision qui structure tout le reste.
 //
-// 1. `telemetry.enabled` vaut `true` dans la configuration effective ;
-// 2. `telemetry.endpoint` est une URL `https:` ;
-// 3. la personne a coché la case dans la page d'options.
+// `telemetry.*` est une clé de configuration ORDINAIRE (§8.2) : le fichier
+// `.conventional-comments.json` d'un dépôt peut l'écrire. Une première conception lisait
+// donc le point de collecte dans la configuration effective, et trois rounds de revue ont
+// montré que cette voie ne se rattrape pas (PR #31) : un dépôt pouvait désigner son propre
+// collecteur, la page d'options certifiait à l'utilisateur qu'il venait « de son
+// organisation », et le point de collecte changeait sous les onglets au gré des dépôts
+// visités — chaque correctif rétrécissait une fenêtre et en ouvrait une autre.
 //
-// La troisième existe parce que `telemetry.*` est une clé de configuration ORDINAIRE
-// (§8.2) : le fichier `.conventional-comments.json` d'un dépôt peut donc l'écrire, et un
-// dépôt hostile désignerait sinon lui-même le point de collecte — « opt-in explicite »
-// (§10) deviendrait l'opt-in d'un dépôt, pas celui de la personne. La page d'options
-// affiche le point de collecte effectif à côté de la case, pour que ce consentement porte
-// sur quelque chose de visible.
+// L'activation de la télémétrie ne vient donc PLUS de la configuration résolue, mais du
+// SEUL canal de politique d'entreprise (`chrome.storage.managed`). C'est exactement le
+// raisonnement que le §8.1.1 tient déjà pour `configUrl` — « un `configUrl` posé dans le
+// fichier de dépôt est ignoré », sans quoi « un dépôt détournerait le niveau 2 vers un
+// document qu'il contrôle » — appliqué au collecteur : un dépôt ne doit pas pouvoir choisir
+// où partent des données, ni les faire partir.
+//
+// TROIS conditions, donc, pour qu'un octet parte :
+//
+// 1. la politique d'entreprise déclare `telemetry.enabled` ;
+// 2. elle déclare un `telemetry.endpoint` en `https:` ;
+// 3. la personne a coché la case dans la page d'options, devant cette adresse.
+//
+// La troisième n'est pas dans la spécification, mais le §10 l'appelle : « opt-in
+// explicite » est celui d'une personne, pas d'une administration. Les deux premières sont
+// désormais hors de portée de tout dépôt.
+//
+// La clé `telemetry.*` du §8.2 reste lue et validée par `core/` — le composant serveur s'en
+// sert, et le schéma ne change pas. C'est l'EXTENSION qui ne l'écoute plus.
 
 /** Ce qu'un composant peut compter. Aucune de ces valeurs n'est du texte saisi : un
  * identifiant de label vient de la configuration, un code de diagnostic de `core/`, un nom
@@ -101,14 +117,30 @@ function counterKey(event: TelemetryEvent): string | null {
   return COUNTER_KEY.test(key) ? key : null;
 }
 
+/** Ce que la politique d'entreprise déclare : `null` quand elle ne déclare rien, ce qui est
+ * le cas par défaut et signifie qu'aucune télémétrie n'est possible.
+ *
+ * Lu à l'identique par le script de contenu et par la page d'options — la seconde AFFICHE
+ * ce que le premier ÉMET, et deux lectures différentes de la même politique laisseraient la
+ * case consentir à autre chose que ce qu'elle montre. C'est ce qui arrivait quand le point
+ * de collecte transitait par une clé partagée réécrite par chaque onglet (revue Codex,
+ * PR #31). */
+export function managedEndpoint(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const { enabled, endpoint } = raw as { enabled?: unknown; endpoint?: unknown };
+  if (enabled !== true) return null;
+  return canonicalEndpoint(typeof endpoint === 'string' ? endpoint : null);
+}
+
 /** Le point de collecte, ou `null` — c'est-à-dire : rien ne part. Les trois conditions de
  * l'en-tête sont ici, en un seul endroit, pour qu'aucun appelant ne puisse en oublier une.
  *
- * `https:` exigé : une page de plateforme est servie en HTTPS, et un navigateur bloque le
- * contenu mixte. Un point de collecte en clair ne recevrait donc jamais rien — mieux vaut
- * ne pas prétendre le contraire. */
+ * `endpoint` vient de `managedEndpoint()`, donc de la politique d'entreprise et d'elle
+ * seule. `config` n'apporte plus que le MODE : une extension inactive (§7) ne compte rien,
+ * et ce mode-là, un dépôt a parfaitement le droit de le fixer. */
 export function telemetryTarget(
-  config: { mode: string; telemetry: { enabled: boolean; endpoint: string | null } },
+  config: { mode: string },
+  endpoint: string | null,
   consent: TelemetryConsent | null,
   repo: string
 ): TelemetryTarget | null {
@@ -117,12 +149,11 @@ export function telemetryTarget(
   // anticipée du mode `off` passait AVANT l'armement (revue Codex, PR #31). La règle vit
   // ici, où aucun ordre d'appel ne peut la contourner.
   if (config.mode === 'off') return null;
-  if (!consent || !config.telemetry.enabled) return null;
-  const endpoint = canonicalEndpoint(config.telemetry.endpoint);
-  if (endpoint === null) return null;
-  // LE point du correctif : le consentement vaut pour CETTE destination, pas pour l'idée de
-  // télémétrie. Un dépôt qui en désigne une autre n'hérite pas de l'accord donné pour la
-  // première — il faut le redonner, devant la nouvelle URL affichée.
+  if (endpoint === null || !consent) return null;
+  // Le consentement vaut pour CETTE destination, pas pour l'idée de télémétrie. Depuis que
+  // le point de collecte vient de la politique, il ne peut plus changer sous les pieds de
+  // la personne au gré des dépôts visités ; cette comparaison reste néanmoins la garantie
+  // que l'accord porte sur ce qui a été affiché, y compris après un changement de politique.
   if (consent.endpoint !== endpoint) return null;
   return { endpoint, mode: config.mode, repo };
 }
@@ -167,11 +198,18 @@ export class TelemetryCounters {
     return this.#target !== null;
   }
 
-  count(event: TelemetryEvent): void {
-    if (!this.#target) return;
+  /** Rend `true` si l'événement a RÉELLEMENT été compté — désarmé, ou hors vocabulaire, il
+   * rend `false`. L'appelant en a besoin : le contrôleur d'éditeur retenait un code comme
+   * « déjà compté » alors que l'émetteur venait de le jeter faute d'être armé, si bien
+   * qu'une erreur présente à cet instant n'était plus jamais émise de toute la vie de
+   * l'éditeur — elle ne comptait que si elle disparaissait puis revenait (revue Codex,
+   * PR #31). */
+  count(event: TelemetryEvent): boolean {
+    if (!this.#target) return false;
     const key = counterKey(event);
-    if (!key) return;
+    if (!key) return false;
     this.#counts.set(key, (this.#counts.get(key) ?? 0) + 1);
+    return true;
   }
 
   /** Émet et remet les compteurs à zéro. Sans compteur, rien ne part — pas même un corps

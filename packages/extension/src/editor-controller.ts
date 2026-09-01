@@ -4,6 +4,7 @@
 
 import {
   analyze,
+  matchPrefix,
   splitBody,
   type CommentAnalysis,
   type EffectiveConfig,
@@ -19,6 +20,16 @@ import { attachQuickInput } from './ui/quickinput.js';
 import { FeedbackView } from './ui/feedback.js';
 import type { ResolvedClientConfig } from './config-resolver.js';
 import type { TelemetryEvent } from './telemetry.js';
+
+/** Le label que le commentaire porte DÉJÀ, au sens du §3.4.1 — `null` s'il n'en porte
+ * aucun. La question est posée à `core/` (`splitBody` isole la ligne de préfixe, `matchPrefix`
+ * lui applique l'expression de référence) plutôt qu'au texte à la main : un repérage
+ * divergent répondrait d'une autre ligne que celle que la validation juge. */
+function labelPosedIn(value: string): string | null {
+  const prefixLine = splitBody(value).prefixLine;
+  if (prefixLine === null) return null;
+  return matchPrefix(prefixLine)?.label.toLowerCase() ?? null;
+}
 
 export const VALIDATION_DEBOUNCE_MS = 150; // §5.3
 
@@ -266,7 +277,17 @@ export class EditorController {
     // pose puis retire ; compter les deux gonflait l'usage d'un label qu'on a justement
     // renoncé à employer (revue Codex, PR #31). Compté à l'insertion, et non à la lecture
     // d'un préfixe déjà saisi — ce qui compterait le même commentaire à chaque frappe.
-    if (!removed) this.deps.telemetry?.({ kind: 'label-used', label: effectiveLabel });
+    //
+    // Et compté seulement si le label CHANGE. Ce même point d'entrée sert aux décorations :
+    // la barre d'outils rappelle `insertPrefix()` avec le label courant (ou `null`) pour
+    // poser `(blocking)`, `(non-blocking)`, une décoration libre… `removed` vaut alors
+    // `false` et chacune de ces retouches recomptait le même label. L'agrégat aurait mesuré
+    // les modifications de décoration, pas les labels posés (revue Codex, PR #31) — et
+    // d'autant plus fort que la personne hésite, ce qui n'a aucun sens à remonter.
+    const posedBefore = labelPosedIn(value);
+    if (!removed && posedBefore !== effectiveLabel) {
+      this.deps.telemetry?.({ kind: 'label-used', label: effectiveLabel });
+    }
     this.deps.adapter.writeValue(this.deps.editor, nextValue, hasSelection ? undefined : caret);
     if (hasSelection) {
       // Le texte sélectionné n'est pas remplacé ; la sélection est restaurée, décalée de

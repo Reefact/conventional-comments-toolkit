@@ -391,7 +391,39 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // résolue n'aura pas dit qu'on en a le droit (§10, voir telemetry.ts). Il est construit
   // ici, avant l'adaptateur, parce que `SelectorLog` reçoit son rappel à la construction.
   const telemetry = new TelemetryCounters();
-  const count = (event: TelemetryEvent): boolean => telemetry.count(event);
+
+  /** Les dégradations de sélecteurs détectées AVANT que l'armement soit conclu.
+   *
+   * `armFor()` est lancé sans être attendu — il ne peut pas l'être : la navigation, elle,
+   * est synchrone. Il se suspend aussitôt sur la résolution de configuration et sur les
+   * lectures de stockage, pendant que le rendu continue et SONDE les sélecteurs. La
+   * dégradation la plus attendue de toutes — un bouton d'envoi introuvable au chargement
+   * d'une PR — tombait donc systématiquement dans cet intervalle, était refusée par un
+   * émetteur encore désarmé, et n'était jamais rejouée : un diagnostic ne se répète pas
+   * (revue Codex, PR #31).
+   *
+   * Le tampon ne relâche pas la règle de l'émetteur (« compté sans être armé est perdu ») :
+   * il ne vit que dans cet intervalle-là, il est JETÉ dès qu'on apprend qu'on n'a pas le
+   * droit d'émettre — armement rendant `null`, changement de PR, retrait de consentement —
+   * et il est borné, une PR pathologique ne devant pas faire enfler la mémoire d'un onglet. */
+  const PENDING_DEGRADATIONS_LIMIT = 20;
+  let pendingDegradations: TelemetryEvent[] = [];
+  const dropPendingDegradations = (): void => {
+    pendingDegradations = [];
+  };
+  const count = (event: TelemetryEvent): boolean => {
+    if (telemetry.count(event)) return true;
+    // `count()` rend aussi `false` hors vocabulaire : c'est `armed` qui distingue « pas
+    // encore le droit » de « jamais compté, et à juste titre ».
+    if (
+      event.kind === 'selector-degradation' &&
+      !telemetry.armed &&
+      pendingDegradations.length < PENDING_DEGRADATIONS_LIMIT
+    ) {
+      pendingDegradations.push(event);
+    }
+    return false;
+  };
 
   // Un seul rappel, deux effets, et c'est voulu : la dégradation de sélecteur se journalise
   // LOCALEMENT dans tous les cas (§9.4, CA-11) et ne se remonte que si la télémétrie est
@@ -496,10 +528,14 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
       // attribution, il n'est pas une raison de perdre la mesure.
       telemetry.flush();
       telemetry.arm(null);
+      // Ce qui a été sondé avant ce changement appartient à la PR précédente : le rejouer
+      // ici l'attribuerait à la nouvelle.
+      dropPendingDegradations();
     }
     if (pr === null || key === null) {
       armedFor = null;
       telemetry.arm(null);
+      dropPendingDegradations();
       return;
     }
     armedFor = { pr, key };
@@ -508,7 +544,13 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     // Toute frontière asynchrone se re-vérifie, pas seulement la première.
     const [endpoint, consent] = await Promise.all([readManagedEndpoint(), readTelemetryConsent()]);
     if (disposed || generation !== armGeneration) return;
-    telemetry.arm(telemetryTarget(resolved.config, endpoint, consent, key));
+    const target = telemetryTarget(resolved.config, endpoint, consent, key);
+    telemetry.arm(target);
+    // L'armement CONCLUT l'intervalle : ce qui a été sondé pendant est crédité maintenant,
+    // ou perdu pour de bon si la réponse est « pas de télémétrie ».
+    const pending = pendingDegradations;
+    dropPendingDegradations();
+    if (target !== null) for (const event of pending) telemetry.count(event);
   };
 
   /** Le consentement peut être RETIRÉ, et la politique d'entreprise peut changer, pendant
@@ -522,7 +564,19 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   ): void => {
     const consentChanged = area === 'local' && TELEMETRY_CONSENT_KEY in changes;
     if (!consentChanged && area !== 'managed') return;
-    telemetry.arm(null);
+    // Désarmer JETTE les compteurs, et c'est fait exprès : on vient d'apprendre qu'on n'a
+    // peut-être plus le droit d'émettre. Encore faut-il l'avoir appris. La zone `managed`
+    // porte AUSSI `allowedHosts` et `floor` : un hôte d'entreprise ajouté par la politique
+    // faisait perdre jusqu'à un intervalle de vidange de compteurs à tous les onglets
+    // ouverts, pour se réarmer aussitôt sur exactement la même cible (revue Codex, PR #31).
+    // Une politique de télémétrie inchangée n'a rien à révoquer ; la réévaluation, elle,
+    // reste due — le mode effectif peut avoir changé avec le plancher —, et `arm()` ne
+    // vidange que si la cible a réellement bougé.
+    const telemetryPolicyChanged = area === 'managed' && 'telemetry' in changes;
+    if (consentChanged || telemetryPolicyChanged) {
+      telemetry.arm(null);
+      dropPendingDegradations();
+    }
     void armFor(armedFor?.pr ?? null, 'refresh');
   };
   try {

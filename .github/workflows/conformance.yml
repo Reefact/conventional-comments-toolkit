@@ -59,6 +59,15 @@ jobs:
         # environnement déjà compilé, donc dans un monde qui n'était pas celui de la CI.
         run: npm run build && npm run build:extension && npm run check:context-apis && npm run check:content-script-io
 
+      # Une clé que le schéma ne déclare pas n'arrive jamais : Chrome la retire du
+      # stockage managé sans rien dire, et un faux de test fabrique justement l'objet
+      # que le vrai canal aurait refusé de transporter. La télémétrie a été déplacée
+      # vers ce canal pour qu'aucun dépôt ne puisse choisir la destination de ses
+      # données, et la déclaration a été oubliée : en production, la fonctionnalité
+      # entière était inerte, sans une erreur nulle part.
+      - name: Toute clé managée lue est déclarée au schéma de politique
+        run: npm run check:managed-keys
+
       # `specifications-fr.md` est la référence NORMATIVE : elle ne se modifie pas pour
       # correspondre au code. Un changement délibéré de la spécification reste possible —
       # il se fait alors sur une PR qui ne touche qu'elle, et cette garde le signale.

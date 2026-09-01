@@ -301,6 +301,38 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     ]);
   });
 
+  // Le MÊME point d'entrée sert aux décorations : la barre d'outils rappelle
+  // `insertPrefix()` avec le label courant pour poser `(blocking)`, puis `(non-blocking)`,
+  // puis une décoration libre… Rien n'est retiré, donc `removed` vaut `false`, et chaque
+  // retouche recomptait le label. L'agrégat mesurait alors l'hésitation sur les décorations
+  // plutôt que les labels posés (revue Codex, PR #31).
+  it('changer de DÉCORATION sur un label déjà posé n’est pas un nouvel usage', () => {
+    const { controller, textarea, events } = setup();
+    textarea.value = 'le nom est ambigu';
+    controller.insertPrefix('issue', [], false); // pose le label : UN usage
+    controller.insertPrefix(null, ['blocking'], false); // décoration
+    const afterFirstDecoration = textarea.value;
+    controller.insertPrefix(null, ['non-blocking'], false); // on change d'avis
+    expect(events.filter((e) => e.kind === 'label-used')).toEqual([
+      { kind: 'label-used', label: 'issue' },
+    ]);
+    // La ligne de préfixe a bel et bien été RÉÉCRITE à chaque appel : c'est un compteur
+    // qu'on corrige, pas une insertion qu'on aurait cessé de faire.
+    expect(afterFirstDecoration).toBe('issue (blocking): le nom est ambigu');
+    expect(textarea.value).toBe('issue (non-blocking): le nom est ambigu');
+  });
+
+  it('changer de LABEL sur un commentaire déjà labellisé compte le nouveau', () => {
+    const { controller, textarea, events } = setup();
+    textarea.value = 'le nom est ambigu';
+    controller.insertPrefix('issue', [], false);
+    controller.insertPrefix('praise', [], false);
+    expect(events.filter((e) => e.kind === 'label-used')).toEqual([
+      { kind: 'label-used', label: 'issue' },
+      { kind: 'label-used', label: 'praise' },
+    ]);
+  });
+
   // « Label utilisé » ne doit pas dépendre du CHEMIN par lequel la personne l'a posé. La
   // saisie rapide écrit le préfixe elle-même, sans passer par `insertPrefix()` : elle
   // n'était pas comptée, tandis que la barre d'outils et les raccourcis l'étaient — un
@@ -589,6 +621,90 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
 
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({ repo: 'github.com/acme/demo' });
+    expect(Object.keys(bodies[0]!['counters'] as object)).toContain('selector:editors');
+    dispose();
+  });
+
+  // L'armement ne peut pas être ATTENDU : la navigation, elle, est synchrone. `armFor()`
+  // part et se suspend aussitôt sur la résolution de configuration, pendant que le rendu
+  // continue et sonde les sélecteurs — un bouton d'envoi introuvable au chargement d'une PR
+  // tombe donc en plein dans cet intervalle. Un émetteur encore désarmé le refusait, et un
+  // diagnostic ne se répète pas : la dégradation la plus attendue de toutes était celle qui
+  // ne partait jamais (revue Codex, PR #31).
+  it('une dégradation sondée PENDANT l’armement est comptée une fois l’armement conclu', async () => {
+    const { captured, delays } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+    // Sans ce retard, le faux serait instantané et l'intervalle où vit le défaut n'aurait
+    // aucune durée — le test passerait avec ET sans le correctif (CLAUDE.md, règle 3).
+    delays.repoConfig = 10;
+    const { bodies } = collectPosts();
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
+    const dispose = await bootstrap(document);
+
+    // AVANT tout `settle()` : l'armement est encore en vol.
+    captured.log!.degraded({ name: 'completion-control', candidates: ['button'] });
+
+    await new Promise((r) => setTimeout(r, 30)); // l'armement se conclut ici
+    await settle();
+    flushByPagehide();
+    await settle();
+
+    expect(bodies).toHaveLength(1);
+    expect(Object.keys(bodies[0]!['counters'] as object)).toContain('selector:completion-control');
+    dispose();
+  });
+
+  // Et l'inverse, qui est la raison d'être de la règle : ce qui a été sondé pendant
+  // l'armement ne part QUE si l'armement conclut qu'on en a le droit. Le tampon ne doit pas
+  // devenir une file d'attente qui finit par émettre.
+  //
+  // Ce test-ci passe avec ET sans la condition `target !== null` du rejeu — c'est dit
+  // franchement plutôt que compté comme une vérification par retrait : ce n'est pas cette
+  // condition qui le tient, mais la règle de l'émetteur lui-même (« compté sans être armé
+  // est perdu »), et le rejeu ne fait alors que retomber dessus. Ce qu'il verrouille est la
+  // conséquence de bout en bout, et elle vaut d'être verrouillée : c'est la propriété qui
+  // sépare un tampon d'une file d'attente.
+  it('une dégradation sondée pendant un armement qui REFUSE est perdue, pas différée', async () => {
+    const { captured, delays } = installTab({ endpoint: `${ENDPOINT}` }, null);
+    delays.repoConfig = 10;
+    const { bodies } = collectPosts();
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
+    const dispose = await bootstrap(document);
+
+    captured.log!.degraded({ name: 'completion-control', candidates: ['button'] });
+
+    await new Promise((r) => setTimeout(r, 30));
+    await settle();
+    flushByPagehide();
+    await settle();
+
+    expect(bodies).toEqual([]);
+    dispose();
+  });
+
+  // La zone `managed` ne porte pas que la télémétrie : `allowedHosts` et `floor` y vivent
+  // aussi. Désarmer JETTE les compteurs — c'est voulu quand on vient d'apprendre qu'on n'a
+  // peut-être plus le droit d'émettre, et gratuit sinon. Un hôte d'entreprise ajouté par la
+  // politique faisait perdre jusqu'à cinq minutes de comptage à tous les onglets ouverts,
+  // pour se réarmer aussitôt sur exactement la même cible (revue Codex, PR #31).
+  it('un changement de politique SANS rapport avec la télémétrie ne jette pas les compteurs', async () => {
+    const { listeners, captured } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+    const { bodies } = collectPosts();
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
+    const dispose = await bootstrap(document);
+    await settle();
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    for (const listener of [...listeners]) {
+      listener({ allowedHosts: { newValue: [{ host: 'ghes.example.corp', platform: 'github' }] } }, 'managed');
+    }
+    await settle();
+
+    flushByPagehide();
+    await settle();
+    expect(bodies).toHaveLength(1);
     expect(Object.keys(bodies[0]!['counters'] as object)).toContain('selector:editors');
     dispose();
   });

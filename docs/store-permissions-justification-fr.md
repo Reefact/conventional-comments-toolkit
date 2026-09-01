@@ -193,8 +193,13 @@ mécanique de messagerie est vérifiée dans un vrai Chromium par
   répondre « aucune collecte ». Rien n'est émis tant que les trois
   conditions suivantes ne sont pas réunies : la **politique d'entreprise**
   poussée par le navigateur déclare `telemetry.enabled`, elle déclare un
-  point de collecte `https:`, **et** la personne coche la case dédiée
-  dans la page d'options, qui affiche cette adresse à côté d'elle.
+  point de collecte `https:` (`telemetry.endpoint`), **et** la personne
+  coche la case dédiée dans la page d'options, qui affiche cette adresse
+  à côté d'elle. Les deux clés sont déclarées dans
+  `packages/extension/src/managed-schema.json` : une clé absente de ce
+  schéma n'est pas transportée par la politique de navigateur — Chrome
+  l'écarte en silence —, ce que `npm run check:managed-keys` vérifie
+  désormais pour toute clé managée que le code lit.
 
   **Le point de collecte vient de ce seul canal**, jamais de la
   configuration résolue. C'est le raisonnement que le §8.1.1 tient déjà

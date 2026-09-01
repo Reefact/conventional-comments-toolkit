@@ -232,10 +232,24 @@ const RAW_PREFIX_LOCATOR = new RegExp(
  * positions antérieures (une citation au-dessus) ne se décalent pas. */
 export function computePrefixInsertion(
   currentValue: string,
-  newPrefix: { label: string; decorations: string[] },
+  newPrefix: { label: string; decorations?: string[] },
   options: { toggle?: boolean } = {}
 ): { nextValue: string; caret: number; delta: number; removed: boolean; changedAt: number } {
-  const decorations = newPrefix.decorations.length > 0 ? ` (${newPrefix.decorations.join(', ')})` : '';
+  // `decorations` distingue TROIS intentions, et un tableau seul ne pouvait en exprimer que
+  // deux — d'où un défaut que l'usage réel a fini par trouver (retour utilisateur) :
+  //
+  //   • `undefined` — « je ne me prononce pas » : on pose un label, la décoration déjà
+  //     écrite est CONSERVÉE. C'est CA-02 (`issue (blocking): x` + `todo` →
+  //     `todo (blocking): x`), et c'est le cas des boutons de label et des raccourcis ;
+  //   • `[]` — « aucune », le premier segment du sélecteur (§5.1) : la décoration est
+  //     RETIRÉE ;
+  //   • une liste non vide — elle remplace.
+  //
+  // Le tableau vide portait auparavant les deux premiers sens à la fois, et « conserver »
+  // l'emportait : le segment « aucune » était donc un bouton sans effet, coché, sur un
+  // commentaire décoré. Le §5.1 décrit pourtant bien « aucune » comme un choix.
+  const given = newPrefix.decorations;
+  const decorations = given !== undefined && given.length > 0 ? ` (${given.join(', ')})` : '';
   const prefixText = `${newPrefix.label}${decorations}: `;
 
   const lines = currentValue.split('\n');
@@ -257,10 +271,10 @@ export function computePrefixInsertion(
       const nextValue = lines.join('\n');
       return { nextValue, caret: changedAt, delta: -(located[0].length - head.length), removed: true, changedAt };
     }
-    // Remplacement : décoration et sujet conservés (CA-02) — la décoration existante est
-    // conservée si le nouveau préfixe n'en apporte pas.
+    // Remplacement : sujet conservé, et décoration conservée SI l'appelant ne s'est pas
+    // prononcé (CA-02). Un `[]` explicite, lui, la retire.
     const keptDecorations =
-      newPrefix.decorations.length === 0 && recognized.decorations !== null
+      given === undefined && recognized.decorations !== null
         ? ` (${recognized.decorations})`
         : decorations;
     const replacement = `${newPrefix.label}${keptDecorations}: `;

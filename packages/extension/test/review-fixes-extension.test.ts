@@ -69,8 +69,7 @@ describe('résidu A — §3.4.1 étapes 4-6 : le préfixe existant est reconnu c
 
   it('emoji de tête toléré (§3.4.2) : décoration conservée, emoji conservé', () => {
     const { nextValue } = computePrefixInsertion('\u{1F41B} issue (blocking): x', {
-      label: 'todo',
-      decorations: [],
+      label: 'todo', // décorations non spécifiées : clic sur un label, donc conservation (CA-02)
     });
     expect(nextValue).toBe('\u{1F41B} todo (blocking): x');
   });

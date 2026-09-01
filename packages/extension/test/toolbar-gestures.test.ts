@@ -19,6 +19,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
 import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controller.js';
+import { selectorFor, type PosedPrefix } from '../src/ui/toolbar.js';
 import { writeToTextField } from '@cct/adapter-shared';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 
@@ -572,5 +573,83 @@ describe('§3.2 — un préfixe écrit dont le label est INCONNU de la configura
 
     clickDecoration('non-blocking');
     expect(textarea.value).toBe('riskk (non-blocking): le nom est ambigu');
+  });
+});
+
+// ————— L'ÉTAT DU SÉLECTEUR, calculé en un seul endroit —————
+// `sync()` avait trois branches, chacune responsable de mettre à jour la provenance de la
+// décoration ; deux le faisaient, la troisième — la plus récente — sortait sans y toucher,
+// et le défaut que les deux autres corrigeaient revenait par elle (revue Codex, PR #35,
+// septième round). `selectorFor()` est maintenant le seul endroit où cet état s'écrit :
+// l'invariant tient par construction, pas par convention.
+describe('§5.1 — la provenance de la décoration, quelle que soit la branche', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  it('une décoration lue d’un préfixe INCONNU disparaît avec lui', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'riskk (blocking): le nom est ambigu');
+
+    clickDecoration('non-blocking'); // posée sur un préfixe que la configuration ignore
+    expect(textarea.value).toBe('riskk (non-blocking): le nom est ambigu');
+
+    await typeByHand(textarea, 'le nom est ambigu'); // préfixe effacé, validation passée
+    clickLabel('issue');
+    // Sans provenance dans cette branche-là : `issue (non-blocking): …`, la décoration
+    // effacée revenait.
+    expect(textarea.value).toBe('issue: le nom est ambigu');
+  });
+});
+
+describe('selectorFor — les cas nommés, sans DOM', () => {
+  const config = defaultConfig();
+  const hasSegment = (id: string) => ['blocking', 'non-blocking', 'if-minor'].includes(id);
+  const prefix = (over: Partial<PosedPrefix> = {}): PosedPrefix => ({
+    hasPrefix: true,
+    label: 'issue',
+    writtenLabel: 'issue',
+    decorations: [],
+    malformedDecorations: false,
+    ...over,
+  });
+  const pending = (...ids: string[]) => ({ origin: 'pending' as const, ids });
+  const posedState = (...ids: string[]) => ({ origin: 'posed' as const, ids });
+
+  it('aucun préfixe : une intention en attente survit et s’affiche', () => {
+    const { state, checked } = selectorFor(prefix({ hasPrefix: false, label: null, writtenLabel: null }), pending('blocking'), config, hasSegment);
+    expect(state).toEqual(pending('blocking'));
+    expect(checked).toEqual({ kind: 'segment', id: 'blocking' });
+  });
+
+  it('aucun préfixe : un reflet, lui, est jeté', () => {
+    const { state, checked } = selectorFor(prefix({ hasPrefix: false, label: null, writtenLabel: null }), posedState('blocking'), config, hasSegment);
+    expect(state).toEqual(pending());
+    expect(checked).toEqual({ kind: 'none' });
+  });
+
+  // Le cas du septième round : un préfixe inconnu porte quand même une décoration LUE.
+  it('préfixe inconnu : rien de coché, mais la décoration est un reflet', () => {
+    const { state, checked } = selectorFor(
+      prefix({ label: null, writtenLabel: 'riskk', decorations: ['blocking'] }),
+      pending(),
+      config,
+      hasSegment
+    );
+    expect(state).toEqual(posedState('blocking'));
+    expect(checked).toEqual({ kind: 'nothing' });
+  });
+
+  it('préfixe reconnu : la décoration écrite est cochée', () => {
+    const { state, checked } = selectorFor(prefix({ decorations: ['blocking'] }), pending(), config, hasSegment);
+    expect(state).toEqual(posedState('blocking'));
+    expect(checked).toEqual({ kind: 'segment', id: 'blocking' });
+  });
+
+  it('les trois refus se lisent pareil : rien de coché', () => {
+    const malformed = selectorFor(prefix({ malformedDecorations: true }), pending(), config, hasSegment);
+    const conflicting = selectorFor(prefix({ decorations: ['blocking', 'non-blocking'] }), pending(), config, hasSegment);
+    const descriptive = selectorFor(prefix({ decorations: ['perf'] }), pending(), config, hasSegment);
+    for (const view of [malformed, conflicting, descriptive]) expect(view.checked).toEqual({ kind: 'nothing' });
   });
 });

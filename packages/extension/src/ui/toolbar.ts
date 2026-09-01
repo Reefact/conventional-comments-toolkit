@@ -2,7 +2,7 @@
 // construit depuis la configuration — un segment par décoration dont `forces` n'est pas
 // null —, champ libre lorsque `decorations.allowFree` vaut true.
 
-import { IDENTIFIER_RE, enabledLabels, type EffectiveConfig } from '@cct/core';
+import { IDENTIFIER_RE, enabledLabels, resolveDecoration, type EffectiveConfig } from '@cct/core';
 import { ui } from './strings.js';
 
 /** Ce que le commentaire porte à cet instant, tel que `core/` le lit (§3.4.1). */
@@ -10,6 +10,13 @@ export interface PosedPrefix {
   /** L'id CANONIQUE du label (§8.2), alias résolu et casse de la configuration conservée —
    * jamais ce qui est littéralement écrit. */
   label: string | null;
+  /** L'orthographe RÉELLEMENT écrite — un alias, ou une casse différente de l'id configuré.
+   *
+   * Un alias est « une orthographe admise, pas un écart » (§3.2) : la réécriture vers la
+   * forme canonique « se propose, sans l'imposer ». Poser une décoration sur `bug: x` ne
+   * doit donc pas le transformer en `issue (blocking): x` au passage — c'est une correction
+   * que personne n'a demandée, glissée dans un autre geste (revue Codex, PR #35). */
+  writtenLabel: string | null;
   decorations: string[];
   /** Des parenthèses sont présentes mais leur contenu est illégal (§3.3, `issue (): x`).
    * Ce n'est ni « une décoration », ni « aucune » : la barre ne doit alors rien cocher. */
@@ -79,10 +86,18 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     button.addEventListener('click', () => {
       // Le second clic RETIRE (§5.1). Ce qui décide est donc le label que le commentaire
       // porte à cet instant, lu dans le texte — pas celui qu'on se souvient d'avoir cliqué.
-      const toggle = opts.currentPrefix().label === label.id;
-      // Aucune décoration choisie dans la barre → `undefined` : poser un label ne doit pas
-      // effacer la décoration déjà écrite (CA-02). Un choix explicite, lui, est transmis.
-      opts.onLabel(label.id, selectedDecorations.length > 0 ? selectedDecorations : undefined, toggle);
+      const posed = opts.currentPrefix();
+      const toggle = posed.label === label.id;
+      // Une décoration en attente dans le champ libre appartient à CE geste : la personne
+      // l'a tapée puis a cliqué un label. Sans cela, le `blur` la posait avec le label de
+      // repli et le clic retirait aussitôt le préfixe ainsi créé — la séquence la plus
+      // naturelle du champ libre laissait le commentaire sans label (revue Codex, PR #35).
+      const pending = takePendingFreeDecoration();
+      // Sinon : la sélection de la barre ne vaut que pour un commentaire qui ne porte AUCUN
+      // label. Sur un commentaire déjà labellisé, c'est le texte qui dit la décoration, et
+      // s'en remettre à la sélection mémorisée restaurait ce qu'on venait d'effacer.
+      const chosen = pending !== null ? [pending] : posed.label === null ? selectedDecorations : [];
+      opts.onLabel(label.id, chosen.length > 0 ? chosen : undefined, toggle);
       for (const b of root.querySelectorAll('.cct-label-button')) {
         b.setAttribute('aria-pressed', b === button && !toggle ? 'true' : 'false');
       }
@@ -101,6 +116,8 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     { id: null, text: ui(opts.lang, 'toolbar.decoration.none') },
     ...carriers.map((d) => ({ id: d.id, text: `(${d.id})` })),
   ];
+  /** Le bouton de chaque segment, pour ne plus l'apparier par son texte affiché. */
+  const segmentButtons = new Map<string | null, HTMLElement>();
   for (const segment of segments) {
     const b = doc.createElement('button');
     b.type = 'button';
@@ -111,12 +128,14 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     b.addEventListener('click', () => {
       selectedDecorations = segment.id === null ? [] : [segment.id];
       checkSegment(b);
-      // Le label sur lequel agir est celui que le COMMENTAIRE porte.
-      const label = opts.currentPrefix().label;
+      // Le label sur lequel agir est celui que le COMMENTAIRE porte, et il est réinséré
+      // TEL QU'IL EST ÉCRIT : ce geste-ci porte sur la décoration, pas sur l'orthographe.
+      const label = opts.currentPrefix().writtenLabel;
       // `selectedDecorations` est passé tel quel, tableau vide compris : c'est ici, et
       // seulement ici, que « aucune » veut dire « retire-la ».
       if (label) opts.onLabel(label, selectedDecorations, false);
     });
+    segmentButtons.set(segment.id, b);
     group.appendChild(b);
   }
   function checkSegment(target: Element | null): void {
@@ -125,6 +144,10 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     }
   }
   root.appendChild(group);
+
+  /** La décoration valide en attente dans le champ libre, RETIRÉE du champ. Rendue à
+   * l'appelant qui la pose lui-même — un clic de label, notamment. */
+  let takePendingFreeDecoration: () => string | null = () => null;
 
   // Champ libre lorsque decorations.allowFree vaut true — sans lui, les décorations
   // libres autorisées resteraient inaccessibles à la souris (§5.1).
@@ -136,6 +159,23 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     // Valider sur Entrée SEULEMENT perdait en silence ce qui venait d'être tapé dès qu'on
     // quittait le champ — au clavier par Tab, à la souris en cliquant ailleurs. Le geste le
     // plus naturel était celui qui effaçait le travail (retour utilisateur).
+    /** La saisie, si elle est posable. Elle SIGNALE une forme illégale plutôt que de la
+     * jeter en silence : §3.3 est structurel, indépendant de `allowFree`. */
+    const readFree = (): string | null => {
+      const raw = free.value.trim().toLowerCase();
+      if (raw === '') return null;
+      if (!IDENTIFIER_RE.test(raw)) {
+        free.setAttribute('aria-invalid', 'true');
+        return null;
+      }
+      free.removeAttribute('aria-invalid');
+      return raw;
+    };
+    takePendingFreeDecoration = (): string | null => {
+      const raw = readFree();
+      if (raw !== null) free.value = '';
+      return raw;
+    };
     const commitFree = (): void => {
       const raw = free.value.trim().toLowerCase();
       if (raw === '') return;
@@ -150,7 +190,8 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       }
       free.removeAttribute('aria-invalid');
       free.value = '';
-      opts.onFreeDecoration(raw, opts.currentPrefix().label);
+      // L'orthographe écrite, ici aussi : décorer ne réécrit pas le label (§3.2).
+      opts.onFreeDecoration(raw, opts.currentPrefix().writtenLabel);
     };
     free.addEventListener('input', () => free.removeAttribute('aria-invalid'));
     free.addEventListener('keydown', (e) => {
@@ -166,7 +207,16 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     });
     // `blur` couvre le reste : clic ailleurs, Maj+Tab, fermeture du composeur. Après une
     // validation par Tab le champ est déjà vide, donc ce second appel ne fait rien.
-    free.addEventListener('blur', commitFree);
+    //
+    // SAUF vers un bouton de label : `blur` précède `click`, et valider ici poserait le
+    // label de repli que le clic, voyant ce label désormais posé, retirerait aussitôt. Ce
+    // clic-là consomme la décoration en attente lui-même — deux correctifs qui, combinés,
+    // laissaient le commentaire sans label (revue Codex, PR #35).
+    free.addEventListener('blur', (e) => {
+      const next = (e as FocusEvent).relatedTarget;
+      if (next instanceof HTMLElement && next.classList.contains('cct-label-button')) return;
+      commitFree();
+    });
     root.appendChild(free);
   }
 
@@ -183,7 +233,14 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     // descriptive (`(perf)`) n'a pas de segment, et n'en fait donc cocher aucun — pas même
     // « aucune », qui affirmerait faussement qu'il n'y en a pas.
     selectedDecorations = posed.decorations;
-    const carried = posed.decorations.find((d) => segments.some((s) => s.id === d));
+    // La casse d'un id de décoration configuré est libre, comme celle d'un label : c'est
+    // `core/` qui apparie, sans en tenir compte. Comparer les chaînes laissait un segment
+    // `Blocking` éteint sur un commentaire qui le porte — le défaut corrigé pour les labels,
+    // laissé ici (revue Codex, PR #35).
+    const carrier = posed.decorations
+      .map((d) => resolveDecoration(d, opts.config))
+      .find((d) => d !== null && segmentButtons.has(d.id));
+    const carried = carrier?.id;
     // Trois cas, et le troisième n'existait pas : des parenthèses illégales ne sont pas une
     // absence de décoration. Cocher « aucune » sur `issue (): x` affirmait le contraire de
     // ce que le validateur dit au même instant (revue Codex, PR #35).
@@ -192,7 +249,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
         ? null
         : posed.decorations.length === 0
           ? group.querySelector('[role="radio"]')
-          : [...group.querySelectorAll('[role="radio"]')].find((s) => s.textContent === `(${carried})`) ?? null;
+          : segmentButtons.get(carried ?? null) ?? null;
     checkSegment(target ?? null);
   };
   sync();

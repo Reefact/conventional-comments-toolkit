@@ -333,6 +333,33 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     ]);
   });
 
+  // §3.2 : « l'alias n'est pas un label distinct […] il est comptabilisé sous son label
+  // canonique ». Depuis qu'un geste de décoration réinsère le préfixe TEL QU'IL EST ÉCRIT
+  // (revue Codex, PR #35), le contrôleur reçoit parfois un alias : comparer et compter sur
+  // cette orthographe ferait d'un alias un label de plus dans l'agrégat, et ferait passer
+  // une simple décoration pour un changement de label.
+  it('un alias est compté sous son label CANONIQUE', () => {
+    const { controller, textarea, events } = setup();
+    controller.deps.resolved.config.labels.find((l) => l.id === 'issue')!.aliases = ['bug'];
+    textarea.value = 'le nom est ambigu';
+
+    controller.insertPrefix('bug', undefined, false);
+    expect(events.filter((e) => e.kind === 'label-used')).toEqual([
+      { kind: 'label-used', label: 'issue' },
+    ]);
+  });
+
+  it('décorer un commentaire écrit avec un alias n’est pas un nouvel usage', () => {
+    const { controller, textarea, events } = setup();
+    controller.deps.resolved.config.labels.find((l) => l.id === 'issue')!.aliases = ['bug'];
+    textarea.value = 'bug: le nom est ambigu';
+
+    // Ce que la barre envoie sur un clic de décoration : le label tel qu'il est écrit.
+    controller.insertPrefix('bug', ['blocking'], false);
+    expect(textarea.value).toBe('bug (blocking): le nom est ambigu');
+    expect(events.filter((e) => e.kind === 'label-used')).toEqual([]);
+  });
+
   // « Label utilisé » ne doit pas dépendre du CHEMIN par lequel la personne l'a posé. La
   // saisie rapide écrit le préfixe elle-même, sans passer par `insertPrefix()` : elle
   // n'était pas comptée, tandis que la barre d'outils et les raccourcis l'étaient — un

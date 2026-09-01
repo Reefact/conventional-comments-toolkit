@@ -326,3 +326,99 @@ describe('§3.2, §3.3 — alias, casse et décorations illégales', () => {
     expect(checkedSegment()).toBeNull();
   });
 });
+
+// ————— DES ENCHAÎNEMENTS, pas des gestes isolés —————
+// Le round 2 de la revue a trouvé une régression qu'aucun test ne pouvait voir : deux de mes
+// correctifs, chacun juste, se combinaient mal. Le `blur` du champ libre part AVANT le
+// `click` d'un bouton, et le clic voyait alors posé le label que le blur venait de créer —
+// il le retirait. Tous mes tests cliquaient un geste à la fois (revue Codex, PR #35).
+describe('§5.1 — enchaînements de gestes', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  it('taper une décoration libre PUIS cliquer un label pose les deux', () => {
+    const { textarea } = setup();
+    textarea.value = 'le nom est ambigu';
+
+    const free = freeField();
+    free.value = 'perf';
+    // L'ordre réel du navigateur : le champ perd le focus au profit du bouton, puis le clic.
+    free.dispatchEvent(new FocusEvent('blur', { relatedTarget: document.querySelector('.cct-label-button[data-label="suggestion"]') }));
+    clickLabel('suggestion');
+
+    expect(textarea.value).toBe('suggestion (perf): le nom est ambigu');
+    expect(free.value).toBe('');
+  });
+
+  // La sélection de la barre est une intention en attente ; sur un commentaire déjà
+  // labellisé, c'est le TEXTE qui dit la décoration. `sync()` y recopiait ce que le texte
+  // portait, si bien que changer de label après avoir effacé la décoration la restaurait.
+  it('changer de label ne restaure pas une décoration qu’on vient d’effacer', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'issue (blocking): le nom est ambigu');
+    // Effacer la décoration à la main, puis cliquer AVANT la validation débattue.
+    writeToTextField(textarea, 'issue: le nom est ambigu', 24);
+
+    clickLabel('todo');
+    expect(textarea.value).toBe('todo: le nom est ambigu');
+  });
+
+  it('mais sur un commentaire SANS label, le segment choisi d’abord s’applique', () => {
+    const { textarea } = setup();
+    textarea.value = 'le nom est ambigu';
+    clickDecoration('blocking'); // aucun label : rien ne bouge encore
+    expect(textarea.value).toBe('le nom est ambigu');
+
+    clickLabel('issue');
+    expect(textarea.value).toBe('issue (blocking): le nom est ambigu');
+  });
+});
+
+describe('§3.2 — un geste de décoration ne réécrit pas l’orthographe du label', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  const withAlias = (config: ReturnType<typeof defaultConfig>) => {
+    config.labels.find((l) => l.id === 'issue')!.aliases = ['bug'];
+  };
+
+  // « L'extension propose la réécriture vers la forme canonique […] sans l'imposer » (§3.2).
+  // Décorer n'est pas l'occasion de l'imposer en douce.
+  it('décorer `bug:` garde `bug:`', async () => {
+    const { textarea } = setup(withAlias);
+    await typeByHand(textarea, 'bug: le nom est ambigu');
+
+    clickDecoration('blocking');
+    expect(textarea.value).toBe('bug (blocking): le nom est ambigu');
+  });
+
+  it('le champ libre non plus', async () => {
+    const { textarea } = setup(withAlias);
+    await typeByHand(textarea, 'bug: le nom est ambigu');
+
+    const free = freeField();
+    free.value = 'perf';
+    free.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    expect(textarea.value).toBe('bug (perf): le nom est ambigu');
+  });
+});
+
+describe('§8.2 — la casse d’une décoration configurée', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  // Même défaut que pour les labels, laissé sur les décorations : `parseDecorations` rend
+  // une forme canonique en minuscules, l'id configuré garde sa casse, et une comparaison
+  // stricte ne les apparie jamais.
+  it('un segment configuré `Blocking` se coche sur un commentaire qui le porte', async () => {
+    const { textarea } = setup((config) => {
+      const blocking = config.decorations.known.find((d) => d.id === 'blocking')!;
+      blocking.id = 'Blocking';
+    });
+    await typeByHand(textarea, 'issue (blocking): le nom est ambigu');
+    expect(checkedSegment()).toBe('(Blocking)');
+  });
+});

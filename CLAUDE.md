@@ -10,20 +10,31 @@
 
 ## Règles du chantier
 
-- **Langue.** Les messages de commit s'écrivent en **anglais**, TOUJOURS, et cela ne se
-  discute pas. Tout le reste est en **français** : titres et corps de pull request,
-  commentaires et réponses de revue, commentaires de code, documents du dépôt. Le critère
-  n'est pas la langue de l'interlocuteur du moment ni celle de l'outil qui lit — un robot de
-  revue anglophone ne change rien.
+- **Langue — anglais d'abord.** Le critère est UNIQUE, et c'est *qui lit ?* : ce qui est lu
+  hors de l'équipe s'écrit en **anglais**, ce qui ne l'est pas suit la langue de l'équipe, le
+  **français**. Deux rédactions successives de cette règle ont énuméré des fichiers plutôt
+  que d'énoncer ce critère, et se sont fait prendre les deux fois, sur les documents
+  anglophones puis sur les catalogues de traduction (revues Codex, PR #32 et #33). Une liste
+  vieillit ; le critère, non.
 
-  **Un document dont le public est explicitement anglophone reste en anglais**, et son
-  contenu doit y être aussi soigné que dans sa version française : `README.md`, tout
-  `docs/*-en.md`, la moitié anglaise de `PRIVACY.md`, et les chaînes anglaises des artefacts
-  de publication (`INSTALLATION.txt` est bilingue, et `release.yml` renvoie au guide
-  anglais). Ce n'est pas une entorse à la règle, c'est sa raison d'être : la langue d'un
-  artefact se décide à sa destination, pas à celle de la conversation qui l'a produit — et
-  ces documents-là sont écrits pour des gens qui ne lisent pas le français. La première
-  version de cette règle les condamnait à être traduits (revue Codex, PR #32).
+  - **Messages de commit : anglais, toujours.** Ils vivent dans l'historique du dépôt, que
+    lit quiconque le clone.
+  - **Contenu des pull requests : anglais** — titre, corps, commentaires et réponses de
+    revue. Le fil d'une PR est ce qu'un contributeur lit en premier.
+  - **Documents du dépôt : anglais, et français EN PLUS quand c'est possible**, la paire
+    portant les suffixes `-en.md` / `-fr.md` (`docs/extension-setup-en.md` et son jumeau).
+    Qu'un document n'existe que dans une langue n'est pas une faute : le doublement est un
+    objectif, pas un préalable.
+  - **Chaînes de l'interface : chacune dans SA langue.** `packages/core/src/i18n/en.ts` et
+    `fr.ts`, les catalogues de `packages/extension/src/ui/strings.ts` — l'interface est
+    bilingue par exigence normative (§10), et franciser le catalogue anglais casserait le
+    produit. Cela devrait aller sans dire ; la première version de cette règle disait
+    pourtant le contraire.
+  - **Fichiers d'outillage interne : français**, et exemptés du doublement — ce fichier,
+    `specifications-fr.md`. Ils s'adressent à l'équipe, pas à un lecteur du dépôt.
+  - **Commentaires de code : français**, même critère : ils expliquent à l'équipe pourquoi
+    le code est ce qu'il est.
+
 - `specifications-fr.md` est la référence fonctionnelle **normative**. Ne jamais
   la modifier pour la faire correspondre à l'implémentation. L'état du
   repository est la source de vérité sur l'avancement.

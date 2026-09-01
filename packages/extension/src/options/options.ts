@@ -2,7 +2,7 @@
 // limitées (§8.1.2 — jamais le mode ni les labels), affichage de l'état dégradé (§5.4)
 // et du journal local de dégradation de sélecteurs (§9.4).
 
-import { TELEMETRY_CONSENT_KEY, canonicalEndpoint, parseConsent } from '../telemetry.js';
+import { TELEMETRY_CONSENT_KEY, managedEndpoint, parseConsent } from '../telemetry.js';
 import {
   HOST_PLATFORMS_KEY,
   hostnameOf,
@@ -242,54 +242,62 @@ document.getElementById('direct-shortcuts-save')?.addEventListener('click', () =
 });
 
 // Télémétrie (§10) — le troisième verrou décrit en tête de `telemetry.ts` : le consentement
-// de la PERSONNE, que la configuration d'un dépôt ne peut pas donner à sa place.
+// de la PERSONNE, qu'aucune configuration ne peut donner à sa place.
 //
-// **La case ne stocke pas un booléen, elle stocke le POINT DE COLLECTE affiché.** Un booléen
-// valait pour n'importe quelle destination : il suffisait de visiter un dépôt dont la
-// configuration en désigne une autre pour que les compteurs y partent, sans que cette
-// destination ait jamais été montrée (revue Codex, PR #31). Cocher, c'est donc consentir à
-// CETTE URL-là ; une autre demande un nouveau geste, devant elle.
-//
-// Sans point de collecte connu, la case est désactivée : il n'y a rien à quoi consentir, et
-// une case cochable qui n'enverrait rien serait un consentement dans le vide.
+// Le point de collecte est lu ICI, dans la politique d'entreprise, au même endroit que le
+// script de contenu. Il ne transite plus par une clé partagée que chaque onglet réécrivait :
+// cette clé faisait que la case pouvait consentir à une adresse qu'elle n'avait pas
+// affichée, et qu'un onglet dont la télémétrie était désactivée effaçait l'adresse — donc la
+// possibilité de révoquer — pour tous les autres (revue Codex, PR #31).
 const telemetryOptIn = document.getElementById('telemetry-opt-in') as HTMLInputElement | null;
 const telemetryLine = document.getElementById('telemetry-endpoint');
 
-/** Le point de collecte RÉELLEMENT AFFICHÉ, et donc le seul auquel cocher puisse consentir.
- *
- * Il vit ici plutôt que d'être relu au clic : `telemetryEndpoint` est une clé partagée, qu'un
- * autre onglet de revue peut réécrire pendant que cette page reste ouverte. Une version
- * antérieure relisait le stockage dans le gestionnaire de la case et enregistrait le
- * consentement pour la valeur du moment — on autorisait une destination qu'on n'avait pas vue
- * (revue Codex, PR #31). La page se réaffiche donc sur changement de la clé, et le
- * consentement porte toujours sur ce que la ligne au-dessus de la case dit. */
-let displayedEndpoint = '';
+/** Le point de collecte réellement affiché, et donc le seul auquel cocher puisse consentir. */
+let displayedEndpoint: string | null = null;
 
-function renderTelemetry(endpoint: string, consented: string | null): void {
+function renderTelemetry(endpoint: string | null, consented: string | null): void {
   displayedEndpoint = endpoint;
   if (telemetryOptIn) {
-    telemetryOptIn.checked = endpoint !== '' && consented === endpoint;
-    telemetryOptIn.disabled = endpoint === '';
+    telemetryOptIn.checked = endpoint !== null && consented === endpoint;
+    // La case reste ACTIONNABLE tant qu'un consentement est stocké, même sans point de
+    // collecte déclaré : sans quoi une politique retirée emprisonnerait l'accord donné —
+    // plus rien pour le révoquer, alors que des onglets ouverts peuvent encore émettre.
+    telemetryOptIn.disabled = endpoint === null && consented === null;
   }
   if (!telemetryLine) return;
-  if (endpoint === '') {
+  if (endpoint === null && consented !== null) {
     telemetryLine.textContent =
-      "Aucun point de collecte configuré par votre organisation : il n'y a rien à autoriser.";
+      `Votre organisation ne déclare plus de point de collecte, mais votre accord pour ` +
+      `${consented} reste enregistré. Décochez pour le retirer.`;
+  } else if (endpoint === null) {
+    telemetryLine.textContent =
+      "La politique de votre organisation ne déclare aucun point de collecte : il n'y a rien à autoriser.";
   } else if (consented !== null && consented !== endpoint) {
-    // Cas à dire explicitement plutôt qu'à faire disparaître : l'accord existe, mais il
-    // portait sur une autre destination, et il ne vaut pas pour celle-ci.
     telemetryLine.textContent =
       `Point de collecte : ${endpoint} — votre accord précédent portait sur ${consented}, ` +
       `il ne s'y applique pas. Cochez pour autoriser cette destination.`;
   } else {
-    telemetryLine.textContent = `Point de collecte configuré par votre organisation : ${endpoint}`;
+    // « Politique d'entreprise » et non « configuration » : depuis que le point de collecte
+    // vient de ce seul canal, cette phrase est vraie. Elle ne l'était pas quand le fichier
+    // d'un dépôt pouvait le fournir — l'écran censé protéger d'un dépôt hostile certifiait
+    // alors que son collecteur venait de l'organisation (revue Codex, PR #31).
+    telemetryLine.textContent =
+      `Point de collecte déclaré par la politique d'entreprise de votre organisation : ${endpoint}`;
   }
 }
 
 function refreshTelemetry(): void {
-  chrome?.storage?.local?.get([TELEMETRY_CONSENT_KEY, 'telemetryEndpoint'], (items) => {
-    const endpoint = canonicalEndpoint(items['telemetryEndpoint'] as string | null) ?? '';
-    renderTelemetry(endpoint, parseConsent(items[TELEMETRY_CONSENT_KEY])?.endpoint ?? null);
+  const readPolicy = new Promise<string | null>((resolve) => {
+    if (!chrome?.storage?.managed) return resolve(null);
+    try {
+      chrome.storage.managed.get((items) => resolve(managedEndpoint(items?.['telemetry'])));
+    } catch {
+      resolve(null);
+    }
+  });
+  chrome?.storage?.local?.get([TELEMETRY_CONSENT_KEY], (items) => {
+    const consented = parseConsent(items[TELEMETRY_CONSENT_KEY])?.endpoint ?? null;
+    void readPolicy.then((endpoint) => renderTelemetry(endpoint, consented));
   });
 }
 refreshTelemetry();
@@ -297,20 +305,19 @@ refreshTelemetry();
 telemetryOptIn?.addEventListener('change', () => {
   // `displayedEndpoint`, jamais une relecture : on consent à ce qui était sous les yeux.
   const endpoint = displayedEndpoint;
-  if (endpoint === '') return; // rien à autoriser ; la case est de toute façon désactivée
-  // `null` et non un booléen à `false` : retirer son accord, c'est effacer à quoi on avait
-  // consenti. Les onglets ouverts écoutent cette clé et se désarment aussitôt.
-  chrome?.storage?.local?.set({
-    [TELEMETRY_CONSENT_KEY]: telemetryOptIn.checked ? { endpoint } : null,
-  });
-  renderTelemetry(endpoint, telemetryOptIn.checked ? endpoint : null);
+  // Décocher retire l'accord même quand plus aucun point de collecte n'est déclaré — c'est
+  // le cas où la révocation compte le plus. `null` et non un booléen à `false` : retirer son
+  // accord, c'est effacer À QUOI l'on avait consenti. Les onglets ouverts écoutent cette clé
+  // et se désarment aussitôt.
+  const consent = telemetryOptIn.checked && endpoint !== null ? { endpoint } : null;
+  chrome?.storage?.local?.set({ [TELEMETRY_CONSENT_KEY]: consent });
+  renderTelemetry(endpoint, consent?.endpoint ?? null);
 });
 
-// Un autre onglet a changé le point de collecte ou le consentement : réafficher, pour que la
-// case et la ligne qui l'explique ne mentent jamais sur ce à quoi un clic consentirait.
+// La politique ou le consentement ont changé ailleurs : réafficher, pour que la case et la
+// ligne qui l'explique ne mentent jamais sur ce à quoi un clic consentirait.
 chrome?.storage?.onChanged?.addListener((changes, area) => {
-  if (area !== 'local') return;
-  if (TELEMETRY_CONSENT_KEY in changes || 'telemetryEndpoint' in changes) refreshTelemetry();
+  if (area === 'managed' || (area === 'local' && TELEMETRY_CONSENT_KEY in changes)) refreshTelemetry();
 });
 
 // État dégradé (§5.4, §9.2.3) et journal de dégradation de sélecteurs (§9.4).

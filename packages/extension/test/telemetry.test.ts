@@ -18,6 +18,7 @@ import {
   TELEMETRY_CONSENT_KEY,
   TelemetryCounters,
   canonicalEndpoint,
+  managedEndpoint,
   parseConsent,
   telemetryTarget,
   type TelemetryEvent,
@@ -41,47 +42,57 @@ afterEach(() => {
 describe('A — les trois verrous : rien ne part si l’un manque (§10)', () => {
   const repo = 'github.com/acme/demo';
   const consent = { endpoint: `${ENDPOINT}` };
+  const active = configWith({ enabled: true, endpoint: ENDPOINT });
+
+  // LE point de conception, arrêté au troisième round de revue : le point de collecte ne
+  // vient plus de la configuration effective — qu'un dépôt peut écrire — mais du SEUL canal
+  // de politique d'entreprise. Le même raisonnement que le §8.1.1 tient pour `configUrl`.
+  it('le point de collecte vient de la POLITIQUE, jamais de la configuration', () => {
+    expect(managedEndpoint({ enabled: true, endpoint: ENDPOINT })).toBe(`${ENDPOINT}`);
+    // Déclarée mais désactivée, absente, ou malformée : rien.
+    expect(managedEndpoint({ enabled: false, endpoint: ENDPOINT })).toBeNull();
+    expect(managedEndpoint({ endpoint: ENDPOINT })).toBeNull();
+    expect(managedEndpoint(undefined)).toBeNull();
+    expect(managedEndpoint({ enabled: true, endpoint: 'http://collecte.example' })).toBeNull();
+  });
 
   it('avec les trois, une cible est rendue, avec le mode et le dépôt', () => {
-    const config = configWith({ enabled: true, endpoint: ENDPOINT });
-    config.mode = 'enforce';
-    expect(telemetryTarget(config, consent, repo)).toEqual({
+    active.mode = 'enforce';
+    expect(telemetryTarget(active, `${ENDPOINT}`, consent, repo)).toEqual({
       endpoint: `${ENDPOINT}`,
       mode: 'enforce',
       repo,
     });
   });
 
-  // LE défaut de conception du premier jet : le consentement était un booléen, donc valable
-  // pour n'importe quelle destination. Il suffisait de visiter un dépôt dont la
-  // configuration en désigne une autre pour que les compteurs y partent, sans que cette
-  // destination ait jamais été montrée (revue Codex, PR #31).
   it('un accord donné pour un point de collecte ne vaut PAS pour un autre', () => {
-    const autre = configWith({ enabled: true, endpoint: 'https://ailleurs.example/collecte' });
-    expect(telemetryTarget(autre, consent, repo)).toBeNull();
+    expect(
+      telemetryTarget(active, 'https://ailleurs.example/collecte', consent, repo)
+    ).toBeNull();
   });
 
-  // `off` : l'extension est inactive (§7). La règle vit dans `telemetryTarget` et non à
-  // l'appelant, où une sortie anticipée la contournait — l'onglet restait armé sur la PR
-  // précédente en naviguant vers un dépôt en `off` (revue Codex, PR #31).
   it('en mode `off`, aucune cible — quel que soit le reste', () => {
-    const config = configWith({ enabled: true, endpoint: ENDPOINT });
-    config.mode = 'off';
-    expect(telemetryTarget(config, consent, repo)).toBeNull();
+    expect(telemetryTarget({ mode: 'off' }, `${ENDPOINT}`, consent, repo)).toBeNull();
+  });
+
+  it('sans consentement local, rien — même si la politique déclare un point de collecte', () => {
+    expect(telemetryTarget(active, `${ENDPOINT}`, null, repo)).toBeNull();
+  });
+
+  it('sans point de collecte déclaré par la politique, rien', () => {
+    expect(telemetryTarget(active, null, consent, repo)).toBeNull();
   });
 
   // La forme d'URL la PLUS COURANTE — sans barre oblique finale — rendait la fonctionnalité
   // inerte en silence : la page affichait et stockait `https://collecte.example`, la
-  // comparaison portait sur `new URL(...).href`, soit `https://collecte.example/`, et le
-  // consentement ne coïncidait jamais. Aucune erreur nulle part (revue Codex, PR #31).
+  // comparaison portait sur `https://collecte.example/`, et le consentement ne coïncidait
+  // jamais. Aucune erreur nulle part (revue Codex, PR #31).
   it('un point de collecte sans barre finale s’arme quand même — une seule forme canonique', () => {
-    const config = configWith({ enabled: true, endpoint: 'https://collecte.example' });
     const consenti = canonicalEndpoint('https://collecte.example');
     expect(consenti).toBe('https://collecte.example/');
-    expect(telemetryTarget(config, { endpoint: consenti! }, repo)).toEqual({
+    expect(managedEndpoint({ enabled: true, endpoint: 'https://collecte.example' })).toBe(consenti);
+    expect(telemetryTarget(active, consenti, { endpoint: consenti! }, repo)).toMatchObject({
       endpoint: 'https://collecte.example/',
-      mode: config.mode,
-      repo,
     });
   });
 
@@ -92,8 +103,6 @@ describe('A — les trois verrous : rien ne part si l’un manque (§10)', () =>
   });
 
   it('un consentement stocké sous une forme non canonique reste utilisable', () => {
-    // Écrit par une version antérieure, ou à la main : il ne doit pas devenir inutilisable
-    // pour une barre oblique.
     expect(parseConsent({ endpoint: 'https://collecte.example' })).toEqual({
       endpoint: 'https://collecte.example/',
     });
@@ -103,31 +112,10 @@ describe('A — les trois verrous : rien ne part si l’un manque (§10)', () =>
     expect(parseConsent(true)).toBeNull();
     expect(parseConsent({ endpoint: '' })).toBeNull();
     expect(parseConsent(null)).toBeNull();
-    expect(parseConsent({ endpoint: ENDPOINT })).toEqual({ endpoint: ENDPOINT });
   });
 
-  // Le verrou qui n'est pas dans la spécification mais en découle : `telemetry.*` est une
-  // clé de configuration ordinaire (§8.2), donc écrivable par le fichier d'un DÉPÔT. Sans
-  // consentement local, « opt-in explicite » (§10) serait l'opt-in d'un dépôt.
-  it('sans consentement local, rien — même si la configuration l’active', () => {
-    expect(telemetryTarget(configWith({ enabled: true, endpoint: ENDPOINT }), null, repo)).toBeNull();
-  });
-
-  it('sans `telemetry.enabled`, rien — c’est le défaut du §10', () => {
-    expect(telemetryTarget(configWith({ enabled: false, endpoint: ENDPOINT }), consent, repo)).toBeNull();
+  it('la configuration par défaut ne déclare aucune télémétrie', () => {
     expect(defaultConfig().telemetry).toEqual({ enabled: false, endpoint: null });
-  });
-
-  it('sans point de collecte, rien', () => {
-    expect(telemetryTarget(configWith({ enabled: true, endpoint: null }), consent, repo)).toBeNull();
-  });
-
-  // Une page de plateforme est servie en HTTPS et le navigateur bloque le contenu mixte :
-  // un point de collecte en clair ne recevrait jamais rien. Le refuser ici plutôt que de
-  // laisser croire le contraire.
-  it('un point de collecte non-https, ou illisible, ne vaut pas mieux', () => {
-    expect(telemetryTarget(configWith({ enabled: true, endpoint: 'http://collecte.example/cc' }), { endpoint: 'http://collecte.example/cc' }, repo)).toBeNull();
-    expect(telemetryTarget(configWith({ enabled: true, endpoint: 'pas une url' }), { endpoint: 'pas une url' }, repo)).toBeNull();
   });
 });
 
@@ -243,7 +231,16 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     number: 42,
   };
 
-  function setup(): { controller: EditorController; textarea: HTMLTextAreaElement; events: TelemetryEvent[] } {
+  function setup(): {
+    controller: EditorController;
+    textarea: HTMLTextAreaElement;
+    events: TelemetryEvent[];
+    armed: { value: boolean };
+  } {
+    // L'émetteur d'un onglet naît DÉSARMÉ et le reste jusqu'à la résolution de la
+    // configuration : un faux qui accepterait toujours ne pourrait pas exprimer cet
+    // intervalle, où vivait le défaut.
+    const armed = { value: true };
     const host = document.createElement('div');
     const textarea = document.createElement('textarea');
     textarea.className = 'CommentBox-input';
@@ -273,9 +270,15 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
       published: null,
       lang: 'fr',
       currentUserLogin: 'alice',
-      telemetry: (event) => events.push(event),
+      // Rend `true` : c'est le contrat de l'émetteur armé — « j'ai compté ». Un faux qui
+      // rendrait `undefined` décrirait un émetteur désarmé, et le contrôleur cesserait à
+      // juste titre de retenir les codes comme comptés.
+      telemetry: (event) => {
+        events.push(event);
+        return armed.value; // `false` = émetteur désarmé : il a refusé de compter
+      },
     });
-    return { controller, textarea, events };
+    return { controller, textarea, events, armed };
   }
 
   it('l’identifiant du label posé est compté — jamais la ligne écrite', () => {
@@ -330,11 +333,21 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
 
     // Un dépliement qui ne pose AUCUN label du vocabulaire ne se compte pas : ce qui part
     // est un identifiant de la configuration, jamais du texte deviné.
-    const avant = events.filter((e) => e.kind === 'label-used').length;
+    let avant = events.filter((e) => e.kind === 'label-used').length;
     textarea.value = '?x';
     textarea.selectionStart = textarea.selectionEnd = 2;
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
     expect(events.filter((e) => e.kind === 'label-used').length).toBe(avant);
+
+    // ...et une abréviation dépliée AILLEURS QU'EN TÊTE ne pose aucun préfixe : `issue: `
+    // inséré au milieu d'une phrase n'est le préfixe de rien. La question se pose sur le
+    // RÉSULTAT, pas sur le texte déplié (revue Codex, PR #31).
+    avant = events.filter((e) => e.kind === 'label-used').length;
+    textarea.value = 'Some text ?i';
+    textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    expect(textarea.value).toContain('Some text issue: '); // le dépliement a bien eu lieu
+    expect(events.filter((e) => e.kind === 'label-used').length).toBe(avant); // ...sans compter
     controller.dispose();
   });
 
@@ -350,6 +363,23 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     const codes = events.filter((e) => e.kind === 'validation-code');
     expect(codes.length).toBeGreaterThan(0);
     expect(new Set(codes.map((c) => JSON.stringify(c))).size).toBe(codes.length);
+  });
+
+  // Un diagnostic présent AVANT que l'émetteur soit armé était marqué « déjà compté » alors
+  // qu'il venait d'être jeté : il n'était plus jamais émis de toute la vie de l'éditeur — il
+  // ne comptait que s'il disparaissait puis revenait (revue Codex, PR #31).
+  it('un code apparu AVANT l’armement est compté une fois la télémétrie armée', () => {
+    const { controller, textarea, events, armed } = setup();
+    armed.value = false; // l'onglet n'a pas encore résolu sa configuration
+    textarea.value = 'sans label';
+    controller.refresh();
+    const refusés = events.filter((e) => e.kind === 'validation-code').length;
+    expect(refusés).toBeGreaterThan(0); // proposés, mais refusés par l'émetteur
+
+    armed.value = true; // la configuration est résolue, l'onglet s'arme
+    controller.refresh();
+    // Le diagnostic est toujours affiché, et il doit maintenant être compté.
+    expect(events.filter((e) => e.kind === 'validation-code').length).toBeGreaterThan(refusés);
   });
 
   it('un code disparu puis revenu est recompté', () => {
@@ -413,14 +443,27 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
 
   /** Un onglet : `chrome` complet (local + onChanged), et un adaptateur qui ne rend AUCUN
    * éditeur — c'est le cas que le premier jet n'armait jamais. */
-  function installTab(consent: unknown, endpoint: string | null) {
+  function installTab(initialConsent: unknown, endpoint: string | null) {
     const written: Record<string, unknown> = {};
+    /** Le consentement doit pouvoir CHANGER : un faux qui rend toujours la valeur initiale
+     * ne peut pas exprimer un retrait, et le test passerait alors qu'un onglet continue
+     * d'émettre (CLAUDE.md, règle 2 — un faux est une affirmation sur l'environnement). */
+    const consentHolder: { value: unknown } = { value: initialConsent };
+    /** La politique d'entreprise : c'est de LÀ que vient le point de collecte, et de nulle
+     * part ailleurs. Un faux qui le ferait venir de la configuration décrirait la
+     * conception d'avant le troisième round de revue. */
+    const policy: Record<string, unknown> = {
+      telemetry: endpoint === null ? { enabled: false } : { enabled: true, endpoint },
+    };
     /** Le journal confié à l'adaptateur : c'est par lui qu'on peut faire COMPTER quelque
      * chose sans éditeur, donc observer à quel dépôt l'onglet attribue ce qu'il compte. */
     const captured: { log?: { degraded: (c: { name: string; candidates: string[] }) => void } } = {};
     /** Retards injectables : une course ne se teste pas avec un faux instantané, qui ne
      * peut pas exprimer la fenêtre où le défaut vit (CLAUDE.md, règle 2). */
     const delays: { repoConfig: number; consentRead: number } = { repoConfig: 0, consentRead: 0 };
+    /** Combien de fois la configuration a été résolue : c'est l'effet observable d'un
+     * réarmement, depuis que le point de collecte ne transite plus par une clé partagée. */
+    const resolves = { count: 0 };
     const calls: string[] = [];
     const rawListeners: ((c: Record<string, { newValue?: unknown }>, a: string) => void)[] = [];
     // Chaque écouteur est enveloppé : ce qu'on observe est son APPEL, pas son inscription.
@@ -435,7 +478,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
           get: (keys: string[], cb: (i: Record<string, unknown>) => void) => {
             const picked: Record<string, unknown> = {
               [EXTRA_HOSTS_KEY]: { github: [], azdo: [] },
-              [TELEMETRY_CONSENT_KEY]: consent,
+              [TELEMETRY_CONSENT_KEY]: consentHolder.value,
             };
             for (const key of keys) if (key in written) picked[key] = written[key];
             const wait = keys.includes(TELEMETRY_CONSENT_KEY) ? delays.consentRead : 0;
@@ -446,6 +489,9 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
             Object.assign(written, items);
             cb?.();
           },
+        },
+        managed: {
+          get: (cb: (i: Record<string, unknown>) => void) => cb(policy),
         },
         onChanged: {
           addListener: (cb: (typeof rawListeners)[number]) => {
@@ -467,7 +513,9 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const config = defaultConfig();
     config.mode = 'enforce';
     config.activation.activatedAt = '2026-09-01T00:00:00Z';
-    config.telemetry = { enabled: true, endpoint };
+    // La configuration du dépôt ne porte PLUS la télémétrie : si ce faux la portait, il
+    // décrirait un monde où un dépôt peut désigner le collecteur — celui qu'on vient
+    // justement de fermer.
     vi.doMock('@cct/adapter-github', () => ({
       GithubClientAdapter: class {
         constructor(opts: { log?: typeof captured.log }) {
@@ -477,10 +525,11 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
           return { login: 'someone' };
         }
         async getRepoConfig() {
+          resolves.count += 1;
           if (delays.repoConfig > 0) {
             await new Promise((r) => setTimeout(r, delays.repoConfig));
           }
-          return { status: 'found', text: JSON.stringify({ telemetry: config.telemetry }) };
+          return { status: 'absent' };
         }
         async getOrgConfig() {
           return { status: 'absent' };
@@ -512,7 +561,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
         }
       },
     }));
-    return { written, listeners, calls, captured, delays };
+    return { written, listeners, calls, captured, delays, policy, resolves, consentHolder };
   }
 
   async function settle(): Promise<void> {
@@ -523,40 +572,69 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     vi.doUnmock('@cct/adapter-github');
   });
 
-  // Le point de collecte doit être visible AVANT de cocher : c'est ce sur quoi porte le
-  // consentement. Il est écrit dès qu'une PR est affichée, sans attendre un éditeur.
-  it('une PR affichée SANS aucun éditeur publie quand même le point de collecte', async () => {
-    const { written } = installTab(null, ENDPOINT);
+  // Une PR sans composeur rendu (droits de commentaire absents, composeur replié) doit
+  // remonter ses dégradations comme les autres (CA-11). Avant le correctif, l'armement
+  // vivait dans l'attachement d'un éditeur : sur une telle PR, il n'arrivait jamais.
+  it('une PR affichée SANS aucun éditeur arme quand même, et émet', async () => {
+    const { captured } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+    const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
     const dispose = await bootstrap(document);
     await settle();
-    // Avant le correctif, l'armement — et cette publication avec lui — vivait dans
-    // l'attachement d'un éditeur : sur une PR qui n'en rend aucun, il n'arrivait jamais.
-    expect(written['telemetryEndpoint']).toBe(ENDPOINT);
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    flushByPagehide();
+    await settle();
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ repo: 'github.com/acme/demo' });
+    expect(Object.keys(bodies[0]!['counters'] as object)).toContain('selector:editors');
     dispose();
   });
 
-  // Le P1 : décocher pendant que des onglets sont ouverts. Ils ne relisaient le
-  // consentement qu'à l'attachement d'un éditeur et gardaient leurs compteurs armés, donc
-  // continuaient à émettre toutes les cinq minutes et à la fermeture.
-  it('le consentement RETIRÉ désarme l’onglet déjà ouvert, sans attendre un rechargement', async () => {
-    const { listeners, written } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+  // Le P1 : décocher pendant que des onglets sont ouverts. Ils ne relisaient le consentement
+  // qu'à l'attachement d'un éditeur et gardaient leurs compteurs armés, donc continuaient à
+  // émettre toutes les cinq minutes et à la fermeture.
+  it('le consentement RETIRÉ désarme l’onglet déjà ouvert : plus rien ne part', async () => {
+    const { listeners, captured, consentHolder } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+    const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
     const dispose = await bootstrap(document);
     await settle();
 
-    // Compter les écouteurs ne prouve RIEN : `watchExtraHosts` en pose déjà un, et une
-    // première version de ce test passait avec ET sans le correctif. Ce qu'il faut观 est un
-    // EFFET propre au changement de consentement — ici, la réévaluation qui republie le
-    // point de collecte. On efface donc la trace, puis on regarde si elle revient.
-    delete written['telemetryEndpoint'];
+    // Retirer VRAIMENT l'accord, puis notifier — c'est ce que fait la page d'options.
+    consentHolder.value = null;
     for (const listener of [...listeners]) {
       listener({ [TELEMETRY_CONSENT_KEY]: { newValue: null } }, 'local');
     }
     await settle();
-    expect(written['telemetryEndpoint']).toBe(ENDPOINT); // réévalué : le changement a été traité
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    flushByPagehide();
+    await settle();
+    expect(bodies).toEqual([]);
+    dispose();
+  });
+
+  // La politique d'entreprise peut changer sous un onglet ouvert, comme le consentement.
+  it('une politique qui retire le point de collecte désarme l’onglet ouvert', async () => {
+    const { listeners, captured, policy } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+    const { bodies } = collectPosts();
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
+    const dispose = await bootstrap(document);
+    await settle();
+
+    policy['telemetry'] = { enabled: false };
+    for (const listener of [...listeners]) listener({ telemetry: { newValue: null } }, 'managed');
+    await settle();
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    flushByPagehide();
+    await settle();
+    expect(bodies).toEqual([]);
     dispose();
   });
 
@@ -679,24 +757,29 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     dispose();
   });
 
-  it('naviguer vers une autre PR republie pour CETTE PR', async () => {
-    const { written } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+  it('naviguer vers une autre PR compte sous CETTE PR', async () => {
+    const { captured } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+    const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
     const dispose = await bootstrap(document);
     await settle();
-    expect(written['telemetryEndpoint']).toBe(ENDPOINT);
 
     Object.defineProperty(document, 'location', { value: new URL(PR_B), configurable: true });
     document.body.appendChild(document.createElement('div')); // la mutation d'une navigation SPA
     await settle();
-    // La publication suit la PR affichée, et non le premier éditeur rencontré.
-    expect(written['telemetryEndpoint']).toBe(ENDPOINT);
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    flushByPagehide();
+    await settle();
+
+    // L'armement suit la PR affichée, et non le premier éditeur rencontré.
+    expect(bodies.map((b) => b['repo'])).toEqual(['github.com/acme/autre']);
     dispose();
   });
 });
 
-describe('F — la page d’options : consentir à ce qu’on VOIT (revue Codex, PR #31)', () => {
+describe('F — la page d’options : consentir à ce que la POLITIQUE déclare (PR #31)', () => {
   function mountOptionsDom(): void {
     document.body.innerHTML = `
       <input type="text" id="host-input" />
@@ -714,7 +797,7 @@ describe('F — la page d’options : consentir à ce qu’on VOIT (revue Codex,
       <p id="selector-log"></p>`;
   }
 
-  function installOptionsChrome(stored: Record<string, unknown>) {
+  function installOptionsChrome(stored: Record<string, unknown>, managed: Record<string, unknown>) {
     (globalThis as { chrome?: unknown }).chrome = {
       permissions: {
         request: () => {},
@@ -732,34 +815,59 @@ describe('F — la page d’options : consentir à ce qu’on VOIT (revue Codex,
           get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}),
           set: () => {},
         },
-        managed: { get: (cb: (i: Record<string, unknown>) => void) => cb({}) },
-        // Volontairement MUET : le scénario est justement celui où la page n'a pas été
-        // prévenue du changement. Si elle relit le stockage au clic, elle consent à une
-        // valeur qu'elle n'a jamais affichée.
+        managed: { get: (cb: (i: Record<string, unknown>) => void) => cb(managed) },
         onChanged: { addListener: () => {} },
       },
     };
   }
 
-  it('le consentement porte sur le point de collecte AFFICHÉ, pas sur celui du stockage au moment du clic', async () => {
-    const stored: Record<string, unknown> = { telemetryEndpoint: `${ENDPOINT}` };
+  it('le consentement enregistre le point de collecte DÉCLARÉ PAR LA POLITIQUE, celui qui est affiché', async () => {
+    const stored: Record<string, unknown> = {};
     mountOptionsDom();
-    installOptionsChrome(stored);
+    installOptionsChrome(stored, { telemetry: { enabled: true, endpoint: ENDPOINT } });
     await import('../src/options/options.js');
     await new Promise((r) => setTimeout(r, 0));
 
     const box = document.getElementById('telemetry-opt-in') as HTMLInputElement;
-    expect(document.getElementById('telemetry-endpoint')!.textContent).toContain(`${ENDPOINT}`);
-
-    // Un AUTRE onglet de revue réécrit la clé partagée, sans que cette page en soit avertie.
-    stored['telemetryEndpoint'] = 'https://ailleurs.example/collecte';
+    const line = document.getElementById('telemetry-endpoint')!;
+    expect(line.textContent).toContain(`${ENDPOINT}`);
+    // La phrase peut désormais nommer la politique d'entreprise sans mentir : le point de
+    // collecte ne peut plus venir du fichier d'un dépôt (revue Codex, PR #31).
+    expect(line.textContent).toContain("politique d'entreprise");
 
     box.checked = true;
     box.dispatchEvent(new Event('change'));
     await new Promise((r) => setTimeout(r, 0));
-
-    // L'accord doit porter sur ce que la personne avait sous les yeux.
     expect(stored[TELEMETRY_CONSENT_KEY]).toEqual({ endpoint: `${ENDPOINT}` });
+  });
+
+  // Le P1 : une politique retirée emprisonnait l'accord donné. La case se désactivait, plus
+  // rien ne permettait de révoquer, et des onglets ouverts pouvaient encore émettre.
+  it('un accord stocké reste RÉVOCABLE même si la politique ne déclare plus rien', async () => {
+    const stored: Record<string, unknown> = {
+      [TELEMETRY_CONSENT_KEY]: { endpoint: `${ENDPOINT}` },
+    };
+    mountOptionsDom();
+    installOptionsChrome(stored, { telemetry: { enabled: false } });
+    await import('../src/options/options.js');
+    await new Promise((r) => setTimeout(r, 0));
+
+    const box = document.getElementById('telemetry-opt-in') as HTMLInputElement;
+    expect(box.disabled).toBe(false);
+    expect(document.getElementById('telemetry-endpoint')!.textContent).toContain('reste enregistré');
+
+    box.checked = false;
+    box.dispatchEvent(new Event('change'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(stored[TELEMETRY_CONSENT_KEY]).toBeNull();
+  });
+
+  it('sans politique ni accord, la case n’a rien à autoriser', async () => {
+    mountOptionsDom();
+    installOptionsChrome({}, {});
+    await import('../src/options/options.js');
+    await new Promise((r) => setTimeout(r, 0));
+    expect((document.getElementById('telemetry-opt-in') as HTMLInputElement).disabled).toBe(true);
   });
 });
 

@@ -3,7 +3,7 @@
 // extensibles par Tab depuis `shortcuts.abbreviations` — l'unicité normative est celle
 // de l'abréviation au moment où Tab est pressée (§5.2).
 
-import { enabledLabels, matchPrefix, type EffectiveConfig } from '@cct/core';
+import { enabledLabels, matchPrefix, splitBody, type EffectiveConfig } from '@cct/core';
 import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
 
 export interface QuickInputOptions {
@@ -18,21 +18,30 @@ export interface QuickInputOptions {
   onLabelAccepted?: (id: string) => void;
 }
 
-/** L'identifiant de label que ce dépliement pose, ou `null` s'il n'en pose aucun.
+/** Le label que ce commentaire porte MAINTENANT, ou `null` — lu sur le RÉSULTAT, jamais sur
+ * le dépliement seul.
  *
- * Une abréviation se déplie en texte libre : `?i` peut donner `issue: `, mais aussi bien
- * `TODO(perf) `, qui n'est PAS un préfixe — il n'a pas de deux-points. Ce qui se compte est
- * un identifiant du vocabulaire fermé (§10), donc on ne le devine pas : on demande à
- * `matchPrefix()` de `core/`, la regex de référence du §3.4, si cette chaîne porte un
- * préfixe, et on vérifie que le label reconnu est ACTIVÉ par la configuration.
+ * Deux versions successives se sont trompées d'objet. La première inspectait le texte
+ * déplié et acceptait `TODO(perf) `, qui n'est pas un préfixe. La seconde l'inspectait
+ * correctement, mais une abréviation se déplie À N'IMPORTE QUELLE POSITION : `?i` frappée
+ * après « Some text » insère `issue: ` en milieu de ligne, où ce n'est le préfixe de rien —
+ * et le compteur l'enregistrait quand même (revue Codex, PR #31).
  *
- * Écrire ici un second reconnaisseur de préfixe aurait produit deux définitions de la même
- * règle, qui finissent toujours par diverger — ma première rédaction acceptait déjà
- * `TODO(perf) `, faute d'exiger les deux-points. */
-function labelOf(expansion: string, config: EffectiveConfig): string | null {
-  const label = matchPrefix(expansion.trim())?.label.toLowerCase();
-  if (label === undefined) return null;
-  return enabledLabels(config).some((l) => l.id === label) ? label : null;
+ * La question à poser n'est donc pas « ce texte ressemble-t-il à un préfixe ? » mais « le
+ * commentaire porte-t-il ce préfixe, une fois l'insertion faite ? ». Elle se pose à `core/`
+ * — `splitBody()` isole la ligne de préfixe au sens du §3.4.1, `matchPrefix()` y applique la
+ * regex de référence — et la réponse ne dépend plus de l'endroit où la personne a frappé. */
+function labelPosedBy(value: string, expansion: string, config: EffectiveConfig): string | null {
+  const expanded = matchPrefix(expansion.trim())?.label.toLowerCase();
+  if (expanded === undefined) return null;
+  // `prefixLine` est `null` quand le corps n'a aucune ligne éligible (tout en citation, en
+  // bloc de code, ou vide) : il n'y a alors aucun préfixe, donc rien à compter.
+  const prefixLine = splitBody(value).prefixLine;
+  const posed = prefixLine === null ? undefined : matchPrefix(prefixLine)?.label.toLowerCase();
+  // Le préfixe du commentaire doit être CELUI que ce dépliement vient de poser : sinon on
+  // compterait un label déjà présent à chaque abréviation frappée ailleurs dans le texte.
+  if (posed !== expanded) return null;
+  return enabledLabels(config).some((l) => l.id === posed) ? posed : null;
 }
 
 export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void } {
@@ -109,7 +118,7 @@ export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void
         // complétion ou la barre d'outils. Seul le chemin de la liste avait été câblé, si
         // bien que `?i` → `issue: ` restait invisible du compteur — l'usage des labels
         // dépendait encore de la façon dont on les pose (revue Codex, PR #31).
-        const posed = labelOf(expansion, opts.config);
+        const posed = labelPosedBy(next, expansion, opts.config);
         if (posed !== null) opts.onLabelAccepted?.(posed);
         return;
       }

@@ -36,7 +36,7 @@ export interface ControllerDeps {
    * intéressent pas. L'émetteur décide seul s'il a le droit d'émettre ; ce contrôleur
    * compte sans se poser la question, et sans jamais lui passer autre chose qu'un
    * identifiant. */
-  telemetry?: (event: TelemetryEvent) => void;
+  telemetry?: (event: TelemetryEvent) => boolean;
 }
 
 /** Table par défaut des raccourcis directs (§5.2) — surchargable par les préférences. */
@@ -232,11 +232,19 @@ export class EditorController {
   /** Compte l'apparition d'un code de diagnostic (§10, « code d'erreur »). */
   #countCodes(diagnostics: readonly { code: string }[]): void {
     const present = new Set(diagnostics.map((d) => d.code));
+    // On ne retient QUE ce qui a effectivement été compté. Marquer un code comme vu alors
+    // que l'émetteur n'était pas encore armé le condamnait au silence jusqu'à sa
+    // disparition — et un diagnostic qui reste affiché ne disparaît pas (revue Codex,
+    // PR #31). Les codes toujours présents mais jamais comptés restent donc candidats.
+    const counted = new Set<string>();
     for (const code of present) {
-      if (this.#countedCodes.has(code)) continue;
-      this.deps.telemetry?.({ kind: 'validation-code', code });
+      if (this.#countedCodes.has(code)) {
+        counted.add(code);
+        continue;
+      }
+      if (this.deps.telemetry?.({ kind: 'validation-code', code }) === true) counted.add(code);
     }
-    this.#countedCodes = present;
+    this.#countedCodes = counted;
   }
 
   /** §5.1 — insertion/remplacement du préfixe, sélection restaurée décalée (CA-02). */

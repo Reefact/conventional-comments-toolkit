@@ -3,9 +3,12 @@ import { computePrefixInsertion } from '@cct/adapter-shared';
 
 describe('§5.1 / CA-02 — insertion et remplacement de préfixe', () => {
   it('CA-02 : clic todo sur "issue (blocking): le nom est ambigu" conserve décoration et sujet', () => {
+    // `decorations` OMIS = « je ne me prononce pas », ce que la barre envoie quand on clique
+    // un label sans avoir touché au sélecteur. C'est ce cas-là que CA-02 décrit. Un `[]`
+    // explicite dit désormais « aucune » et RETIRE la décoration : les deux sens vivaient
+    // auparavant dans la même valeur, et « conserver » l'emportait toujours.
     const { nextValue, caret } = computePrefixInsertion('issue (blocking): le nom est ambigu', {
       label: 'todo',
-      decorations: [],
     });
     expect(nextValue).toBe('todo (blocking): le nom est ambigu');
     // Curseur en fin de préfixe (§5.1).

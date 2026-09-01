@@ -15,7 +15,7 @@ import {
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { computePrefixInsertion, shiftSelection } from '@cct/adapter-shared';
 import { decideGuard, feedbackState, type GuardDecision } from './guard.js';
-import { buildToolbar } from './ui/toolbar.js';
+import { buildToolbar, type PosedPrefix, type Toolbar } from './ui/toolbar.js';
 import { attachQuickInput } from './ui/quickinput.js';
 import { FeedbackView } from './ui/feedback.js';
 import type { ResolvedClientConfig } from './config-resolver.js';
@@ -25,10 +25,25 @@ import type { TelemetryEvent } from './telemetry.js';
  * aucun. La question est posée à `core/` (`splitBody` isole la ligne de préfixe, `matchPrefix`
  * lui applique l'expression de référence) plutôt qu'au texte à la main : un repérage
  * divergent répondrait d'une autre ligne que celle que la validation juge. */
-function labelPosedIn(value: string): string | null {
+function prefixPosedIn(value: string): PosedPrefix {
   const prefixLine = splitBody(value).prefixLine;
-  if (prefixLine === null) return null;
-  return matchPrefix(prefixLine)?.label.toLowerCase() ?? null;
+  const posed = prefixLine === null ? null : matchPrefix(prefixLine);
+  if (posed === null) return { label: null, decorations: [] };
+  // `decorations` est le contenu BRUT des parenthèses : c'est `core/` qui sait le découper,
+  // espaces et casse compris (§3.3). Les formes illégales n'ont pas à être devinées ici —
+  // elles ne correspondront simplement à aucun segment.
+  const decorations =
+    posed.decorations === null
+      ? []
+      : posed.decorations
+          .split(',')
+          .map((d) => d.trim().toLowerCase())
+          .filter((d) => d !== '');
+  return { label: posed.label.toLowerCase(), decorations };
+}
+
+function labelPosedIn(value: string): string | null {
+  return prefixPosedIn(value).label;
 }
 
 export const VALIDATION_DEBOUNCE_MS = 150; // §5.3
@@ -67,6 +82,8 @@ export class EditorController {
   #feedback: FeedbackView | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #lastAnalysis: CommentAnalysis | null = null;
+  /** La barre, pour la réaligner sur le texte à chaque validation (§5.1). */
+  #toolbar: Toolbar | null = null;
   #lastDecision: GuardDecision | null = null;
   #disposers: (() => void)[] = [];
   /** Codes déjà comptés pour l'état COURANT de l'éditeur. `refresh()` s'exécute à chaque
@@ -130,9 +147,14 @@ export class EditorController {
       lang: this.deps.lang,
       onLabel: (label, decorations, toggle) => this.insertPrefix(label, decorations, toggle),
       onFreeDecoration: (decoration) => this.insertPrefix(null, [decoration], false),
+      currentPrefix: () => prefixPosedIn(this.deps.adapter.readValue(this.deps.editor)),
     });
-    host.insertBefore(toolbar, this.deps.editor.element);
-    this.#disposers.push(() => toolbar.remove());
+    this.#toolbar = toolbar;
+    host.insertBefore(toolbar.element, this.deps.editor.element);
+    this.#disposers.push(() => {
+      toolbar.element.remove();
+      this.#toolbar = null;
+    });
 
     // §5.3 — pastille permanente sous la zone de saisie, zone aria-live.
     this.#feedback = new FeedbackView(this.deps.editor.element, this.deps.lang);
@@ -171,7 +193,9 @@ export class EditorController {
         const label = Object.hasOwn(table, combo) ? table[combo] : undefined;
         if (label !== undefined && this.config.labels.some((l) => l.id === label && l.enabled)) {
           ke.preventDefault();
-          this.insertPrefix(label, [], false);
+          // `undefined`, pas `[]` : un raccourci pose un label, il n'efface pas une
+          // décoration déjà écrite (CA-02).
+          this.insertPrefix(label, undefined, false);
           return;
         }
       }
@@ -226,6 +250,10 @@ export class EditorController {
     const decision = this.evaluateNow();
     const analysis = this.#lastAnalysis!;
     this.#countCodes(analysis.diagnostics);
+    // La barre se réaligne sur le texte à chaque validation — donc après chaque frappe
+    // débattue comme après chaque insertion. Un préfixe tapé à la main allume son bouton
+    // et coche sa décoration, exactement comme s'il venait d'être cliqué.
+    this.#toolbar?.sync();
     this.#feedback?.render({
       state: feedbackState(analysis.diagnostics, decision, this.deps.resolved.degraded),
       diagnostics: analysis.diagnostics, // tous, dans l'ordre du §3.5.1 (§5.3)
@@ -259,7 +287,7 @@ export class EditorController {
   }
 
   /** §5.1 — insertion/remplacement du préfixe, sélection restaurée décalée (CA-02). */
-  insertPrefix(label: string | null, decorations: string[], toggle: boolean): void {
+  insertPrefix(label: string | null, decorations: string[] | undefined, toggle: boolean): void {
     const element = this.deps.editor.element as HTMLTextAreaElement;
     const value = this.deps.adapter.readValue(this.deps.editor);
     const selStart = element.selectionStart ?? 0;

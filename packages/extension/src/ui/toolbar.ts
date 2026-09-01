@@ -2,26 +2,51 @@
 // construit depuis la configuration — un segment par décoration dont `forces` n'est pas
 // null —, champ libre lorsque `decorations.allowFree` vaut true.
 
-import { enabledLabels, type EffectiveConfig } from '@cct/core';
+import { IDENTIFIER_RE, enabledLabels, type EffectiveConfig } from '@cct/core';
 import { ui } from './strings.js';
+
+/** Ce que le commentaire porte à cet instant, tel que `core/` le lit (§3.4.1). */
+export interface PosedPrefix {
+  label: string | null;
+  decorations: string[];
+}
 
 export interface ToolbarOptions {
   config: EffectiveConfig;
   lang: string;
-  onLabel: (label: string, decorations: string[], toggle: boolean) => void;
+  /** `undefined` = « je ne me prononce pas sur la décoration » (CA-02) ; `[]` = « aucune ». */
+  onLabel: (label: string, decorations: string[] | undefined, toggle: boolean) => void;
   onFreeDecoration: (decoration: string) => void;
+  /** Le préfixe RÉELLEMENT écrit dans la zone de saisie, relu à chaque geste.
+   *
+   * La barre ne peut pas se contenter de mémoriser les clics : un commentaire déjà
+   * labellisé — rouvert, tapé à la main, posé par la complétion — n'a laissé aucun clic
+   * derrière lui. Le sélecteur de décoration était alors entièrement inerte, faute de
+   * savoir sur quel label agir (retour utilisateur). Le texte est la seule source qui ne
+   * dépende pas du chemin par lequel on y est arrivé. */
+  currentPrefix: () => PosedPrefix;
+}
+
+export interface Toolbar {
+  element: HTMLElement;
+  /** Réaligne ce que la barre AFFICHE sur ce que le commentaire porte. Appelée à chaque
+   * validation, donc après chaque frappe débattue comme après chaque insertion. */
+  sync: () => void;
 }
 
 // Les exemples d'infobulle sont localisés dans strings.ts (§5.1 : « dans la langue de
 // l'interface »).
 
-export function buildToolbar(opts: ToolbarOptions): HTMLElement {
+export function buildToolbar(opts: ToolbarOptions): Toolbar {
   const doc = globalThis.document;
   const root = doc.createElement('div');
   root.className = 'cct-toolbar';
   root.setAttribute('role', 'toolbar');
   root.setAttribute('aria-label', ui(opts.lang, 'toolbar.aria'));
 
+  // Décoration choisie DANS LA BARRE, en attente d'un label : elle ne sert qu'au prochain
+  // clic de label sur un commentaire qui n'en porte pas encore. Dès qu'un label est posé,
+  // c'est le texte qui fait foi.
   let selectedDecorations: string[] = [];
   let activeLabel: string | null = null;
 
@@ -42,7 +67,9 @@ export function buildToolbar(opts: ToolbarOptions): HTMLElement {
         : description;
     button.addEventListener('click', () => {
       const toggle = activeLabel === label.id;
-      opts.onLabel(label.id, selectedDecorations, toggle);
+      // Aucune décoration choisie dans la barre → `undefined` : poser un label ne doit pas
+      // effacer la décoration déjà écrite (CA-02). Un choix explicite, lui, est transmis.
+      opts.onLabel(label.id, selectedDecorations.length > 0 ? selectedDecorations : undefined, toggle);
       activeLabel = toggle ? null : label.id;
       for (const b of root.querySelectorAll('.cct-label-button')) {
         b.setAttribute('aria-pressed', b === button && !toggle ? 'true' : 'false');
@@ -71,12 +98,20 @@ export function buildToolbar(opts: ToolbarOptions): HTMLElement {
     b.setAttribute('aria-checked', segment.id === null ? 'true' : 'false');
     b.addEventListener('click', () => {
       selectedDecorations = segment.id === null ? [] : [segment.id];
-      for (const s of group.querySelectorAll('[role="radio"]')) {
-        s.setAttribute('aria-checked', s === b ? 'true' : 'false');
-      }
-      if (activeLabel) opts.onLabel(activeLabel, selectedDecorations, false);
+      checkSegment(b);
+      // Le label sur lequel agir est celui que le COMMENTAIRE porte ; `activeLabel` ne
+      // sert plus que de repli pour un commentaire qui n'en porte pas encore.
+      const label = opts.currentPrefix().label ?? activeLabel;
+      // `selectedDecorations` est passé tel quel, tableau vide compris : c'est ici, et
+      // seulement ici, que « aucune » veut dire « retire-la ».
+      if (label) opts.onLabel(label, selectedDecorations, false);
     });
     group.appendChild(b);
+  }
+  function checkSegment(target: Element | null): void {
+    for (const s of group.querySelectorAll('[role="radio"]')) {
+      s.setAttribute('aria-checked', s === target ? 'true' : 'false');
+    }
   }
   root.appendChild(group);
 
@@ -87,15 +122,67 @@ export function buildToolbar(opts: ToolbarOptions): HTMLElement {
     free.type = 'text';
     free.className = 'cct-free-decoration';
     free.placeholder = ui(opts.lang, 'toolbar.decoration.free');
+    // Valider sur Entrée SEULEMENT perdait en silence ce qui venait d'être tapé dès qu'on
+    // quittait le champ — au clavier par Tab, à la souris en cliquant ailleurs. Le geste le
+    // plus naturel était celui qui effaçait le travail (retour utilisateur).
+    const commitFree = (): void => {
+      const raw = free.value.trim().toLowerCase();
+      if (raw === '') return;
+      // §3.3 : la forme d'une décoration est STRUCTURELLE et toujours appliquée —
+      // indépendante de `allowFree`, qui gouverne l'appartenance à la liste connue. Sur
+      // Entrée, poser « perf critique » était une faute délibérée ; sur une perte de focus,
+      // ce serait un accident. Le champ garde donc ce qu'il ne peut pas poser, signalé, au
+      // lieu de l'appliquer ou de le jeter.
+      if (!IDENTIFIER_RE.test(raw)) {
+        free.setAttribute('aria-invalid', 'true');
+        return;
+      }
+      free.removeAttribute('aria-invalid');
+      free.value = '';
+      opts.onFreeDecoration(raw);
+    };
+    free.addEventListener('input', () => free.removeAttribute('aria-invalid'));
     free.addEventListener('keydown', (e) => {
-      if ((e as KeyboardEvent).key === 'Enter' && free.value.trim() !== '') {
+      const key = (e as KeyboardEvent).key;
+      if (key === 'Enter') {
         e.preventDefault();
-        opts.onFreeDecoration(free.value.trim().toLowerCase());
-        free.value = '';
+        commitFree();
+      } else if (key === 'Tab') {
+        // Pas de `preventDefault` : Tab pose la décoration ET continue de déplacer le
+        // focus, comme partout ailleurs (§5.1, CA-12).
+        commitFree();
       }
     });
+    // `blur` couvre le reste : clic ailleurs, Maj+Tab, fermeture du composeur. Après une
+    // validation par Tab le champ est déjà vide, donc ce second appel ne fait rien.
+    free.addEventListener('blur', commitFree);
     root.appendChild(free);
   }
 
-  return root;
+  /** Ce que la barre montre doit être ce que le commentaire porte. Sans cette
+   * synchronisation, `issue (blocking): x` s'affichait avec « aucune » coché : le
+   * radiogroup mentait, y compris à un lecteur d'écran (§5.1, CA-12). */
+  const sync = (): void => {
+    const posed = opts.currentPrefix();
+    activeLabel = posed.label;
+    for (const b of root.querySelectorAll('.cct-label-button')) {
+      const id = (b as HTMLElement).dataset['label'];
+      b.setAttribute('aria-pressed', id !== undefined && id === posed.label ? 'true' : 'false');
+    }
+    // Le sélecteur ne porte QUE les décorations porteuses : une décoration purement
+    // descriptive (`(perf)`) n'a pas de segment, et n'en fait donc cocher aucun — pas même
+    // « aucune », qui affirmerait faussement qu'il n'y en a pas.
+    selectedDecorations = posed.decorations;
+    const carried = posed.decorations.find((d) => segments.some((s) => s.id === d));
+    const target =
+      posed.decorations.length === 0
+        ? group.querySelector('[role="radio"]')
+        : carried === undefined
+          ? null
+          : [...group.querySelectorAll('[role="radio"]')].find((s) => s.textContent === `(${carried})`) ?? null;
+    checkSegment(target ?? null);
+  };
+  sync();
+
+  return { element: root, sync };
 }

@@ -17,6 +17,7 @@ import { EditorController } from '../src/editor-controller.js';
 import {
   TELEMETRY_CONSENT_KEY,
   TelemetryCounters,
+  canonicalEndpoint,
   parseConsent,
   telemetryTarget,
   type TelemetryEvent,
@@ -67,6 +68,35 @@ describe('A — les trois verrous : rien ne part si l’un manque (§10)', () =>
     const config = configWith({ enabled: true, endpoint: ENDPOINT });
     config.mode = 'off';
     expect(telemetryTarget(config, consent, repo)).toBeNull();
+  });
+
+  // La forme d'URL la PLUS COURANTE — sans barre oblique finale — rendait la fonctionnalité
+  // inerte en silence : la page affichait et stockait `https://collecte.example`, la
+  // comparaison portait sur `new URL(...).href`, soit `https://collecte.example/`, et le
+  // consentement ne coïncidait jamais. Aucune erreur nulle part (revue Codex, PR #31).
+  it('un point de collecte sans barre finale s’arme quand même — une seule forme canonique', () => {
+    const config = configWith({ enabled: true, endpoint: 'https://collecte.example' });
+    const consenti = canonicalEndpoint('https://collecte.example');
+    expect(consenti).toBe('https://collecte.example/');
+    expect(telemetryTarget(config, { endpoint: consenti! }, repo)).toEqual({
+      endpoint: 'https://collecte.example/',
+      mode: config.mode,
+      repo,
+    });
+  });
+
+  it('la casse de l’hôte et le port par défaut ne font pas deux points de collecte', () => {
+    expect(canonicalEndpoint('https://Collecte.Example:443/cc')).toBe('https://collecte.example/cc');
+    expect(canonicalEndpoint('http://collecte.example/cc')).toBeNull(); // contenu mixte : bloqué
+    expect(canonicalEndpoint('pas une url')).toBeNull();
+  });
+
+  it('un consentement stocké sous une forme non canonique reste utilisable', () => {
+    // Écrit par une version antérieure, ou à la main : il ne doit pas devenir inutilisable
+    // pour une barre oblique.
+    expect(parseConsent({ endpoint: 'https://collecte.example' })).toEqual({
+      endpoint: 'https://collecte.example/',
+    });
   });
 
   it('une valeur de consentement malformée ne vaut pas consentement', () => {
@@ -256,6 +286,18 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     expect(JSON.stringify(events)).not.toContain('ambigu');
   });
 
+  // Cliquer deux fois le même bouton pose puis RETIRE le préfixe. Compter les deux gonflait
+  // l'usage d'un label qu'on a justement renoncé à employer (revue Codex, PR #31).
+  it('retirer un label par bascule n’est PAS un usage', () => {
+    const { controller, textarea, events } = setup();
+    textarea.value = 'le nom est ambigu';
+    controller.insertPrefix('issue', [], true); // pose
+    controller.insertPrefix('issue', [], true); // retire
+    expect(events.filter((e) => e.kind === 'label-used')).toEqual([
+      { kind: 'label-used', label: 'issue' },
+    ]);
+  });
+
   // « Label utilisé » ne doit pas dépendre du CHEMIN par lequel la personne l'a posé. La
   // saisie rapide écrit le préfixe elle-même, sans passer par `insertPrefix()` : elle
   // n'était pas comptée, tandis que la barre d'outils et les raccourcis l'étaient — un
@@ -270,6 +312,29 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     expect(option).not.toBeNull();
     option!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     expect(events).toContainEqual({ kind: 'label-used', label: 'issue' });
+    controller.dispose();
+  });
+
+  // L'autre chemin de la saisie rapide : les abréviations dépliées par Tab. Seule la liste
+  // de complétion avait été câblée, si bien que `?i` → `issue: ` restait invisible du
+  // compteur (revue Codex, PR #31).
+  it('un label posé par une ABRÉVIATION Tab est compté, un dépliement quelconque ne l’est pas', async () => {
+    const { controller, textarea, events } = setup();
+    controller.deps.resolved.config.shortcuts.abbreviations = { '?i': 'issue: ', '?x': 'TODO(perf) ' };
+    controller.attach();
+
+    textarea.value = '?i';
+    textarea.selectionStart = textarea.selectionEnd = 2;
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    expect(events).toContainEqual({ kind: 'label-used', label: 'issue' });
+
+    // Un dépliement qui ne pose AUCUN label du vocabulaire ne se compte pas : ce qui part
+    // est un identifiant de la configuration, jamais du texte deviné.
+    const avant = events.filter((e) => e.kind === 'label-used').length;
+    textarea.value = '?x';
+    textarea.selectionStart = textarea.selectionEnd = 2;
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    expect(events.filter((e) => e.kind === 'label-used').length).toBe(avant);
     controller.dispose();
   });
 
@@ -300,6 +365,29 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
   });
 });
 
+describe('G — écritures de stockage : un diagnostic ne fait jamais échouer son appelant', () => {
+  // Une mise à jour, un rechargement ou une désactivation de l'extension invalide le
+  // contexte du script de contenu, et `chrome.storage.local.set` lève alors SYNCHRONEMENT.
+  // La centralisation dans `storage.ts` n'entourait que la recherche de propriété, pas
+  // l'appel : un diagnostic inoffensif pouvait faire échouer la résolution de configuration
+  // qui l'appelait (revue Codex, PR #31).
+  it('un `set` qui lève ne remonte pas — ces clés sont un diagnostic', async () => {
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}),
+          set: () => {
+            throw new Error('Extension context invalidated.');
+          },
+        },
+      },
+    };
+    const { writeCurrentState, appendToJournal } = await import('../src/storage.js');
+    expect(() => writeCurrentState({ degradedState: false })).not.toThrow();
+    await expect(appendToJournal('selectorFailures', [{ chain: 'x', at: 'now' }], 50)).resolves.toBeUndefined();
+  });
+});
+
 describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Codex PR #31)', () => {
   // Neuf trouvailles de revue, sept dans le câblage : mes tests étaient rangés par clause
   // du §10, c'est-à-dire par contrat du module — une boucle fermée sur la conception. Ce
@@ -308,6 +396,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
 
   const PR_A = 'https://github.com/acme/demo/pull/42';
   const PR_B = 'https://github.com/acme/autre/pull/7';
+  const PR_C = 'https://github.com/acme/troisieme/pull/9';
 
   function prFromLocation(doc: Document) {
     const m = /^\/([^/]+)\/([^/]+)\/pull\/(\d+)/.exec(new URL(doc.location.href).pathname);
@@ -326,6 +415,12 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
    * éditeur — c'est le cas que le premier jet n'armait jamais. */
   function installTab(consent: unknown, endpoint: string | null) {
     const written: Record<string, unknown> = {};
+    /** Le journal confié à l'adaptateur : c'est par lui qu'on peut faire COMPTER quelque
+     * chose sans éditeur, donc observer à quel dépôt l'onglet attribue ce qu'il compte. */
+    const captured: { log?: { degraded: (c: { name: string; candidates: string[] }) => void } } = {};
+    /** Retards injectables : une course ne se teste pas avec un faux instantané, qui ne
+     * peut pas exprimer la fenêtre où le défaut vit (CLAUDE.md, règle 2). */
+    const delays: { repoConfig: number; consentRead: number } = { repoConfig: 0, consentRead: 0 };
     const calls: string[] = [];
     const rawListeners: ((c: Record<string, { newValue?: unknown }>, a: string) => void)[] = [];
     // Chaque écouteur est enveloppé : ce qu'on observe est son APPEL, pas son inscription.
@@ -343,7 +438,9 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
               [TELEMETRY_CONSENT_KEY]: consent,
             };
             for (const key of keys) if (key in written) picked[key] = written[key];
-            cb(picked);
+            const wait = keys.includes(TELEMETRY_CONSENT_KEY) ? delays.consentRead : 0;
+            if (wait === 0) cb(picked);
+            else setTimeout(() => cb(picked), wait);
           },
           set: (items: Record<string, unknown>, cb?: () => void) => {
             Object.assign(written, items);
@@ -373,10 +470,16 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     config.telemetry = { enabled: true, endpoint };
     vi.doMock('@cct/adapter-github', () => ({
       GithubClientAdapter: class {
+        constructor(opts: { log?: typeof captured.log }) {
+          captured.log = opts.log;
+        }
         async getCurrentUser() {
           return { login: 'someone' };
         }
         async getRepoConfig() {
+          if (delays.repoConfig > 0) {
+            await new Promise((r) => setTimeout(r, delays.repoConfig));
+          }
           return { status: 'found', text: JSON.stringify({ telemetry: config.telemetry }) };
         }
         async getOrgConfig() {
@@ -409,7 +512,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
         }
       },
     }));
-    return { written, listeners, calls };
+    return { written, listeners, calls, captured, delays };
   }
 
   async function settle(): Promise<void> {
@@ -476,6 +579,106 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     expect(calls).toEqual([]);
   });
 
+  /** Ce que le collecteur reçoit RÉELLEMENT. Le transport passe par `fetch` : le stuber est
+   * la seule façon d'observer à quel dépôt l'onglet attribue ce qu'il compte, sans exposer
+   * l'émetteur pour les besoins du test. La vidange est provoquée par `pagehide`, comme à la
+   * fermeture d'un onglet. */
+  function collectPosts(): { bodies: Record<string, unknown>[] } {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', async (_url: string, init: { body?: string }) => {
+      if (init?.body) bodies.push(JSON.parse(init.body) as Record<string, unknown>);
+      return { ok: true } as unknown as Response;
+    });
+    return { bodies };
+  }
+
+  const flushByPagehide = (): void => {
+    window.dispatchEvent(new Event('pagehide'));
+  };
+
+  // La fenêtre entre « la PR a changé » et « sa configuration est résolue » : l'onglet
+  // restait armé sur la PRÉCÉDENTE, et une dégradation rencontrée sur la nouvelle était
+  // comptée puis émise au nom de l'ancienne (revue Codex, PR #31).
+  it('ce qui est compté pendant la résolution d’une NOUVELLE PR n’est pas attribué à l’ancienne', async () => {
+    const { captured, delays } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+    const { bodies } = collectPosts();
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
+    const dispose = await bootstrap(document);
+    await settle();
+
+    // Une dégradation sur A, légitimement attribuée à A.
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+
+    // Navigation vers B, dont la configuration met du temps à se résoudre.
+    delays.repoConfig = 30;
+    Object.defineProperty(document, 'location', { value: new URL(PR_B), configurable: true });
+    document.body.appendChild(document.createElement('div'));
+    await new Promise((r) => setTimeout(r, 0)); // la navigation est vue, B n'est pas résolue
+
+    // Une dégradation rencontrée sur B PENDANT cette fenêtre.
+    captured.log!.degraded({ name: 'submitButtons', candidates: ['button'] });
+
+    await new Promise((r) => setTimeout(r, 60));
+    await settle();
+    flushByPagehide();
+    await settle();
+
+    const versA = bodies.filter((b) => b['repo'] === 'github.com/acme/demo');
+    // A reçoit ce qui a été compté sur A — le désarmement protège de la mauvaise
+    // attribution, il ne doit pas faire perdre la mesure.
+    expect(versA.flatMap((b) => Object.keys(b['counters'] as object))).toContain('selector:editors');
+    // ...et surtout PAS ce qui a été compté sur B.
+    expect(versA.flatMap((b) => Object.keys(b['counters'] as object))).not.toContain(
+      'selector:submitButtons'
+    );
+    dispose();
+  });
+
+  // La lecture du consentement est un SECOND aller-retour asynchrone. Une première version
+  // ne re-vérifiait la clé de PR qu'AVANT celui-ci : l'invocation partie pour une PR
+  // précédente pouvait réarmer après qu'une plus récente avait armé la bonne cible (revue
+  // Codex, PR #31).
+  //
+  // Ma première rédaction de ce test ne prouvait rien : elle « renaviguait » vers la MÊME
+  // PR, or `armFor` n'est rappelé que sur changement de clé — la course n'était jamais
+  // créée, et le test passait avec ET sans le correctif. Il faut donc trois PR distinctes :
+  // B part avec une lecture de consentement lente, C arme entre-temps, et B revient trop
+  // tard.
+  it('une invocation partie pour une PR précédente ne réarme pas après la lecture du consentement', async () => {
+    const { captured, delays } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
+    const { bodies } = collectPosts();
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
+    const dispose = await bootstrap(document);
+    await settle();
+
+    // B : sa lecture de consentement traîne.
+    delays.consentRead = 60;
+    Object.defineProperty(document, 'location', { value: new URL(PR_B), configurable: true });
+    document.body.appendChild(document.createElement('div'));
+    await new Promise((r) => setTimeout(r, 5));
+
+    // C arrive pendant, et s'arme normalement.
+    delays.consentRead = 0;
+    Object.defineProperty(document, 'location', { value: new URL(PR_C), configurable: true });
+    document.body.appendChild(document.createElement('div'));
+    await new Promise((r) => setTimeout(r, 120)); // B revient trop tard
+    await settle();
+
+    // Ce qui est compté maintenant appartient à C. Sans la re-vérification, l'invocation de
+    // B avait réarmé par-dessus, et ceci partait sous le dépôt de B.
+    captured.log!.degraded({ name: 'threads', candidates: ['div'] });
+    flushByPagehide();
+    await settle();
+
+    const repos = bodies
+      .filter((b) => Object.keys(b['counters'] as object).includes('selector:threads'))
+      .map((b) => b['repo']);
+    expect(repos).toEqual(['github.com/acme/troisieme']);
+    dispose();
+  });
+
   it('naviguer vers une autre PR republie pour CETTE PR', async () => {
     const { written } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
     const { bootstrap } = await import('../src/content-internal.js');
@@ -490,6 +693,73 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     // La publication suit la PR affichée, et non le premier éditeur rencontré.
     expect(written['telemetryEndpoint']).toBe(ENDPOINT);
     dispose();
+  });
+});
+
+describe('F — la page d’options : consentir à ce qu’on VOIT (revue Codex, PR #31)', () => {
+  function mountOptionsDom(): void {
+    document.body.innerHTML = `
+      <input type="text" id="host-input" />
+      <select id="host-platform"><option value="" selected></option></select>
+      <button id="host-add" type="button"></button>
+      <span id="host-add-state"></span>
+      <ul id="host-list"></ul>
+      <select id="language"></select>
+      <textarea id="direct-shortcuts"></textarea>
+      <button id="direct-shortcuts-save"></button>
+      <span id="direct-shortcuts-state"></span>
+      <input type="checkbox" id="telemetry-opt-in" />
+      <p id="telemetry-endpoint"></p>
+      <p id="degraded-state"></p>
+      <p id="selector-log"></p>`;
+  }
+
+  function installOptionsChrome(stored: Record<string, unknown>) {
+    (globalThis as { chrome?: unknown }).chrome = {
+      permissions: {
+        request: () => {},
+        getAll: (cb: (p: { origins?: string[] }) => void) => cb({ origins: [] }),
+      },
+      storage: {
+        local: {
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({ ...stored }),
+          set: (items: Record<string, unknown>, cb?: () => void) => {
+            Object.assign(stored, items);
+            cb?.();
+          },
+        },
+        sync: {
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}),
+          set: () => {},
+        },
+        managed: { get: (cb: (i: Record<string, unknown>) => void) => cb({}) },
+        // Volontairement MUET : le scénario est justement celui où la page n'a pas été
+        // prévenue du changement. Si elle relit le stockage au clic, elle consent à une
+        // valeur qu'elle n'a jamais affichée.
+        onChanged: { addListener: () => {} },
+      },
+    };
+  }
+
+  it('le consentement porte sur le point de collecte AFFICHÉ, pas sur celui du stockage au moment du clic', async () => {
+    const stored: Record<string, unknown> = { telemetryEndpoint: `${ENDPOINT}` };
+    mountOptionsDom();
+    installOptionsChrome(stored);
+    await import('../src/options/options.js');
+    await new Promise((r) => setTimeout(r, 0));
+
+    const box = document.getElementById('telemetry-opt-in') as HTMLInputElement;
+    expect(document.getElementById('telemetry-endpoint')!.textContent).toContain(`${ENDPOINT}`);
+
+    // Un AUTRE onglet de revue réécrit la clé partagée, sans que cette page en soit avertie.
+    stored['telemetryEndpoint'] = 'https://ailleurs.example/collecte';
+
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    await new Promise((r) => setTimeout(r, 0));
+
+    // L'accord doit porter sur ce que la personne avait sous les yeux.
+    expect(stored[TELEMETRY_CONSENT_KEY]).toEqual({ endpoint: `${ENDPOINT}` });
   });
 });
 

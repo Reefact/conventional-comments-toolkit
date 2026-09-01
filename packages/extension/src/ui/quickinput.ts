@@ -3,7 +3,7 @@
 // extensibles par Tab depuis `shortcuts.abbreviations` — l'unicité normative est celle
 // de l'abréviation au moment où Tab est pressée (§5.2).
 
-import { enabledLabels, type EffectiveConfig } from '@cct/core';
+import { enabledLabels, matchPrefix, type EffectiveConfig } from '@cct/core';
 import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
 
 export interface QuickInputOptions {
@@ -16,6 +16,23 @@ export interface QuickInputOptions {
    * « label utilisé » (§10) dépendait du chemin d'interaction — la barre d'outils et les
    * raccourcis directs comptaient, la complétion `/` ou `:` non (revue Codex, PR #31). */
   onLabelAccepted?: (id: string) => void;
+}
+
+/** L'identifiant de label que ce dépliement pose, ou `null` s'il n'en pose aucun.
+ *
+ * Une abréviation se déplie en texte libre : `?i` peut donner `issue: `, mais aussi bien
+ * `TODO(perf) `, qui n'est PAS un préfixe — il n'a pas de deux-points. Ce qui se compte est
+ * un identifiant du vocabulaire fermé (§10), donc on ne le devine pas : on demande à
+ * `matchPrefix()` de `core/`, la regex de référence du §3.4, si cette chaîne porte un
+ * préfixe, et on vérifie que le label reconnu est ACTIVÉ par la configuration.
+ *
+ * Écrire ici un second reconnaisseur de préfixe aurait produit deux définitions de la même
+ * règle, qui finissent toujours par diverger — ma première rédaction acceptait déjà
+ * `TODO(perf) `, faute d'exiger les deux-points. */
+function labelOf(expansion: string, config: EffectiveConfig): string | null {
+  const label = matchPrefix(expansion.trim())?.label.toLowerCase();
+  if (label === undefined) return null;
+  return enabledLabels(config).some((l) => l.id === label) ? label : null;
 }
 
 export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void } {
@@ -88,6 +105,12 @@ export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void
         ke.preventDefault();
         const next = element.value.slice(0, caret - token.length) + expansion + element.value.slice(caret);
         opts.adapter.writeValue(opts.editor, next, caret - token.length + expansion.length);
+        // Une abréviation qui se déplie en un LABEL en pose un, exactement comme la liste de
+        // complétion ou la barre d'outils. Seul le chemin de la liste avait été câblé, si
+        // bien que `?i` → `issue: ` restait invisible du compteur — l'usage des labels
+        // dépendait encore de la façon dont on les pose (revue Codex, PR #31).
+        const posed = labelOf(expansion, opts.config);
+        if (posed !== null) opts.onLabelAccepted?.(posed);
         return;
       }
     }

@@ -37,7 +37,18 @@ function localArea(): NonNullable<NonNullable<NonNullable<typeof chrome>['storag
  * voulu : ces clés décrivent « ce que l'extension constate maintenant », pas un historique.
  * Le dire ici évite qu'on le redécouvre comme un bug. */
 export function writeCurrentState(items: Record<string, unknown>): void {
-  localArea()?.set?.(items);
+  // L'APPEL dans le `try`, pas seulement la résolution de `chrome.storage.local` : une mise
+  // à jour, un rechargement ou une désactivation de l'extension invalide le contexte du
+  // script de contenu, et `set()` lève alors SYNCHRONEMENT. La version d'avant la
+  // centralisation entourait bien l'appel ; ma première rédaction ne couvrait que la
+  // recherche de propriété, si bien qu'un diagnostic inoffensif pouvait faire échouer la
+  // résolution de configuration qui l'appelait (revue Codex, PR #31).
+  try {
+    localArea()?.set?.(items);
+  } catch {
+    // Hors contexte d'extension, ou contexte invalidé : ces clés sont un diagnostic, leur
+    // perte n'a aucune conséquence sur ce que l'extension fait dans la page.
+  }
 }
 
 /** File d'attente d'un seul écrivain, PAR ONGLET. Elle ne protège que de la concurrence
@@ -61,10 +72,18 @@ export function appendToJournal<T>(key: string, entries: readonly T[], limit: nu
       new Promise<void>((resolve) => {
         const area = localArea();
         if (!area?.get || !area?.set) return resolve();
-        area.get([key], (items) => {
-          const existing = Array.isArray(items?.[key]) ? (items[key] as T[]) : [];
-          area.set!({ [key]: [...existing, ...entries].slice(-limit) }, () => resolve());
-        });
+        try {
+          area.get([key], (items) => {
+            const existing = Array.isArray(items?.[key]) ? (items[key] as T[]) : [];
+            try {
+              area.set!({ [key]: [...existing, ...entries].slice(-limit) }, () => resolve());
+            } catch {
+              resolve(); // contexte invalidé entre la lecture et l'écriture
+            }
+          });
+        } catch {
+          resolve(); // même raison, du côté de la lecture
+        }
       })
   );
   journalQueue = next.catch(() => undefined);

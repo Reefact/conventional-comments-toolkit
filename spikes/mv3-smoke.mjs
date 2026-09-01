@@ -84,6 +84,21 @@ try {
     worker.evaluate(() => typeof chrome?.permissions?.getAll === 'function').catch(() => false)
   );
 
+  // 1 bis. Ce que le navigateur AFFICHE de la version. `version` ne peut porter que des
+  //    entiers, donc deux pré-versions successives s'y présentent à l'identique ; c'est
+  //    `version_name` qui les distingue dans chrome://extensions. L'affirmation « Chromium
+  //    accepte ce champ et le conserve » est mesurée ici plutôt que rappelée : si le champ
+  //    était rejeté, le manifeste chargé ne le porterait pas — et l'extension empaquetée
+  //    par le workflow de release annoncerait une version que personne ne peut vérifier.
+  const versionName = await worker
+    .evaluate(() => chrome.runtime.getManifest().version_name ?? null)
+    .catch(() => null);
+  assert(
+    'Chromium conserve le version_name du manifeste empaqueté',
+    typeof versionName === 'string' && versionName.length > 0,
+    JSON.stringify({ version_name: versionName })
+  );
+
   // 2. LA PRÉMISSE DE TOUTE L'ARCHITECTURE : `chrome.permissions` est exposé au service
   //    worker. C'est ce qui justifie que le croisement origines × étiquettes vive là-bas
   //    plutôt que dans le script de contenu (cf. src/host-platform.ts).

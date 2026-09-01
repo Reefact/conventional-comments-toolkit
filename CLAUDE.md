@@ -10,6 +10,11 @@
 
 ## Règles du chantier
 
+- **Langue.** Les messages de commit s'écrivent en **anglais**, TOUJOURS — c'est la seule
+  exception, et elle ne se discute pas. Tout le reste est en **français** : titres et corps
+  de pull request, commentaires et réponses de revue, commentaires de code, documents du
+  dépôt. Le critère n'est pas la langue de l'interlocuteur du moment ni celle de l'outil qui
+  lit (un robot de revue anglophone ne change rien) : c'est cette règle-ci, et rien d'autre.
 - `specifications-fr.md` est la référence fonctionnelle **normative**. Ne jamais
   la modifier pour la faire correspondre à l'implémentation. L'état du
   repository est la source de vérité sur l'avancement.

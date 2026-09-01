@@ -107,12 +107,20 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       // puis cliquer le label déjà actif retirait le préfixe ET jetait la décoration — un
       // geste qui ajoute en enlevait deux (revue Codex, PR #35).
       const toggle = pendingFree === null && posed.label === label.id;
-      // Sinon : la sélection de la barre ne vaut que si elle est EN ATTENTE et que le
-      // commentaire ne porte aucun label. Un reflet du texte n'a rien à réinsérer.
+      // Sinon : la sélection de la barre ne vaut que si elle est EN ATTENTE et qu'AUCUN
+      // préfixe n'est écrit. Un reflet du texte n'a rien à réinsérer, et un préfixe écrit
+      // dit lui-même sa décoration — même quand son label est inconnu de la configuration.
+      //
+      // `hasPrefix` et non `label === null` : introduit au commit précédent pour distinguer
+      // ces deux cas exactement, il n'avait été posé que dans `sync()`, si bien qu'un choix
+      // en attente écrasait la décoration de `riskk (non-blocking): x` (revue Codex, PR #35).
+      // Sixième fois sur cette barre qu'une règle n'atteint qu'un de ses points
+      // d'application ; les trois lectures de `posed.label` du fichier ont donc été
+      // relues ensemble cette fois, plutôt qu'une seule corrigée.
       const chosen =
         pendingFree !== null
           ? [pendingFree]
-          : posed.label === null && decoration.origin === 'pending'
+          : !posed.hasPrefix && decoration.origin === 'pending'
             ? decoration.ids
             : [];
       opts.onLabel(label.id, chosen.length > 0 ? chosen : undefined, toggle);

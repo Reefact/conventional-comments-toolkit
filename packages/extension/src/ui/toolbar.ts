@@ -232,23 +232,38 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     // Le sélecteur ne porte QUE les décorations porteuses : une décoration purement
     // descriptive (`(perf)`) n'a pas de segment, et n'en fait donc cocher aucun — pas même
     // « aucune », qui affirmerait faussement qu'il n'y en a pas.
+    // SANS label posé, le texte n'a rien à dire de la décoration : ce que la barre montre
+    // est alors la sélection EN ATTENTE. L'écraser avec le `[]` du texte effaçait le choix
+    // dès qu'une revalidation s'intercalait entre « je clique (blocking) » et « je clique
+    // issue » — et le parcours ne marchait que si aucune n'arrivait, ce que mon test ne
+    // faisait justement pas arriver (revue Codex, PR #35).
+    if (posed.label === null) {
+      checkSegment(segmentButtons.get(selectedDecorations[0] ?? null) ?? null);
+      return;
+    }
     selectedDecorations = posed.decorations;
     // La casse d'un id de décoration configuré est libre, comme celle d'un label : c'est
     // `core/` qui apparie, sans en tenir compte. Comparer les chaînes laissait un segment
     // `Blocking` éteint sur un commentaire qui le porte — le défaut corrigé pour les labels,
     // laissé ici (revue Codex, PR #35).
-    const carrier = posed.decorations
+    const carriers = posed.decorations
       .map((d) => resolveDecoration(d, opts.config))
-      .find((d) => d !== null && segmentButtons.has(d.id));
-    const carried = carrier?.id;
-    // Trois cas, et le troisième n'existait pas : des parenthèses illégales ne sont pas une
-    // absence de décoration. Cocher « aucune » sur `issue (): x` affirmait le contraire de
-    // ce que le validateur dit au même instant (revue Codex, PR #35).
+      .filter((d): d is NonNullable<typeof d> => d !== null && d.forces !== null);
+    // §3.3, règle 2 : deux porteuses aux effets opposés sont un `E-CONFLICT`, et `core/`
+    // les ignore TOUTES LES DEUX pour décider du caractère bloquant — « aucune règle de
+    // la première gagne n'est définie, précisément parce qu'un tel commentaire traduit une
+    // intention ambiguë ». En cocher une présentait un côté du conflit comme le choix
+    // actif (revue Codex, PR #35).
+    const conflicting = new Set(carriers.map((d) => d.forces)).size > 1;
+    const carried = carriers.find((d) => segmentButtons.has(d.id))?.id;
+    // La barre ne peut RIEN affirmer dans trois cas : parenthèses illégales, porteuses
+    // contradictoires, décoration sans segment (une descriptive comme `(perf)`). Elle ne
+    // coche alors rien — pas même « aucune », qui nierait la décoration présente.
     const target =
-      posed.malformedDecorations || (posed.decorations.length > 0 && carried === undefined)
+      posed.malformedDecorations || conflicting || (posed.decorations.length > 0 && carried === undefined)
         ? null
         : posed.decorations.length === 0
-          ? group.querySelector('[role="radio"]')
+          ? segmentButtons.get(null) ?? null
           : segmentButtons.get(carried ?? null) ?? null;
     checkSegment(target ?? null);
   };

@@ -310,9 +310,13 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     const { controller, textarea, events } = setup();
     textarea.value = 'le nom est ambigu';
     controller.insertPrefix('issue', [], false); // pose le label : UN usage
-    controller.insertPrefix(null, ['blocking'], false); // décoration
+    // Ce que la barre envoie sur un clic de décoration : le label LU dans le commentaire.
+    // Ces appels passaient `null` et comptaient sur `#lastAnalysis` pour le retrouver — un
+    // repli supprimé depuis, parce qu'il recréait un label qu'on venait d'effacer (revue
+    // Codex, PR #35). `null` veut maintenant dire « aucun label », pas « devine ».
+    controller.insertPrefix('issue', ['blocking'], false); // décoration
     const afterFirstDecoration = textarea.value;
-    controller.insertPrefix(null, ['non-blocking'], false); // on change d'avis
+    controller.insertPrefix('issue', ['non-blocking'], false); // on change d'avis
     expect(events.filter((e) => e.kind === 'label-used')).toEqual([
       { kind: 'label-used', label: 'issue' },
     ]);

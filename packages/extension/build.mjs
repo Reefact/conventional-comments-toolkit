@@ -33,6 +33,20 @@ await copyFile(join(here, 'src/managed-schema.json'), join(out, 'managed-schema.
 
 const manifest = JSON.parse(await readFile(join(here, 'src/manifest.json'), 'utf8'));
 manifest.options_ui = { page: 'options.html', open_in_tab: true };
+
+// NOM DE VERSION AFFICHÉ — `version` ne peut pas le porter (Chromium n'y accepte que des
+// entiers), si bien que `v1.0.0-beta.1` et `v1.0.0-beta.2` se présentaient toutes deux
+// comme « 1.0.0 » dans chrome://extensions. Rien ne distinguait donc, à l'écran, la build
+// qu'on vient d'installer de celle qu'on croyait avoir remplacée — sur des captures
+// destinées au magasin, c'est le genre d'erreur qu'on ne voit jamais.
+//
+// `version_name` est le champ prévu pour ça. Il est renseigné par le workflow de release
+// (`CCT_VERSION_NAME`, dérivé du tag), et vaut la version du manifeste hors de lui : une
+// construction locale reste ainsi honnête sur ce qu'elle est.
+//
+// Que Chromium l'accepte ET le conserve est MESURÉ par `npm run smoke:mv3`, dans un vrai
+// navigateur, plutôt que rappelé de mémoire.
+manifest.version_name = process.env['CCT_VERSION_NAME']?.trim() || manifest.version;
 await writeFile(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
 // Icônes : la liste qui fait foi est celle du manifeste, jamais une copie écrite ici.
@@ -49,6 +63,9 @@ for (const icon of icons) await copyFile(join(here, 'src', icon), join(out, icon
 // Variante Firefox : event page (§10 — Firefox n'implémente pas le service worker MV3),
 // et déclaration d'identifiant pour les politiques ExtensionSettings.
 const firefox = structuredClone(manifest);
+// `version_name` est propre à Chromium : Firefox le signale comme propriété inconnue.
+// L'avertissement est inoffensif, mais une release ne doit pas en produire pour rien.
+delete firefox.version_name;
 firefox.background = { scripts: ['background.js'], type: 'module' };
 firefox.browser_specific_settings = {
   gecko: { id: 'conventional-comments-toolkit@example.org', strict_min_version: '128.0' },

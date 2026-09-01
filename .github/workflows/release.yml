@@ -57,8 +57,14 @@ jobs:
       - name: Suite de tests (vitest)
         run: npm test
 
+      # `version_name` porte la version ANNONCÉE — étiquette de pré-version comprise —, que
+      # `version` ne peut pas déclarer. Sans lui, `v1.0.0-beta.1` et `v1.0.0-beta.2` se
+      # présentaient toutes deux comme « 1.0.0 » dans chrome://extensions : rien ne
+      # distinguait à l'écran la build installée de celle qu'on croyait avoir remplacée.
       - name: Empaqueter (esbuild → dist-ext/, variante Firefox comprise)
         run: npm run build:extension
+        env:
+          CCT_VERSION_NAME: ${{ steps.version.outputs.version }}
 
       # §10 : « aucun code distant, aucune dépendance CDN ». Vérifié ici aussi : une
       # release est justement ce que personne ne relira avant de l'installer.
@@ -79,14 +85,18 @@ jobs:
             const ff = JSON.parse(readFileSync('packages/extension/dist-ext/firefox/manifest.json', 'utf8'));
             if (base.manifest_version !== 3) throw new Error('manifest_version attendu : 3');
             if (base.version !== process.env.CORE) throw new Error('version du bundle: ' + base.version);
+            if (base.version_name !== process.env.VERSION) throw new Error('version_name du bundle: ' + base.version_name);
+            if ('version_name' in ff) throw new Error('version_name est propre à Chromium : la variante Firefox ne doit pas le porter');
             if (!ff.browser_specific_settings?.gecko?.id) throw new Error('variante Firefox sans identifiant gecko');
             if (!Array.isArray(ff.background?.scripts)) throw new Error('Firefox attend une event page, pas un service worker');
             console.log('✓ manifestes MV3 valides (Chromium et Firefox)');
           "
         env:
           # Le noyau numérique, pas la version annoncée : une pré-version porte une
-          # étiquette que le manifeste ne peut pas déclarer.
+          # étiquette que le manifeste ne peut pas déclarer dans `version` — c'est
+          # `version_name` qui la porte, et les deux sont vérifiés.
           CORE: ${{ steps.version.outputs.core }}
+          VERSION: ${{ steps.version.outputs.version }}
 
       # Une icône déclarée par le manifeste mais absente du bundle fait REFUSER le
       # chargement de l'extension par Chromium : l'utilisateur ne voit qu'un message

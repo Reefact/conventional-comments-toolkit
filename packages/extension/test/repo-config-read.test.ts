@@ -64,4 +64,43 @@ describe('§8.2 — lecture de la configuration de dépôt sur GitHub', () => {
     const { adapter } = adapterWith(() => new Response('', { status: 403 }));
     expect(await adapter.getRepoConfig(pr)).toEqual({ status: 'unreachable', reason: 'HTTP 403' });
   });
+
+  // Le retrait des cookies vaut pour la route mesurée, pas pour tous les hôtes : sur un GHES
+  // accepté par `extraHosts`, aucune redirection hors origine n'a été observée, et la session
+  // est ce qui rend lisible la configuration d'un dépôt privé (revue Codex, PR #36, P1).
+  it("un GitHub Enterprise Server garde sa session : la redirection mesurée est celle de github.com", async () => {
+    const { adapter, calls } = adapterWith(() => new Response('{"version":1}', { status: 200 }));
+    await adapter.getRepoConfig({ ...pr, host: 'github.acme.com' });
+
+    expect(calls[0]!.url).toBe(
+      'https://github.acme.com/acme/demo/raw/HEAD/.conventional-comments.json',
+    );
+    expect(calls[0]!.init?.credentials).toBe('include');
+  });
+});
+
+// La lecture du `configUrl` d'organisation (§8.1.1) tombe dans le même piège dès que l'URL
+// est de même origine que la page : `relayableFrom()` décline alors le relais — à raison, le
+// worker n'a pas de permission d'hôte — et la lecture directe partait avec ses cookies.
+describe('§8.1.1 — lecture du configUrl d\'organisation', () => {
+  it('un configUrl `raw` sur github.com part sans cookies, comme celui du dépôt', async () => {
+    const { adapter, calls } = adapterWith(() => new Response('{"version":1}', { status: 200 }));
+    await adapter.getOrgConfig('https://github.com/acme/config/raw/HEAD/cc.json');
+
+    expect(calls[0]!.init?.credentials).toBe('omit');
+  });
+
+  it('un configUrl hors de cette route garde sa session', async () => {
+    const { adapter, calls } = adapterWith(() => new Response('{"version":1}', { status: 200 }));
+    await adapter.getOrgConfig('https://config.acme.com/cc.json');
+
+    expect(calls[0]!.init?.credentials).toBe('include');
+  });
+
+  it("une page HTML de github.com n'est pas la route `raw` : elle garde sa session", async () => {
+    const { adapter, calls } = adapterWith(() => new Response('{"version":1}', { status: 200 }));
+    await adapter.getOrgConfig('https://github.com/acme/config/blob/HEAD/cc.json');
+
+    expect(calls[0]!.init?.credentials).toBe('include');
+  });
 });

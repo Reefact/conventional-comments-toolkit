@@ -55,6 +55,35 @@ export interface GithubClientOptions {
   log?: SelectorLog;
 }
 
+/** `credentials` d'une lecture de configuration — décidé PAR URL, et non une fois pour toutes.
+ *
+ * Le retrait des cookies n'est pas une bonne pratique générale : c'est la réponse à un
+ * mécanisme précis, mesuré sur UNE route. La route `raw` de github.com redirige vers
+ * `raw.githubusercontent.com` dès que le fichier existe, cette origine répond
+ * `Access-Control-Allow-Origin: *`, et le navigateur refuse le joker quand la requête porte
+ * des cookies (mesuré : `npm run check:content-script-cors`). Sur cette route, la session ne
+ * sert donc à rien — elle empêche la lecture.
+ *
+ * Partout ailleurs, `include` reste la règle, et l'absence de mesure est ici l'argument, pas
+ * une négligence : sur un GitHub Enterprise Server accepté par `extraHosts`, nous n'avons
+ * PAS observé de redirection hors origine, et la session y est justement ce qui rend lisible
+ * la configuration d'un dépôt privé. Généraliser le `'omit'` à tous les hôtes retirerait un
+ * accès qui fonctionne, au nom d'un fait établi sur un seul domaine (revue Codex, PR #36,
+ * P1). Le défaut se corrige donc là où il est démontré, nulle part ailleurs. */
+export function configCredentials(url: string): RequestCredentials {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return 'include';
+  }
+  // Hôte ET chemin : sur github.com, seule la route `raw` redirige. Une autre URL du même
+  // domaine (page HTML, route d'API) n'a aucune raison de perdre sa session.
+  return parsed.hostname === 'github.com' && parsed.pathname.includes('/raw/')
+    ? 'omit'
+    : 'include';
+}
+
 export class GithubClientAdapter implements PlatformAdapter {
   #hosts: string[];
   #fetch: typeof fetch;
@@ -92,8 +121,9 @@ export class GithubClientAdapter implements PlatformAdapter {
     return { id: 'github', suggestionInfoString: 'suggestion' };
   }
 
-  /** Route web `raw` — et SANS cookies, ce qui demande une explication, parce que le
-   * contraire semble évident et ne marche pas.
+  /** Route web `raw` — et sur github.com SANS cookies, ce qui demande une explication,
+   * parce que le contraire semble évident et ne marche pas. Le choix est fait par
+   * `configCredentials()`, qui dit aussi pourquoi il ne s'étend pas aux autres hôtes.
    *
    * La route `raw` de github.com **redirige** vers `raw.githubusercontent.com` dès que le
    * fichier existe (302 ; un fichier absent rend 404 sans redirection). La requête part de
@@ -111,7 +141,7 @@ export class GithubClientAdapter implements PlatformAdapter {
    * cette lecture était « une requête same-origin » sans frontière CORS : vrai de la requête,
    * faux de la redirection.
    *
-   * Conséquence assumée du `'omit'` : sur un dépôt PRIVÉ, la route rend 403 faute de session
+   * Conséquence assumée du `'omit'` : sur un dépôt PRIVÉ de github.com, la route rend 403 faute de session
    * — donc `unreachable`, et l'état dégradé. C'est le comportement honnête : l'extension dit
    * qu'elle n'a pas pu lire, au lieu de prétendre qu'il n'y a pas de fichier. La lecture
    * authentifiée des dépôts privés demande une permission d'hôte et passe par le service
@@ -119,7 +149,7 @@ export class GithubClientAdapter implements PlatformAdapter {
   async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
     const url = `https://${pr.host}/${pr.scope.join('/')}/raw/HEAD/.conventional-comments.json`;
     try {
-      const res = await this.#fetch(url, { credentials: 'omit' });
+      const res = await this.#fetch(url, { credentials: configCredentials(url) });
       if (res.status === 404) return { status: 'absent' };
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
       return { status: 'found', text: await res.text() };
@@ -131,11 +161,15 @@ export class GithubClientAdapter implements PlatformAdapter {
   async getOrgConfig(url: string | null): Promise<ConfigRead> {
     if (url === null) return { status: 'absent' };
     // `null` : l'appelant décline pour CETTE url (même origine que la page) — la lecture
-    // directe ci-dessous est alors la bonne, et la seule qui aboutisse.
+    // directe ci-dessous est alors la bonne, et la seule qui aboutisse. Elle passe par
+    // `configCredentials()` comme celle du dépôt : un `configUrl` d'organisation en
+    // `https://github.com/<org>/<dépôt>/raw/...` est de même origine que la page, donc décliné
+    // par le relais, et prenait exactement le mur de la redirection que ce dépôt vient de
+    // documenter (revue Codex, PR #36, P2).
     const relayed = this.#readOrgConfig?.(url);
     if (relayed) return relayed;
     try {
-      const res = await this.#fetch(url, { credentials: 'include' });
+      const res = await this.#fetch(url, { credentials: configCredentials(url) });
       if (res.status === 404) return { status: 'absent' };
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
       return { status: 'found', text: await res.text() };

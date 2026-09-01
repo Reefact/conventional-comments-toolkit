@@ -25,6 +25,7 @@ import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.
 import {
   TELEMETRY_CONSENT_KEY,
   TelemetryCounters,
+  canonicalEndpoint,
   parseConsent,
   telemetryTarget,
   type TelemetryConsent,
@@ -248,8 +249,13 @@ const SELECTOR_LOG_LIMIT = 50;
 function publishTelemetryEndpoint(config: {
   telemetry: { enabled: boolean; endpoint: string | null };
 }): void {
+  // CANONIQUE, comme partout ailleurs : c'est cette chaîne que la page d'options affiche,
+  // puis stocke comme consentement, puis que `telemetryTarget()` compare. Publier la forme
+  // brute ici suffisait à ce que le consentement ne coïncide jamais.
   writeCurrentState({
-    telemetryEndpoint: config.telemetry.enabled ? (config.telemetry.endpoint ?? '') : '',
+    telemetryEndpoint: config.telemetry.enabled
+      ? (canonicalEndpoint(config.telemetry.endpoint) ?? '')
+      : '',
   });
 }
 
@@ -474,9 +480,22 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
 
   const armFor = async (pr: PrRef | null): Promise<void> => {
     if (disposed) return;
+    // DÉSARMER D'ABORD, avant la moindre lecture asynchrone. Entre l'instant où la PR change
+    // et celui où sa configuration est résolue, l'onglet restait armé sur la PRÉCÉDENTE :
+    // `observePrChromeNavigation` sonde ses sélecteurs immédiatement, et une dégradation
+    // rencontrée sur la nouvelle PR était comptée — puis émise — au nom de l'ancienne, même
+    // quand la nouvelle se résout en `off` ou vers un point de collecte non consenti (revue
+    // Codex, PR #31).
+    //
+    // Vidanger AVANT de désarmer, et non l'inverse : `arm(null)` jette, et ce qui a été
+    // compté pour la PR précédente lui appartient légitimement. Le désarmement protège de
+    // la mauvaise attribution, il n'est pas une raison de perdre la mesure. Sur retrait du
+    // consentement, `onConsentChanged` a déjà jeté les compteurs avant d'appeler ici : cette
+    // vidange n'a alors rien à émettre, ce qui est exactement voulu.
+    telemetry.flush();
+    telemetry.arm(null);
     if (!pr) {
       armedFor = null;
-      telemetry.arm(null);
       return;
     }
     const key = prTelemetryKey(pr);
@@ -484,8 +503,14 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     const resolved = await resolver.resolve(adapter, pr); // en cache le plus souvent
     // La PR a pu changer pendant la résolution : un résultat périmé ne doit pas réarmer.
     if (disposed || armedFor?.key !== key) return;
+    // ...et elle a pu changer PENDANT LA LECTURE DU CONSENTEMENT, qui est un second aller-
+    // retour asynchrone. Une première version ne vérifiait qu'avant celui-ci : l'invocation
+    // partie pour l'ancienne PR pouvait réarmer après que la nouvelle avait désarmé (revue
+    // Codex, PR #31). Toute frontière asynchrone se re-vérifie, pas seulement la première.
+    const consent = await readTelemetryConsent();
+    if (disposed || armedFor?.key !== key) return;
     publishTelemetryEndpoint(resolved.config);
-    telemetry.arm(telemetryTarget(resolved.config, await readTelemetryConsent(), key));
+    telemetry.arm(telemetryTarget(resolved.config, consent, key));
   };
 
   // Le consentement peut être RETIRÉ pendant que l'onglet vit. Sans cette écoute, la case

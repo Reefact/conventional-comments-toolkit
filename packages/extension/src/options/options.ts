@@ -2,7 +2,7 @@
 // limitées (§8.1.2 — jamais le mode ni les labels), affichage de l'état dégradé (§5.4)
 // et du journal local de dégradation de sélecteurs (§9.4).
 
-import { TELEMETRY_CONSENT_KEY, parseConsent } from '../telemetry.js';
+import { TELEMETRY_CONSENT_KEY, canonicalEndpoint, parseConsent } from '../telemetry.js';
 import {
   HOST_PLATFORMS_KEY,
   hostnameOf,
@@ -28,6 +28,11 @@ declare const chrome: {
       set: (items: Record<string, unknown>, cb?: () => void) => void;
     };
     managed?: { get: (cb: (items: Record<string, unknown>) => void) => void };
+    onChanged?: {
+      addListener: (
+        cb: (changes: Record<string, { newValue?: unknown }>, areaName: string) => void
+      ) => void;
+    };
   };
 } | undefined;
 
@@ -250,7 +255,18 @@ document.getElementById('direct-shortcuts-save')?.addEventListener('click', () =
 const telemetryOptIn = document.getElementById('telemetry-opt-in') as HTMLInputElement | null;
 const telemetryLine = document.getElementById('telemetry-endpoint');
 
+/** Le point de collecte RÉELLEMENT AFFICHÉ, et donc le seul auquel cocher puisse consentir.
+ *
+ * Il vit ici plutôt que d'être relu au clic : `telemetryEndpoint` est une clé partagée, qu'un
+ * autre onglet de revue peut réécrire pendant que cette page reste ouverte. Une version
+ * antérieure relisait le stockage dans le gestionnaire de la case et enregistrait le
+ * consentement pour la valeur du moment — on autorisait une destination qu'on n'avait pas vue
+ * (revue Codex, PR #31). La page se réaffiche donc sur changement de la clé, et le
+ * consentement porte toujours sur ce que la ligne au-dessus de la case dit. */
+let displayedEndpoint = '';
+
 function renderTelemetry(endpoint: string, consented: string | null): void {
+  displayedEndpoint = endpoint;
   if (telemetryOptIn) {
     telemetryOptIn.checked = endpoint !== '' && consented === endpoint;
     telemetryOptIn.disabled = endpoint === '';
@@ -270,21 +286,31 @@ function renderTelemetry(endpoint: string, consented: string | null): void {
   }
 }
 
-chrome?.storage?.local?.get([TELEMETRY_CONSENT_KEY, 'telemetryEndpoint'], (items) => {
-  const endpoint = typeof items['telemetryEndpoint'] === 'string' ? items['telemetryEndpoint'] : '';
-  renderTelemetry(endpoint, parseConsent(items[TELEMETRY_CONSENT_KEY])?.endpoint ?? null);
-});
+function refreshTelemetry(): void {
+  chrome?.storage?.local?.get([TELEMETRY_CONSENT_KEY, 'telemetryEndpoint'], (items) => {
+    const endpoint = canonicalEndpoint(items['telemetryEndpoint'] as string | null) ?? '';
+    renderTelemetry(endpoint, parseConsent(items[TELEMETRY_CONSENT_KEY])?.endpoint ?? null);
+  });
+}
+refreshTelemetry();
 
 telemetryOptIn?.addEventListener('change', () => {
-  chrome?.storage?.local?.get(['telemetryEndpoint'], (items) => {
-    const endpoint = typeof items['telemetryEndpoint'] === 'string' ? items['telemetryEndpoint'] : '';
-    // `null` et non un booléen à `false` : retirer son accord, c'est effacer à quoi on avait
-    // consenti. Les onglets ouverts écoutent cette clé et se désarment aussitôt.
-    chrome?.storage?.local?.set({
-      [TELEMETRY_CONSENT_KEY]: telemetryOptIn.checked && endpoint !== '' ? { endpoint } : null,
-    });
-    renderTelemetry(endpoint, telemetryOptIn.checked && endpoint !== '' ? endpoint : null);
+  // `displayedEndpoint`, jamais une relecture : on consent à ce qui était sous les yeux.
+  const endpoint = displayedEndpoint;
+  if (endpoint === '') return; // rien à autoriser ; la case est de toute façon désactivée
+  // `null` et non un booléen à `false` : retirer son accord, c'est effacer à quoi on avait
+  // consenti. Les onglets ouverts écoutent cette clé et se désarment aussitôt.
+  chrome?.storage?.local?.set({
+    [TELEMETRY_CONSENT_KEY]: telemetryOptIn.checked ? { endpoint } : null,
   });
+  renderTelemetry(endpoint, telemetryOptIn.checked ? endpoint : null);
+});
+
+// Un autre onglet a changé le point de collecte ou le consentement : réafficher, pour que la
+// case et la ligne qui l'explique ne mentent jamais sur ce à quoi un clic consentirait.
+chrome?.storage?.onChanged?.addListener((changes, area) => {
+  if (area !== 'local') return;
+  if (TELEMETRY_CONSENT_KEY in changes || 'telemetryEndpoint' in changes) refreshTelemetry();
 });
 
 // État dégradé (§5.4, §9.2.3) et journal de dégradation de sélecteurs (§9.4).

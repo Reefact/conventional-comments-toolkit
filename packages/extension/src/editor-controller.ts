@@ -248,15 +248,17 @@ export class EditorController {
     const hasSelection = selEnd > selStart;
 
     const effectiveLabel = label ?? this.#lastAnalysis?.resolved?.label.id ?? 'suggestion';
-    const { nextValue, caret, delta, changedAt } = computePrefixInsertion(
+    const { nextValue, caret, delta, changedAt, removed } = computePrefixInsertion(
       value,
       { label: effectiveLabel, decorations },
       { toggle }
     );
-    // « label utilisé » (§10) : l'identifiant du label effectivement posé, jamais la ligne
-    // écrite. Compté ici, à l'insertion, et non à la lecture d'un préfixe déjà saisi — ce
-    // qui compterait le même commentaire à chaque frappe.
-    this.deps.telemetry?.({ kind: 'label-used', label: effectiveLabel });
+    // « label utilisé » (§10) : l'identifiant du label effectivement POSÉ, jamais la ligne
+    // écrite, et jamais un label qu'on vient de RETIRER. Cliquer deux fois le même bouton
+    // pose puis retire ; compter les deux gonflait l'usage d'un label qu'on a justement
+    // renoncé à employer (revue Codex, PR #31). Compté à l'insertion, et non à la lecture
+    // d'un préfixe déjà saisi — ce qui compterait le même commentaire à chaque frappe.
+    if (!removed) this.deps.telemetry?.({ kind: 'label-used', label: effectiveLabel });
     this.deps.adapter.writeValue(this.deps.editor, nextValue, hasSelection ? undefined : caret);
     if (hasSelection) {
       // Le texte sélectionné n'est pas remplacé ; la sélection est restaurée, décalée de

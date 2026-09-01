@@ -48,7 +48,30 @@ export interface TelemetryTarget {
  * était affichée au moment où la case a été cochée, et ne vaut que pour elle. */
 export const TELEMETRY_CONSENT_KEY = 'telemetryConsent';
 
-/** Ce qui est stocké sous cette clé. `endpoint` est l'URL exacte qui a été présentée. */
+/** Forme CANONIQUE d'un point de collecte, ou `null` s'il n'est pas exploitable.
+ *
+ * UNE seule représentation, employée partout — publication, affichage, stockage du
+ * consentement, comparaison. Sans elle, la fonctionnalité était inerte en silence pour la
+ * forme d'URL la plus courante : la page d'options affichait et stockait
+ * `https://collecte.example` tel quel, `telemetryTarget()` comparait à
+ * `new URL(...).href`, soit `https://collecte.example/`, et le consentement ne coïncidait
+ * JAMAIS. L'organisation aurait cru la télémétrie active sans rien recevoir, sans erreur
+ * nulle part (revue Codex, PR #31). Port par défaut, casse du nom d'hôte et normalisation
+ * du chemin produisaient la même divergence.
+ *
+ * `https:` exigé ici : une page de plateforme est servie en HTTPS et le navigateur bloque le
+ * contenu mixte — un point de collecte en clair ne recevrait jamais rien. */
+export function canonicalEndpoint(raw: string | null | undefined): string | null {
+  if (typeof raw !== 'string' || raw === '') return null;
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Ce qui est stocké sous cette clé. `endpoint` est l'URL canonique qui a été présentée. */
 export interface TelemetryConsent {
   endpoint: string;
 }
@@ -56,9 +79,10 @@ export interface TelemetryConsent {
 /** Forme sûre de la valeur stockée — elle vient du stockage, donc de l'extérieur. */
 export function parseConsent(raw: unknown): TelemetryConsent | null {
   const value = raw as Partial<TelemetryConsent> | undefined;
-  return typeof value?.endpoint === 'string' && value.endpoint !== ''
-    ? { endpoint: value.endpoint }
-    : null;
+  // Canonicalisé À LA RELECTURE aussi : un consentement écrit par une version antérieure,
+  // ou à la main, ne doit pas devenir inutilisable pour une barre oblique.
+  const endpoint = canonicalEndpoint(value?.endpoint ?? null);
+  return endpoint === null ? null : { endpoint };
 }
 
 /** Vocabulaire fermé, appliqué à la CLÉ COMPLÈTE du compteur. Un identifiant de label ou
@@ -93,19 +117,14 @@ export function telemetryTarget(
   // anticipée du mode `off` passait AVANT l'armement (revue Codex, PR #31). La règle vit
   // ici, où aucun ordre d'appel ne peut la contourner.
   if (config.mode === 'off') return null;
-  if (!consent || !config.telemetry.enabled || !config.telemetry.endpoint) return null;
-  let endpoint: URL;
-  try {
-    endpoint = new URL(config.telemetry.endpoint);
-  } catch {
-    return null;
-  }
-  if (endpoint.protocol !== 'https:') return null;
+  if (!consent || !config.telemetry.enabled) return null;
+  const endpoint = canonicalEndpoint(config.telemetry.endpoint);
+  if (endpoint === null) return null;
   // LE point du correctif : le consentement vaut pour CETTE destination, pas pour l'idée de
   // télémétrie. Un dépôt qui en désigne une autre n'hérite pas de l'accord donné pour la
   // première — il faut le redonner, devant la nouvelle URL affichée.
-  if (consent.endpoint !== endpoint.href) return null;
-  return { endpoint: endpoint.href, mode: config.mode, repo };
+  if (consent.endpoint !== endpoint) return null;
+  return { endpoint, mode: config.mode, repo };
 }
 
 /** L'émetteur. Compte en mémoire, n'émet qu'à la vidange — c'est ce que « compteurs

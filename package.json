@@ -22,11 +22,12 @@
     "check:ca-matrix": "node scripts/check-ca-matrix.mjs",
     "check:invisible": "node scripts/check-invisible-chars.mjs",
     "check:extension-css": "node scripts/check-extension-css.mjs",
-    "checks": "npm run check:ca-matrix && npm run check:invisible && npm run check:extension-css && npm run build && npm run build:extension && npm run check:context-apis",
+    "checks": "npm run check:ca-matrix && npm run check:invisible && npm run check:extension-css && npm run build && npm run build:extension && npm run check:context-apis && npm run check:content-script-io",
     "server": "node packages/server/dist/main.js",
     "check:context-apis": "node scripts/check-context-apis.mjs",
     "smoke:mv3": "node spikes/mv3-smoke.mjs",
-    "check:beacon": "node spikes/beacon-transport.mjs"
+    "check:beacon": "node spikes/beacon-transport.mjs",
+    "check:content-script-io": "node scripts/check-content-script-io.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

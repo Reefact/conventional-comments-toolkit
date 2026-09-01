@@ -57,7 +57,7 @@ jobs:
         # workspace, que `tsc -b` produit. Sans lui, esbuild échoue sur un clone frais —
         # ce qui est arrivé ici, la vérification locale ayant été faite dans un
         # environnement déjà compilé, donc dans un monde qui n'était pas celui de la CI.
-        run: npm run build && npm run build:extension && npm run check:context-apis
+        run: npm run build && npm run build:extension && npm run check:context-apis && npm run check:content-script-io
 
       # `specifications-fr.md` est la référence NORMATIVE : elle ne se modifie pas pour
       # correspondre au code. Un changement délibéré de la spécification reste possible —

@@ -49,7 +49,18 @@ const collector = await listen((req, res) => {
   let body = '';
   req.on('data', (chunk) => (body += chunk));
   req.on('end', () => {
-    collected.push({ method: req.method, contentType: req.headers['content-type'], body });
+    collected.push({
+      method: req.method,
+      contentType: req.headers['content-type'],
+      body,
+      // Ce que la requête emporte D'ELLE-MÊME, sans qu'on l'ait mis dans le corps. C'est
+      // ici que se vérifie la phrase de `PRIVACY.md` : « seuls les compteurs listés
+      // quittent le navigateur ». Une revue a trouvé cette phrase fausse — le `Referer`
+      // par défaut emporte l'URL de la page de revue — parce qu'elle avait été écrite de
+      // mémoire, jamais mesurée (revue Codex, PR #31).
+      referer: req.headers['referer'] ?? null,
+      cookie: req.headers['cookie'] ?? null,
+    });
     res.writeHead(204).end();
   });
 });
@@ -63,6 +74,14 @@ try {
   const page = await browser.newPage();
   await page.goto(pageUrl, { waitUntil: 'load' });
 
+  // Le cookie est posé PAR LA PAGE, sur son origine ; le collecteur est sur une autre
+  // origine. `credentials: 'omit'` doit l'empêcher de suivre — mais un cookie d'origine
+  // tierce ne serait de toute façon pas envoyé ici, donc ce test ne prouve que la moitié
+  // de la phrase. Ce qu'il prouve entièrement, c'est l'absence de `Referer`.
+  await page.evaluate(() => {
+    document.cookie = 'cct_probe=1';
+  });
+
   const payload = JSON.stringify({ v: 1, mode: 'enforce', repo: 'exemple/dépôt', counters: { 'label:issue': 4 } });
   const sent = await page.evaluate(
     async ([url, body]) => {
@@ -72,6 +91,7 @@ try {
           mode: 'no-cors',
           keepalive: true,
           credentials: 'omit',
+          referrerPolicy: 'no-referrer',
           headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
           body,
         });
@@ -97,6 +117,16 @@ try {
     'le collecteur d’une autre origine reçoit le POST, corps intact',
     received?.method === 'POST' && received?.body === payload,
     JSON.stringify(received ?? null)
+  );
+
+  // Ce que la requête emporte en plus du corps. `PRIVACY.md` affirme que seuls les
+  // compteurs listés quittent le navigateur : sans `referrerPolicy`, l'URL de la page de
+  // revue partait dans le `Referer` et cette phrase était fausse. La mesurer ici la rend
+  // vérifiable à chaque exécution, au lieu de reposer sur la mémoire de qui l'a écrite.
+  assert(
+    'la requête n’emporte NI referer NI cookie, comme PRIVACY.md l’affirme',
+    received != null && received.referer === null && received.cookie === null,
+    JSON.stringify({ referer: received?.referer ?? null, cookie: received?.cookie ?? null })
   );
 
   // Le pendant, et il compte pour l'honnêteté du dispositif : `no-cors` n'est pas une

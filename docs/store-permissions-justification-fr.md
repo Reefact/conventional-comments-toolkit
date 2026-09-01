@@ -199,6 +199,13 @@ mécanique de messagerie est vérifiée dans un vrai Chromium par
   de configuration ordinaire, le fichier d'un dépôt peut l'écrire, et
   sans consentement local un dépôt désignerait lui-même le collecteur.
 
+  **L'accord porte sur UNE destination**, celle qui était affichée : un
+  dépôt qui en désigne une autre n'en hérite pas, il faut consentir à
+  nouveau devant la nouvelle adresse. Il est stocké sur l'appareil
+  (`chrome.storage.local`), **ne se synchronise pas** vers les autres
+  appareils du compte, et le retirer **désarme immédiatement les onglets
+  déjà ouverts** — ils écoutent cette clé.
+
   **Ce qui part**, à la vidange périodique et jamais à la frappe : le
   dépôt affiché (`hôte/portée`), le mode, et des compteurs
   d'identifiants — labels employés, codes de diagnostic, chaînes de
@@ -207,6 +214,12 @@ mécanique de messagerie est vérifiée dans un vrai Chromium par
   identifiant est **abandonnée**, jamais tronquée ni assainie, de sorte
   qu'aucun fragment de texte saisi ne puisse suivre ce chemin. Aucun
   cookie n'est joint (`credentials: 'omit'`).
+
+  La requête ne joint **ni cookie ni référent** : sans `referrerPolicy`,
+  le `Referer` par défaut emporterait l'URL complète de la page de revue,
+  identifiant de PR compris. `npm run check:beacon` lit les en-têtes
+  effectivement reçus par un collecteur, et `npm run check:content-script-io`
+  vérifie que le code livré pose bien la politique.
 
   **Aucune permission supplémentaire n'est demandée pour cela** : le
   POST est émis en `no-cors`, dont la réponse n'est pas lue —

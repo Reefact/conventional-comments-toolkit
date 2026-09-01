@@ -317,7 +317,17 @@ export class EditorController {
     const selEnd = element.selectionEnd ?? 0;
     const hasSelection = selEnd > selStart;
 
-    const effectiveLabel = label ?? this.#lastAnalysis?.resolved?.label.id ?? 'suggestion';
+    // `label` vient du GESTE et vaut ce qu'il dit : un label, ou `null` pour « le
+    // commentaire n'en porte aucun ». Il retombait auparavant sur `#lastAnalysis`, ce qui
+    // faisait de `null` un « je ne me prononce pas » — et l'analyse, débattue à 150 ms, est
+    // en retard. Effacer un préfixe puis valider une décoration RECRÉAIT donc le label
+    // qu'on venait de supprimer (revue Codex, PR #35).
+    //
+    // C'est la troisième fois dans cette barre qu'une même valeur porte deux intentions :
+    // `[]` pour « aucune décoration » et « non spécifiée », un label seul pour l'id canonique
+    // et l'orthographe écrite, `null` ici. Le repli périmé disparaît plutôt que d'être
+    // rattrapé : plus aucun geste ne demande son avis à une analyse qu'il n'a pas lue.
+    const effectiveLabel = label ?? 'suggestion';
     // Ce que le commentaire porte AVANT cette insertion, en id canonique — alias résolu et
     // casse de la configuration (§3.2). Deux décisions en dépendent : retirer ou remplacer,
     // et compter ou non un « label utilisé ».

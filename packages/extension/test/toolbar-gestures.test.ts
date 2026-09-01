@@ -373,6 +373,20 @@ describe('§5.1 — enchaînements de gestes', () => {
     clickLabel('issue');
     expect(textarea.value).toBe('issue (blocking): le nom est ambigu');
   });
+
+  // Le test ci-dessus passait pour la MAUVAISE raison : rien ne revalidait entre les deux
+  // clics. Or `sync()` recopiait le texte dans la sélection, donc la moindre revalidation —
+  // taper le sujet, par exemple, ce que tout le monde fait entre les deux — effaçait le
+  // choix et cochait « aucune » (revue Codex, PR #35).
+  it('… même si l’on écrit le sujet entre les deux clics', async () => {
+    const { textarea } = setup();
+    clickDecoration('blocking');
+    await typeByHand(textarea, 'le nom est ambigu'); // une validation complète s'intercale
+    expect(checkedSegment()).toBe('(blocking)'); // la barre montre toujours le choix en attente
+
+    clickLabel('issue');
+    expect(textarea.value).toBe('issue (blocking): le nom est ambigu');
+  });
 });
 
 describe('§3.2 — un geste de décoration ne réécrit pas l’orthographe du label', () => {
@@ -420,5 +434,50 @@ describe('§8.2 — la casse d’une décoration configurée', () => {
     });
     await typeByHand(textarea, 'issue (blocking): le nom est ambigu');
     expect(checkedSegment()).toBe('(Blocking)');
+  });
+});
+
+describe('§3.3 — ce que la barre ne peut PAS affirmer', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  // Règle 2 du §3.3 : deux porteuses aux effets opposés produisent `E-CONFLICT`, et `core/`
+  // les ignore toutes les deux — « aucune règle de la première gagne n'est définie ». En
+  // cocher une présentait un côté du conflit comme le choix actif.
+  it('des décorations porteuses CONTRADICTOIRES ne font cocher aucun segment', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'issue (blocking, non-blocking): le nom est ambigu');
+    expect(checkedSegment()).toBeNull();
+  });
+
+  // Deux porteuses au MÊME effet ne se contredisent pas (§3.3 : ce sont les effets opposés
+  // qui font le conflit) : la barre peut alors dire ce qu'elle affiche.
+  it('deux porteuses au même effet ne sont pas un conflit', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'issue (non-blocking, if-minor): le nom est ambigu');
+    expect(checkedSegment()).toBe('(non-blocking)');
+  });
+});
+
+describe('§5.1 — effacer un label et décorer dans la foulée', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  // Le miroir du défaut du round précédent : `null` voulait dire « aucun label » ET « je ne
+  // me prononce pas », et le second sens retombait sur une analyse en retard de 150 ms.
+  it('valider une décoration après avoir effacé le préfixe ne le RECRÉE pas', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'issue: le nom est ambigu'); // analysé : le contrôleur connaît `issue`
+    writeToTextField(textarea, 'le nom est ambigu', 17); // effacé, avant toute revalidation
+
+    const free = freeField();
+    free.value = 'perf';
+    free.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+
+    // `suggestion` est le repli d'un commentaire SANS label — pas `issue`, que la personne
+    // vient précisément de retirer.
+    expect(textarea.value).toBe('suggestion (perf): le nom est ambigu');
   });
 });

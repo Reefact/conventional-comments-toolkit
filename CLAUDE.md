@@ -10,11 +10,20 @@
 
 ## Règles du chantier
 
-- **Langue.** Les messages de commit s'écrivent en **anglais**, TOUJOURS — c'est la seule
-  exception, et elle ne se discute pas. Tout le reste est en **français** : titres et corps
-  de pull request, commentaires et réponses de revue, commentaires de code, documents du
-  dépôt. Le critère n'est pas la langue de l'interlocuteur du moment ni celle de l'outil qui
-  lit (un robot de revue anglophone ne change rien) : c'est cette règle-ci, et rien d'autre.
+- **Langue.** Les messages de commit s'écrivent en **anglais**, TOUJOURS, et cela ne se
+  discute pas. Tout le reste est en **français** : titres et corps de pull request,
+  commentaires et réponses de revue, commentaires de code, documents du dépôt. Le critère
+  n'est pas la langue de l'interlocuteur du moment ni celle de l'outil qui lit — un robot de
+  revue anglophone ne change rien.
+
+  **Un document dont le public est explicitement anglophone reste en anglais**, et son
+  contenu doit y être aussi soigné que dans sa version française : `README.md`, tout
+  `docs/*-en.md`, la moitié anglaise de `PRIVACY.md`, et les chaînes anglaises des artefacts
+  de publication (`INSTALLATION.txt` est bilingue, et `release.yml` renvoie au guide
+  anglais). Ce n'est pas une entorse à la règle, c'est sa raison d'être : la langue d'un
+  artefact se décide à sa destination, pas à celle de la conversation qui l'a produit — et
+  ces documents-là sont écrits pour des gens qui ne lisent pas le français. La première
+  version de cette règle les condamnait à être traduits (revue Codex, PR #32).
 - `specifications-fr.md` est la référence fonctionnelle **normative**. Ne jamais
   la modifier pour la faire correspondre à l'implémentation. L'état du
   repository est la source de vérité sur l'avancement.

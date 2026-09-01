@@ -46,18 +46,25 @@ function prefixPosedIn(value: string, config: EffectiveConfig): PosedPrefix {
   const prefixLine = splitBody(value).prefixLine;
   const posed = prefixLine === null ? null : matchPrefix(prefixLine);
   if (posed === null) {
-    return { label: null, writtenLabel: null, decorations: [], malformedDecorations: false };
+    return { hasPrefix: false, label: null, writtenLabel: null, decorations: [], malformedDecorations: false };
   }
-  const resolved = resolveLabel(posed.label, config);
   // L'id canonique sert à COMPARER (bouton, bascule, comptage) ; l'orthographe écrite sert à
   // RÉÉCRIRE. Les confondre imposait la forme canonique au premier geste venu (§3.2).
-  const label = resolved?.label.id ?? null;
-  const writtenLabel = resolved === null ? null : posed.label;
+  //
+  // Et le `null` de `resolveLabel` dit « ce label n'est pas dans la configuration », pas
+  // « ce commentaire n'a pas de préfixe » : effacer AUSSI l'orthographe faisait prendre à la
+  // barre sa branche « rien d'écrit » sur `riskk (blocking): x`, où elle pouvait cocher
+  // « aucune » devant une décoration bien visible, et où plus aucun geste n'atteignait le
+  // préfixe (revue Codex, PR #35). `hasPrefix` porte donc la question « une ligne de préfixe
+  // est-elle reconnue ? », que `label` ne peut pas porter.
+  const label = resolveLabel(posed.label, config)?.label.id ?? null;
+  const writtenLabel = posed.label;
   if (posed.decorations === null) {
-    return { label, writtenLabel, decorations: [], malformedDecorations: false };
+    return { hasPrefix: true, label, writtenLabel, decorations: [], malformedDecorations: false };
   }
   const parsed = parseDecorations(posed.decorations);
   return {
+    hasPrefix: true,
     label,
     writtenLabel,
     decorations: parsed.canonical,
@@ -336,13 +343,18 @@ export class EditorController {
     // qu'il est écrit. Les deux décisions ci-dessus portent sur le label, pas sur son
     // orthographe : elles se prennent donc sur la forme canonique, sans quoi décorer
     // `bug: x` compterait un usage de label et casserait la bascule.
-    const canonicalEffective = resolveLabel(effectiveLabel, this.config)?.label.id ?? effectiveLabel;
+    // `null` quand le label posé n'est PAS de la configuration (`riskk`). Deux décisions en
+    // dépendent, et aucune ne doit alors s'appuyer sur la chaîne écrite : ce serait comparer
+    // à un label qui n'existe pas, et surtout COMPTER du texte saisi par la personne — le
+    // §10 interdit d'émettre autre chose qu'un identifiant du vocabulaire. Décorer un
+    // préfixe inconnu ne compte donc aucun usage, plutôt que d'en inventer un.
+    const canonicalEffective = resolveLabel(effectiveLabel, this.config)?.label.id ?? null;
     const { nextValue, caret, delta, changedAt, removed } = computePrefixInsertion(
       value,
       { label: effectiveLabel, decorations },
       // `sameLabel` se décide ICI, où la configuration est disponible : `posedBefore` est
       // déjà l'id canonique rendu par `resolveLabel()`, alias résolu (§3.2).
-      { toggle, sameLabel: posedBefore === canonicalEffective }
+      { toggle, sameLabel: canonicalEffective !== null && posedBefore === canonicalEffective }
     );
     // « label utilisé » (§10) : l'identifiant du label effectivement POSÉ, jamais la ligne
     // écrite, et jamais un label qu'on vient de RETIRER. Cliquer deux fois le même bouton
@@ -358,7 +370,7 @@ export class EditorController {
     // d'autant plus fort que la personne hésite, ce qui n'a aucun sens à remonter.
     // Et compté sous l'id CANONIQUE : « l'alias n'est pas un label distinct […] il est
     // comptabilisé sous son label canonique » (§3.2).
-    if (!removed && posedBefore !== canonicalEffective) {
+    if (!removed && canonicalEffective !== null && posedBefore !== canonicalEffective) {
       this.deps.telemetry?.({ kind: 'label-used', label: canonicalEffective });
     }
     this.deps.adapter.writeValue(this.deps.editor, nextValue, hasSelection ? undefined : caret);

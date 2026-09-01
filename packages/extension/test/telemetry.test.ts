@@ -364,6 +364,21 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     expect(events.filter((e) => e.kind === 'label-used')).toEqual([]);
   });
 
+  // §10 : « jamais de texte libre ». Un label INCONNU de la configuration est du texte
+  // saisi par la personne — `riskk` n'est pas un identifiant du vocabulaire. Décorer un tel
+  // préfixe passe désormais ce texte au contrôleur, puisque l'orthographe écrite est
+  // conservée pour pouvoir le réécrire : il ne doit surtout pas partir dans un compteur
+  // (revue Codex, PR #35 — conséquence trouvée en corrigeant, pas signalée).
+  it('un label inconnu de la configuration n’est JAMAIS compté', () => {
+    const { controller, textarea, events } = setup();
+    textarea.value = 'riskk (blocking): le nom est ambigu';
+
+    controller.insertPrefix('riskk', ['non-blocking'], false);
+    expect(textarea.value).toBe('riskk (non-blocking): le nom est ambigu');
+    expect(events.filter((e) => e.kind === 'label-used')).toEqual([]);
+    expect(JSON.stringify(events)).not.toContain('riskk');
+  });
+
   // « Label utilisé » ne doit pas dépendre du CHEMIN par lequel la personne l'a posé. La
   // saisie rapide écrit le préfixe elle-même, sans passer par `insertPrefix()` : elle
   // n'était pas comptée, tandis que la barre d'outils et les raccourcis l'étaient — un

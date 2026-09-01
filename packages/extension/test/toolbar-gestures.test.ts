@@ -552,6 +552,18 @@ describe('§3.2 — un préfixe écrit dont le label est INCONNU de la configura
     expect(checkedSegment()).toBeNull();
   });
 
+  // Un préfixe écrit dit lui-même sa décoration, même si son label est inconnu : un choix
+  // resté en attente ne doit pas l'écraser. `hasPrefix` existait pour cette distinction et
+  // n'avait été posé que dans la synchronisation, pas dans le clic (revue Codex, PR #35).
+  it('un choix en attente n’écrase pas la décoration d’un préfixe écrit', async () => {
+    const { textarea } = setup();
+    clickDecoration('blocking'); // en attente, sur un commentaire encore nu
+    await typeByHand(textarea, 'riskk (non-blocking): le nom est ambigu');
+
+    clickLabel('issue');
+    expect(textarea.value).toBe('issue (non-blocking): le nom est ambigu');
+  });
+
   // L'orthographe écrite est conservée : décorer reste possible, et n'impose pas un label
   // que la personne n'a pas choisi.
   it('décorer un label inconnu garde son orthographe', async () => {

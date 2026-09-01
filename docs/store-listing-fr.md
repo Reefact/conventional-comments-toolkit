@@ -111,14 +111,22 @@ priorité pour la fiche store :
 Format recommandé par Chrome Web Store : 1280×800 ou 640×400, PNG ou JPEG,
 jusqu'à 5 captures.
 
-**Si le bandeau « Configuration non lue » apparaît sur la capture**, ce
-n'est **pas** parce que le dépôt n'a pas de `.conventional-comments.json`.
-`ClientConfigResolver` ne passe en état dégradé (§5.4) que lorsqu'une
-lecture rend `unreachable` ; un fichier **absent** rend `absent`, avec
-`degraded: false`, et n'affiche aucun bandeau — conformément au §10
-(« un fichier simplement absent est un cas nominal, pas une
-dégradation »). Le bandeau signale donc un `fetch` réellement en échec
-sur `https://{hôte}/{owner}/{repo}/raw/HEAD/.conventional-comments.json`
-(erreur réseau, ou statut HTTP autre que 404) : c'est cette requête qu'il
-faut inspecter dans l'onglet réseau, et **ajouter un fichier de
-configuration ne le fera pas disparaître**.
+**Si le bandeau « Configuration non lue » apparaît sur la capture** : le
+diagnostic écrit ici pendant plusieurs versions était juste sur son
+prémisse et faux sur sa conclusion, et il vaut d'être corrigé plutôt que
+remplacé. Juste : un fichier **absent** rend `absent`, `degraded: false`,
+et n'affiche aucun bandeau (§10, « un fichier simplement absent est un cas
+nominal »). Faux : « ajouter un fichier de configuration ne le fera pas
+disparaître ». C'était l'inverse — le bandeau apparaissait **parce qu'il y
+avait un fichier**. La route `raw` de github.com redirige vers
+`raw.githubusercontent.com` dès que le fichier existe, cette origine
+répond `Access-Control-Allow-Origin: *`, et le navigateur refuse ce joker
+quand la requête porte des cookies : le `fetch` levait, la lecture rendait
+`unreachable`, et le bandeau s'affichait exactement sur les dépôts qui
+avaient une configuration à lire.
+
+Corrigé : la lecture part sans cookies. Sur un dépôt **public**, elle
+aboutit et le bandeau disparaît. Sur un dépôt **privé**, la route rend 403
+sans session : le bandeau reste, et il dit alors la vérité — l'extension
+n'a pas pu lire. Prenez donc les captures sur un dépôt public, ou sur un
+dépôt sans fichier de configuration.

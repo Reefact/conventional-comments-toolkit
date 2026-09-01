@@ -75,6 +75,13 @@ jobs:
       # La télémétrie (§10) repose sur une affirmation à propos du navigateur : un POST
       # `no-cors` vers une autre origine part et arrive, sans permission d'hôte. Un faux
       # `fetch` ne dirait que ce qu'on a cru ; ce test sert deux vraies origines et regarde.
+      # Trois documents ont affirmé que la lecture de configuration était « same-origin »,
+      # donc sans frontière CORS. Vrai de la requête, faux de la redirection : le niveau
+      # « dépôt » du §8.2 n'a jamais fonctionné sur GitHub. Ce que le navigateur autorise
+      # à un script de contenu se mesure, il ne se rappelle pas.
+      - name: CORS d'un script de contenu — ce qu'il a le droit de lire
+        run: npm run check:content-script-cors
+
       - name: Transport de la télémétrie — POST no-cors vers une autre origine (§10)
         run: npm run check:beacon
 

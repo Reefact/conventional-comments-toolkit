@@ -30,7 +30,7 @@ const pr: PrRef = {
   number: 42,
 };
 
-function setup() {
+function setup(tweak: (config: ReturnType<typeof defaultConfig>) => void = () => {}) {
   const host = document.createElement('div');
   const textarea = document.createElement('textarea');
   textarea.className = 'CommentBox-input';
@@ -53,6 +53,7 @@ function setup() {
   const config = defaultConfig();
   config.mode = 'enforce';
   config.activation.activatedAt = '2026-09-01T00:00:00Z';
+  tweak(config);
 
   const controller = new EditorController({
     adapter: adapter as PlatformAdapter,
@@ -237,5 +238,91 @@ describe('§5.1 — le champ de décoration libre', () => {
     const free = freeField();
     free.dispatchEvent(new Event('blur', { bubbles: false }));
     expect(textarea.value).toBe(before);
+  });
+});
+
+// ————— La FENÊTRE DE VALIDATION DÉBATTUE (150 ms) —————
+// La barre se réaligne sur le texte à la validation, débattue à 150 ms. Entre une frappe et
+// ce réalignement, tout ce qu'elle aurait mémorisé est en retard sur le commentaire — et
+// quelqu'un qui tape vite, ou qui colle, clique dans cet intervalle. Trois des quatre
+// trouvailles de la revue vivaient là (revue Codex, PR #35), une par geste : le premier
+// correctif ne faisait relire le texte QU'AU segment de décoration.
+//
+// Ces tests ne laissent donc jamais passer la validation avant de cliquer.
+describe('§5.1 — les gestes dans la fenêtre de validation débattue', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  it('le second clic RETIRE, même si la barre n’a pas encore vu le label', () => {
+    const { textarea } = setup();
+    writeToTextField(textarea, 'issue: le nom est ambigu', 24); // pas d'attente
+
+    clickLabel('issue');
+    expect(textarea.value).toBe('le nom est ambigu');
+  });
+
+  it('le champ libre décore le label ÉCRIT, il ne le remplace pas', () => {
+    const { textarea } = setup();
+    writeToTextField(textarea, 'issue: le nom est ambigu', 24); // pas d'attente
+
+    const free = freeField();
+    free.value = 'perf';
+    free.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    // Sans la lecture au geste : `suggestion (perf): …` — une décoration réécrivait le label.
+    expect(textarea.value).toBe('issue (perf): le nom est ambigu');
+  });
+});
+
+// ————— Ce que la barre dit du COMMENTAIRE, dans les termes de la CONFIGURATION —————
+describe('§3.2, §3.3 — alias, casse et décorations illégales', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  // §3.2 : un alias « hérite intégralement » de son label. Il n'a pas de bouton propre —
+  // c'est celui du label canonique qui doit s'allumer.
+  it('un ALIAS allume le bouton de son label canonique', async () => {
+    // Les alias viennent de la CONFIGURATION (§8.2) : la configuration par défaut n'en
+    // déclare aucun. Le premier jet de ce test tenait `bug` pour un alias d'`issue` parce
+    // que la spécification l'emploie en exemple — un faux qui décrivait un produit qui
+    // n'existe pas (CLAUDE.md, règle 2). Il est donc déclaré ici.
+    const { textarea } = setup((config) => {
+      config.labels.find((l) => l.id === 'issue')!.aliases = ['bug'];
+    });
+    await typeByHand(textarea, 'bug: le nom est ambigu');
+
+    expect(document.querySelector('.cct-label-button[data-label="issue"]')!.getAttribute('aria-pressed')).toBe('true');
+    // Et le geste suit : cliquer `issue` sur un commentaire écrit `bug:` le RETIRE.
+    clickLabel('issue');
+    expect(textarea.value).toBe('le nom est ambigu');
+  });
+
+  // La casse d'un id configuré est libre (§8.2) : la comparer telle quelle laissait le
+  // bouton d'un label `Risk` éteint sur un commentaire qui le porte.
+  it('un label configuré en casse mixte est reconnu', async () => {
+    const { textarea } = setup((config) => {
+      config.labels.push({
+        ...config.labels[0]!,
+        id: 'Risk',
+        aliases: [],
+        enabled: true,
+      });
+    });
+    await typeByHand(textarea, 'risk: le nom est ambigu');
+
+    expect(document.querySelector('.cct-label-button[data-label="Risk"]')!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  // Des parenthèses vides sont une coquille (§3.4.2), pas une absence de décoration : le
+  // validateur signale E-DECORATION-SYNTAX au même instant. Cocher « aucune » affirmerait
+  // le contraire, à l'œil comme au lecteur d'écran.
+  it('une décoration ILLÉGALE ne fait cocher aucun segment, « aucune » comprise', async () => {
+    const { textarea } = setup();
+    await typeByHand(textarea, 'issue (): le nom est ambigu');
+    expect(checkedSegment()).toBeNull();
+
+    await typeByHand(textarea, 'issue (perf critique): le nom est ambigu');
+    expect(checkedSegment()).toBeNull();
   });
 });

@@ -7,8 +7,13 @@ import { ui } from './strings.js';
 
 /** Ce que le commentaire porte à cet instant, tel que `core/` le lit (§3.4.1). */
 export interface PosedPrefix {
+  /** L'id CANONIQUE du label (§8.2), alias résolu et casse de la configuration conservée —
+   * jamais ce qui est littéralement écrit. */
   label: string | null;
   decorations: string[];
+  /** Des parenthèses sont présentes mais leur contenu est illégal (§3.3, `issue (): x`).
+   * Ce n'est ni « une décoration », ni « aucune » : la barre ne doit alors rien cocher. */
+  malformedDecorations: boolean;
 }
 
 export interface ToolbarOptions {
@@ -16,7 +21,9 @@ export interface ToolbarOptions {
   lang: string;
   /** `undefined` = « je ne me prononce pas sur la décoration » (CA-02) ; `[]` = « aucune ». */
   onLabel: (label: string, decorations: string[] | undefined, toggle: boolean) => void;
-  onFreeDecoration: (decoration: string) => void;
+  /** `label` est celui que le commentaire porte AU MOMENT DU GESTE, `null` s'il n'en porte
+   * aucun — le contrôleur décide alors du label à poser. */
+  onFreeDecoration: (decoration: string, label: string | null) => void;
   /** Le préfixe RÉELLEMENT écrit dans la zone de saisie, relu à chaque geste.
    *
    * La barre ne peut pas se contenter de mémoriser les clics : un commentaire déjà
@@ -47,8 +54,12 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   // Décoration choisie DANS LA BARRE, en attente d'un label : elle ne sert qu'au prochain
   // clic de label sur un commentaire qui n'en porte pas encore. Dès qu'un label est posé,
   // c'est le texte qui fait foi.
+  //
+  // C'est le SEUL état que la barre garde. Une première version retenait aussi le dernier
+  // label cliqué et s'en servait pour décider ; trois gestes sur quatre s'appuyaient alors
+  // sur une mémoire que la validation débattue (150 ms) ne rafraîchit qu'après coup, donc
+  // en retard sur le texte dès qu'on tape vite (revue Codex, PR #35). Chaque geste relit.
   let selectedDecorations: string[] = [];
-  let activeLabel: string | null = null;
 
   // Un bouton par label, avec icône, libellé et couleur distincts (§5.1).
   for (const label of enabledLabels(opts.config)) {
@@ -66,11 +77,12 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
         ? `${description}\n${ui(opts.lang, 'label.example', { example })}`
         : description;
     button.addEventListener('click', () => {
-      const toggle = activeLabel === label.id;
+      // Le second clic RETIRE (§5.1). Ce qui décide est donc le label que le commentaire
+      // porte à cet instant, lu dans le texte — pas celui qu'on se souvient d'avoir cliqué.
+      const toggle = opts.currentPrefix().label === label.id;
       // Aucune décoration choisie dans la barre → `undefined` : poser un label ne doit pas
       // effacer la décoration déjà écrite (CA-02). Un choix explicite, lui, est transmis.
       opts.onLabel(label.id, selectedDecorations.length > 0 ? selectedDecorations : undefined, toggle);
-      activeLabel = toggle ? null : label.id;
       for (const b of root.querySelectorAll('.cct-label-button')) {
         b.setAttribute('aria-pressed', b === button && !toggle ? 'true' : 'false');
       }
@@ -99,9 +111,8 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     b.addEventListener('click', () => {
       selectedDecorations = segment.id === null ? [] : [segment.id];
       checkSegment(b);
-      // Le label sur lequel agir est celui que le COMMENTAIRE porte ; `activeLabel` ne
-      // sert plus que de repli pour un commentaire qui n'en porte pas encore.
-      const label = opts.currentPrefix().label ?? activeLabel;
+      // Le label sur lequel agir est celui que le COMMENTAIRE porte.
+      const label = opts.currentPrefix().label;
       // `selectedDecorations` est passé tel quel, tableau vide compris : c'est ici, et
       // seulement ici, que « aucune » veut dire « retire-la ».
       if (label) opts.onLabel(label, selectedDecorations, false);
@@ -139,7 +150,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       }
       free.removeAttribute('aria-invalid');
       free.value = '';
-      opts.onFreeDecoration(raw);
+      opts.onFreeDecoration(raw, opts.currentPrefix().label);
     };
     free.addEventListener('input', () => free.removeAttribute('aria-invalid'));
     free.addEventListener('keydown', (e) => {
@@ -164,7 +175,6 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
    * radiogroup mentait, y compris à un lecteur d'écran (§5.1, CA-12). */
   const sync = (): void => {
     const posed = opts.currentPrefix();
-    activeLabel = posed.label;
     for (const b of root.querySelectorAll('.cct-label-button')) {
       const id = (b as HTMLElement).dataset['label'];
       b.setAttribute('aria-pressed', id !== undefined && id === posed.label ? 'true' : 'false');
@@ -174,11 +184,14 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     // « aucune », qui affirmerait faussement qu'il n'y en a pas.
     selectedDecorations = posed.decorations;
     const carried = posed.decorations.find((d) => segments.some((s) => s.id === d));
+    // Trois cas, et le troisième n'existait pas : des parenthèses illégales ne sont pas une
+    // absence de décoration. Cocher « aucune » sur `issue (): x` affirmait le contraire de
+    // ce que le validateur dit au même instant (revue Codex, PR #35).
     const target =
-      posed.decorations.length === 0
-        ? group.querySelector('[role="radio"]')
-        : carried === undefined
-          ? null
+      posed.malformedDecorations || (posed.decorations.length > 0 && carried === undefined)
+        ? null
+        : posed.decorations.length === 0
+          ? group.querySelector('[role="radio"]')
           : [...group.querySelectorAll('[role="radio"]')].find((s) => s.textContent === `(${carried})`) ?? null;
     checkSegment(target ?? null);
   };

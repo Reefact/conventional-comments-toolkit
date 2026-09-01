@@ -5,6 +5,8 @@
 import {
   analyze,
   matchPrefix,
+  parseDecorations,
+  resolveLabel,
   splitBody,
   type CommentAnalysis,
   type EffectiveConfig,
@@ -25,25 +27,35 @@ import type { TelemetryEvent } from './telemetry.js';
  * aucun. La question est posée à `core/` (`splitBody` isole la ligne de préfixe, `matchPrefix`
  * lui applique l'expression de référence) plutôt qu'au texte à la main : un repérage
  * divergent répondrait d'une autre ligne que celle que la validation juge. */
-function prefixPosedIn(value: string): PosedPrefix {
+/** Ce que le commentaire porte, dans les termes de la CONFIGURATION.
+ *
+ * Rien n'est décidé ici : `core/` répond aux deux questions, parce que c'est lui qui les
+ * tranche partout ailleurs, et qu'un second jugement finit toujours par diverger du premier.
+ *
+ * `resolveLabel` — et non une comparaison de chaînes — pour deux raisons trouvées en revue
+ * (revue Codex, PR #35) : la casse d'un id configuré est libre, donc un `Risk` mis en
+ * minuscules ici ne correspondait plus à son propre bouton ; et un ALIAS (`bug:` pour
+ * `issue`, §3.2) ne correspondait à aucun bouton, alors que le §3.2 dit qu'il « en hérite
+ * intégralement ». La barre parle donc de labels canoniques, jamais de ce qui est écrit.
+ *
+ * `parseDecorations` pour la même raison, et pour une de plus : elle distingue une absence
+ * de décoration d'une décoration ILLÉGALE. `issue (): x` faisait cocher « aucune » — la
+ * barre affirmait qu'il n'y en avait pas pendant que le validateur signalait
+ * `E-DECORATION-SYNTAX`. */
+function prefixPosedIn(value: string, config: EffectiveConfig): PosedPrefix {
   const prefixLine = splitBody(value).prefixLine;
   const posed = prefixLine === null ? null : matchPrefix(prefixLine);
-  if (posed === null) return { label: null, decorations: [] };
-  // `decorations` est le contenu BRUT des parenthèses : c'est `core/` qui sait le découper,
-  // espaces et casse compris (§3.3). Les formes illégales n'ont pas à être devinées ici —
-  // elles ne correspondront simplement à aucun segment.
-  const decorations =
-    posed.decorations === null
-      ? []
-      : posed.decorations
-          .split(',')
-          .map((d) => d.trim().toLowerCase())
-          .filter((d) => d !== '');
-  return { label: posed.label.toLowerCase(), decorations };
-}
-
-function labelPosedIn(value: string): string | null {
-  return prefixPosedIn(value).label;
+  if (posed === null) return { label: null, decorations: [], malformedDecorations: false };
+  const resolved = resolveLabel(posed.label, config);
+  if (posed.decorations === null) {
+    return { label: resolved?.label.id ?? null, decorations: [], malformedDecorations: false };
+  }
+  const parsed = parseDecorations(posed.decorations);
+  return {
+    label: resolved?.label.id ?? null,
+    decorations: parsed.canonical,
+    malformedDecorations: parsed.syntaxIssues.length > 0,
+  };
 }
 
 export const VALIDATION_DEBOUNCE_MS = 150; // §5.3
@@ -146,8 +158,12 @@ export class EditorController {
       config: this.config,
       lang: this.deps.lang,
       onLabel: (label, decorations, toggle) => this.insertPrefix(label, decorations, toggle),
-      onFreeDecoration: (decoration) => this.insertPrefix(null, [decoration], false),
-      currentPrefix: () => prefixPosedIn(this.deps.adapter.readValue(this.deps.editor)),
+      // Le label vient du GESTE, pas de la dernière analyse : dans la fenêtre de
+      // validation débattue, `#lastAnalysis` est en retard sur le texte et son repli
+      // (`suggestion`) réécrivait le label du commentaire — une décoration changeait un
+      // label (revue Codex, PR #35).
+      onFreeDecoration: (decoration, label) => this.insertPrefix(label, [decoration], false),
+      currentPrefix: () => prefixPosedIn(this.deps.adapter.readValue(this.deps.editor), this.config),
     });
     this.#toolbar = toolbar;
     host.insertBefore(toolbar.element, this.deps.editor.element);
@@ -295,10 +311,16 @@ export class EditorController {
     const hasSelection = selEnd > selStart;
 
     const effectiveLabel = label ?? this.#lastAnalysis?.resolved?.label.id ?? 'suggestion';
+    // Ce que le commentaire porte AVANT cette insertion, en id canonique — alias résolu et
+    // casse de la configuration (§3.2). Deux décisions en dépendent : retirer ou remplacer,
+    // et compter ou non un « label utilisé ».
+    const posedBefore = prefixPosedIn(value, this.config).label;
     const { nextValue, caret, delta, changedAt, removed } = computePrefixInsertion(
       value,
       { label: effectiveLabel, decorations },
-      { toggle }
+      // `sameLabel` se décide ICI, où la configuration est disponible : `posedBefore` est
+      // déjà l'id canonique rendu par `resolveLabel()`, alias résolu (§3.2).
+      { toggle, sameLabel: posedBefore === effectiveLabel }
     );
     // « label utilisé » (§10) : l'identifiant du label effectivement POSÉ, jamais la ligne
     // écrite, et jamais un label qu'on vient de RETIRER. Cliquer deux fois le même bouton
@@ -312,7 +334,6 @@ export class EditorController {
     // `false` et chacune de ces retouches recomptait le même label. L'agrégat aurait mesuré
     // les modifications de décoration, pas les labels posés (revue Codex, PR #31) — et
     // d'autant plus fort que la personne hésite, ce qui n'a aucun sens à remonter.
-    const posedBefore = labelPosedIn(value);
     if (!removed && posedBefore !== effectiveLabel) {
       this.deps.telemetry?.({ kind: 'label-used', label: effectiveLabel });
     }

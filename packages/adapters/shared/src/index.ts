@@ -233,7 +233,12 @@ const RAW_PREFIX_LOCATOR = new RegExp(
 export function computePrefixInsertion(
   currentValue: string,
   newPrefix: { label: string; decorations?: string[] },
-  options: { toggle?: boolean } = {}
+  options: {
+    toggle?: boolean;
+    /** L'appelant a établi — configuration en main, alias compris — que le préfixe écrit
+     * porte bien le label demandé. À défaut, les deux chaînes sont comparées. */
+    sameLabel?: boolean;
+  } = {}
 ): { nextValue: string; caret: number; delta: number; removed: boolean; changedAt: number } {
   // `decorations` distingue TROIS intentions, et un tableau seul ne pouvait en exprimer que
   // deux — d'où un défaut que l'usage réel a fini par trouver (retour utilisateur) :
@@ -263,7 +268,18 @@ export function computePrefixInsertion(
     const rest = lines[target]!.slice(located[0].length);
     const start = lineStart(lines, target);
     const changedAt = start + head.length;
-    const sameLabel = recognized.label.toLowerCase() === newPrefix.label.toLowerCase();
+    // « Est-ce le MÊME label ? » est une question de CONFIGURATION, pas de chaînes : `bug:`
+    // est le même label qu'`issue` si la configuration le déclare en alias, et il « en
+    // hérite intégralement » (§3.2). Ce paquet ne voit aucune configuration — il ne peut
+    // donc pas trancher, et une comparaison littérale répondait `false` sur un alias : le
+    // second clic réécrivait `bug:` en `issue:` au lieu de retirer le préfixe (revue Codex,
+    // PR #35, étendu aux alias sur demande).
+    //
+    // La décision revient donc à l'appelant, qui la prend avec `resolveLabel()` de `core/`,
+    // et `toggle` veut dire ce qu'il dit : « retire ce préfixe ». Le repli littéral ne sert
+    // qu'aux appelants sans configuration sous la main.
+    const sameLabel =
+      options.sameLabel ?? recognized.label.toLowerCase() === newPrefix.label.toLowerCase();
     if (options.toggle && sameLabel) {
       // Second clic sur un label déjà actif : retrait (§5.1) — le label seul décide,
       // pas l'état du sélecteur de décoration.

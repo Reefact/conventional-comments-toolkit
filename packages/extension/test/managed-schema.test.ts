@@ -54,6 +54,28 @@ describe('§8.1.1 — le schéma de politique managée porte tout le document de
   });
 });
 
+// ————— La télémétrie n'est activable QUE par ce canal (§10) —————
+// Une clé absente du schéma n'arrive jamais : Chrome la retire du stockage managé sans rien
+// dire. Le point de collecte ayant été déplacé vers ce canal pour qu'aucun dépôt ne puisse
+// choisir la destination de ses données, la déclaration oubliée rendait la fonctionnalité
+// entière inerte en production — case grisée, aucun compteur, aucune erreur (revue Codex,
+// PR #31). `npm run check:managed-keys` confronte les LECTURES du code à ce schéma ; ce
+// test-ci fixe la forme attendue des deux champs.
+
+describe('§10 — le canal de politique transporte la déclaration de télémétrie', () => {
+  const telemetry = (
+    JSON.parse(
+      readFileSync(fileURLToPath(new URL('../src/managed-schema.json', import.meta.url)), 'utf8')
+    ) as { properties: Record<string, { type?: string; properties?: Record<string, { type?: string }> }> }
+  ).properties['telemetry'];
+
+  it('déclare `telemetry.enabled` (booléen) et `telemetry.endpoint` (chaîne)', () => {
+    expect(telemetry?.type).toBe('object');
+    expect(telemetry?.properties?.['enabled']?.type).toBe('boolean');
+    expect(telemetry?.properties?.['endpoint']?.type).toBe('string');
+  });
+});
+
 // ————— Contraintes de forme imposées par Chrome au schéma lui-même —————
 // La doc « Manifest for managed storage » les énonce en trois points : le schéma de tête
 // est un `object`, il ne porte pas d'`additionalProperties`, et **chaque schéma porte un

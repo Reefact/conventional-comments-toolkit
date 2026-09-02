@@ -131,6 +131,7 @@ afterEach(() => {
   vi.doUnmock('@cct/adapter-github');
   vi.doUnmock('@cct/adapter-azdo');
   vi.resetModules();
+  delete (globalThis as { chrome?: unknown }).chrome;
   document.body.innerHTML = '';
 });
 
@@ -267,5 +268,143 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     // Un bouton de label prouve un contrôleur RÉELLEMENT attaché (`attach()` exécuté), pas
     // seulement un vestige DOM : `buildToolbar()` ne les pose qu'à l'attachement.
     expect(host.querySelectorAll('.cct-label-button').length).toBeGreaterThan(0);
+  });
+
+  it('F. un changement de labels EN MODE ACTIF reconstruit la barre d’outils, pas seulement la validation', async () => {
+    const element = document.createElement('textarea');
+    element.className = 'CommentBox-input';
+    const host = document.createElement('div');
+    const submit = document.createElement('button');
+    host.append(element, submit);
+    document.body.append(host);
+
+    const state: FakeState = {
+      // Défauts : le label "issue" est actif — un bouton lui correspond dans la barre.
+      configText: JSON.stringify({
+        mode: 'enforce',
+        configCacheTtlSeconds: 0,
+        activation: { activatedAt: '2019-01-01T00:00:00Z' },
+      }),
+      published: published({ state: 'failure', unresolvedBlockingCount: 1 }),
+    };
+    installAdapter(state, element, submit);
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
+    disposers.push(await bootstrap(document));
+    await flushAll();
+
+    const issueButton = () => host.querySelector('.cct-label-button[data-label="issue"]');
+    expect(issueButton()).not.toBeNull();
+
+    // Le MODE reste `enforce` — seul le label change. `buildToolbar()`/`attachQuickInput()`
+    // capturent la configuration à la construction et ne la relisent jamais (revue Codex,
+    // PR #39) : sans reconstruction, ce bouton resterait affiché malgré la désactivation.
+    state.configText = JSON.stringify({
+      mode: 'enforce',
+      configCacheTtlSeconds: 0,
+      activation: { activatedAt: '2019-01-01T00:00:00Z' },
+      labels: [{ id: 'issue', enabled: false }],
+    });
+    // Un changement visible fait tourner l'observateur — le compte descend à 0, aucun fil
+    // bloquant ne correspondant plus au label retiré n'a de sens ici, seul un changement de
+    // `chromeSignatureOf` (état publié) compte pour déclencher un rendu.
+    state.published = published({ state: 'success', unresolvedBlockingCount: 0 });
+    document.body.appendChild(document.createElement('span'));
+    await flushAll();
+
+    // Sans le correctif (simple échange de `deps.resolved`), le bouton « issue » resterait
+    // affiché — cliquable, pour poser un préfixe qu'`analyze()` ne reconnaît plus.
+    expect(issueButton()).toBeNull();
+  });
+
+  it('G. une réconciliation plus ancienne, encore en vol, ne réinstalle pas un contrôleur après qu’une plus récente est passée à off', async () => {
+    const element = document.createElement('textarea');
+    element.className = 'CommentBox-input';
+    const host = document.createElement('div');
+    const submit = document.createElement('button');
+    host.append(element, submit);
+    document.body.append(host);
+
+    const state: FakeState = {
+      configText: JSON.stringify({
+        mode: 'enforce',
+        configCacheTtlSeconds: 0,
+        activation: { activatedAt: '2019-01-01T00:00:00Z' },
+      }),
+      published: published({ state: 'failure', unresolvedBlockingCount: 1 }),
+    };
+    installAdapter(state, element, submit);
+
+    // `readUserLanguage()`/`readDirectShortcuts()` (§8.1.2) lisent `chrome.storage.sync` —
+    // c'est CETTE lecture, hors chemin critique du rendu, que `reconcile()` attend avant de
+    // construire un nouveau contrôleur (revue Codex, PR #39) : un second rendu peut se
+    // conclure entièrement pendant qu'elle est en vol, ouvrant la fenêtre de concurrence.
+    // Bloquée manuellement ici pour la rendre observable, plutôt que de dépendre d'un tampon
+    // réseau réel.
+    // `renderPrChrome()` lit AUSSI la langue pour son propre rendu, avant même que
+    // `reconcile()` ne soit atteint : le PREMIER appel, une fois armé, doit donc résoudre
+    // normalement (sans quoi `run()` resterait `inFlight` et le second rendu, plus bas, ne
+    // se déclencherait jamais) — seul le SECOND appel, celui de `reconcile()`, est bloqué.
+    let armed = false;
+    let callsSinceArmed = 0;
+    let releaseBlockedRead: (() => void) | null = null;
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        sync: {
+          get: (_keys: string[], cb: (items: Record<string, unknown>) => void) => {
+            if (armed) {
+              callsSinceArmed++;
+              if (callsSinceArmed === 2) {
+                releaseBlockedRead = () => cb({});
+                return;
+              }
+            }
+            cb({});
+          },
+        },
+      },
+    };
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
+    disposers.push(await bootstrap(document));
+    await flushAll();
+    expect(host.querySelector('.cct-toolbar')).not.toBeNull();
+
+    // Réconciliation N°1 : un changement de label, mode toujours `enforce` — force une
+    // reconstruction dont la lecture de langue est bloquée.
+    armed = true;
+    state.configText = JSON.stringify({
+      mode: 'enforce',
+      configCacheTtlSeconds: 0,
+      activation: { activatedAt: '2019-01-01T00:00:00Z' },
+      labels: [{ id: 'issue', enabled: false }],
+    });
+    // Un changement du résumé publié rend ce rendu VISIBLE (`chromeSignatureOf`) — sans lui,
+    // rien ne distinguerait ce passage de « rien de neuf », et `run()` renoncerait avant
+    // même d'atteindre `reconcile()`.
+    state.published = published({ state: 'failure', unresolvedBlockingCount: 2 });
+    document.body.appendChild(document.createElement('span'));
+    await flushAll();
+    expect(releaseBlockedRead).not.toBeNull(); // la première réconciliation attend bien
+
+    // Réconciliation N°2, PENDANT que la première est encore en vol : le mode passe à
+    // `off`. Aucune lecture de stockage sur ce chemin — elle se conclut immédiatement, avant
+    // que la première n'ait eu la moindre chance de reprendre.
+    state.configText = JSON.stringify({ mode: 'off', configCacheTtlSeconds: 0 });
+    state.published = null;
+    document.body.appendChild(document.createElement('span'));
+    await flushAll();
+    expect(host.querySelector('.cct-toolbar')).toBeNull(); // off a bien détaché
+
+    // La première réconciliation reprend enfin.
+    releaseBlockedRead!();
+    await flushAll();
+
+    // Sans le correctif (une génération par entrée, invalidée par TOUT appel de
+    // `reconcile()` suivant), elle réinstallerait ici un contrôleur ACTIF par-dessus — la
+    // barre réapparaîtrait alors que la configuration COURANTE est `off`.
+    expect(host.querySelector('.cct-toolbar')).toBeNull();
   });
 });

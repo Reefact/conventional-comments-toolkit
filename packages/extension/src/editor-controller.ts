@@ -274,7 +274,26 @@ export class EditorController {
     this.refresh();
   }
 
+  /** Défait tout ce qu'`attach()` a posé — barre d'outils, saisie rapide, écouteurs — ET
+   * l'état de blocage que ce contrôleur a lui-même écrit sur les boutons de soumission
+   * (revue Codex, PR #39) : `#disposers` ne couvre que ce qu'`attach()` a construit, jamais
+   * `aria-disabled`, posé plus tard par `refresh()` sur des éléments de la PLATEFORME que ce
+   * contrôleur ne possède pas. Sans ce retrait explicite, un éditeur `enforce` disposé
+   * pendant qu'un diagnostic bloquant est affiché (passage en direct à `off`, §7) laissait
+   * son bouton grisé indéfiniment — une extension qui vient de se déclarer entièrement
+   * inactive continuait pourtant d'en bloquer l'envoi.
+   *
+   * Le timer de validation débattue (§5.3) est annulé pour la même raison : un `refresh()`
+   * déjà programmé exécuté APRÈS ce `dispose()` réécrirait cet état juste après l'avoir
+   * retiré, sur un contrôleur que plus rien ne doit toucher. */
   dispose(): void {
+    if (this.#timer) {
+      clearTimeout(this.#timer);
+      this.#timer = null;
+    }
+    for (const control of this.deps.adapter.getSubmitControls(this.deps.editor)) {
+      control.element.removeAttribute('aria-disabled');
+    }
     for (const d of this.#disposers) d();
     this.#disposers = [];
   }

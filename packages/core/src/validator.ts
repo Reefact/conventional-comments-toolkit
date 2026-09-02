@@ -67,6 +67,19 @@ export type MalformedMotif =
   | 'missing-space-after-colon'
   | 'unexpected-character';
 
+/** Une décoration syntaxiquement valide du préfixe (§3.3), résolue face à la configuration —
+ * pour l'affichage (badges, §5.5), jamais pour la validation elle-même (Diagnostic suffit). */
+export interface ResolvedDecoration {
+  /** Forme canonique (minuscules, §3.1). */
+  id: string;
+  /** `DecorationConfig.forces` si connue, sinon `null` — une décoration libre non déclarée
+   * n'a jamais d'effet sur le caractère bloquant (§3.3, ligne « Décoration libre »). */
+  forces: 'blocking' | 'non-blocking' | null;
+  /** Vrai si déclarée dans `decorations.known` ; fausse si acceptée seulement via
+   * `decorations.allowFree`. */
+  known: boolean;
+}
+
 export interface CommentAnalysis {
   /** 'excluded' : zone éteinte par configuration (étage −2) ; 'exempt' : §4.2 (étage −1) ;
    * 'analyzed' : le préfixe a été soumis aux étages 1a et suivants. */
@@ -80,6 +93,9 @@ export interface CommentAnalysis {
   blocking: boolean;
   /** Vrai si le commentaire porte un E-CONFLICT (règles 1 ou 2 du §3.3). */
   hadConflict: boolean;
+  /** Décorations syntaxiquement valides du préfixe, dans l'ordre d'écriture, dédupliquées
+   * par forme canonique — pour l'affichage (§5.5), toujours vide hors décoration valide. */
+  decorations: ResolvedDecoration[];
   /** Réécriture proposée vers la forme canonique d'un alias — commodité d'édition,
    * jamais une correction de Diagnostic.fix (§8.2). */
   aliasRewrite: { from: string; to: string; replacement: string } | null;
@@ -121,6 +137,7 @@ export function analyze(input: ValidationInput, config: EffectiveConfig): Commen
     implicitSuggestion: false,
     blocking: false,
     hadConflict: false,
+    decorations: [],
     aliasRewrite: null,
     prefixLine: split.prefixLine,
   };
@@ -157,6 +174,7 @@ export function analyze(input: ValidationInput, config: EffectiveConfig): Commen
 
   let blocking = false;
   let hadConflict = false;
+  let decorations: ResolvedDecoration[] = [];
   let aliasRewrite: CommentAnalysis['aliasRewrite'] = null;
 
   if (prefix.proceed && prefix.resolved) {
@@ -165,6 +183,7 @@ export function analyze(input: ValidationInput, config: EffectiveConfig): Commen
     diagnostics.push(...t2.diagnostics);
     blocking = t2.blocking;
     hadConflict = t2.hadConflict;
+    decorations = t2.decorations;
 
     if (prefix.resolved.viaAlias && prefix.match && split.prefixLine) {
       const canonical = prefix.resolved.label.id;
@@ -183,6 +202,7 @@ export function analyze(input: ValidationInput, config: EffectiveConfig): Commen
     implicitSuggestion: prefix.implicitSuggestion,
     blocking,
     hadConflict,
+    decorations,
     aliasRewrite,
     prefixLine: split.prefixLine,
   };
@@ -341,6 +361,7 @@ interface ContentResult {
   diagnostics: Diagnostic[];
   blocking: boolean;
   hadConflict: boolean;
+  decorations: ResolvedDecoration[];
 }
 
 function contentControls(
@@ -390,6 +411,17 @@ function contentControls(
     .filter((d): d is NonNullable<typeof d> => d !== null && d.forces !== null);
   const forcesBlocking = carriers.some((d) => d.forces === 'blocking');
   const forcesNonBlocking = carriers.some((d) => d.forces === 'non-blocking');
+
+  // Pour l'affichage (§5.5) : une entrée par forme canonique distincte, dans l'ordre
+  // d'écriture — les doublons (W-DECORATION-STYLE) ne dupliquent pas le badge.
+  const seenForBadges = new Set<string>();
+  const decorations: ResolvedDecoration[] = [];
+  for (const c of canonical) {
+    if (seenForBadges.has(c)) continue;
+    seenForBadges.add(c);
+    const known = resolveDecoration(c, config);
+    decorations.push({ id: c, forces: known?.forces ?? null, known: known !== null });
+  }
 
   // Précédence du §3.3, règles 1 et 2 : E-CONFLICT.
   const conflictLabel = resolved.label.alwaysNonBlocking && forcesBlocking;
@@ -513,7 +545,7 @@ function contentControls(
     });
   }
 
-  return { diagnostics, blocking, hadConflict };
+  return { diagnostics, blocking, hadConflict, decorations };
 }
 
 // ————— Motifs de E-MALFORMED-PREFIX (§3.5.1), évalués dans l'ordre —————

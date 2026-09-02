@@ -267,6 +267,36 @@
 .cct-badge-pill { border-radius: 999px; }
 .cct-badge-flat { border-radius: var(--borderRadius-small, 2px); }
 
+/* Badges de décoration (§3.3, §5.5) : posés après le badge de label par decorateComment(),
+   toujours plus discrets que lui — taille réduite, jamais en gras — pour que le label reste
+   la seule chose qui saute aux yeux. La couleur ne suit que `forces` (le seul effet réel
+   d'une décoration sur le caractère bloquant, §3.3), jamais l'identité de la décoration :
+   ni `(non-blocking)` ni `(if-minor)` n'ont de couleur propre, les deux forcent le même
+   `forces: "non-blocking"` et partagent donc le même vert — leur donner des teintes
+   distinctes suggérerait un troisième état bloquant qui n'existe pas dans le modèle. */
+.cct-badge-deco {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--fgColor-muted, var(--color-fg-muted, currentColor));
+}
+
+.cct-badge-deco-blocking {
+  border-color: var(--fgColor-danger, var(--color-danger-fg, currentColor));
+  color: var(--fgColor-danger, var(--color-danger-fg, currentColor));
+}
+
+.cct-badge-deco-nonblocking {
+  border-color: var(--fgColor-success, var(--color-success-fg, currentColor));
+  color: var(--fgColor-success, var(--color-success-fg, currentColor));
+}
+
+/* Décoration libre, non déclarée dans decorations.known (allowFree) : aucune existence en
+   configuration, contour pointillé pour le signaler — à la différence d'une décoration
+   connue mais purement descriptive (contour plein, ci-dessus, sans classe supplémentaire). */
+.cct-badge-deco-custom {
+  border-style: dashed;
+}
+
 .cct-merge-blocked { opacity: 0.5; }
 
 .cct-quick-list {

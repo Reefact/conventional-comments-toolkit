@@ -167,17 +167,19 @@ export function queryChainAll(root: ParentNode, chain: SelectorChain): Element[]
   return [];
 }
 
-/** Texte d'un corps de commentaire, badge de label de l'extension EXCLU (§5.5) :
- * `decorateComment` (extension/src/ui/badges.ts) insère `.cct-badge` comme premier enfant
- * de ce même élément — celui que `getThreads()`/`getRenderedComments()` lisent ensuite.
- * Un rendu répété sur la même PR (résumé publié changé après coup, §5.5) relirait sinon le
- * texte du badge mêlé au corps réel, cassant la reconnaissance du préfixe par `analyze()`
- * au tour suivant. `:scope >` : seul un badge posé en enfant DIRECT — jamais un badge
- * hérité d'une citation ou d'un bloc de code imbriqué. */
+/** Texte d'un corps de commentaire, badges de l'extension EXCLUS (§5.5) : `decorateComment`
+ * (extension/src/ui/badges.ts) insère un badge de label, suivi d'un badge par décoration
+ * résolue (§3.3) — tous enfants DIRECTS de ce même élément, celui que `getThreads()`/
+ * `getRenderedComments()` lisent ensuite. Un rendu répété sur la même PR (résumé publié
+ * changé après coup, §5.5) relirait sinon leur texte mêlé au corps réel, cassant la
+ * reconnaissance du préfixe par `analyze()` au tour suivant — d'où `querySelectorAll` : un
+ * commentaire à plusieurs décorations pose plusieurs badges, il faut tous les retirer, pas
+ * seulement le premier trouvé. `:scope >` : seuls les badges posés en enfant DIRECT —
+ * jamais un badge hérité d'une citation ou d'un bloc de code imbriqué. */
 export function commentBodyText(element: Element): string {
   if (!element.querySelector(':scope > .cct-badge')) return element.textContent ?? '';
   const clone = element.cloneNode(true) as Element;
-  clone.querySelector(':scope > .cct-badge')?.remove();
+  clone.querySelectorAll(':scope > .cct-badge').forEach((badge) => badge.remove());
   return clone.textContent ?? '';
 }
 

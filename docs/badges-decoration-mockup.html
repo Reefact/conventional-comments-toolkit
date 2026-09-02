@@ -1,0 +1,425 @@
+<title>Label vs Decoration Badges</title>
+<style>
+:root {
+  --canvas: #f6f8fa;
+  --surface: #ffffff;
+  --border: #d0d7de;
+  --border-muted: #d8dee4;
+  --text: #1f2328;
+  --text-muted: #59636e;
+  --text-faint: #818b98;
+  --link: #0969da;
+  --code-bg: #eef1f4;
+
+  --label-praise: #2da44e;
+  --label-issue: #cf222e;
+  --label-suggestion: #0969da;
+  --label-nitpick: #6639ba;
+  --label-question: #9a6700;
+
+  --deco-blocking: #cf222e;
+  --deco-nonblocking: #1a7f37;
+  --deco-descriptive: #59636e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0d1117;
+    --surface: #151b23;
+    --border: #3d444d;
+    --border-muted: #2e3742;
+    --text: #f0f6fc;
+    --text-muted: #9198a1;
+    --text-faint: #6e7681;
+    --link: #4493f8;
+    --code-bg: #1c2430;
+
+    --label-praise: #3fb950;
+    --label-issue: #ff7b72;
+    --label-suggestion: #4493f8;
+    --label-nitpick: #a371f7;
+    --label-question: #d29922;
+
+    --deco-blocking: #ff7b72;
+    --deco-nonblocking: #3fb950;
+    --deco-descriptive: #9198a1;
+  }
+}
+
+:root[data-theme="dark"] {
+  --canvas: #0d1117;
+  --surface: #151b23;
+  --border: #3d444d;
+  --border-muted: #2e3742;
+  --text: #f0f6fc;
+  --text-muted: #9198a1;
+  --text-faint: #6e7681;
+  --link: #4493f8;
+  --code-bg: #1c2430;
+
+  --label-praise: #3fb950;
+  --label-issue: #ff7b72;
+  --label-suggestion: #4493f8;
+  --label-nitpick: #a371f7;
+  --label-question: #d29922;
+
+  --deco-blocking: #ff7b72;
+  --deco-nonblocking: #3fb950;
+  --deco-descriptive: #9198a1;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--text);
+  font: 14px/1.5 -apple-system, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  padding: 40px 20px 80px;
+}
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.intro {
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 8px;
+}
+
+.intro h1 {
+  font-size: 22px;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+
+.intro p {
+  margin: 0;
+  color: var(--text-muted);
+  max-width: 62ch;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 20px 0 36px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 36px 0 12px;
+}
+
+.comment {
+  background: var(--surface);
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.comment-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--code-bg);
+  border-bottom: 1px solid var(--border-muted);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--border), var(--text-faint));
+  flex: none;
+}
+
+.comment-head strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.comment-body {
+  padding: 14px;
+}
+
+.badge-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.badge-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--cct-color, var(--border));
+  color: var(--cct-color, var(--text));
+  background: transparent;
+}
+
+.badge-deco {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 400;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  color: var(--text-faint);
+  background: transparent;
+}
+
+.badge-deco.blocking {
+  border-color: var(--deco-blocking);
+  color: var(--deco-blocking);
+}
+
+.badge-deco.nonblocking {
+  border-color: var(--deco-nonblocking);
+  color: var(--deco-nonblocking);
+}
+
+.badge-deco.custom {
+  border-width: 1.5px;
+  border-style: dashed;
+  color: var(--text-faint);
+}
+
+.comment-text {
+  color: var(--text);
+}
+
+footer {
+  margin-top: 48px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-muted);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+footer code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+</style>
+
+<div class="page">
+  <div class="intro">
+    <p class="eyebrow">Conventional Comments Toolkit — exploration visuelle</p>
+    <h1>Badge de label vs badges de décoration</h1>
+    <p>
+      Huit commentaires publiés, tels qu'ils s'afficheraient avec l'extension active :
+      un badge label plein contour + icône, et à sa droite, plus petits, sans fond et
+      sans gras, les badges de décoration — liseré rouge uniquement quand la décoration
+      force le caractère bloquant. Le préfixe <code>label (décorations):</code> n'est plus
+      répété dans le texte : les badges portent seuls cette information structurée, le
+      corps du commentaire ne garde que le sujet libre.
+    </p>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="badge-label" style="--cct-color: var(--label-issue)">🐛 issue</span> badge label — plein contour, coloré, icône</div>
+    <div class="legend-item"><span class="badge-deco blocking">blocking</span> porteuse, force bloquant — rouge</div>
+    <div class="legend-item"><span class="badge-deco nonblocking">non-blocking</span> porteuse, force non-bloquant — vert</div>
+    <div class="legend-item"><span class="badge-deco">perf</span> connue, déclarée dans <code>decorations.known</code></div>
+    <div class="legend-item"><span class="badge-deco custom">spike</span> libre, non déclarée — contour pointillé</div>
+  </div>
+
+  <p class="section-title">Label seul, sans décoration</p>
+
+  <div class="comment">
+    <div class="comment-head">
+      <div class="avatar"></div>
+      <strong>reefact</strong> a laissé un commentaire
+    </div>
+    <div class="comment-body">
+      <div class="badge-row">
+        <span class="badge-label" style="--cct-color: var(--label-praise)">🙌 praise</span>
+      </div>
+      <div class="comment-text">
+        The decision is now both rigorous and appropriately scoped. I have no remaining design
+        blocker on this PR.
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Label + une décoration porteuse (bloquante)</p>
+
+  <div class="comment">
+    <div class="comment-head">
+      <div class="avatar"></div>
+      <strong>reefact</strong> a laissé un commentaire
+    </div>
+    <div class="comment-body">
+      <div class="badge-row">
+        <span class="badge-label" style="--cct-color: var(--label-issue)">🐛 issue</span>
+        <span class="badge-deco blocking">blocking</span>
+      </div>
+      <div class="comment-text">
+        Le nom de la fonction est ambigu, il entre en collision avec le label du module voisin.
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Label + décoration non bloquante</p>
+
+  <div class="comment">
+    <div class="comment-head">
+      <div class="avatar"></div>
+      <strong>reefact</strong> a laissé un commentaire
+    </div>
+    <div class="comment-body">
+      <div class="badge-row">
+        <span class="badge-label" style="--cct-color: var(--label-suggestion)">💡 suggestion</span>
+        <span class="badge-deco nonblocking">non-blocking</span>
+      </div>
+      <div class="comment-text">
+        On pourrait extraire cette validation dans une fonction partagée, à voir si ça vaut le
+        coup ici.
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Label + décoration descriptive seule</p>
+
+  <div class="comment">
+    <div class="comment-head">
+      <div class="avatar"></div>
+      <strong>reefact</strong> a laissé un commentaire
+    </div>
+    <div class="comment-body">
+      <div class="badge-row">
+        <span class="badge-label" style="--cct-color: var(--label-nitpick)">🔍 nitpick</span>
+        <span class="badge-deco">a11y</span>
+      </div>
+      <div class="comment-text">
+        Ce bouton n'a pas de <code>aria-label</code>, l'icône seule ne suffit pas au lecteur
+        d'écran.
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Label + plusieurs décorations mixtes (porteuse + descriptive)</p>
+
+  <div class="comment">
+    <div class="comment-head">
+      <div class="avatar"></div>
+      <strong>reefact</strong> a laissé un commentaire
+    </div>
+    <div class="comment-body">
+      <div class="badge-row">
+        <span class="badge-label" style="--cct-color: var(--label-issue)">🐛 issue</span>
+        <span class="badge-deco blocking">blocking</span>
+        <span class="badge-deco">security</span>
+      </div>
+      <div class="comment-text">
+        Le token n'est jamais purgé du stockage local à la déconnexion.
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Label + trois décorations descriptives, aucune porteuse</p>
+
+  <div class="comment">
+    <div class="comment-head">
+      <div class="avatar"></div>
+      <strong>reefact</strong> a laissé un commentaire
+    </div>
+    <div class="comment-body">
+      <div class="badge-row">
+        <span class="badge-label" style="--cct-color: var(--label-question)">❓ question</span>
+        <span class="badge-deco">perf</span>
+        <span class="badge-deco">ux</span>
+        <span class="badge-deco">a11y</span>
+      </div>
+      <div class="comment-text">
+        A-t-on mesuré l'impact de ce re-render sur la liste virtualisée avant de valider cette
+        approche ?
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Label + décoration connue et décoration libre non déclarée</p>
+
+  <div class="comment">
+    <div class="comment-head">
+      <div class="avatar"></div>
+      <strong>reefact</strong> a laissé un commentaire
+    </div>
+    <div class="comment-body">
+      <div class="badge-row">
+        <span class="badge-label" style="--cct-color: var(--label-nitpick)">🔍 nitpick</span>
+        <span class="badge-deco">perf</span>
+        <span class="badge-deco custom">spike-follow-up</span>
+      </div>
+      <div class="comment-text">
+        On pourra creuser après le spike de la semaine dernière, pas bloquant maintenant.
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Label + <code>if-minor</code> — même vert que <code>non-blocking</code>, même <code>forces</code></p>
+
+  <div class="comment">
+    <div class="comment-head">
+      <div class="avatar"></div>
+      <strong>reefact</strong> a laissé un commentaire
+    </div>
+    <div class="comment-body">
+      <div class="badge-row">
+        <span class="badge-label" style="--cct-color: var(--label-nitpick)">🔍 nitpick</span>
+        <span class="badge-deco nonblocking">if-minor</span>
+      </div>
+      <div class="comment-text">
+        Le message d'erreur pourrait être plus précis, à corriger seulement si c'est rapide.
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Style de base repris de <code>.cct-badge</code> (badge label : contour + couleur du label,
+    fond transparent). Les badges décoration réutilisent la même forme en plus petit, en poids
+    normal et sans couleur propre — seul <code>forces: "blocking"</code> déclenche le liseré
+    rouge. Le texte affiché n'inclut plus le préfixe structuré : c'est un choix délibéré qui
+    fait dépendre la lisibilité complète du commentaire de la présence de l'extension — à
+    trancher explicitement avant implémentation, pas juste une conséquence du rendu.
+  </footer>
+</div>

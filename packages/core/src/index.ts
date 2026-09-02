@@ -55,6 +55,7 @@ export {
   DEFAULT_SEVERITIES,
   type CommentAnalysis,
   type MalformedMotif,
+  type ResolvedDecoration,
 } from './validator.js';
 
 // §8 — configuration

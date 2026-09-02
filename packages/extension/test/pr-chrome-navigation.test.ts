@@ -729,6 +729,36 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     expect(commentBodyText(el)).toBe('issue: quelque chose ne va pas'); // mais pas la lecture
   });
 
+  it('commentBodyText exclut TOUS les badges — label ET chaque décoration, pas seulement le premier', () => {
+    // decorateComment() pose désormais un badge de label suivi d'un badge par décoration
+    // (§3.3, §5.5) : plusieurs enfants directs .cct-badge, pas un seul. Un querySelector()
+    // simple n'en retirerait que le premier, laissant « blocking security » mêlé au corps
+    // relu au tour suivant.
+    const el = document.createElement('div');
+    el.textContent = 'issue (blocking, security): fuite mémoire';
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    decorateComment(el, 'issue (blocking, security): fuite mémoire', defaultConfig(), profile);
+
+    expect(el.querySelectorAll(':scope > .cct-badge').length).toBe(3); // label + 2 décorations
+    expect(commentBodyText(el)).toBe('issue (blocking, security): fuite mémoire');
+  });
+
+  it('decorateComment() : un badge par décoration, stylé selon `forces`/`known` (§3.3, §5.5)', () => {
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const el = document.createElement('div');
+    // blocking : porteuse connue, bloquante. security : libre (allowFree, absente de
+    // decorations.known par défaut). if-minor : porteuse connue, même `forces` que non-blocking.
+    el.textContent = 'issue (blocking, security, if-minor): x';
+    decorateComment(el, 'issue (blocking, security, if-minor): x', defaultConfig(), profile);
+
+    const decoBadges = [...el.querySelectorAll(':scope > .cct-badge-deco')];
+    expect(decoBadges.map((b) => b.textContent)).toEqual(['blocking', 'security', 'if-minor']);
+    expect(decoBadges[0]!.className).toContain('cct-badge-deco-blocking'); // porteuse bloquante
+    expect(decoBadges[1]!.className).not.toMatch(/cct-badge-deco-(blocking|nonblocking)/); // libre, descriptive
+    expect(decoBadges[1]!.className).toContain('cct-badge-deco-custom'); // non déclarée (allowFree)
+    expect(decoBadges[2]!.className).toContain('cct-badge-deco-nonblocking'); // if-minor → même forces que non-blocking
+  });
+
   it('un .cct-badge imbriqué (pas enfant direct) n’est pas exclu à tort', () => {
     // decorateComment() ne pose jamais un badge autrement qu'en `afterbegin` — un
     // `.cct-badge` plus profond (citation, bloc de code d'un autre commentaire cité) est un

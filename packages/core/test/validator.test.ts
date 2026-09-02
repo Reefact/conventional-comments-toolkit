@@ -141,6 +141,54 @@ describe('§3.3 — décorations', () => {
   });
 });
 
+describe('§3.3, §5.5 — CommentAnalysis.decorations, pour l’affichage (badges)', () => {
+  it('aucune décoration écrite → tableau vide', () => {
+    expect(analyze(vInput('issue: le nom est ambigu'), config()).decorations).toEqual([]);
+  });
+
+  it('décoration connue et porteuse : id, forces et known repris de la configuration', () => {
+    const a = analyze(vInput('issue (blocking): fuite mémoire'), config());
+    expect(a.decorations).toEqual([{ id: 'blocking', forces: 'blocking', known: true }]);
+  });
+
+  it('(non-blocking) et (if-minor) restent deux entrées distinctes, même `forces`', () => {
+    const a = analyze(vInput('issue (non-blocking, if-minor): fuite mémoire'), config());
+    expect(a.decorations).toEqual([
+      { id: 'non-blocking', forces: 'non-blocking', known: true },
+      { id: 'if-minor', forces: 'non-blocking', known: true },
+    ]);
+  });
+
+  it('décoration libre (allowFree) : known=false, forces=null', () => {
+    const a = analyze(vInput('issue (security): le nom est ambigu\n\nd'), config());
+    expect(a.decorations).toEqual([{ id: 'security', forces: null, known: false }]);
+  });
+
+  it('décoration inconnue et allowFree=false : quand même exposée (E-UNKNOWN-DECORATION reste un diagnostic séparé)', () => {
+    const cfg = config((c) => {
+      c.decorations.allowFree = false;
+    });
+    const a = analyze(vInput('issue (foo): fuite mémoire\n\nd'), cfg);
+    expect(a.decorations).toEqual([{ id: 'foo', forces: null, known: false }]);
+    expect(codes(a.diagnostics)).toEqual(['E-UNKNOWN-DECORATION']);
+  });
+
+  it('doublon : une seule entrée, à la première occurrence écrite (W-DECORATION-STYLE ne duplique pas le badge)', () => {
+    const a = analyze(vInput('issue (blocking, blocking): fuite mémoire'), config());
+    expect(a.decorations).toEqual([{ id: 'blocking', forces: 'blocking', known: true }]);
+  });
+
+  it('ordre d’écriture préservé, mélange connue/libre', () => {
+    const a = analyze(vInput('issue (security, blocking): fuite mémoire'), config());
+    expect(a.decorations.map((d) => d.id)).toEqual(['security', 'blocking']);
+  });
+
+  it('préfixe non reconnu ou label implicite : jamais de décoration exposée', () => {
+    expect(analyze(vInput('pas de préfixe ici'), config()).decorations).toEqual([]);
+    expect(analyze(vInput('```suggestion\nx\n```'), config()).decorations).toEqual([]);
+  });
+});
+
 describe('§3.3 — précédence du caractère bloquant, départage E-CONFLICT', () => {
   const blocking = (body: string, c = config()) => isBlocking(vInput(body), c);
 

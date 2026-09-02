@@ -175,12 +175,43 @@ describe('§5 — contrôleur d’éditeur', () => {
     const offConfig = defaultConfig();
     offConfig.mode = 'off';
     offConfig.activation.activatedAt = '2026-09-01T00:00:00Z';
-    controller.updateResolved({ config: offConfig, notices: [], fingerprint: 'cccc3333', degraded: false });
+    controller.updateResolved({ config: offConfig, notices: [], fingerprint: 'cccc3333', degraded: false }, null);
 
     // Sans le correctif, ce même éditeur continuerait de bloquer sur la configuration
     // périmée jusqu'à sa fermeture/réouverture ou au rechargement de la page.
     expect(submit.hasAttribute('aria-disabled')).toBe(false);
     controller.dispose();
+  });
+
+  it('revue Codex, PR #39 : dispose() retire le grisage qu’il a lui-même posé, et annule la validation en attente', async () => {
+    const { controller, textarea, submit } = setup('enforce');
+    controller.attach();
+    writeToTextField(textarea, 'pas de label ici'); // diagnostic bloquant, débattu à 150 ms
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+
+    // `dispose()` défait la barre d'outils, la saisie rapide et les écouteurs — mais AVANT
+    // ce correctif, ne touchait pas à `aria-disabled`, posé par `refresh()` sur un élément
+    // de la PLATEFORME (`getSubmitControls()`), pas par `attach()` lui-même : un éditeur
+    // disposé pendant qu'un diagnostic bloquant est affiché (passage en direct à `off`, §7)
+    // laissait donc son bouton grisé indéfiniment, alors que l'extension venait de se
+    // déclarer entièrement inactive.
+    controller.dispose();
+
+    expect(submit.hasAttribute('aria-disabled')).toBe(false);
+  });
+
+  it('revue Codex, PR #39 : dispose() annule aussi un `refresh()` de validation débattue déjà programmé', async () => {
+    const { controller, textarea, submit } = setup('enforce');
+    controller.attach();
+    writeToTextField(textarea, 'pas de label ici'); // programme un refresh() à VALIDATION_DEBOUNCE_MS
+    // Disposé PENDANT la fenêtre de débat, avant que ce refresh() ne s'exécute : sans
+    // l'annulation du timer, il grisait le bouton APRÈS `dispose()`, sur un contrôleur que
+    // plus rien ne doit toucher — un aria-disabled qui survivrait à la révocation.
+    controller.dispose();
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+
+    expect(submit.hasAttribute('aria-disabled')).toBe(false);
   });
 
   it('§5.4 : Ctrl+Entrée intercepté quand le commentaire est en erreur (§4.3)', async () => {

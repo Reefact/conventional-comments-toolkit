@@ -458,10 +458,31 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // l'attachait donc jamais — jusqu'à sa fermeture/réouverture ou au rechargement de la
   // page. L'éditeur (le handle brut de la plateforme) est conservé dans les deux cas : il
   // suffit, à lui seul, à reconstruire un contrôleur si le mode redevient actif.
+  // `builtSignature` — la signature (`renderConfigSignatureOf`) de la configuration qui a
+  // SERVI À CONSTRUIRE le contrôleur courant, `null` tant qu'aucun n'a encore été bâti :
+  // sans elle, chaque rendu non navigué (y compris ceux qu'une mutation ORDINAIRE de la
+  // page déclenche sur la même PR, sans le moindre changement de configuration) aurait
+  // reconstruit barre d'outils et saisie rapide pour rien — perdant focus et saisie en
+  // cours à chaque nouveau commentaire ailleurs sur la page (revue Codex, PR #39).
+  //
+  // `generation` — incrémentée SYNCHRONEMENT à chaque `reconcile()` qui doit (re)construire
+  // un contrôleur, AVANT tout `await` : deux réconciliations concurrentes sur la MÊME
+  // entrée (un rendu qui en chevauche un autre pendant que le premier attend la langue ou
+  // les raccourcis stockés) verraient sinon toutes deux `entry.controller === null` et
+  // construiraient chacune la leur, la plus lente écrasant la plus rapide dans `entry
+  // .controller` sans jamais défaire celle qu'elle remplace — deux barres d'outils vivantes
+  // à la fois, ou pire, une réconciliation PLUS ANCIENNE qui réinstalle un contrôleur actif
+  // après qu'une PLUS RÉCENTE est passée en `off` (revue Codex, PR #39). Comme JavaScript
+  // est mono-thread, l'incrément de la SECONDE réconciliation s'exécute nécessairement
+  // avant que la PREMIÈRE ne reprenne après son `await` — celle-ci se retrouve donc avec
+  // une génération périmée et renonce juste avant d'attacher, quel que soit l'ordre dans
+  // lequel les deux se terminent.
   type EditorEntry = {
     editor: Parameters<Parameters<PlatformAdapter['observeEditors']>[0]>[0];
     element: Element;
     controller: EditorController | null;
+    builtSignature: string | null;
+    generation: number;
   };
   const knownEditors = new Set<EditorEntry>();
 
@@ -490,30 +511,57 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
    * si le mode redevient actif après avoir été ignoré (`off` → `warn`/`enforce`), le
    * détache si le mode devient `off` après avoir été actif (§7 — extension entièrement
    * inactive, `dispose()` retire déjà tout ce qu'`attach()` avait posé, barre d'outils et
-   * saisie rapide comprises). Sur un éditeur déjà attaché dont le mode reste actif, ne fait
-   * que repousser la configuration/le résumé publié les plus frais. */
+   * saisie rapide comprises).
+   *
+   * Sur un éditeur déjà attaché, une configuration qui n'a PAS changé pour lui (même
+   * signature qu'à sa dernière construction) ne fait que repousser le résumé publié le plus
+   * frais — sans reconstruire quoi que ce soit, ce qui perdrait focus et saisie en cours à
+   * chaque rendu non navigué, y compris ceux qu'une simple mutation ailleurs sur la page
+   * déclenche. Une configuration qui A changé pour lui (labels, décorations, langue —
+   * `renderConfigSignatureOf` couvre tout ce dont dépendent la barre d'outils et la saisie
+   * rapide) le reconstruit entièrement : ni `buildToolbar()` ni `attachQuickInput()` ne
+   * relisent la configuration après leur construction, un simple échange de
+   * `deps.resolved` les aurait laissés offrir les anciens labels/abréviations et jamais les
+   * nouveaux (revue Codex, PR #39). */
   const reconcile = async (entry: EditorEntry, resolved: ResolvedClientConfig): Promise<void> => {
     if (disposed) return;
+    // Incrémentée ICI, avant même de savoir quelle branche suit — inconditionnellement,
+    // donc AUSSI sur un passage à `off` — pas seulement avant l'`await` de la branche de
+    // construction : n'importe quel appel de `reconcile()` sur cette entrée périme toute
+    // construction de contrôleur encore en vol pour elle, quelle que soit la branche que
+    // CET appel-ci emprunte lui-même. Sans ce placement, un passage à `off` n'invalidait pas
+    // une reconstruction déjà en vol (elle n'attend, elle, qu'un `await` plus bas) — celle-ci
+    // pouvait reprendre après coup et réinstaller un contrôleur actif malgré le mode
+    // désormais inactif (revue Codex, PR #39).
+    const generation = ++entry.generation;
     if (resolved.config.mode === 'off') {
       // §7 : mode off = extension entièrement inactive. L'entrée reste connue — seul son
       // contrôleur part — pour pouvoir réattacher sans réobserver le DOM si le mode
       // redevient actif.
       entry.controller?.dispose();
       entry.controller = null;
+      entry.builtSignature = null;
       return;
     }
-    if (entry.controller) {
-      // Toujours attaché, mode toujours actif : seule la configuration bouge. `published`
-      // relu ICI, jamais gardé de l'attachement d'origine — sans quoi le résumé publié
-      // resterait figé pendant que la configuration, elle, avance (revue Reefact, PR #39) :
-      // le mode `enforce`/écart d'empreinte se jugerait alors sur un résumé périmé.
+    const signature = renderConfigSignatureOf(resolved);
+    if (entry.controller && entry.builtSignature === signature) {
+      // `published` relu ICI, jamais gardé de l'attachement d'origine — sans quoi le résumé
+      // publié resterait figé pendant que la configuration, elle, avance (revue Reefact, PR
+      // #39) : le mode `enforce`/écart d'empreinte se jugerait alors sur un résumé périmé.
       entry.controller.updateResolved(resolved, adapter.readPublishedResult());
       return;
     }
-    // Jamais attaché — découvert en `off`, ou tout juste réactivé : construit exactement
-    // comme `attach()` l'aurait fait à la découverte.
+    // Jamais attaché (découvert en `off`, ou tout juste réactivé), OU une configuration
+    // RÉELLEMENT différente pour cet éditeur : (re)construit exactement comme `attach()`
+    // l'aurait fait à la découverte — l'ancien contrôleur, s'il existe, est défait d'abord.
+    entry.controller?.dispose();
+    entry.controller = null;
     const published = adapter.readPublishedResult();
     const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
+    const directShortcuts = await readDirectShortcuts(); // §5.2 — préférence locale (§8.1.2)
+    // Supplanté par une réconciliation plus récente sur la MÊME entrée, ou révoqué, pendant
+    // les lectures ci-dessus : ne rien construire au nom d'une génération périmée.
+    if (disposed || generation !== entry.generation) return;
     const controller = new EditorController({
       adapter,
       editor: entry.editor,
@@ -521,12 +569,13 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
       published,
       lang,
       currentUserLogin: currentUser.login,
-      directShortcuts: await readDirectShortcuts(), // §5.2 — préférence locale (§8.1.2)
+      directShortcuts,
       telemetry: count,
     });
-    if (disposed) return; // révoqué pendant les lectures ci-dessus : ne rien installer
+    if (disposed || generation !== entry.generation) return;
     controller.attach();
     entry.controller = controller;
+    entry.builtSignature = signature;
   };
 
   const attach = async (editor: Parameters<Parameters<PlatformAdapter['observeEditors']>[0]>[0]) => {
@@ -535,7 +584,7 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     const resolved = await resolver.resolve(adapter, editor.context.pr);
     writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
     if (disposed) return;
-    const entry: EditorEntry = { editor, element: editor.element, controller: null };
+    const entry: EditorEntry = { editor, element: editor.element, controller: null, builtSignature: null, generation: 0 };
     releaseDetached();
     knownEditors.add(entry);
     await reconcile(entry, resolved);

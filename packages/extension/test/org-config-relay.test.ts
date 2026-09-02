@@ -490,6 +490,30 @@ describe('D — le gestionnaire du SERVICE WORKER, seul contexte qui a le droit 
     expect(calls).toEqual([ORG_URL]);
   });
 
+  // Le worker n'échappe au CORS que pour l'URL DEMANDÉE : la CIBLE d'une redirection n'est
+  // dans aucune permission d'hôte. Mesuré (`npm run check:relay-cors`) : `include` LÈVE dès
+  // qu'on est redirigé vers une origine en `ACAO: *`. Le relais applique donc la même règle
+  // par URL que l'adaptateur — cookies retirés sur la route `raw` de github.com, gardés
+  // partout ailleurs, ce qui est justement sa raison d'être (revue Codex, PR #36, round 4).
+  it("retire les cookies sur la route qui redirige, et les garde ailleurs", async () => {
+    const seen: { url: string; credentials: unknown }[] = [];
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      seen.push({ url: String(url), credentials: init?.credentials });
+      return new Response('{}', { status: 200 });
+    });
+    const raw = 'https://github.com/acme/config/raw/HEAD/cc.json';
+    const swRaw = installServiceWorkerChrome({ floor: { configUrl: raw } });
+    await import('../src/background.js');
+    await ask(swRaw.listener(), raw);
+    expect(seen.at(-1)).toEqual({ url: raw, credentials: 'same-origin' });
+
+    vi.resetModules();
+    const swOrg = installServiceWorkerChrome({ floor: { configUrl: ORG_URL } });
+    await import('../src/background.js');
+    await ask(swOrg.listener(), ORG_URL);
+    expect(seen.at(-1)).toEqual({ url: ORG_URL, credentials: 'include' });
+  });
+
   it('404 vaut absent, une autre erreur HTTP vaut unreachable (§8.1.5)', async () => {
     let status = 404;
     vi.stubGlobal('fetch', async () => new Response('', { status }));

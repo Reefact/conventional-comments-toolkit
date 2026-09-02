@@ -95,6 +95,14 @@ Deux gardes mécanisent la part mécanisable :
   et le joker est refusé dès que la requête porte des cookies. Le niveau « dépôt » du §8.2
   n'a donc jamais fonctionné sur GitHub, et le bandeau dégradé s'affichait exactement sur les
   dépôts qui avaient une configuration à lire. Trois affirmations successives, aucune mesurée.
+  La suite de l'histoire dit pourquoi il faut mesurer JUSQU'AU BOUT : `credentials:
+  'same-origin'` traverse cette redirection — premier saut authentifié, redirection anonyme —
+  et rend les dépôts privés lisibles sans aucune permission d'hôte. Le `'omit'` écrit d'abord
+  était un renoncement inutile, faute d'avoir posé la question complète.
+- `npm run check:relay-cors` — la même question dans l'AUTRE contexte. « Le service worker
+  échappe au CORS quand il a la permission d'hôte » : vrai de l'URL demandée, faux de la CIBLE
+  d'une redirection, qu'aucune permission ne couvre. Le relais `cct-fetch-config` prenait donc
+  le mur du script de contenu, dans le contexte même qui était censé y échapper.
 - `npm run smoke:mv3` — l'extension **empaquetée** chargée dans un vrai Chromium,
   qui vérifie les prémisses de l'architecture (le service worker voit bien
   `chrome.permissions`, il publie bien la répartition, la page d'options n'impose
@@ -114,9 +122,10 @@ npm run smoke:mv3               # extension empaquetée dans un vrai Chromium (p
 npm run check:github-theme-vars # variables Primer de styles.css toujours présentes sur github.com
 npm run check:beacon            # un POST no-cors cross-origin part et arrive, sans referer ni cookie
 npm run check:content-script-cors # ce qu'un script de contenu a le droit de LIRE (redirections, cookies)
+npm run check:relay-cors        # la même question pour le service worker du relais
 ```
 
-`spike`, `smoke:mv3`, `check:beacon` et `check:github-theme-vars` pilotent un vrai Chromium via
+`spike`, `smoke:mv3`, `check:beacon`, les deux `check:*-cors` et `check:github-theme-vars` pilotent un vrai Chromium via
 `playwright-core`, qui ne le télécharge pas à l'install : une fois par machine, `npx
 playwright-core install chromium` (comme le fait la CI avant ces commandes). `smoke:mv3`
 charge `packages/extension/dist-ext/` : lancer `npm run build:extension` d'abord.

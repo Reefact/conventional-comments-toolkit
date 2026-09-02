@@ -54,6 +54,7 @@ const fr: Record<string, string> = {
   'example.quibble': 'quibble: nom un peu long',
   'filter.aria': 'Filtrer les fils par label',
   'filter.all': 'tous',
+  'badge.decoration.overflow': '{count} décoration(s) supplémentaire(s), non affichée(s)',
 };
 
 const en: Record<string, string> = {
@@ -109,6 +110,7 @@ const en: Record<string, string> = {
   'example.quibble': 'quibble: slightly long name',
   'filter.aria': 'Filter threads by label',
   'filter.all': 'all',
+  'badge.decoration.overflow': '{count} more decoration(s), not shown',
 };
 
 const catalogs: Record<string, Record<string, string>> = { fr, en };

@@ -12,6 +12,7 @@
 // et Codex, PR #37 — https://github.com/Reefact/conventional-comments-toolkit/pull/37).
 
 import { analyze, type CommentAnalysis, type EffectiveConfig, type PlatformProfile, type ResolvedDecoration } from '@cct/core';
+import { ui } from './strings.js';
 
 function labelBadge(label: { icon?: string; id: string; color?: string }, config: EffectiveConfig): HTMLElement {
   const badge = globalThis.document.createElement('span');
@@ -45,21 +46,35 @@ function decorationBadge(decoration: ResolvedDecoration, config: EffectiveConfig
 // validation (§3.3 : le corps reste conforme, seul l'AFFICHAGE tronque).
 const MAX_RENDERED_DECORATIONS = 12;
 
-function overflowBadge(count: number, config: EffectiveConfig): HTMLElement {
+function overflowBadge(count: number, config: EffectiveConfig, lang: string): HTMLElement {
   const badge = globalThis.document.createElement('span');
   badge.className = `cct-badge cct-badge-deco cct-badge-${config.badgeStyle}`;
   badge.textContent = `+${count}`;
-  badge.title = `${count} décoration(s) supplémentaire(s), non affichée(s)`;
+  badge.title = ui(lang, 'badge.decoration.overflow', { count });
   return badge;
 }
 
-/** Badges de décoration à poser, décorations en surplus repliées dans un seul badge « +N »
- * plutôt que d'en créer un par entrée au-delà de MAX_RENDERED_DECORATIONS. */
-function decorationBadges(decorations: ResolvedDecoration[], config: EffectiveConfig): HTMLElement[] {
-  const shown = decorations.slice(0, MAX_RENDERED_DECORATIONS);
-  const overflow = decorations.length - shown.length;
+/** Badges de décoration à poser. Seules les décorations DESCRIPTIVES (`forces: null`) sont
+ * repliées au-delà de MAX_RENDERED_DECORATIONS — jamais une porteuse (`blocking`/
+ * `non-blocking`) : son nombre est borné par la configuration (`decorations.known`, que
+ * l'auteur du commentaire ne contrôle pas), jamais par un préfixe adversarial, et la replier
+ * dans un badge « +N » sans couleur effacerait le seul signal que les badges existent pour
+ * porter — le caractère bloquant (revue Codex, PR #38). L'ordre d'écriture est conservé
+ * parmi les entrées gardées ; seules des descriptives EN EXCÈS sont retirées. */
+function decorationBadges(decorations: ResolvedDecoration[], config: EffectiveConfig, lang: string): HTMLElement[] {
+  const shown: ResolvedDecoration[] = [];
+  let shownDescriptive = 0;
+  let hiddenDescriptive = 0;
+  for (const d of decorations) {
+    if (d.forces !== null || shownDescriptive < MAX_RENDERED_DECORATIONS) {
+      shown.push(d);
+      if (d.forces === null) shownDescriptive++;
+    } else {
+      hiddenDescriptive++;
+    }
+  }
   const badges = shown.map((d) => decorationBadge(d, config));
-  if (overflow > 0) badges.push(overflowBadge(overflow, config));
+  if (hiddenDescriptive > 0) badges.push(overflowBadge(hiddenDescriptive, config, lang));
   return badges;
 }
 
@@ -68,12 +83,19 @@ function decorationBadges(decorations: ResolvedDecoration[], config: EffectiveCo
  * s'accordent-ils sur le VERDICT ?) et exclut pour cette raison badgeStyle/labels[].color/
  * icon. Deux appels avec la même signature doivent produire des badges identiques ; deux
  * appels avec une signature différente peuvent en produire des différents. */
-function badgeSignature(a: CommentAnalysis & { resolved: NonNullable<CommentAnalysis['resolved']> }, config: EffectiveConfig): string {
+function badgeSignature(
+  a: CommentAnalysis & { resolved: NonNullable<CommentAnalysis['resolved']> },
+  config: EffectiveConfig,
+  lang: string
+): string {
   return JSON.stringify({
     style: config.badgeStyle,
     label: { id: a.resolved.label.id, icon: a.resolved.label.icon ?? null, color: a.resolved.label.color ?? null },
     blocking: a.blocking,
     decorations: a.decorations,
+    // Le badge de dépassement porte une infobulle localisée (ui()) : un changement de
+    // langue en direct doit la rafraîchir comme n'importe quel autre changement d'apparence.
+    lang,
   });
 }
 
@@ -81,7 +103,8 @@ export function decorateComment(
   commentBodyElement: Element,
   bodyText: string,
   config: EffectiveConfig,
-  platform: PlatformProfile
+  platform: PlatformProfile,
+  lang: string
 ): void {
   const a = analyze(
     {
@@ -101,8 +124,8 @@ export function decorateComment(
     for (const badge of stale) badge.remove();
     return;
   }
-  const signature = badgeSignature({ ...a, resolved: a.resolved }, config);
-  const decoBadges = decorationBadges(a.decorations, config);
+  const signature = badgeSignature({ ...a, resolved: a.resolved }, config, lang);
+  const decoBadges = decorationBadges(a.decorations, config, lang);
   // La signature seule ne suffit pas : elle n'est portée QUE par le badge de label (stale[0]),
   // donc une réhydratation de plateforme qui efface un badge de DÉCORATION sans toucher au
   // label laisserait stale[0] intact et ce court-circuit renoncerait à réparer le manquant

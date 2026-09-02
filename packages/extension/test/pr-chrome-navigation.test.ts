@@ -841,6 +841,23 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     expect(decoBadges[12]!.textContent).toBe('+3'); // les 3 décorations restantes, repliées
   });
 
+  it('decorateComment() : la signature stockée reste bornée même avec des milliers de décorations (revue Codex, PR #38)', () => {
+    // Le plafond d'affichage ne sert à rien si la signature persistée dans data-cct-sig
+    // sérialise quand même le tableau COMPLET : un commentaire adversarial ferait alors porter
+    // un attribut DOM de plusieurs dizaines de Ko à chaque comparaison, malgré 12 badges visibles.
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const ids = Array.from({ length: 2000 }, (_, i) => `d${i + 1}`);
+    const body = `issue (${ids.join(', ')}): x`;
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    const label = el.querySelector(':scope > .cct-badge-label') as HTMLElement;
+    const sig = label.dataset['cctSig']!;
+    expect(sig.length).toBeLessThan(2000); // très en-deçà de la taille du corps (≈14 Ko)
+    expect(sig).not.toContain('"d1999"'); // une décoration repliée n'apparaît pas dans la signature
+  });
+
   it('decorateComment() : une décoration PORTEUSE au-delà du plafond reste affichée, jamais repliée (revue Codex, PR #38)', () => {
     // Cas cité par la revue : issue (d1, ..., d12, blocking): x — une troncature naïve
     // couperait juste avant `blocking`, effaçant le seul signal que les badges existent pour

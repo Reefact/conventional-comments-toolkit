@@ -54,14 +54,22 @@ function overflowBadge(count: number, config: EffectiveConfig, lang: string): HT
   return badge;
 }
 
-/** Badges de décoration à poser. Seules les décorations DESCRIPTIVES (`forces: null`) sont
- * repliées au-delà de MAX_RENDERED_DECORATIONS — jamais une porteuse (`blocking`/
- * `non-blocking`) : son nombre est borné par la configuration (`decorations.known`, que
- * l'auteur du commentaire ne contrôle pas), jamais par un préfixe adversarial, et la replier
- * dans un badge « +N » sans couleur effacerait le seul signal que les badges existent pour
- * porter — le caractère bloquant (revue Codex, PR #38). L'ordre d'écriture est conservé
+/** Sélectionne ce qui sera effectivement rendu, une fois pour toutes — utilisé à la fois
+ * pour bâtir les badges et pour la signature (revue Codex, PR #38) : cette dernière ne doit
+ * JAMAIS sérialiser `a.decorations` en entier, sous peine de porter, dans un attribut DOM
+ * persistant, la même taille non bornée que le rendu vient d'éliminer — un commentaire à
+ * des milliers de décorations libres continuerait de peser des dizaines de Ko par
+ * commentaire, malgré un affichage plafonné à 12 badges. Seules les décorations DESCRIPTIVES
+ * (`forces: null`) sont repliées au-delà de MAX_RENDERED_DECORATIONS — jamais une porteuse
+ * (`blocking`/`non-blocking`) : son nombre est borné par la configuration
+ * (`decorations.known`, que l'auteur du commentaire ne contrôle pas), jamais par un préfixe
+ * adversarial, et la replier dans un badge « +N » sans couleur effacerait le seul signal que
+ * les badges existent pour porter — le caractère bloquant. L'ordre d'écriture est conservé
  * parmi les entrées gardées ; seules des descriptives EN EXCÈS sont retirées. */
-function decorationBadges(decorations: ResolvedDecoration[], config: EffectiveConfig, lang: string): HTMLElement[] {
+function selectDecorationsForRender(decorations: ResolvedDecoration[]): {
+  shown: ResolvedDecoration[];
+  hiddenDescriptive: number;
+} {
   const shown: ResolvedDecoration[] = [];
   let shownDescriptive = 0;
   let hiddenDescriptive = 0;
@@ -73,6 +81,15 @@ function decorationBadges(decorations: ResolvedDecoration[], config: EffectiveCo
       hiddenDescriptive++;
     }
   }
+  return { shown, hiddenDescriptive };
+}
+
+function decorationBadges(
+  shown: ResolvedDecoration[],
+  hiddenDescriptive: number,
+  config: EffectiveConfig,
+  lang: string
+): HTMLElement[] {
   const badges = shown.map((d) => decorationBadge(d, config));
   if (hiddenDescriptive > 0) badges.push(overflowBadge(hiddenDescriptive, config, lang));
   return badges;
@@ -82,9 +99,13 @@ function decorationBadges(decorations: ResolvedDecoration[], config: EffectiveCo
  * clés que fingerprint() (§9.2.2), qui répond à une question différente (deux composants
  * s'accordent-ils sur le VERDICT ?) et exclut pour cette raison badgeStyle/labels[].color/
  * icon. Deux appels avec la même signature doivent produire des badges identiques ; deux
- * appels avec une signature différente peuvent en produire des différents. */
+ * appels avec une signature différente peuvent en produire des différents. Prend `shown`/
+ * `hiddenDescriptive` — déjà bornés par selectDecorationsForRender() — jamais le tableau
+ * `decorations` brut d'analyze(), pour rester elle-même bornée (revue Codex, PR #38). */
 function badgeSignature(
   a: CommentAnalysis & { resolved: NonNullable<CommentAnalysis['resolved']> },
+  shown: ResolvedDecoration[],
+  hiddenDescriptive: number,
   config: EffectiveConfig,
   lang: string
 ): string {
@@ -92,7 +113,8 @@ function badgeSignature(
     style: config.badgeStyle,
     label: { id: a.resolved.label.id, icon: a.resolved.label.icon ?? null, color: a.resolved.label.color ?? null },
     blocking: a.blocking,
-    decorations: a.decorations,
+    decorations: shown,
+    hiddenDescriptive,
     // Le badge de dépassement porte une infobulle localisée (ui()) : un changement de
     // langue en direct doit la rafraîchir comme n'importe quel autre changement d'apparence.
     lang,
@@ -124,8 +146,9 @@ export function decorateComment(
     for (const badge of stale) badge.remove();
     return;
   }
-  const signature = badgeSignature({ ...a, resolved: a.resolved }, config, lang);
-  const decoBadges = decorationBadges(a.decorations, config, lang);
+  const { shown, hiddenDescriptive } = selectDecorationsForRender(a.decorations);
+  const signature = badgeSignature({ ...a, resolved: a.resolved }, shown, hiddenDescriptive, config, lang);
+  const decoBadges = decorationBadges(shown, hiddenDescriptive, config, lang);
   // La signature seule ne suffit pas : elle n'est portée QUE par le badge de label (stale[0]),
   // donc une réhydratation de plateforme qui efface un badge de DÉCORATION sans toucher au
   // label laisserait stale[0] intact et ce court-circuit renoncerait à réparer le manquant

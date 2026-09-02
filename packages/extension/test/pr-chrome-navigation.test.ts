@@ -1918,4 +1918,37 @@ describe('Codex #38 — sondage périodique de la configuration effective sur un
     // rien dans le domaine du verdict n'a changé.
     expect(doc.querySelector('.cct-banner-judged')?.textContent).toContain('jugée');
   });
+
+  it('un label retiré par un changement de configuration efface le badge déjà posé, sans aucune mutation DOM', async () => {
+    const doc = document;
+    const current = pr(33);
+    const commentEl = doc.createElement('div');
+    doc.body.appendChild(commentEl); // decorateComment()/clearBadges() interrogent le document
+    let configText = '{}'; // défauts : label "issue" actif
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
+      getRenderedComments: () => [{ element: commentEl, bodyText: 'issue: quelque chose ne va pas' }],
+    });
+    adapter.getRepoConfig = async () => ({ status: 'found', text: configText });
+    let resolverNow = 0;
+    const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
+    const POLL_MS = 30;
+
+    observe(adapter, resolver, doc, undefined, undefined, POLL_MS);
+    await flushAll();
+    expect(commentEl.querySelector('.cct-badge')).not.toBeNull(); // badge "issue" posé
+
+    // Le label est retiré de la configuration — decorateComment() est normalement
+    // IDEMPOTENT (§5.5, garde `.cct-badge` déjà posé) : sans le correctif du rendu forcé par
+    // sondage (`forceBadgeRefresh`), cette garde laisserait l'ancien badge affiché
+    // indéfiniment, alors même que ce commentaire ne porte plus aucun label reconnu. Aucune
+    // mutation DOM n'a lieu ici — seul le sondage périodique peut faire remarquer ce
+    // changement à un onglet par ailleurs inerte.
+    configText = JSON.stringify({ labels: [{ id: 'issue', enabled: false }] });
+    resolverNow += 3601 * 1000; // dépasse le TTL du cache de configuration (§8.1.2)
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS * 3));
+    await flushAll();
+
+    expect(commentEl.querySelector('.cct-badge')).toBeNull();
+  });
 });

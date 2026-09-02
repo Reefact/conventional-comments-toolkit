@@ -807,22 +807,30 @@ function injectedSurfacesOf(doc: Document): string {
   return `${banner}${filter}`;
 }
 
-/** Signature de TOUT ce qu'une configuration effective (§8.1.2) peut faire varier dans le
- * rendu — délibérément PLUS LARGE que `fingerprint()` (core/, config/fingerprint.ts), qui
- * ne couvre que le domaine du VERDICT partagé par les deux composants (§9.2.2) et exclut à
- * dessein `language`, `badgeStyle`, l'icône d'un label : autant de clés qui ne changent
- * aucun verdict mais que `renderPrChrome`/`decorateComment` affichent bel et bien (revue
- * Codex, PR #39). Comparer seulement `fingerprint()` dans `pollConfig` (voir
- * `observePrChromeNavigation`) aurait laissé un changement de langue ou de style de badge,
- * survenu pendant que l'onglet est inerte, ne jamais atteindre la page tant qu'aucun champ
- * du domaine de verdict n'avait lui-même changé.
+/** Signature de TOUT ce qu'une configuration résolue (§8.1.2) peut faire varier côté client
+ * — rendu ET grisage — délibérément PLUS LARGE que `fingerprint()` (core/,
+ * config/fingerprint.ts), qui ne couvre que le domaine du VERDICT partagé par les deux
+ * composants (§9.2.2) et exclut à dessein `language`, `badgeStyle`, l'icône d'un label :
+ * autant de clés qui ne changent aucun verdict mais que `renderPrChrome`/`decorateComment`
+ * affichent bel et bien (revue Codex, PR #39). Comparer seulement `fingerprint()` dans
+ * `pollConfig` (voir `observePrChromeNavigation`) aurait laissé un changement de langue ou
+ * de style de badge, survenu pendant que l'onglet est inerte, ne jamais atteindre la page
+ * tant qu'aucun champ du domaine de verdict n'avait lui-même changé.
  *
- * `JSON.stringify` de la configuration entière, sans projection à la main : une liste de
+ * `degraded` (§5.4, condition 4) EN PLUS de `config` — pas seulement `EffectiveConfig` (revue
+ * Reefact, PR #39) : il vit à côté de `config` dans `ResolvedClientConfig`, jamais dedans, et
+ * une lecture qui devient `unreachable` peut très bien retomber, par repli, sur une
+ * configuration effective IDENTIQUE à celle d'avant (mêmes valeurs par défaut). Sans lui, ce
+ * repli ne changerait rien à la signature : `pollConfig` conclurait à tort que rien n'a
+ * changé, et un éditeur déjà ouvert garderait `degraded: false` — donc un blocage actif —
+ * alors que le §5.4 exige justement de le désarmer dès qu'une lecture est dégradée.
+ *
+ * `JSON.stringify`, sans projection à la main pour la partie configuration : une liste de
  * champs choisie ici referait, pour le RENDU, exactement l'erreur que ce commentaire décrit
  * pour `fingerprint()` — une clé de rendu ajoutée plus tard resterait invisible tant que
  * personne ne pense à l'ajouter à la liste. */
-function renderConfigSignatureOf(config: EffectiveConfig): string {
-  return JSON.stringify(config);
+function renderConfigSignatureOf(resolved: { config: EffectiveConfig; degraded: boolean }): string {
+  return JSON.stringify({ config: resolved.config, degraded: resolved.degraded });
 }
 
 /** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) — navigation
@@ -937,7 +945,7 @@ export function observePrChromeNavigation(
     // référence, sans jamais être détecté.
     if (lastRenderConfigSignature === null) return;
     void resolver.resolve(adapter, pr).then((resolved) => {
-      if (disposed || renderConfigSignatureOf(resolved.config) === lastRenderConfigSignature) return;
+      if (disposed || renderConfigSignatureOf(resolved) === lastRenderConfigSignature) return;
       forceRender = true;
       run();
     });
@@ -1044,7 +1052,7 @@ export function observePrChromeNavigation(
         // rendu vient d'appliquer — jamais sur une relecture séparée, qui ouvrirait une
         // fenêtre où `configCacheTtlSeconds: 0` (valeur légale) la ferait déjà diverger de
         // ce que la page affiche réellement (revue Codex, PR #39).
-        lastRenderConfigSignature = resolved ? renderConfigSignatureOf(resolved.config) : null;
+        lastRenderConfigSignature = resolved ? renderConfigSignatureOf(resolved) : null;
       })
       .finally(() => {
         inFlight = false;

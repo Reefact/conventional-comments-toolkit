@@ -46,7 +46,7 @@ import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { commentBodyText, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
 import { defaultConfig, fingerprint, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
-import { ClientConfigResolver } from '../src/config-resolver.js';
+import { ClientConfigResolver, type ResolvedClientConfig } from '../src/config-resolver.js';
 import { decorateComment } from '../src/ui/badges.js';
 import { applyLabelFilter, clearLabelFilter } from '../src/ui/thread-filter.js';
 import {
@@ -1937,12 +1937,12 @@ describe('Codex #38 — sondage périodique de la configuration effective sur un
     await flushAll();
     expect(commentEl.querySelector('.cct-badge')).not.toBeNull(); // badge "issue" posé
 
-    // Le label est retiré de la configuration — decorateComment() est normalement
-    // IDEMPOTENT (§5.5, garde `.cct-badge` déjà posé) : sans le correctif du rendu forcé par
-    // sondage (`forceBadgeRefresh`), cette garde laisserait l'ancien badge affiché
-    // indéfiniment, alors même que ce commentaire ne porte plus aucun label reconnu. Aucune
-    // mutation DOM n'a lieu ici — seul le sondage périodique peut faire remarquer ce
-    // changement à un onglet par ailleurs inerte.
+    // Le label est retiré de la configuration — decorateComment() compare sa propre
+    // signature de rendu (ui/badges.ts) et retire le badge devenu obsolète, mais seulement
+    // s'il est effectivement RAPPELÉ : sans le sondage périodique de cette PR, `run()` ne se
+    // déclenche jamais sur un onglet par ailleurs inerte, et decorateComment() ne serait
+    // jamais rappelé pour constater le changement. Aucune mutation DOM n'a lieu ici — seul
+    // le sondage périodique peut faire remarquer ce changement à un onglet inerte.
     configText = JSON.stringify({ labels: [{ id: 'issue', enabled: false }] });
     resolverNow += 3601 * 1000; // dépasse le TTL du cache de configuration (§8.1.2)
 
@@ -1950,5 +1950,46 @@ describe('Codex #38 — sondage périodique de la configuration effective sur un
     await flushAll();
 
     expect(commentEl.querySelector('.cct-badge')).toBeNull();
+  });
+
+  it('un changement d’état DÉGRADÉ sans changement de contenu de configuration est quand même sondé (revue Reefact, PR #39)', async () => {
+    const doc = document;
+    const current = pr(34);
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }));
+    // Le fichier de dépôt est vide — la configuration effective ne dépend donc QUE du
+    // plancher (mode et périmètre d'activation forcés ici), jamais de sa lisibilité : la
+    // rendre injoignable ne change pas un seul champ de `EffectiveConfig`. Seul `degraded`
+    // (§5.4, condition 4) bouge — exactement le cas que `renderConfigSignatureOf` doit
+    // couvrir, à côté de `config`, pas seulement dedans.
+    let repoUnreachable = false;
+    adapter.getRepoConfig = async () => (repoUnreachable ? { status: 'unreachable' } : { status: 'found', text: '{}' });
+    let resolverNow2 = 0;
+    const resolver2 = new ClientConfigResolver(
+      async () => ({ minimumMode: 'enforce', activation: { activatedAt: '2025-01-01T00:00:00Z' } }),
+      () => resolverNow2
+    );
+    const POLL_MS2 = 30;
+    const refreshes: (ResolvedClientConfig | null)[] = [];
+
+    observe(adapter, resolver2, doc, undefined, (_pr, changed, resolved) => {
+      if (!changed) refreshes.push(resolved);
+    }, POLL_MS2);
+    await flushAll();
+    expect(refreshes).toHaveLength(0); // rien qu'une navigation jusqu'ici : pas de ré-résolution
+
+    // Le dépôt devient injoignable, et AUCUNE mutation DOM n'a lieu — seul le sondage
+    // périodique peut faire remarquer ce changement à un onglet par ailleurs inerte.
+    repoUnreachable = true;
+    resolverNow2 += 3601 * 1000; // dépasse le TTL du cache de configuration (§8.1.2)
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS2 * 3));
+    await flushAll();
+
+    // Comparer seulement `renderConfigSignatureOf(resolved.config)` (avant correctif)
+    // aurait vu une configuration parfaitement identique et conclu qu'il n'y avait rien à
+    // signaler — un éditeur déjà ouvert serait resté armé sur `degraded: false`, alors que
+    // le §5.4 exige de désarmer le blocage dès qu'une lecture est dégradée.
+    expect(refreshes).toHaveLength(1);
+    expect(refreshes[0]?.degraded).toBe(true);
   });
 });

@@ -76,7 +76,8 @@ export interface ResolvedDecoration {
    * n'a jamais d'effet sur le caractère bloquant (§3.3, ligne « Décoration libre »). */
   forces: 'blocking' | 'non-blocking' | null;
   /** Vrai si déclarée dans `decorations.known` ; fausse si acceptée seulement via
-   * `decorations.allowFree`. */
+   * `decorations.allowFree` — jamais une décoration inconnue REJETÉE (E-UNKNOWN-DECORATION,
+   * allowFree=false), qui n'apparaît pas du tout dans `CommentAnalysis.decorations`. */
   known: boolean;
 }
 
@@ -93,8 +94,10 @@ export interface CommentAnalysis {
   blocking: boolean;
   /** Vrai si le commentaire porte un E-CONFLICT (règles 1 ou 2 du §3.3). */
   hadConflict: boolean;
-  /** Décorations syntaxiquement valides du préfixe, dans l'ordre d'écriture, dédupliquées
-   * par forme canonique — pour l'affichage (§5.5), toujours vide hors décoration valide. */
+  /** Décorations syntaxiquement valides ET NON REJETÉES du préfixe, dans l'ordre d'écriture,
+   * dédupliquées par forme canonique — pour l'affichage (§5.5). Une décoration inconnue avec
+   * `decorations.allowFree` à `false` (E-UNKNOWN-DECORATION) n'y figure jamais : afficher un
+   * badge pour une décoration que l'analyse rejette suggérerait à tort qu'elle est valide. */
   decorations: ResolvedDecoration[];
   /** Réécriture proposée vers la forme canonique d'un alias — commodité d'édition,
    * jamais une correction de Diagnostic.fix (§8.2). */
@@ -413,14 +416,19 @@ function contentControls(
   const forcesNonBlocking = carriers.some((d) => d.forces === 'non-blocking');
 
   // Pour l'affichage (§5.5) : une entrée par forme canonique distincte, dans l'ordre
-  // d'écriture — les doublons (W-DECORATION-STYLE) ne dupliquent pas le badge.
+  // d'écriture — les doublons (W-DECORATION-STYLE) ne dupliquent pas le badge. Une
+  // décoration inconnue REJETÉE (E-UNKNOWN-DECORATION, allowFree=false) n'est jamais
+  // exposée : `known: false` ne doit désigner qu'un seul cas, une décoration libre
+  // ACCEPTÉE — sans ce filtre, une décoration invalide recevrait le même badge « libre »
+  // qu'une décoration réellement autorisée (revue Reefact, PR #37).
   const seenForBadges = new Set<string>();
   const decorations: ResolvedDecoration[] = [];
   for (const c of canonical) {
     if (seenForBadges.has(c)) continue;
     seenForBadges.add(c);
-    const known = resolveDecoration(c, config);
-    decorations.push({ id: c, forces: known?.forces ?? null, known: known !== null });
+    const resolvedDecoration = resolveDecoration(c, config);
+    if (resolvedDecoration === null && !config.decorations.allowFree) continue;
+    decorations.push({ id: c, forces: resolvedDecoration?.forces ?? null, known: resolvedDecoration !== null });
   }
 
   // Précédence du §3.3, règles 1 et 2 : E-CONFLICT.

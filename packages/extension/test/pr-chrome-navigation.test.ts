@@ -759,6 +759,22 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     expect(decoBadges[2]!.className).toContain('cct-badge-deco-nonblocking'); // if-minor → même forces que non-blocking
   });
 
+  it('decorateComment() : une décoration inconnue REJETÉE (allowFree=false) ne reçoit aucun badge (revue Reefact, PR #37)', () => {
+    // Sans ce filtre côté core, (foo) — pourtant invalide (E-UNKNOWN-DECORATION) — recevrait
+    // le même badge en pointillé qu'une décoration libre RÉELLEMENT autorisée : le lecteur ne
+    // pourrait pas distinguer un commentaire non conforme d'un commentaire valide.
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const cfg = defaultConfig();
+    cfg.decorations.allowFree = false;
+    const el = document.createElement('div');
+    el.textContent = 'issue (foo, blocking): x';
+    decorateComment(el, 'issue (foo, blocking): x', cfg, profile);
+
+    const decoBadges = [...el.querySelectorAll(':scope > .cct-badge-deco')];
+    expect(decoBadges.map((b) => b.textContent)).toEqual(['blocking']); // (foo) absent
+    expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull(); // le label, lui, reste rendu
+  });
+
   it('un .cct-badge imbriqué (pas enfant direct) n’est pas exclu à tort', () => {
     // decorateComment() ne pose jamais un badge autrement qu'en `afterbegin` — un
     // `.cct-badge` plus profond (citation, bloc de code d'un autre commentaire cité) est un

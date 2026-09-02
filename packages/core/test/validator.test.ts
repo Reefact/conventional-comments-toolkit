@@ -164,12 +164,21 @@ describe('§3.3, §5.5 — CommentAnalysis.decorations, pour l’affichage (badg
     expect(a.decorations).toEqual([{ id: 'security', forces: null, known: false }]);
   });
 
-  it('décoration inconnue et allowFree=false : quand même exposée (E-UNKNOWN-DECORATION reste un diagnostic séparé)', () => {
+  it('décoration inconnue et allowFree=false : REJETÉE, jamais exposée (sinon même badge qu’une décoration libre valide)', () => {
     const cfg = config((c) => {
       c.decorations.allowFree = false;
     });
     const a = analyze(vInput('issue (foo): fuite mémoire\n\nd'), cfg);
-    expect(a.decorations).toEqual([{ id: 'foo', forces: null, known: false }]);
+    expect(a.decorations).toEqual([]);
+    expect(codes(a.diagnostics)).toEqual(['E-UNKNOWN-DECORATION']);
+  });
+
+  it('décoration inconnue rejetée mêlée à une décoration valide : seule la valide est exposée', () => {
+    const cfg = config((c) => {
+      c.decorations.allowFree = false;
+    });
+    const a = analyze(vInput('issue (foo, blocking): fuite mémoire\n\nd'), cfg);
+    expect(a.decorations).toEqual([{ id: 'blocking', forces: 'blocking', known: true }]);
     expect(codes(a.diagnostics)).toEqual(['E-UNKNOWN-DECORATION']);
   });
 

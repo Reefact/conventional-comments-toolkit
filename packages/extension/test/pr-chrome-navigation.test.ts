@@ -58,6 +58,9 @@ import {
   RENDER_RETRY_THROTTLE_MS,
   RENDER_RETRY_WINDOW_MS,
 } from '../src/content-internal.js';
+// CONFIG_POLL_INTERVAL_MS n'est pas importée : les tests du sondage périodique lui
+// substituent une valeur courte (voir `configPollIntervalMs`, dernier paramètre de
+// `observePrChromeNavigation`) pour ne pas attendre les cinq minutes de production.
 
 function pr(number: number): PrRef {
   return { platform: 'github', createdAt: '2026-01-01T00:00:00Z', host: 'github.com', scope: ['acme', 'demo'], number };
@@ -152,9 +155,11 @@ function observe(
   adapter: Parameters<typeof observePrChromeNavigation>[0],
   resolver: Parameters<typeof observePrChromeNavigation>[1],
   doc: Parameters<typeof observePrChromeNavigation>[2],
-  now?: Parameters<typeof observePrChromeNavigation>[3]
+  now?: Parameters<typeof observePrChromeNavigation>[3],
+  onPrChange?: Parameters<typeof observePrChromeNavigation>[4],
+  configPollIntervalMs?: Parameters<typeof observePrChromeNavigation>[5]
 ): () => void {
-  const dispose = observePrChromeNavigation(adapter, resolver, doc, now);
+  const dispose = observePrChromeNavigation(adapter, resolver, doc, now, onPrChange, configPollIntervalMs);
   openObservations.push(dispose);
   return dispose;
 }
@@ -1792,5 +1797,87 @@ describe('Codex round 4 — la signature de reprise sonde le COMPTE de commentai
     // renderPrChrome), jamais par la signature de reprise (chromeSignatureOf) — ici la PR
     // ne change jamais de signature après le premier rendu, donc aucun second rendu réel.
     expect(commentsCalls).toBe(1);
+  });
+});
+
+describe('Codex #38 — sondage périodique de la configuration effective sur un onglet inerte (§8.1.2)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('une modification de configuration est adoptée dans l’intervalle de sondage, SANS aucune mutation DOM', async () => {
+    const doc = document;
+    const current = pr(30);
+    const control: SubmitControl = { element: doc.createElement('button'), kind: 'complete-pr' };
+    let configText = '{}'; // défauts : mode assist
+    const adapter = makeAdapter(
+      () => current,
+      () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }),
+      { getCompletionControl: () => control }
+    );
+    adapter.getRepoConfig = async () => ({ status: 'found', text: configText });
+    // Horloge du RÉSOLVEUR, indépendante de celle passée à observePrChromeNavigation (comme
+    // au test Codex #5 ci-dessus) : c'est elle qui gouverne l'expiration du cache de
+    // configuration (§8.1.2), pas la fenêtre de rattrapage de la barre.
+    let resolverNow = 0;
+    const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
+    const POLL_MS = 30;
+
+    observe(adapter, resolver, doc, undefined, undefined, POLL_MS);
+    await flushAll();
+    expect(control.element.getAttribute('aria-disabled')).toBe('true'); // grisé (mode assist, check en échec)
+
+    // La configuration du dépôt bascule sur `off`, et le cache expire — mais AUCUNE mutation
+    // DOM n'est produite ici : la page reste par ailleurs parfaitement inerte (pas de
+    // nouveau commentaire, pas de navigation, pas de changement d'état de fil). Seul le
+    // sondage périodique, indépendant du MutationObserver, peut faire remarquer ce
+    // changement à cette observation.
+    configText = JSON.stringify({ mode: 'off' });
+    resolverNow += 3601 * 1000; // dépasse le TTL du cache de configuration (§8.1.2)
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS * 3));
+    await flushAll();
+
+    expect(control.element.hasAttribute('aria-disabled')).toBe(false);
+    expect(control.element.classList.contains('cct-merge-blocked')).toBe(false);
+  });
+
+  it('des réveils périodiques répétés sans changement de configuration ne produisent ni rendu ni écriture DOM', async () => {
+    const doc = document;
+    const current = pr(31);
+    let getThreadsCalls = 0;
+    // Décompte NON nul : bannerHasContent() (ui/banner.ts) tait le bandeau sur un décompte
+    // à zéro — ce n'est pas ce que ce test couvre (un rendu qui n'a rien à montrer), qui
+    // porte sur un rendu déjà affiché qu'aucun réveil sans changement ne doit reconstruire.
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }), {
+      getThreads: async () => {
+        getThreadsCalls++;
+        return [];
+      },
+    });
+    adapter.getRepoConfig = async () => ({ status: 'found', text: '{}' });
+    let resolverNow = 0;
+    const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
+    const POLL_MS = 20;
+
+    observe(adapter, resolver, doc, undefined, undefined, POLL_MS);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+    const callsOnceShown = getThreadsCalls;
+    const bannerAfterFirstRender = doc.querySelector('.cct-banner');
+
+    // Bien au-delà de l'ancien plafond de tentatives : plusieurs intervalles de sondage
+    // s'écoulent, l'horloge du résolveur n'avance PAS (le cache de configuration reste
+    // valide, rien n'a changé) et la page reste inerte — aucune mutation DOM, aucune
+    // navigation.
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS * 8));
+    await flushAll();
+
+    // Ni relecture des fils (donc pas de second `renderPrChrome`), ni second bandeau — le
+    // sondage périodique n'a produit aucune écriture dans la page tant que la configuration
+    // qu'il a lue n'a pas changé.
+    expect(getThreadsCalls).toBe(callsOnceShown);
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+    expect(doc.querySelector('.cct-banner')).toBe(bannerAfterFirstRender); // même élément, jamais reconstruit
   });
 });

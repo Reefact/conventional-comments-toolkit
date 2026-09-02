@@ -684,6 +684,24 @@ export const RENDER_RETRY_WINDOW_MS = 5000;
  * du résumé publié — les deux restent immédiats. */
 export const RENDER_RETRY_THROTTLE_MS = 250;
 
+/** Intervalle de rattrapage de la configuration EFFECTIVE (§8.1.2) sur un onglet inerte :
+ * `run()` ne se déclenche que sur mutation DOM ou changement de PR — un onglet resté
+ * ouvert sans nouvelle activité (pas de commentaire, pas de navigation, pas de changement
+ * d'état de fil) ne relit donc jamais la configuration après l'expiration de son TTL
+ * (`configCacheTtlSeconds`, une heure par défaut), même si une modification d'organisation
+ * ou de dépôt — censée s'appliquer en direct (§8.1.3, ligne « Élargissant ») — a eu lieu
+ * entre-temps (revue Codex, PR #38). Ce que la vérification affiche en dépend tout entier :
+ * pas seulement le badge, mais le verdict de conformité rendu par `decorateComment`.
+ *
+ * Ce n'est PAS un sondage rapide : dix fois plus long que `RENDER_RETRY_THROTTLE_MS`
+ * n'aurait aucun sens ici, la staleness tolérée se compte en minutes, pas en
+ * millisecondes. Volontairement plus court que le TTL par défaut pour ne pas dépendre
+ * d'une valeur d'entreprise qui peut être réduite : chaque réveil ne coûte qu'un
+ * `resolver.resolve()`, sans effet tant que le cache du résolveur n'a pas expiré lui-même
+ * — la fréquence réelle des lectures réseau reste bornée par le TTL, jamais par cette
+ * constante. */
+export const CONFIG_POLL_INTERVAL_MS = 5 * 60 * 1000;
+
 /** Signature légère du résumé publié (§5.5, §6.5, §8.1.3 règle 2, CA-03) : par valeur, pas
  * par identité d'objet — l'adaptateur peut renvoyer un objet neuf à chaque lecture. Les
  * quatre champs sont EXACTEMENT ceux que le rendu affiche — `state` pilote le grisage
@@ -818,7 +836,11 @@ export function observePrChromeNavigation(
    * arme (voir `armFor`), parce qu'une PR sans composeur rendu doit remonter ses
    * dégradations comme les autres (CA-11), et parce qu'un onglet restait armé sur l'ancienne
    * configuration quand celle-ci se rafraîchissait sans navigation (revue Codex, PR #31). */
-  onPrChange: (pr: PrRef | null, changed: boolean) => void = () => {}
+  onPrChange: (pr: PrRef | null, changed: boolean) => void = () => {},
+  /** Injectable pour les tests (une horloge réelle, pas `now`, gouverne `setInterval` — voir
+   * `CONFIG_POLL_INTERVAL_MS`) : une valeur courte y remplace les cinq minutes de production
+   * sans attendre cette durée pour de vrai. `0` désactive le sondage. */
+  configPollIntervalMs: number = CONFIG_POLL_INTERVAL_MS
   /** Révoque l'observation : déconnecte l'observateur et annule un rattrapage en attente.
    * Sans emploi en production — l'observateur vit le temps de l'onglet — mais nécessaire à
    * tout appelant qui n'est PAS un onglet : deux observations concurrentes sur le même
@@ -849,6 +871,40 @@ export function observePrChromeNavigation(
   // pour la même raison que le filtre : renderPrChrome reconstruit le bandeau à chaque appel.
   let bannerOpen: boolean | null = null;
   let bannerBlocked: boolean | null = null;
+  // Empreinte de la configuration EFFECTIVE (§8.1.2) telle qu'appliquée par le DERNIER rendu
+  // réel — posée juste après lui (voir la fin de `run()`), jamais par `pollConfig` : un
+  // sondage qui se contenterait de comparer ses propres lectures successives raterait tout
+  // changement survenu AVANT son premier réveil. `null` tant qu'aucun rendu n'a encore eu
+  // lieu pour la PR affichée (pas de référence à comparer, donc pas de sondage actif).
+  let lastConfigFingerprint: string | null = null;
+  // Posé par `pollConfig` quand elle constate un écart : fait sauter la comparaison de
+  // signatures ci-dessous pour LE PROCHAIN `run()`, sans quoi un changement de
+  // configuration qui ne modifie ni le résumé publié de la plateforme ni notre propre
+  // sortie (chromeSig/ownSig ignorent l'un comme l'autre la configuration résolue
+  // localement) resterait invisible jusqu'à la prochaine navigation.
+  let forceRender = false;
+  let configPollTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Réveil périodique, indépendant de toute mutation DOM (§8.1.2, revue Codex PR #38) :
+   * un onglet resté inerte doit quand même remarquer qu'un plancher, une configuration
+   * d'organisation ou de dépôt a changé une fois le TTL du résolveur écoulé. Ne lit QUE la
+   * configuration — jamais `getThreads()` ni le DOM — pour rester bon marché tant que rien
+   * n'a changé : la plupart des réveils ne coûtent qu'un cache hit du résolveur. */
+  const pollConfig = (): void => {
+    if (disposed) return;
+    const pr = currentPrOf(adapter);
+    if (!pr) return; // rien à surveiller hors PR
+    // La référence n'est posée qu'APRÈS un rendu réel (voir `run()`, plus bas) — jamais ici :
+    // sinon un changement survenu AVANT le tout premier réveil s'établirait lui-même comme
+    // référence, sans jamais être détecté.
+    if (lastConfigFingerprint === null) return;
+    void resolver.resolve(adapter, pr).then((resolved) => {
+      if (disposed || resolved.fingerprint === lastConfigFingerprint) return;
+      forceRender = true;
+      run();
+    });
+  };
+  if (configPollIntervalMs > 0) configPollTimer = setInterval(pollConfig, configPollIntervalMs);
 
   const run = (): void => {
     if (disposed) return;
@@ -871,12 +927,16 @@ export function observePrChromeNavigation(
       selectedLabel = null; // nouveau contexte de PR : le filtre repart à zéro
       bannerOpen = null; // et le pliage aussi : le choix portait sur une autre PR
       bannerBlocked = null;
+      // Nouvelle PR : la référence de config du sondage périodique portait sur l'ancienne,
+      // et comparer les deux n'aurait aucun sens. Le prochain sondage établira une nouvelle
+      // référence sans forcer de rendu (voir `pollConfig`).
+      lastConfigFingerprint = null;
     }
     // Sonde le bouton de complétion (chromeSignatureOf) seulement dans la fenêtre
     // d'hydratation de CETTE PR — jamais indéfiniment (§9.4, cf. chromeSignatureOf).
     const probeCompletionControl = navigated || nowMs <= retryUntil;
     const chromeSig = key === null ? null : chromeSignatureOf(adapter, probeCompletionControl);
-    if (!navigated) {
+    if (!navigated && !forceRender) {
       if (showedSomething) {
         // Deux versants, et il faut les deux : l'état de la PLATEFORME a-t-il changé, et ce
         // que notre dernier rendu a laissé est-il toujours là, intact ? Une racine éditée sur
@@ -890,6 +950,11 @@ export function observePrChromeNavigation(
         return; // fenêtre d'hydratation écoulée, rien à montrer et toujours pas plus de contenu
       }
     }
+    // Consommé ici, que le rendu ait été déclenché par `forceRender` ou non : un
+    // `pollConfig` qui l'a posé pendant qu'un rendu était déjà en vol (`inFlight`, plus
+    // haut) le laisse survivre jusqu'à la relance temporisée qui le consommera à son tour —
+    // jamais perdu, jamais consommé deux fois pour un seul écart constaté.
+    forceRender = false;
     lastChromeSig = chromeSig;
     inFlight = true;
     // Une navigation peut survenir pendant les lectures asynchrones : le rendu vérifie
@@ -933,6 +998,18 @@ export function observePrChromeNavigation(
         // la page doit encore porter au prochain réveil. Toute différence constatée ensuite
         // vient d'une main extérieure, jamais de la nôtre.
         lastOwnSig = key === null ? null : ownOutputSignatureOf(adapter, doc);
+        // Référence du sondage périodique (`pollConfig`), alignée sur ce que CE rendu vient
+        // d'appliquer — jamais sur ce qu'un sondage lirait de son côté, qui pourrait déjà
+        // avoir changé une seconde fois. `renderPrChrome` ne renvoie pas la configuration
+        // résolue : on la relit ici, ce qui touche le cache du résolveur qu'il vient
+        // lui-même de remplir — un second appel sans coût réseau, jamais une deuxième
+        // lecture réelle.
+        const pollPr = key === null ? null : currentPrOf(adapter);
+        if (pollPr) {
+          void resolver.resolve(adapter, pollPr).then((resolved) => {
+            if (!disposed && key === lastPrKey) lastConfigFingerprint = resolved.fingerprint;
+          });
+        }
       })
       .finally(() => {
         inFlight = false;
@@ -960,6 +1037,10 @@ export function observePrChromeNavigation(
     if (retryTimer !== null) {
       clearTimeout(retryTimer);
       retryTimer = null;
+    }
+    if (configPollTimer !== null) {
+      clearInterval(configPollTimer);
+      configPollTimer = null;
     }
   };
 }

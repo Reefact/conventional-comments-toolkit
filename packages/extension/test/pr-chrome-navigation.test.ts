@@ -775,6 +775,56 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull(); // le label, lui, reste rendu
   });
 
+  it('decorateComment() : un rendu répété à configuration INCHANGÉE ne touche pas le DOM (§5.5, anti-churn)', () => {
+    // content-internal.ts appelle decorateComment() sur CHAQUE commentaire à CHAQUE passage
+    // de rendu — un simple mouvement de souris ailleurs sur une PR à 200 commentaires ne doit
+    // jamais retirer puis reposer 200 badges pour rien.
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const body = 'issue (blocking, security): x';
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile);
+    const labelBefore = el.querySelector(':scope > .cct-badge-label');
+    const decoBefore = [...el.querySelectorAll(':scope > .cct-badge-deco')];
+
+    // Un objet de configuration FRAIS mais structurellement identique — la comparaison doit
+    // porter sur ce que analyze() en tire, pas sur l'identité de l'objet JS.
+    decorateComment(el, body, defaultConfig(), profile);
+
+    expect(el.querySelector(':scope > .cct-badge-label')).toBe(labelBefore); // même nœud
+    expect([...el.querySelectorAll(':scope > .cct-badge-deco')]).toEqual(decoBefore); // mêmes nœuds
+  });
+
+  it('decorateComment() : rafraîchit label ET décoration quand la configuration change en direct (§8.1.1, §5.5)', () => {
+    // Cas cité par la revue Codex sur la PR #37 : (security) passe de libre à connue et
+    // bloquante après expiration du cache de configuration (§8.1.2) — le badge doit suivre,
+    // pas rester figé sur l'état du premier rendu. Le label change de couleur en même temps,
+    // pour couvrir aussi le badge de label, pas seulement les décorations.
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const body = 'issue (blocking, security): x';
+    const el = document.createElement('div');
+    el.textContent = body;
+
+    const before = defaultConfig();
+    decorateComment(el, body, before, profile);
+    const labelBefore = el.querySelector(':scope > .cct-badge-label')!;
+    const securityBefore = [...el.querySelectorAll(':scope > .cct-badge-deco')][1]!;
+    expect(securityBefore.className).toContain('cct-badge-deco-custom'); // encore libre
+
+    const after = defaultConfig();
+    after.decorations.known.push({ id: 'security', forces: 'blocking' });
+    after.labels.find((l) => l.id === 'issue')!.color = '#123456';
+    decorateComment(el, body, after, profile);
+
+    const labelAfter = el.querySelector(':scope > .cct-badge-label')!;
+    const decoAfter = [...el.querySelectorAll(':scope > .cct-badge-deco')];
+    expect(decoAfter.map((b) => b.textContent)).toEqual(['blocking', 'security']); // toujours les deux
+    expect(decoAfter[1]!.className).toContain('cct-badge-deco-blocking'); // security est maintenant porteuse
+    expect(decoAfter[1]!.className).not.toContain('cct-badge-deco-custom');
+    expect((labelAfter as HTMLElement).style.getPropertyValue('--cct-label-color')).toBe('#123456');
+    expect(labelAfter).not.toBe(labelBefore); // churn légitime : le contenu a réellement changé
+  });
+
   it('un .cct-badge imbriqué (pas enfant direct) n’est pas exclu à tort', () => {
     // decorateComment() ne pose jamais un badge autrement qu'en `afterbegin` — un
     // `.cct-badge` plus profond (citation, bloc de code d'un autre commentaire cité) est un

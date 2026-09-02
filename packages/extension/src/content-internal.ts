@@ -553,14 +553,23 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     }
     // Jamais attaché (découvert en `off`, ou tout juste réactivé), OU une configuration
     // RÉELLEMENT différente pour cet éditeur : (re)construit exactement comme `attach()`
-    // l'aurait fait à la découverte — l'ancien contrôleur, s'il existe, est défait d'abord.
-    entry.controller?.dispose();
-    entry.controller = null;
+    // l'aurait fait à la découverte. L'ANCIEN contrôleur, s'il existe, reste actif — garde
+    // et blocage compris — jusqu'à ce que le remplaçant soit prêt : le défaire tout de suite,
+    // avant les deux lectures asynchrones qui suivent, laissait l'éditeur sans AUCUNE garde
+    // pendant leur durée (le bouton de soumission dégrisé, aucun clic intercepté) — un
+    // commentaire invalide restait alors soumissible tant qu'elles n'avaient pas abouti,
+    // potentiellement indéfiniment si l'une d'elles ne répondait jamais (revue Codex, PR
+    // #39). Seul un passage à `off` (branche ci-dessus) défait immédiatement : §7 veut alors
+    // l'extension inactive tout de suite, pas seulement une fois un remplaçant prêt qui
+    // n'existera jamais dans ce cas.
+    const previousController = entry.controller;
     const published = adapter.readPublishedResult();
     const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
     const directShortcuts = await readDirectShortcuts(); // §5.2 — préférence locale (§8.1.2)
     // Supplanté par une réconciliation plus récente sur la MÊME entrée, ou révoqué, pendant
-    // les lectures ci-dessus : ne rien construire au nom d'une génération périmée.
+    // les lectures ci-dessus : ne rien construire ni rien défaire au nom d'une génération
+    // périmée — l'ancien contrôleur reste en place tel quel, une réconciliation plus
+    // récente (ou `revoke()`) en décidera.
     if (disposed || generation !== entry.generation) return;
     const controller = new EditorController({
       adapter,
@@ -571,8 +580,14 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
       currentUserLogin: currentUser.login,
       directShortcuts,
       telemetry: count,
+      // Repris tel quel de l'ancien contrôleur (revue Codex, PR #39) : cette reconstruction
+      // peut survenir sans que le diagnostic affiché change (langue, style de badge, TTL,
+      // état dégradé) — un `#countedCodes` reparti de zéro recompterait alors un code
+      // toujours présent, jamais disparu depuis l'ancien contrôleur.
+      initialCountedCodes: previousController?.snapshotCountedCodes(),
     });
     if (disposed || generation !== entry.generation) return;
+    previousController?.dispose();
     controller.attach();
     entry.controller = controller;
     entry.builtSignature = signature;

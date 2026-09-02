@@ -4,6 +4,7 @@ import { defaultConfig, type PrRef } from '@cct/core';
 import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controller.js';
 import { writeToTextField } from '@cct/adapter-shared';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import type { TelemetryEvent } from '../src/telemetry.js';
 
 const pr: PrRef = {
   platform: 'github',
@@ -13,7 +14,10 @@ const pr: PrRef = {
   number: 42,
 };
 
-function setup(mode: 'enforce' | 'warn' = 'enforce') {
+function setup(
+  mode: 'enforce' | 'warn' = 'enforce',
+  opts: { telemetry?: (event: TelemetryEvent) => boolean; initialCountedCodes?: ReadonlySet<string> } = {}
+) {
   const host = document.createElement('div');
   const textarea = document.createElement('textarea');
   // Génération React du CommentBox GitHub (cf. selectors.ts, `class*="CommentBox"`) : c'est
@@ -49,6 +53,8 @@ function setup(mode: 'enforce' | 'warn' = 'enforce') {
     published: null,
     lang: 'fr',
     currentUserLogin: 'alice',
+    telemetry: opts.telemetry,
+    initialCountedCodes: opts.initialCountedCodes,
   });
   return { controller, textarea, submit, host };
 }
@@ -212,6 +218,78 @@ describe('§5 — contrôleur d’éditeur', () => {
     await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
 
     expect(submit.hasAttribute('aria-disabled')).toBe(false);
+  });
+
+  it('revue Codex, PR #39 : le grisage préserve un `aria-disabled` NATIF déjà posé par la plateforme', async () => {
+    const { controller, textarea, submit } = setup('enforce');
+    // La plateforme a DÉJÀ désactivé ce bouton pour sa propre raison (branche protégée,
+    // permissions…), avant même que ce contrôleur n'existe.
+    submit.setAttribute('aria-disabled', 'true');
+    controller.attach();
+    writeToTextField(textarea, 'pas de label ici'); // diagnostic bloquant, débattu à 150 ms
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(submit.getAttribute('aria-disabled')).toBe('true'); // grisage du contrôleur, même valeur
+
+    // Le diagnostic se résorbe : sans restauration de la valeur NATIVE, `refresh()`
+    // retirerait purement et simplement l'attribut, rendant accessible un bouton que la
+    // plateforme avait natvement désactivé (revue Codex, PR #39).
+    writeToTextField(textarea, 'issue: le nom est ambigu');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(submit.getAttribute('aria-disabled')).toBe('true'); // restauré, jamais retiré
+
+    controller.dispose();
+  });
+
+  it('revue Codex, PR #39 : dispose() restaure un `aria-disabled` NATIF plutôt que de le retirer', async () => {
+    const { controller, textarea, submit } = setup('enforce');
+    submit.setAttribute('aria-disabled', 'true'); // natif, préexistant à ce contrôleur
+    controller.attach();
+    writeToTextField(textarea, 'pas de label ici');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+
+    controller.dispose();
+
+    // Un simple retrait rendrait accessible un bouton que la plateforme avait natvement
+    // désactivé pour une raison qui n'a rien à voir avec ce contrôleur.
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('revue Codex, PR #39 : `initialCountedCodes` évite de recompter un diagnostic jamais disparu', async () => {
+    const telemetryCalls: string[] = [];
+    const telemetry = (event: TelemetryEvent) => {
+      if (event.kind === 'validation-code') telemetryCalls.push(event.code);
+      return true;
+    };
+
+    const { controller: controller1, textarea: textarea1 } = setup('enforce', { telemetry });
+    controller1.attach();
+    writeToTextField(textarea1, 'pas de label ici');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(telemetryCalls.length).toBe(1); // comptage à l'apparition
+
+    const snapshot = controller1.snapshotCountedCodes();
+    controller1.dispose();
+
+    // Reconstruction (revue Codex, PR #39) : `bootstrap()` en refait une à chaque
+    // changement de configuration qui touche au rendu — langue, style de badge, TTL, état
+    // dégradé — MÊME quand le diagnostic affiché, lui, ne change pas du tout. Sans reprise
+    // de `#countedCodes`, le nouveau contrôleur recompterait ce diagnostic pourtant jamais
+    // disparu, gonflant la télémétrie à chaque rebuild plutôt qu'à chaque apparition réelle.
+    // Le texte porte DÉJÀ le diagnostic à l'attachement — comme dans `bootstrap()`, où le
+    // même éditeur, avec son contenu déjà saisi, est reconstruit sur place (`reconcile()`) :
+    // `attach()` y relit tout de suite le diagnostic toujours présent, jamais un textarea
+    // vide qui l'aurait fait disparaître avant même la première validation.
+    const { controller: controller2, textarea: textarea2 } = setup('enforce', {
+      telemetry,
+      initialCountedCodes: snapshot,
+    });
+    textarea2.value = 'pas de label ici';
+    controller2.attach();
+    expect(telemetryCalls.length).toBe(1); // toujours un seul comptage au total
+
+
+    controller2.dispose();
   });
 
   it('§5.4 : Ctrl+Entrée intercepté quand le commentaire est en erreur (§4.3)', async () => {

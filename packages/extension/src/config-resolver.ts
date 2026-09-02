@@ -33,6 +33,18 @@ interface CacheEntry {
 export class ClientConfigResolver {
   #floorProvider: () => Promise<Floor | null>;
   #cache = new Map<string, CacheEntry>();
+  // Une résolution EN VOL par clé (revue Codex, PR #39) : `resolve()` est appelée depuis
+  // plusieurs points indépendants de content-internal.ts (rendu déclenché par mutation,
+  // sondage périodique d'un onglet inerte, découverte d'un éditeur) sur la MÊME instance de
+  // résolveur. Sans coalescence, deux appels concurrents sur un cache expiré déclenchaient
+  // chacun leur propre lecture, et `#cache.set()` retenait celle qui ABOUTISSAIT en dernier —
+  // pas celle demandée en dernier. Une lecture plus lente mais plus ANCIENNE écrasait alors
+  // au cache une réponse plus fraîche déjà posée, et le rattrapage forcé qui en découvrait
+  // l'écart relisait ensuite ce cache corrompu, rétablissant le mode ou les règles périmés
+  // pour tout le TTL restant. Un second appel pendant une lecture déjà en vol pour la même
+  // clé rejoint donc celle-ci au lieu d'en démarrer une concurrente : il n'existe alors plus
+  // qu'une seule réponse possible, jamais une course entre deux.
+  #inFlight = new Map<string, Promise<{ read: ConfigRead; degraded: boolean }>>();
   #now: () => number;
   #lastTtl = 3600; // la clé vit dans le document qu'elle sert à mettre en cache (§9.2.3)
 
@@ -73,18 +85,30 @@ export class ClientConfigResolver {
     if (entry && this.#now() - entry.fetchedAt < this.#lastTtl * 1000) {
       return { read: entry.value, degraded: false };
     }
-    const value = await fetcher();
-    if (value.status !== 'unreachable') {
-      this.#cache.set(key, { value, fetchedAt: this.#now() });
-      return { read: value, degraded: false };
+    // Rejoint la lecture déjà en vol pour cette clé plutôt que d'en démarrer une seconde —
+    // voir le commentaire de `#inFlight` plus haut.
+    const pending = this.#inFlight.get(key);
+    if (pending) return pending;
+    const promise = (async (): Promise<{ read: ConfigRead; degraded: boolean }> => {
+      const value = await fetcher();
+      if (value.status !== 'unreachable') {
+        this.#cache.set(key, { value, fetchedAt: this.#now() });
+        return { read: value, degraded: false };
+      }
+      // Lecture impossible : le repli normatif est le NIVEAU INFÉRIEUR, en état dégradé
+      // (§8.1.5 « Lecture impossible », §9.2.3 : « se rabat sur le niveau inférieur, en
+      // signalant son état dégradé »). La lecture `unreachable` est donc rendue telle
+      // quelle — resolveConfig() saute ce niveau — et jamais remplacée par la valeur
+      // expirée du même niveau : l'extension n'énonce aucun diagnostic au nom d'une règle
+      // qu'elle n'a pas pu relire. La valeur en cache ne sert que pendant son TTL.
+      return { read: value, degraded: true };
+    })();
+    this.#inFlight.set(key, promise);
+    try {
+      return await promise;
+    } finally {
+      this.#inFlight.delete(key);
     }
-    // Lecture impossible : le repli normatif est le NIVEAU INFÉRIEUR, en état dégradé
-    // (§8.1.5 « Lecture impossible », §9.2.3 : « se rabat sur le niveau inférieur, en
-    // signalant son état dégradé »). La lecture `unreachable` est donc rendue telle
-    // quelle — resolveConfig() saute ce niveau — et jamais remplacée par la valeur
-    // expirée du même niveau : l'extension n'énonce aucun diagnostic au nom d'une règle
-    // qu'elle n'a pas pu relire. La valeur en cache ne sert que pendant son TTL.
-    return { read: value, degraded: true };
   }
 
   invalidate(): void {

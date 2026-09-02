@@ -24,6 +24,7 @@
 // rendu ne dépend pas).
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fingerprint, resolveConfig } from '@cct/core';
 
 interface FakeState {
   configText: string;
@@ -93,6 +94,16 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
       }
     },
   }));
+}
+
+/** Empreinte réellement produite pour un texte de configuration de DÉPÔT donné — même
+ * calcul que `ClientConfigResolver.resolve()` (organisation absente, aucun plancher, sans
+ * épinglage). Sert à poser un `configFingerprint` publié qui CORRESPOND à la configuration
+ * du moment, pour qu'un test puisse isoler le blocage dû au seul diagnostic du commentaire
+ * sans jamais le confondre avec un écart d'empreinte (§8.1.3, règle 2). */
+function fingerprintFor(configText: string): string {
+  const { config } = resolveConfig(null, { status: 'absent' }, { status: 'found', text: configText }, null, false);
+  return fingerprint(config);
 }
 
 function published(overrides: Record<string, unknown>): Record<string, unknown> {
@@ -406,5 +417,94 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     // `reconcile()` suivant), elle réinstallerait ici un contrôleur ACTIF par-dessus — la
     // barre réapparaîtrait alors que la configuration COURANTE est `off`.
     expect(host.querySelector('.cct-toolbar')).toBeNull();
+  });
+
+  it('H. la garde d’un éditeur ACTIF reste posée pendant sa reconstruction — jamais de fenêtre sans blocage (revue Codex, PR #39)', async () => {
+    const element = document.createElement('textarea');
+    element.className = 'CommentBox-input';
+    const host = document.createElement('div');
+    const submit = document.createElement('button');
+    host.append(element, submit);
+    document.body.append(host);
+
+    const initialConfigText = JSON.stringify({
+      mode: 'enforce',
+      configCacheTtlSeconds: 0,
+      activation: { activatedAt: '2019-01-01T00:00:00Z' },
+    });
+    const state: FakeState = {
+      configText: initialConfigText,
+      // Comme dans le test A : aucun résumé publié à l'attachement, pas d'écart d'empreinte
+      // possible tant qu'aucun résumé n'existe (§8.1.3, règle 2) — le blocage joue à plein
+      // sur le seul diagnostic du commentaire, jamais sur une empreinte à faire concorder.
+      published: null,
+    };
+    installAdapter(state, element, submit);
+
+    // Même dispositif que G : seul le SECOND appel de `chrome.storage.sync.get` après
+    // armement (celui de `reconcile()`, pas celui du rendu qui le précède) est bloqué.
+    let armed = false;
+    let callsSinceArmed = 0;
+    let releaseBlockedRead: (() => void) | null = null;
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        sync: {
+          get: (_keys: string[], cb: (items: Record<string, unknown>) => void) => {
+            if (armed) {
+              callsSinceArmed++;
+              if (callsSinceArmed === 2) {
+                releaseBlockedRead = () => cb({});
+                return;
+              }
+            }
+            cb({});
+          },
+        },
+      },
+    };
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
+    element.value = 'pas de label ici'; // diagnostic bloquant sous enforce, déjà présent
+    disposers.push(await bootstrap(document));
+    await flushAll();
+    expect(submit.getAttribute('aria-disabled')).toBe('true'); // bloqué : enforce, en périmètre, pas d'écart
+
+    // Un changement de label EN MODE ACTIF force une reconstruction (test F) — la lecture
+    // de langue qu'elle attend est bloquée pour observer la fenêtre entre l'ancien
+    // contrôleur défait et le nouveau prêt. Le résumé publié porte l'empreinte EXACTE de
+    // cette nouvelle configuration (`fingerprintFor`) : le diagnostic reste seul responsable
+    // du blocage observé plus bas, jamais un écart d'empreinte qui le désarmerait pour une
+    // tout autre raison que celle testée ici.
+    armed = true;
+    const nextConfigText = JSON.stringify({
+      mode: 'enforce',
+      configCacheTtlSeconds: 0,
+      activation: { activatedAt: '2019-01-01T00:00:00Z' },
+      labels: [{ id: 'issue', enabled: false }],
+    });
+    state.configText = nextConfigText;
+    state.published = published({
+      state: 'failure',
+      unresolvedBlockingCount: 1,
+      configFingerprint: fingerprintFor(nextConfigText),
+    });
+    document.body.appendChild(document.createElement('span'));
+    await flushAll();
+    expect(releaseBlockedRead).not.toBeNull(); // la reconstruction attend bien
+
+    // PENDANT la reconstruction : l'ANCIEN contrôleur, encore en place, garde son blocage —
+    // jamais de fenêtre où le bouton redevient soumissible avant que le remplaçant ne soit
+    // prêt (revue Codex, PR #39). Sans le correctif, l'ancien contrôleur était défait
+    // immédiatement, avant même cette lecture, et `submit` perdait son grisage ici.
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+
+    releaseBlockedRead!();
+    await flushAll();
+
+    // Le remplaçant est bien en place, et continue de bloquer le même diagnostic toujours
+    // affiché.
+    expect(host.querySelector('.cct-toolbar')).not.toBeNull();
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
   });
 });

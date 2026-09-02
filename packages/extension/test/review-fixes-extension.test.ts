@@ -164,6 +164,61 @@ describe('écart A — §5.4 cond. 4 : une lecture unreachable n’est jamais ma
   });
 });
 
+describe('revue Codex, PR #39 : deux résolutions concurrentes pour la même clé se coalescent', () => {
+  const pr: PrRef = {
+    platform: 'github',
+    createdAt: '2026-10-01T00:00:00Z',
+    host: 'github.com',
+    scope: ['acme', 'demo'],
+    number: 42,
+  };
+
+  function makeAdapter(read: () => Promise<ConfigRead>): PlatformAdapter {
+    return {
+      matches: () => true,
+      platformProfile: () => ({ id: 'github', suggestionInfoString: null }),
+      getRepoConfig: read,
+      getOrgConfig: async () => ({ status: 'absent' }),
+      observeEditors: () => ({ dispose: () => {} }),
+      getSubmitControls: () => [],
+      readValue: () => '',
+      writeValue: () => {},
+      getThreads: async () => [],
+      getCompletionControl: () => null,
+      getCurrentUser: async () => ({ id: 'u', login: 'u', isServiceAccount: false }),
+      readPublishedResult: () => null,
+    };
+  }
+
+  it('la seconde résolution rejoint la première en vol au lieu de déclencher sa propre lecture', async () => {
+    let callCount = 0;
+    let releaseFirst: ((read: ConfigRead) => void) | null = null;
+    const adapter = makeAdapter(() => {
+      callCount++;
+      return new Promise<ConfigRead>((resolve) => {
+        releaseFirst = resolve;
+      });
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+
+    // Cache vide : les deux appels tombent sur un cache expiré et pourraient chacun
+    // déclencher leur propre lecture si elle n'était pas coalescée.
+    const first = resolver.resolve(adapter, pr);
+    const second = resolver.resolve(adapter, pr);
+
+    // Laisse les deux promesses s'installer avant de vérifier : une microtâche suffit pour
+    // que `second`, si elle démarrait sa propre lecture, l'ait déjà fait.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(callCount).toBe(1); // une seule lecture en vol pour cette clé, jamais deux
+
+    releaseFirst!({ status: 'found', text: JSON.stringify({ mode: 'enforce' }) });
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult.config.mode).toBe('enforce');
+    expect(secondResult.config.mode).toBe('enforce'); // la même réponse, jamais une course
+  });
+});
+
 describe('écart A — §5.2 : la table des abréviations ne fuit pas le prototype', () => {
   it('les clés héritées (constructor, toString) ne sont pas des abréviations', () => {
     const abbr = defaultConfig().shortcuts.abbreviations;

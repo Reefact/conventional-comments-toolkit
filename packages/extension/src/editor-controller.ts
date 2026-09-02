@@ -89,9 +89,52 @@ export interface ControllerDeps {
    * compte sans se poser la question, et sans jamais lui passer autre chose qu'un
    * identifiant. */
   telemetry?: (event: TelemetryEvent) => boolean;
+  /** Codes de diagnostic déjà comptés par un contrôleur PRÉCÉDENT pour ce même éditeur, à
+   * reprendre tel quel (revue Codex, PR #39) : `bootstrap()` reconstruit entièrement le
+   * contrôleur dès qu'un champ de rendu change (langue, style de badge, TTL, état
+   * dégradé — `renderConfigSignatureOf`), y compris quand le diagnostic affiché, lui, ne
+   * change pas du tout. Repartir d'un `#countedCodes` vide à chaque reconstruction ferait
+   * recompter un code encore présent, jamais disparu, gonflant la télémétrie opt-in (§10)
+   * à chaque rendu forcé plutôt qu'à chaque apparition RÉELLE. */
+  initialCountedCodes?: ReadonlySet<string>;
 }
 
 /** Table par défaut des raccourcis directs (§5.2) — surchargable par les préférences. */
+/** Marque, sur l'élément lui-même, la valeur NATIVE d'`aria-disabled` juste avant que ce
+ * contrôleur ne pose la sienne — même mécanisme que `NATIVE_ARIA_DISABLED_MARKER` du bouton
+ * de complétion (content-internal.ts, §6.5) : un bouton de soumission peut déjà porter
+ * `aria-disabled="true"` pour une raison qui lui est PROPRE (branche protégée, permissions),
+ * sans rapport avec le grisage de ce contrôleur (§5.4). Écraser puis retirer purement et
+ * simplement l'attribut confondait les deux états : au dégrisage (`refresh()`) comme à
+ * `dispose()`, le bouton redevenait accessible même si la plateforme l'avait natvement
+ * désactivé (revue Codex, PR #39). Chaîne vide = attribut natif absent — retiré, pas
+ * réécrit avec une chaîne vide, à la restauration. */
+const SUBMIT_NATIVE_ARIA_DISABLED_MARKER = 'cctSubmitNativeAriaDisabled';
+
+/** Pose le grisage de ce contrôleur sur un bouton de soumission (§5.4), en capturant sa
+ * valeur native d'`aria-disabled` la toute première fois — jamais aux passages suivants,
+ * sous peine d'écraser la valeur native par notre PROPRE écriture lors d'un second cycle
+ * bloqué → bloqué. */
+function blockSubmit(control: SubmitControl): void {
+  const element = control.element as HTMLElement;
+  if (element.dataset[SUBMIT_NATIVE_ARIA_DISABLED_MARKER] === undefined) {
+    element.dataset[SUBMIT_NATIVE_ARIA_DISABLED_MARKER] = element.getAttribute('aria-disabled') ?? '';
+  }
+  element.setAttribute('aria-disabled', 'true');
+}
+
+/** Défait `blockSubmit` — restaure la valeur native capturée, sans y toucher si ce
+ * contrôleur n'a jamais grisé ce bouton (rien à défaire, jamais un retrait d'un état natif
+ * qu'il n'a pas posé lui-même). */
+function unblockSubmit(control: SubmitControl): void {
+  const element = control.element as HTMLElement;
+  const native = element.dataset[SUBMIT_NATIVE_ARIA_DISABLED_MARKER];
+  if (native === undefined) return;
+  if (native) element.setAttribute('aria-disabled', native);
+  else element.removeAttribute('aria-disabled');
+  delete element.dataset[SUBMIT_NATIVE_ARIA_DISABLED_MARKER];
+}
+
 export const DEFAULT_DIRECT_SHORTCUTS: Record<string, string> = {
   'Alt+I': 'issue',
   'Alt+S': 'suggestion',
@@ -116,10 +159,18 @@ export class EditorController {
    * frappe débattue : compter à chaque passage ferait d'un « code d'erreur » (§10) un
    * compteur de frappes, ce qui n'est plus un agrégat et en dit bien plus long. Seule
    * l'APPARITION d'un code est comptée ; sa disparition puis son retour en recomptent un. */
-  #countedCodes = new Set<string>();
+  #countedCodes: Set<string>;
 
   constructor(deps: ControllerDeps) {
     this.deps = deps;
+    this.#countedCodes = new Set(deps.initialCountedCodes ?? []);
+  }
+
+  /** Photo des codes actuellement comptés (§10) — lue par `bootstrap()` juste avant de
+   * défaire ce contrôleur pour le reconstruire (revue Codex, PR #39), pour que le
+   * remplaçant la reprenne via `initialCountedCodes` plutôt que de repartir de zéro. */
+  snapshotCountedCodes(): ReadonlySet<string> {
+    return this.#countedCodes;
   }
 
   get config(): EffectiveConfig {
@@ -292,7 +343,7 @@ export class EditorController {
       this.#timer = null;
     }
     for (const control of this.deps.adapter.getSubmitControls(this.deps.editor)) {
-      control.element.removeAttribute('aria-disabled');
+      unblockSubmit(control);
     }
     for (const d of this.#disposers) d();
     this.#disposers = [];
@@ -342,9 +393,11 @@ export class EditorController {
     });
     for (const control of this.deps.adapter.getSubmitControls(this.deps.editor)) {
       // aria-disabled, jamais l'attribut natif disabled : il retirerait le bouton de
-      // l'ordre de tabulation (§5.4, CA-12).
-      if (decision.block) control.element.setAttribute('aria-disabled', 'true');
-      else control.element.removeAttribute('aria-disabled');
+      // l'ordre de tabulation (§5.4, CA-12). La valeur NATIVE, si le bouton en portait déjà
+      // une pour son propre compte, est capturée/restaurée plutôt qu'écrasée (revue Codex,
+      // PR #39) — voir `blockSubmit`/`unblockSubmit`.
+      if (decision.block) blockSubmit(control);
+      else unblockSubmit(control);
     }
   }
 

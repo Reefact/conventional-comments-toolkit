@@ -37,6 +37,32 @@ function decorationBadge(decoration: ResolvedDecoration, config: EffectiveConfig
   return badge;
 }
 
+// Ni parseDecorations() ni analyze() ne bornent le nombre de décorations distinctes du
+// préfixe (§3.3) : avec decorations.allowFree (le défaut), un commentaire adversarial peut
+// en écrire des milliers dans la longueur qu'un corps de commentaire autorise, pour poser
+// autant de nœuds DOM sur la page de CHAQUE lecteur, à CHAQUE passage de rendu (revue
+// Codex, PR #38). Rendu plafonné ici — c'est un choix d'affichage, pas une règle de
+// validation (§3.3 : le corps reste conforme, seul l'AFFICHAGE tronque).
+const MAX_RENDERED_DECORATIONS = 12;
+
+function overflowBadge(count: number, config: EffectiveConfig): HTMLElement {
+  const badge = globalThis.document.createElement('span');
+  badge.className = `cct-badge cct-badge-deco cct-badge-${config.badgeStyle}`;
+  badge.textContent = `+${count}`;
+  badge.title = `${count} décoration(s) supplémentaire(s), non affichée(s)`;
+  return badge;
+}
+
+/** Badges de décoration à poser, décorations en surplus repliées dans un seul badge « +N »
+ * plutôt que d'en créer un par entrée au-delà de MAX_RENDERED_DECORATIONS. */
+function decorationBadges(decorations: ResolvedDecoration[], config: EffectiveConfig): HTMLElement[] {
+  const shown = decorations.slice(0, MAX_RENDERED_DECORATIONS);
+  const overflow = decorations.length - shown.length;
+  const badges = shown.map((d) => decorationBadge(d, config));
+  if (overflow > 0) badges.push(overflowBadge(overflow, config));
+  return badges;
+}
+
 /** Tout ce qui détermine l'APPARENCE des badges d'un commentaire résolu — pas les mêmes
  * clés que fingerprint() (§9.2.2), qui répond à une question différente (deux composants
  * s'accordent-ils sur le VERDICT ?) et exclut pour cette raison badgeStyle/labels[].color/
@@ -76,7 +102,15 @@ export function decorateComment(
     return;
   }
   const signature = badgeSignature({ ...a, resolved: a.resolved }, config);
-  if (stale[0]?.dataset['cctSig'] === signature) return; // inchangé — aucune écriture DOM
+  const decoBadges = decorationBadges(a.decorations, config);
+  // La signature seule ne suffit pas : elle n'est portée QUE par le badge de label (stale[0]),
+  // donc une réhydratation de plateforme qui efface un badge de DÉCORATION sans toucher au
+  // label laisserait stale[0] intact et ce court-circuit renoncerait à réparer le manquant
+  // (revue Codex, PR #38). Le compte de badges effectivement présents doit donc correspondre
+  // à ce que CE rendu produirait, pas seulement la signature du premier.
+  if (stale.length === 1 + decoBadges.length && stale[0]?.dataset['cctSig'] === signature) {
+    return; // inchangé — aucune écriture DOM
+  }
 
   const badge = labelBadge(a.resolved.label, config);
   badge.dataset['blocking'] = a.blocking ? 'true' : 'false';
@@ -85,5 +119,5 @@ export function decorateComment(
   // prepend() insère tous les badges en une fois, dans l'ordre donné (label, puis les
   // décorations dans l'ordre d'écriture) — contrairement à insertAdjacentElement('afterbegin'),
   // répété, qui les aurait posés en ordre inverse.
-  commentBodyElement.prepend(badge, ...a.decorations.map((d) => decorationBadge(d, config)));
+  commentBodyElement.prepend(badge, ...decoBadges);
 }

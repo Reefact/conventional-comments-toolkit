@@ -507,4 +507,89 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     expect(host.querySelector('.cct-toolbar')).not.toBeNull();
     expect(submit.getAttribute('aria-disabled')).toBe('true');
   });
+
+  it('I. une entrée détachée pendant sa réconciliation n’attache jamais son remplaçant (revue Codex, PR #39)', async () => {
+    const element = document.createElement('textarea');
+    element.className = 'CommentBox-input';
+    const host = document.createElement('div');
+    const submit = document.createElement('button');
+    host.append(element, submit);
+    document.body.append(host);
+
+    const state: FakeState = {
+      configText: JSON.stringify({
+        mode: 'enforce',
+        configCacheTtlSeconds: 0,
+        activation: { activatedAt: '2019-01-01T00:00:00Z' },
+      }),
+      published: published({ state: 'failure', unresolvedBlockingCount: 1 }),
+    };
+    installAdapter(state, element, submit);
+
+    // Même dispositif que G/H : seul le SECOND appel de `chrome.storage.sync.get` après
+    // armement (celui de `reconcile()`) est bloqué.
+    let armed = false;
+    let callsSinceArmed = 0;
+    let releaseBlockedRead: (() => void) | null = null;
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        sync: {
+          get: (_keys: string[], cb: (items: Record<string, unknown>) => void) => {
+            if (armed) {
+              callsSinceArmed++;
+              if (callsSinceArmed === 2) {
+                releaseBlockedRead = () => cb({});
+                return;
+              }
+            }
+            cb({});
+          },
+        },
+      },
+    };
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
+    disposers.push(await bootstrap(document));
+    await flushAll();
+    expect(host.querySelector('.cct-toolbar')).not.toBeNull();
+
+    // Un changement de label EN MODE ACTIF force une reconstruction — la lecture de langue
+    // qu'elle attend est bloquée pour l'observer en vol.
+    armed = true;
+    state.configText = JSON.stringify({
+      mode: 'enforce',
+      configCacheTtlSeconds: 0,
+      activation: { activatedAt: '2019-01-01T00:00:00Z' },
+      labels: [{ id: 'issue', enabled: false }],
+    });
+    state.published = published({ state: 'failure', unresolvedBlockingCount: 2 });
+    document.body.appendChild(document.createElement('span'));
+    await flushAll();
+    expect(releaseBlockedRead).not.toBeNull(); // la reconstruction attend bien
+
+    // La plateforme détache tout le sous-arbre PENDANT que cette réconciliation attend
+    // encore — un fil masqué/virtualisé, ou un remplacement React du conteneur du
+    // composeur. `host` reste intact (l'éditeur garde un parent, `attach()` ne bute donc
+    // pas sur son garde `if (!host) return`) : seule sa connexion au DOCUMENT disparaît.
+    host.remove();
+    expect(element.isConnected).toBe(false);
+
+    // Un rendu SUIVANT (résumé publié encore différent, pour rester visible) appelle
+    // `releaseDetached()`, qui doit repérer cette entrée désormais détachée et l'invalider
+    // — AVANT que la réconciliation bloquée plus haut ne reprenne.
+    state.published = published({ state: 'failure', unresolvedBlockingCount: 3 });
+    document.body.appendChild(document.createElement('span'));
+    await flushAll();
+
+    // La réconciliation bloquée reprend enfin.
+    releaseBlockedRead!();
+    await flushAll();
+
+    // Sans le correctif, elle attacherait ici un tout NOUVEAU contrôleur — barre d'outils
+    // comprise — sur ce sous-arbre DÉTACHÉ, que ni `revoke()` (qui ne parcourt que
+    // `knownEditors`, dont cette entrée a été retirée) ni un passage à `off` ne pourraient
+    // plus jamais retrouver pour le disposer.
+    expect(host.querySelector('.cct-toolbar')).toBeNull();
+  });
 });

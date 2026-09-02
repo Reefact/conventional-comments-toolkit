@@ -45,7 +45,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { commentBodyText, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
-import { defaultConfig, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
+import { defaultConfig, fingerprint, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver } from '../src/config-resolver.js';
 import { decorateComment } from '../src/ui/badges.js';
 import { applyLabelFilter, clearLabelFilter } from '../src/ui/thread-filter.js';
@@ -1879,5 +1879,43 @@ describe('Codex #38 — sondage périodique de la configuration effective sur un
     expect(getThreadsCalls).toBe(callsOnceShown);
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
     expect(doc.querySelector('.cct-banner')).toBe(bannerAfterFirstRender); // même élément, jamais reconstruit
+  });
+
+  it('un champ hors du domaine du verdict (langue) change le rendu sans changer le fingerprint — sondé quand même', async () => {
+    // Prémisse vérifiée séparément, sans passer par le résolveur ni le DOM : `fingerprint()`
+    // (core/, §9.2.2) exclut `language` de son domaine par construction — deux configurations
+    // qui ne diffèrent QUE sur cette clé produisent la même empreinte.
+    const enConfig = defaultConfig();
+    enConfig.language = 'en';
+    const frConfig = { ...enConfig, language: 'fr' };
+    expect(fingerprint(enConfig)).toBe(fingerprint(frConfig));
+
+    const doc = document;
+    const current = pr(32);
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }));
+    let configText = JSON.stringify({ language: 'en' });
+    adapter.getRepoConfig = async () => ({ status: 'found', text: configText });
+    let resolverNow = 0;
+    const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
+    const POLL_MS = 30;
+
+    observe(adapter, resolver, doc, undefined, undefined, POLL_MS);
+    await flushAll();
+    // « judged in {mode} by core/ {coreVersion} » (en) — voir ui/strings.ts.
+    expect(doc.querySelector('.cct-banner-judged')?.textContent).toContain('judged');
+
+    // Seule la langue change — le fingerprint(), lui, reste identique (prémisse ci-dessus) —
+    // et AUCUNE mutation DOM n'a lieu : seul le sondage périodique peut faire remarquer ce
+    // changement à un onglet par ailleurs inerte.
+    configText = JSON.stringify({ language: 'fr' });
+    resolverNow += 3601 * 1000; // dépasse le TTL du cache de configuration (§8.1.2)
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS * 3));
+    await flushAll();
+
+    // « jugée en {mode} par core/ {coreVersion} » (fr). Comparer le seul `fingerprint()`
+    // dans `pollConfig` (avant correctif) aurait laissé ce texte en anglais indéfiniment :
+    // rien dans le domaine du verdict n'a changé.
+    expect(doc.querySelector('.cct-banner-judged')?.textContent).toContain('jugée');
   });
 });

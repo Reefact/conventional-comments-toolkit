@@ -9,12 +9,12 @@
 // Ce module peut exporter librement pour les tests ; content.ts, lui, ne doit rien
 // exporter.
 
-import type { ConfigRead, Floor, PrRef, PublishedSummary } from '@cct/core';
+import type { ConfigRead, EffectiveConfig, Floor, PrRef, PublishedSummary } from '@cct/core';
 import { SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { analyze, enabledLabels } from '@cct/core';
-import { ClientConfigResolver, resolveUiLanguage } from './config-resolver.js';
+import { ClientConfigResolver, resolveUiLanguage, type ResolvedClientConfig } from './config-resolver.js';
 import {
   EMPTY_EXTRA_HOSTS,
   EXTRA_HOSTS_KEY,
@@ -589,9 +589,17 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // simple ré-résolution de la même PR après expiration du TTL — l'onglet restait sinon armé
   // sur l'ancienne configuration alors que l'interface adoptait la nouvelle (revue Codex,
   // PR #31).
-  const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc, Date.now, (pr, changed) =>
-    void armFor(pr, changed ? 'pr' : 'refresh')
-  );
+  const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc, Date.now, (pr, changed, resolved) => {
+    void armFor(pr, changed ? 'pr' : 'refresh');
+    // Éditeurs DÉJÀ attachés (§5, revue Codex PR #39) : chacun garde la configuration
+    // capturée à son propre `attach()` tant que rien ne la lui repousse — sans ce geste, un
+    // éditeur ouvert avant une ré-résolution (TTL expiré, ou sondage périodique du §8.1.2)
+    // continuerait à valider et à bloquer l'envoi sur une configuration périmée jusqu'à sa
+    // fermeture/réouverture. `resolved` est `null` sur une navigation (`changed: true`,
+    // chaque éditeur de la page qui vient d'arriver reçoit la sienne, fraîche, via son
+    // propre `attach()`) ou sans PR affichée — rien à repousser dans les deux cas.
+    if (resolved) for (const { controller } of attached) controller.updateResolved(resolved);
+  });
 
   // Vidange : périodique, et à la fermeture de l'onglet. `pagehide` et non `unload` —
   // celui-ci empêche la mise en cache arrière/avant et n'est plus fiable ; `keepalive`
@@ -799,6 +807,24 @@ function injectedSurfacesOf(doc: Document): string {
   return `${banner}${filter}`;
 }
 
+/** Signature de TOUT ce qu'une configuration effective (§8.1.2) peut faire varier dans le
+ * rendu — délibérément PLUS LARGE que `fingerprint()` (core/, config/fingerprint.ts), qui
+ * ne couvre que le domaine du VERDICT partagé par les deux composants (§9.2.2) et exclut à
+ * dessein `language`, `badgeStyle`, l'icône d'un label : autant de clés qui ne changent
+ * aucun verdict mais que `renderPrChrome`/`decorateComment` affichent bel et bien (revue
+ * Codex, PR #39). Comparer seulement `fingerprint()` dans `pollConfig` (voir
+ * `observePrChromeNavigation`) aurait laissé un changement de langue ou de style de badge,
+ * survenu pendant que l'onglet est inerte, ne jamais atteindre la page tant qu'aucun champ
+ * du domaine de verdict n'avait lui-même changé.
+ *
+ * `JSON.stringify` de la configuration entière, sans projection à la main : une liste de
+ * champs choisie ici referait, pour le RENDU, exactement l'erreur que ce commentaire décrit
+ * pour `fingerprint()` — une clé de rendu ajoutée plus tard resterait invisible tant que
+ * personne ne pense à l'ajouter à la liste. */
+function renderConfigSignatureOf(config: EffectiveConfig): string {
+  return JSON.stringify(config);
+}
+
 /** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) — navigation
  * SPA vers une PR différente (ou plus aucune) —, tant que le dernier rendu sur la MÊME PR
  * n'a rien eu à montrer (fenêtre `RENDER_RETRY_WINDOW_MS` : au premier chargement direct
@@ -835,8 +861,15 @@ export function observePrChromeNavigation(
    * C'est le seul signal de ce module lié à la PR et non à un éditeur : la télémétrie s'y
    * arme (voir `armFor`), parce qu'une PR sans composeur rendu doit remonter ses
    * dégradations comme les autres (CA-11), et parce qu'un onglet restait armé sur l'ancienne
-   * configuration quand celle-ci se rafraîchissait sans navigation (revue Codex, PR #31). */
-  onPrChange: (pr: PrRef | null, changed: boolean) => void = () => {},
+   * configuration quand celle-ci se rafraîchissait sans navigation (revue Codex, PR #31).
+   *
+   * `resolved` porte la configuration EFFECTIVEMENT appliquée par le rendu qui a produit cet
+   * appel — `null` sur une navigation (`changed: true`, pas encore résolue à cet instant) ou
+   * sans PR affichée. `bootstrap()` s'en sert pour rafraîchir les éditeurs déjà attachés
+   * (revue Codex, PR #39) : sans ce signal, un éditeur ouvert avant qu'un sondage périodique
+   * ou une expiration de TTL ne change la configuration continuerait à valider et à bloquer
+   * l'envoi sur celle, périmée, capturée à son propre `attach()`. */
+  onPrChange: (pr: PrRef | null, changed: boolean, resolved: ResolvedClientConfig | null) => void = () => {},
   /** Injectable pour les tests (une horloge réelle, pas `now`, gouverne `setInterval` — voir
    * `CONFIG_POLL_INTERVAL_MS`) : une valeur courte y remplace les cinq minutes de production
    * sans attendre cette durée pour de vrai. `0` désactive le sondage. */
@@ -871,12 +904,17 @@ export function observePrChromeNavigation(
   // pour la même raison que le filtre : renderPrChrome reconstruit le bandeau à chaque appel.
   let bannerOpen: boolean | null = null;
   let bannerBlocked: boolean | null = null;
-  // Empreinte de la configuration EFFECTIVE (§8.1.2) telle qu'appliquée par le DERNIER rendu
-  // réel — posée juste après lui (voir la fin de `run()`), jamais par `pollConfig` : un
-  // sondage qui se contenterait de comparer ses propres lectures successives raterait tout
-  // changement survenu AVANT son premier réveil. `null` tant qu'aucun rendu n'a encore eu
-  // lieu pour la PR affichée (pas de référence à comparer, donc pas de sondage actif).
-  let lastConfigFingerprint: string | null = null;
+  // Signature de TOUT ce que la configuration effective (§8.1.2) peut faire varier dans le
+  // rendu — `renderConfigSignatureOf`, jamais `resolved.fingerprint` (revue Codex, PR #39) :
+  // ce dernier ne couvre que le domaine du VERDICT partagé par les deux composants (§9.2.2)
+  // et exclut à dessein `language`, `badgeStyle`, l'icône d'un label — autant de clés qui ne
+  // changent aucun verdict mais que `renderPrChrome`/`decorateComment` affichent bel et
+  // bien. Telle qu'appliquée par le DERNIER rendu réel — posée juste après lui (voir la fin
+  // de `run()`), jamais par `pollConfig` : un sondage qui se contenterait de comparer ses
+  // propres lectures successives raterait tout changement survenu AVANT son premier réveil.
+  // `null` tant qu'aucun rendu n'a encore eu lieu pour la PR affichée (pas de référence à
+  // comparer, donc pas de sondage actif).
+  let lastRenderConfigSignature: string | null = null;
   // Posé par `pollConfig` quand elle constate un écart : fait sauter la comparaison de
   // signatures ci-dessous pour LE PROCHAIN `run()`, sans quoi un changement de
   // configuration qui ne modifie ni le résumé publié de la plateforme ni notre propre
@@ -897,9 +935,9 @@ export function observePrChromeNavigation(
     // La référence n'est posée qu'APRÈS un rendu réel (voir `run()`, plus bas) — jamais ici :
     // sinon un changement survenu AVANT le tout premier réveil s'établirait lui-même comme
     // référence, sans jamais être détecté.
-    if (lastConfigFingerprint === null) return;
+    if (lastRenderConfigSignature === null) return;
     void resolver.resolve(adapter, pr).then((resolved) => {
-      if (disposed || resolved.fingerprint === lastConfigFingerprint) return;
+      if (disposed || renderConfigSignatureOf(resolved.config) === lastRenderConfigSignature) return;
       forceRender = true;
       run();
     });
@@ -920,7 +958,7 @@ export function observePrChromeNavigation(
       lastPrKey = key;
       // AVANT tout rendu : c'est ici que la PR affichée change, et l'armement de la
       // télémétrie doit suivre ce changement-là, pas celui d'un éditeur.
-      onPrChange(currentPrOf(adapter), true);
+      onPrChange(currentPrOf(adapter), true, null);
       showedSomething = false;
       lastOwnSig = null;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
@@ -930,7 +968,7 @@ export function observePrChromeNavigation(
       // Nouvelle PR : la référence de config du sondage périodique portait sur l'ancienne,
       // et comparer les deux n'aurait aucun sens. Le prochain sondage établira une nouvelle
       // référence sans forcer de rendu (voir `pollConfig`).
-      lastConfigFingerprint = null;
+      lastRenderConfigSignature = null;
     }
     // Sonde le bouton de complétion (chromeSignatureOf) seulement dans la fenêtre
     // d'hydratation de CETTE PR — jamais indéfiniment (§9.4, cf. chromeSignatureOf).
@@ -987,29 +1025,26 @@ export function observePrChromeNavigation(
         bannerBlocked = null;
       },
     })
-      .then((showed) => {
+      .then(({ showed, resolved }) => {
         if (key !== lastPrKey) return; // supplanté par une navigation : ce rendu ne fait plus foi
         // Ce rendu a résolu la configuration effective — éventuellement une NOUVELLE, le
         // cache du résolveur ayant expiré. La télémétrie doit s'aligner sur celle-là, sans
         // désarmer : `changed: false` recalcule la cible et ne vidange que si elle diffère.
-        if (!navigated) onPrChange(currentPrOf(adapter), false);
+        // `resolved` — CELLE que ce rendu vient d'appliquer, jamais une relecture séparée —
+        // laisse aussi `bootstrap()` rafraîchir les éditeurs déjà attachés (revue Codex, PR
+        // #39) : un éditeur ouvert avant ce rendu garde sinon la configuration figée à son
+        // propre `attach()`, sans jamais apprendre qu'elle vient de changer.
+        if (!navigated) onPrChange(currentPrOf(adapter), false, resolved);
         showedSomething = showed;
         // Photo prise ICI, une fois nos badges posés et nos surfaces montées : c'est ce que
         // la page doit encore porter au prochain réveil. Toute différence constatée ensuite
         // vient d'une main extérieure, jamais de la nôtre.
         lastOwnSig = key === null ? null : ownOutputSignatureOf(adapter, doc);
-        // Référence du sondage périodique (`pollConfig`), alignée sur ce que CE rendu vient
-        // d'appliquer — jamais sur ce qu'un sondage lirait de son côté, qui pourrait déjà
-        // avoir changé une seconde fois. `renderPrChrome` ne renvoie pas la configuration
-        // résolue : on la relit ici, ce qui touche le cache du résolveur qu'il vient
-        // lui-même de remplir — un second appel sans coût réseau, jamais une deuxième
-        // lecture réelle.
-        const pollPr = key === null ? null : currentPrOf(adapter);
-        if (pollPr) {
-          void resolver.resolve(adapter, pollPr).then((resolved) => {
-            if (!disposed && key === lastPrKey) lastConfigFingerprint = resolved.fingerprint;
-          });
-        }
+        // Référence du sondage périodique (`pollConfig`), alignée EXACTEMENT sur ce que CE
+        // rendu vient d'appliquer — jamais sur une relecture séparée, qui ouvrirait une
+        // fenêtre où `configCacheTtlSeconds: 0` (valeur légale) la ferait déjà diverger de
+        // ce que la page affiche réellement (revue Codex, PR #39).
+        lastRenderConfigSignature = resolved ? renderConfigSignatureOf(resolved.config) : null;
       })
       .finally(() => {
         inFlight = false;
@@ -1045,12 +1080,21 @@ export function observePrChromeNavigation(
   };
 }
 
-/** Rend le bandeau et l'état de complétion pour la PR courante. Renvoie `true` quand
+/** Rend le bandeau et l'état de complétion pour la PR courante. `showed` vaut `true` quand
  * l'issue est définitive — rien à retenter tant que la PR ne change pas (pas de PR, mode
  * `off`, ou bandeau effectivement affiché) — et `false` quand la PR est active mais que
  * rien n'a été trouvé à montrer : ce cas-là reste ambigu (page encore en cours
  * d'hydratation, ou PR réellement sans fil ni statut) et `observePrChromeNavigation` doit
- * retenter au prochain signe de vie de la page plutôt que de conclure trop tôt. */
+ * retenter au prochain signe de vie de la page plutôt que de conclure trop tôt.
+ *
+ * `resolved` porte la configuration EFFECTIVEMENT appliquée par CE rendu — `null`
+ * uniquement quand aucune PR n'est affichée, seul cas où `resolver.resolve()` n'est jamais
+ * appelé. L'appelant s'en sert pour tenir sa propre référence (§8.1.2) et pour rafraîchir
+ * les éditeurs déjà attachés (revue Codex, PR #39) : la relire lui-même par un second
+ * `resolver.resolve()` ouvrait une fenêtre où, `configCacheTtlSeconds` valant `0` (valeur
+ * légale), cette seconde lecture peut renvoyer une configuration DÉJÀ différente de celle
+ * que ce rendu vient d'appliquer — la référence retenue ne correspondrait alors plus à la
+ * page réellement affichée. */
 async function renderPrChrome(
   adapter: PlatformAdapter,
   resolver: ClientConfigResolver,
@@ -1078,7 +1122,7 @@ async function renderPrChrome(
     set: () => {},
     clear: () => {},
   }
-): Promise<boolean> {
+): Promise<{ showed: boolean; resolved: ResolvedClientConfig | null }> {
   const clearStaleBanner = () => {
     // Un fil masqué par le filtre local du §5.5 (applyLabelFilter) porte un `display:
     // none` posé sur l'élément de PAGE, pas sur la barre qu'on s'apprête à retirer : une
@@ -1104,7 +1148,7 @@ async function renderPrChrome(
       clearStaleBanner();
       clearBadges();
     }
-    return true; // pas de PR : rien à retenter tant que la navigation ne change pas
+    return { showed: true, resolved: null }; // pas de PR : rien à retenter tant que la navigation ne change pas
   }
   const resolved = await resolver.resolve(adapter, pr);
   writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
@@ -1119,7 +1163,7 @@ async function renderPrChrome(
       // branche de dégrisage de applyCompletionState ne le lit pas.
       applyCompletionState(adapter.getCompletionControl(), null, '');
     }
-    return true; // désactivé : un état délibéré, pas un chargement encore en cours
+    return { showed: true, resolved }; // désactivé : un état délibéré, pas un chargement encore en cours
   }
   const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
   const profile = adapter.platformProfile();
@@ -1132,7 +1176,7 @@ async function renderPrChrome(
   // plus cette lecture de son utilisation : rien ne peut plus s'intercaler avant l'écriture
   // (§5.5, CA-03).
   const published = adapter.readPublishedResult();
-  if (!isCurrent()) return true; // supplanté entre-temps : la navigation suivante prend le relais
+  if (!isCurrent()) return { showed: true, resolved }; // supplanté entre-temps : la navigation suivante prend le relais
   clearStaleBanner(); // efface le bandeau d'un contexte précédent avant d'insérer le sien
   const model = buildBannerModel(
     published,
@@ -1226,7 +1270,7 @@ async function renderPrChrome(
   // Repassé par la porte : la navigation ou la révocation ont pu survenir APRÈS celle du
   // bandeau, ces deux écritures-ci étant les dernières du rendu. Le décompte reste rendu
   // (`hasSomethingToShow`), seul l'effet de bord est abandonné.
-  if (!isCurrent()) return hasSomethingToShow;
+  if (!isCurrent()) return { showed: hasSomethingToShow, resolved };
 
   // Badges des commentaires publiés (§5.5) — rendu visuel, contenu stocké intact.
   const withRendered = adapter as PlatformAdapter & {
@@ -1239,7 +1283,7 @@ async function renderPrChrome(
   }
 
   applyCompletionState(adapter.getCompletionControl(), published, lang);
-  return hasSomethingToShow;
+  return { showed: hasSomethingToShow, resolved };
 }
 
 /** Porte le `title`/`aria-disabled` NATIFS du bouton (branche protégée, revue requise…)

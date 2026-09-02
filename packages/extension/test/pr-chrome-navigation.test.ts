@@ -825,6 +825,44 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     expect(labelAfter).not.toBe(labelBefore); // churn légitime : le contenu a réellement changé
   });
 
+  it('decorateComment() : plafonne les badges de décoration, repli sur un badge « +N » (revue Codex, PR #38)', () => {
+    // decorations.allowFree n'a pas de limite de nombre (§3.3) : un préfixe adversarial avec
+    // des dizaines de décorations distinctes ne doit pas poser autant de nœuds DOM.
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const ids = Array.from({ length: 15 }, (_, i) => `d${i + 1}`);
+    const body = `issue (${ids.join(', ')}): x`;
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile);
+
+    const decoBadges = [...el.querySelectorAll(':scope > .cct-badge-deco')];
+    expect(decoBadges).toHaveLength(13); // 12 décorations affichées + 1 badge de dépassement
+    expect(decoBadges.slice(0, 12).map((b) => b.textContent)).toEqual(ids.slice(0, 12));
+    expect(decoBadges[12]!.textContent).toBe('+3'); // les 3 décorations restantes, repliées
+  });
+
+  it('decorateComment() : restaure un badge de décoration effacé par une réhydratation de plateforme (revue Codex, PR #38)', () => {
+    // Le court-circuit anti-churn ne doit pas se fier au seul badge de label : si la
+    // plateforme efface un badge de DÉCORATION sans toucher au label, sa signature reste
+    // intacte, et un contrôle qui ne regarderait qu'elle renoncerait à réparer le manquant.
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const body = 'issue (blocking, security): x';
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile);
+    expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(3); // label + 2 décorations
+
+    // Simule une réhydratation qui emporte le badge « security », en laissant le label intact.
+    [...el.querySelectorAll(':scope > .cct-badge-deco')][1]!.remove();
+    expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(1);
+
+    // Même corps, même configuration — seul le DOM a divergé de ce que ce rendu produirait.
+    decorateComment(el, body, defaultConfig(), profile);
+
+    const decoAfter = [...el.querySelectorAll(':scope > .cct-badge-deco')];
+    expect(decoAfter.map((b) => b.textContent)).toEqual(['blocking', 'security']); // réparé
+  });
+
   it('un .cct-badge imbriqué (pas enfant direct) n’est pas exclu à tort', () => {
     // decorateComment() ne pose jamais un badge autrement qu'en `afterbegin` — un
     // `.cct-badge` plus profond (citation, bloc de code d'un autre commentaire cité) est un

@@ -795,6 +795,24 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     expect([...el.querySelectorAll(':scope > .cct-badge-deco')]).toEqual(decoBefore); // mêmes nœuds
   });
 
+  it('decorateComment() : ne construit aucun badge sur le chemin inchangé (revue Codex, PR #38)', () => {
+    // decorateComment() tourne pour CHAQUE commentaire à CHAQUE passage de rendu, y compris
+    // ceux déjà à jour — leur bâtir des éléments DOM détachés avant de les jeter aussitôt
+    // serait un coût réel sur une PR à beaucoup de commentaires, même sans aucune écriture.
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const body = 'issue (blocking, security): x';
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    const createElementSpy = vi.spyOn(document, 'createElement');
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+    // Seul `el` lui-même a été créé avant l'espion ; le second appel, inchangé, ne doit créer
+    // ni le badge de label ni ses deux badges de décoration.
+    expect(createElementSpy).not.toHaveBeenCalled();
+    createElementSpy.mockRestore();
+  });
+
   it('decorateComment() : rafraîchit label ET décoration quand la configuration change en direct (§8.1.1, §5.5)', () => {
     // Cas cité par la revue Codex sur la PR #37 : (security) passe de libre à connue et
     // bloquante après expiration du cache de configuration (§8.1.2) — le badge doit suivre,

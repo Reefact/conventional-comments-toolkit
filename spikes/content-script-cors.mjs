@@ -9,8 +9,14 @@
 // configuration — le niveau « dépôt » du §8.2 n'a jamais fonctionné sur GitHub, et le
 // bandeau du §5.4 s'affichait précisément là où il y avait quelque chose à lire.
 //
+// Ce que la mesure a appris ENSUITE, et qui ne se devine pas : `credentials: 'same-origin'`
+// traverse cette redirection. Le premier saut, de même origine, part AVEC la session — donc
+// GitHub autorise ; la redirection franchit une origine, le navigateur cesse d'envoyer les
+// cookies, et le joker est accepté. Un dépôt PRIVÉ redevient lisible sans permission d'hôte.
+// Les deux moitiés sont vérifiées ici : le code de retour ET qui a reçu les cookies.
+//
 // Aucun test unitaire ne peut voir ça : un faux `fetch` rend ce qu'on lui dit de rendre.
-// Ce fichier reproduit les quatre situations dans un vrai Chromium, avec une extension
+// Ce fichier reproduit ces situations dans un vrai Chromium, avec une extension
 // SANS permission d'hôte — la configuration réelle du manifeste depuis la PR #28.
 //
 // CE QU'IL NE VÉRIFIE PAS, et il faut le dire : il n'atteint pas github.com (pas de session,
@@ -56,6 +62,7 @@ writeFileSync(
     ['redirect-nocors-include', location.origin + '/redirect-nocors.json', { credentials: 'include' }],
     ['redirect-cors-include', location.origin + '/redirect-cors.json', { credentials: 'include' }],
     ['redirect-cors-omit', location.origin + '/redirect-cors.json', { credentials: 'omit' }],
+    ['redirect-cors-sameorigin', location.origin + '/redirect-cors.json', { credentials: 'same-origin' }],
   ];
   const out = {};
   for (const [name, url, init] of cases) {
@@ -66,15 +73,21 @@ writeFileSync(
 })();`
 );
 
+// Le cookie mesure la MOITIÉ que le code de retour ne dit pas : qui a été authentifié.
+const cookiesSeen = {};
 const pageServer = createServer((req, res) => {
+  cookiesSeen[req.url] = req.headers.cookie ?? null;
   if (req.url === '/present.json') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end('{"version":1}'); }
   if (req.url === '/missing.json') { res.writeHead(404); return res.end(); }
   if (req.url === '/redirect-nocors.json') { res.writeHead(302, { location: `http://127.0.0.1:${PLAIN}/x.json` }); return res.end(); }
   if (req.url === '/redirect-cors.json') { res.writeHead(302, { location: `http://127.0.0.1:${CORS}/ok.json` }); return res.end(); }
-  res.writeHead(200, { 'content-type': 'text/html' }); res.end('<title>attente</title>');
+  res.writeHead(200, { 'content-type': 'text/html', 'set-cookie': 'session=secret; Path=/' });
+  res.end('<title>attente</title>');
 }).listen(PAGE, '127.0.0.1');
 const plainServer = createServer((_q, res) => { res.writeHead(200); res.end('{}'); }).listen(PLAIN, '127.0.0.1');
-const corsServer = createServer((_q, res) => {
+const corsSeen = {};
+const corsServer = createServer((q, res) => {
+  corsSeen[q.url] = q.headers.cookie ?? null;
   res.writeHead(200, { 'access-control-allow-origin': '*', 'content-type': 'application/json' });
   res.end('{"version":1}');
 }).listen(CORS, '127.0.0.1');
@@ -97,7 +110,11 @@ try {
   assert('une REDIRECTION vers une origine sans CORS lève', seen['redirect-nocors-include'] === 'THREW', seen['redirect-nocors-include']);
   // LE défaut : `ACAO: *` ne vaut RIEN avec des cookies. C'est le cas de raw.githubusercontent.com.
   assert('`ACAO: *` + `credentials: include` lève — le joker exclut les cookies', seen['redirect-cors-include'] === 'THREW', seen['redirect-cors-include']);
-  assert('la même lecture SANS cookies passe — ce que fait getRepoConfig()', seen['redirect-cors-omit'] === 'HTTP 200', seen['redirect-cors-omit']);
+  assert('la même lecture SANS cookies passe', seen['redirect-cors-omit'] === 'HTTP 200', seen['redirect-cors-omit']);
+  // CE QUE FAIT getRepoConfig() : authentifié au premier saut, anonyme après la redirection.
+  assert('`same-origin` traverse la redirection — ce que fait getRepoConfig()', seen['redirect-cors-sameorigin'] === 'HTTP 200', seen['redirect-cors-sameorigin']);
+  assert('… en AYANT authentifié le premier saut — un dépôt privé reste lisible', cookiesSeen['/redirect-cors.json'] === 'session=secret', String(cookiesSeen['/redirect-cors.json']));
+  assert('… et SANS envoyer le cookie après la redirection — le joker l’exige', corsSeen['/ok.json'] === null, String(corsSeen['/ok.json']));
 } finally {
   await ctx.close();
   pageServer.close(); plainServer.close(); corsServer.close();

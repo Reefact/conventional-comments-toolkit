@@ -148,14 +148,19 @@ export function decorateComment(
   }
   const { shown, hiddenDescriptive } = selectDecorationsForRender(a.decorations);
   const signature = badgeSignature({ ...a, resolved: a.resolved }, shown, hiddenDescriptive, config, lang);
-  const decoBadges = decorationBadges(shown, hiddenDescriptive, config, lang);
+  // Compte attendu SANS construire les badges : decorateComment() tourne pour CHAQUE
+  // commentaire à CHAQUE passage de rendu, y compris ceux déjà à jour — leur bâtir jusqu'à
+  // 13 éléments DOM détachés avant de les jeter aussitôt serait un coût réel sur une PR à
+  // beaucoup de commentaires (revue Codex, PR #38). decorationBadges() n'est appelée que
+  // dans la branche qui écrit réellement dans le DOM, ci-dessous.
+  const expectedCount = shown.length + (hiddenDescriptive > 0 ? 1 : 0);
   // La signature seule ne suffit pas : elle n'est portée QUE par le badge de label (stale[0]),
   // donc une réhydratation de plateforme qui efface un badge de DÉCORATION sans toucher au
   // label laisserait stale[0] intact et ce court-circuit renoncerait à réparer le manquant
   // (revue Codex, PR #38). Le compte de badges effectivement présents doit donc correspondre
   // à ce que CE rendu produirait, pas seulement la signature du premier.
-  if (stale.length === 1 + decoBadges.length && stale[0]?.dataset['cctSig'] === signature) {
-    return; // inchangé — aucune écriture DOM
+  if (stale.length === 1 + expectedCount && stale[0]?.dataset['cctSig'] === signature) {
+    return; // inchangé — aucune écriture DOM, aucun badge construit pour rien
   }
 
   const badge = labelBadge(a.resolved.label, config);
@@ -165,5 +170,5 @@ export function decorateComment(
   // prepend() insère tous les badges en une fois, dans l'ordre donné (label, puis les
   // décorations dans l'ordre d'écriture) — contrairement à insertAdjacentElement('afterbegin'),
   // répété, qui les aurait posés en ordre inverse.
-  commentBodyElement.prepend(badge, ...decoBadges);
+  commentBodyElement.prepend(badge, ...decorationBadges(shown, hiddenDescriptive, config, lang));
 }

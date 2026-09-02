@@ -98,6 +98,32 @@ describe('§8.1.1 — lecture du configUrl d\'organisation', () => {
     expect(calls[0]!.init?.credentials).toBe('include');
   });
 
+  // Le `configUrl` désigne un AUTRE dépôt que celui affiché : la page ne dit pas sa visibilité,
+  // et l'astuce du bloc précédent n'est pas transposable. Sans moyen de distinguer un fichier
+  // supprimé d'une ressource masquée, on refuse de conclure « pas de configuration ».
+  it('un 404 lu sans session ne prouve pas l\'absence : la lecture est déclarée impossible', async () => {
+    const { adapter } = adapterWith(() => new Response('', { status: 404 }));
+    expect(await adapter.getOrgConfig('https://github.com/acme/config/raw/HEAD/cc.json')).toEqual({
+      status: 'unreachable',
+      reason: 'HTTP 404 (lu sans session : absence indiscernable)',
+    });
+  });
+
+  // Le vrai cas nominal est ailleurs, et reste intact : aucune URL déclarée.
+  it("aucun configUrl déclaré reste un cas nominal", async () => {
+    const { adapter, calls } = adapterWith(() => new Response('', { status: 404 }));
+    expect(await adapter.getOrgConfig(null)).toEqual({ status: 'absent' });
+    expect(calls).toHaveLength(0);
+  });
+
+  // Là où la session part avec la requête, un 404 garde son sens ordinaire.
+  it("un configUrl lu AVEC session lit un 404 comme un fichier absent", async () => {
+    const { adapter } = adapterWith(() => new Response('', { status: 404 }));
+    expect(await adapter.getOrgConfig('https://config.acme.com/cc.json')).toEqual({
+      status: 'absent',
+    });
+  });
+
   it("une page HTML de github.com n'est pas la route `raw` : elle garde sa session", async () => {
     const { adapter, calls } = adapterWith(() => new Response('{"version":1}', { status: 200 }));
     await adapter.getOrgConfig('https://github.com/acme/config/blob/HEAD/cc.json');

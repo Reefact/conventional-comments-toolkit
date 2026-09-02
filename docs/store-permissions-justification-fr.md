@@ -121,7 +121,12 @@ d'aucun chemin identifié.
   — GitHub masquant volontiers le privé en « inexistant » — en le
   reclassant dès que la page indique un dépôt privé, faute de quoi
   l'extension conclurait « pas de configuration » et appliquerait les
-  niveaux inférieurs en affirmant avoir lu. Le mécanisme CORS, lui, est
+  niveaux inférieurs en affirmant avoir lu. La lecture du `configUrl`
+  d'organisation connaît la même ambiguïté **sans** le moyen de la lever
+  — le document vit dans un autre dépôt, dont la page affichée ne dit
+  pas la visibilité : un 404 lu sans session y est donc déclaré
+  illisible, le vrai cas nominal restant l'absence de `configUrl`
+  déclaré. Le mécanisme CORS, lui, est
   mesuré par `npm run check:content-script-cors`, pas déduit.
 - **Sur cette route, et sur elle seule.** Le choix est fait par URL
   (`configCredentials()`) : hôte `github.com` **et** chemin `/raw/`. Les

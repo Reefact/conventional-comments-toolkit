@@ -206,9 +206,26 @@ export class GithubClientAdapter implements PlatformAdapter {
     // documenter (revue Codex, PR #36, P2).
     const relayed = this.#readOrgConfig?.(url);
     if (relayed) return relayed;
+    const credentials = configCredentials(url);
     try {
-      const res = await this.#fetch(url, { credentials: configCredentials(url) });
-      if (res.status === 404) return { status: 'absent' };
+      const res = await this.#fetch(url, { credentials });
+      if (res.status === 404) {
+        // Même ambiguïté que pour le dépôt — sans le moyen de la lever. Le `configUrl` désigne
+        // un AUTRE dépôt que celui affiché, dont la page ne dit pas la visibilité : lue sans
+        // session, une ressource privée y rend le même 404 qu'un fichier supprimé (revue Codex,
+        // PR #36, round 3).
+        //
+        // Faute de pouvoir distinguer, on refuse de conclure « pas de configuration
+        // d'organisation ». Le vrai cas nominal est ailleurs et reste intact : aucune URL
+        // déclarée, traité juste au-dessus. Ici une URL EST déclarée par le canal de plancher
+        // (§8.1.1) — elle nomme un document censé exister, et un 404 est d'abord le signe qu'on
+        // ne l'a pas lu. Coût assumé : un `configUrl` pointant sur un fichier réellement
+        // supprimé affiche l'état dégradé au lieu de se taire ; c'est le bon sens de l'erreur
+        // (§8.1.3, règle 2 — désarmer en le disant plutôt que bloquer sur une règle non lue).
+        return credentials === 'omit'
+          ? { status: 'unreachable', reason: 'HTTP 404 (lu sans session : absence indiscernable)' }
+          : { status: 'absent' };
+      }
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
       return { status: 'found', text: await res.text() };
     } catch (e) {

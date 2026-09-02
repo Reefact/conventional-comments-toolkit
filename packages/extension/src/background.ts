@@ -21,6 +21,7 @@
 // bien ici que dans la page d'options et le script de contenu.
 
 import { vetFloor, vettedConfigUrl, type Floor } from '@cct/core';
+import { configCredentials } from '@cct/adapter-github';
 import {
   EMPTY_EXTRA_HOSTS,
   EXTRA_HOSTS_KEY,
@@ -135,7 +136,15 @@ chrome?.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (vetted === null || vetted !== req.url) {
         return sendResponse({ status: 'unreachable', reason: 'url not vetted by floor' });
       }
-      const res = await fetch(vetted, { credentials: 'include' });
+      // `configCredentials()` et non `include` : ce worker n'échappe pas au CORS sur la CIBLE
+      // d'une redirection, qui n'est pas dans ses permissions d'hôte. Mesuré
+      // (`npm run check:relay-cors`) : depuis un service worker MV3 ayant la permission de
+      // l'origine de départ seulement, `include` LÈVE dès qu'on est redirigé vers une origine
+      // en `ACAO: *` — le mur exact du script de contenu, à un contexte près (revue Codex,
+      // PR #36, round 4). La même fonction décide donc des deux côtés : sur la route `raw` de
+      // github.com, pas de cookies ; partout ailleurs — un `configUrl` interne, la raison
+      // d'être du relais — `include`, et la session avec.
+      const res = await fetch(vetted, { credentials: configCredentials(vetted) });
       if (res.status === 404) return sendResponse({ status: 'absent' });
       if (!res.ok) return sendResponse({ status: 'unreachable', reason: `HTTP ${res.status}` });
       sendResponse({ status: 'found', text: await res.text() });

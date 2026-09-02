@@ -82,6 +82,12 @@ jobs:
       - name: CORS d'un script de contenu — ce qu'il a le droit de lire
         run: npm run check:content-script-cors
 
+      # Et la même question dans l'autre contexte : le service worker « échappe au CORS »
+      # pour l'URL DEMANDÉE, pas pour la CIBLE d'une redirection, qu'aucune permission ne
+      # couvre. Le relais prenait donc le même mur, là où on le croyait hors de portée.
+      - name: CORS du relais — ce qu'un service worker a le droit de lire
+        run: npm run check:relay-cors
+
       - name: Transport de la télémétrie — POST no-cors vers une autre origine (§10)
         run: npm run check:beacon
 

@@ -514,6 +514,23 @@ describe('D — le gestionnaire du SERVICE WORKER, seul contexte qui a le droit 
     expect(seen.at(-1)).toEqual({ url: ORG_URL, credentials: 'include' });
   });
 
+  // Dans CE contexte, `same-origin` ne veut pas dire « authentifié au premier saut » : l'origine
+  // du worker est `chrome-extension://`, donc aucun cookie ne part. Un `configUrl` sur un dépôt
+  // github.com privé reçoit alors le 404 masqué, indiscernable d'un fichier manquant — et le
+  // rendre `absent` ferait appliquer les niveaux inférieurs en affirmant avoir lu le niveau 2
+  // (revue Codex, PR #36, round 5). L'enchaînement manuel qui sauverait le cas n'existe pas :
+  // mesuré, `redirect: 'manual'` rend une réponse opaque dont `Location` est illisible.
+  it("un 404 obtenu SANS cookies ne prouve pas l'absence", async () => {
+    vi.stubGlobal('fetch', async () => new Response('', { status: 404 }));
+    const raw = 'https://github.com/acme/config/raw/HEAD/cc.json';
+    const sw = installServiceWorkerChrome({ floor: { configUrl: raw } });
+    await import('../src/background.js');
+    expect(await ask(sw.listener(), raw)).toEqual({
+      status: 'unreachable',
+      reason: "HTTP 404 (absence indiscernable d'un accès refusé)",
+    });
+  });
+
   it('404 vaut absent, une autre erreur HTTP vaut unreachable (§8.1.5)', async () => {
     let status = 404;
     vi.stubGlobal('fetch', async () => new Response('', { status }));

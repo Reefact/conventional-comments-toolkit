@@ -144,8 +144,26 @@ chrome?.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       // PR #36, round 4). La même fonction décide donc des deux côtés : sur la route `raw` de
       // github.com, pas de cookies ; partout ailleurs — un `configUrl` interne, la raison
       // d'être du relais — `include`, et la session avec.
-      const res = await fetch(vetted, { credentials: configCredentials(vetted) });
-      if (res.status === 404) return sendResponse({ status: 'absent' });
+      //
+      // ATTENTION à ce que `same-origin` veut dire ICI. Dans une page github.com, il
+      // authentifie le premier saut ; dans ce worker, l'origine est `chrome-extension://`,
+      // donc il n'envoie AUCUN cookie, nulle part. La lecture relayée d'un `configUrl` sur la
+      // route `raw` de github.com est donc anonyme — et l'enchaînement manuel qui sauverait le
+      // cas n'existe pas : mesuré, `redirect: 'manual'` rend une réponse `opaqueredirect` dont
+      // `Location` est `null`, impossible à suivre soi-même (revue Codex, PR #36, round 5).
+      const credentials = configCredentials(vetted);
+      const res = await fetch(vetted, { credentials });
+      if (res.status === 404) {
+        // Conséquence : sur un dépôt PRIVÉ, ce 404 est le masque de GitHub, pas un fichier
+        // manquant — et le rendre `absent` ferait appliquer les niveaux inférieurs en
+        // AFFIRMANT avoir lu le niveau 2. Même refus de conclure que dans `getOrgConfig()`,
+        // pour la même raison : la réponse est indiscernable d'un accès refusé.
+        return sendResponse(
+          credentials === 'include'
+            ? { status: 'absent' }
+            : { status: 'unreachable', reason: "HTTP 404 (absence indiscernable d'un accès refusé)" }
+        );
+      }
       if (!res.ok) return sendResponse({ status: 'unreachable', reason: `HTTP ${res.status}` });
       sendResponse({ status: 'found', text: await res.text() });
     } catch (e) {

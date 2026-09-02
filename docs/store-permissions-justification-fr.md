@@ -130,7 +130,14 @@ d'aucun chemin identifié.
   — le document vit dans un autre dépôt, dont la page affichée ne dit
   pas la visibilité : un 404 lu sans session y est donc déclaré
   illisible, le vrai cas nominal restant l'absence de `configUrl`
-  déclaré. Le mécanisme CORS, lui, est
+  déclaré. Le relais du service worker applique la même règle, et pour
+  une raison qui lui est propre : son origine est `chrome-extension://`,
+  si bien que `same-origin` n'y authentifie rien du tout. Un `configUrl`
+  hébergé par un dépôt github.com **privé** n'est donc pas lisible depuis
+  une page d'une autre plateforme — la lecture le DIT, au lieu de conclure
+  qu'il n'y a pas de configuration. Suivre la redirection à la main pour
+  n'authentifier que le premier saut n'est pas possible : mesuré, la
+  réponse revient opaque et son `Location` est illisible. Le mécanisme CORS, lui, est
   mesuré par `npm run check:content-script-cors`, pas déduit.
 - **Sur cette route, et sur elle seule.** Le choix est fait par URL
   (`configCredentials()`) : hôte `github.com` **et** chemin `/raw/`. Les

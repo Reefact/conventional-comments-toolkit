@@ -113,9 +113,16 @@ d'aucun chemin identifié.
   navigateur refuse dès que la requête porte des cookies. La lecture
   levait donc sur tout dépôt possédant une configuration. Elle part
   désormais **sans cookies** (`credentials: 'omit'`), ce qui la fait
-  aboutir sur les dépôts publics ; un dépôt privé rend 403 et l'extension
-  affiche l'état dégradé, faute de pouvoir lire. Le mécanisme est mesuré
-  par `npm run check:content-script-cors`, pas déduit.
+  aboutir sur les dépôts publics. Sur un dépôt **privé**, elle est refusée
+  faute de session, et l'extension affiche l'état dégradé — elle dit
+  qu'elle n'a pas pu lire. Avec quel code GitHub refuse n'a pas été
+  mesuré (le proxy de l'environnement de développement répond à sa
+  place) : les deux cas sont donc traités, le 403 directement, et le 404
+  — GitHub masquant volontiers le privé en « inexistant » — en le
+  reclassant dès que la page indique un dépôt privé, faute de quoi
+  l'extension conclurait « pas de configuration » et appliquerait les
+  niveaux inférieurs en affirmant avoir lu. Le mécanisme CORS, lui, est
+  mesuré par `npm run check:content-script-cors`, pas déduit.
 - **Sur cette route, et sur elle seule.** Le choix est fait par URL
   (`configCredentials()`) : hôte `github.com` **et** chemin `/raw/`. Les
   deux lectures y passent — celle du dépôt, et celle du `configUrl`

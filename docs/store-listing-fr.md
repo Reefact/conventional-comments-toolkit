@@ -126,7 +126,10 @@ quand la requête porte des cookies : le `fetch` levait, la lecture rendait
 avaient une configuration à lire.
 
 Corrigé : la lecture part sans cookies. Sur un dépôt **public**, elle
-aboutit et le bandeau disparaît. Sur un dépôt **privé**, la route rend 403
-sans session : le bandeau reste, et il dit alors la vérité — l'extension
-n'a pas pu lire. Prenez donc les captures sur un dépôt public, ou sur un
+aboutit et le bandeau disparaît. Sur un dépôt **privé**, elle est refusée
+faute de session : le bandeau reste, et il dit alors la vérité —
+l'extension n'a pas pu lire. (GitHub masquant volontiers le privé en
+« inexistant », un 404 y est reclassé en lecture impossible dès que la
+page indique un dépôt privé ; sans quoi l'extension conclurait « pas de
+configuration ».) Prenez donc les captures sur un dépôt public, ou sur un
 dépôt sans fichier de configuration.

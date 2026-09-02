@@ -122,6 +122,10 @@ repositories that had a configuration to read.
 
 Fixed: the read is sent without cookies. On a **public** repository it
 succeeds and the banner disappears. On a **private** one the route
-returns 403 without a session, so the banner stays — and now says
-something true: the extension could not read. Take screenshots on a
-public repository, or on one with no configuration file.
+refuses without a session, so the banner stays — and now says something
+true: the extension could not read. (GitHub readily masks private
+resources as missing, so a 404 there is reclassified as an unreadable
+configuration as soon as the page says the repository is private;
+otherwise the extension would conclude "no configuration".) Take
+screenshots on a public repository, or on one with no configuration
+file.

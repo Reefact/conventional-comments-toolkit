@@ -1153,7 +1153,7 @@ async function renderPrChrome(
   };
   if (withRendered.getRenderedComments) {
     for (const { element, bodyText } of withRendered.getRenderedComments()) {
-      decorateComment(element, bodyText, resolved.config, profile);
+      decorateComment(element, bodyText, resolved.config, profile, lang);
     }
   }
 

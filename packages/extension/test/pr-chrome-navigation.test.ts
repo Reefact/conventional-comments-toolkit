@@ -737,7 +737,7 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     const el = document.createElement('div');
     el.textContent = 'issue (blocking, security): fuite mémoire';
     const profile = { id: 'github', suggestionInfoString: 'suggestion' };
-    decorateComment(el, 'issue (blocking, security): fuite mémoire', defaultConfig(), profile);
+    decorateComment(el, 'issue (blocking, security): fuite mémoire', defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll(':scope > .cct-badge').length).toBe(3); // label + 2 décorations
     expect(commentBodyText(el)).toBe('issue (blocking, security): fuite mémoire');
@@ -749,7 +749,7 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     // blocking : porteuse connue, bloquante. security : libre (allowFree, absente de
     // decorations.known par défaut). if-minor : porteuse connue, même `forces` que non-blocking.
     el.textContent = 'issue (blocking, security, if-minor): x';
-    decorateComment(el, 'issue (blocking, security, if-minor): x', defaultConfig(), profile);
+    decorateComment(el, 'issue (blocking, security, if-minor): x', defaultConfig(), profile, 'en');
 
     const decoBadges = [...el.querySelectorAll(':scope > .cct-badge-deco')];
     expect(decoBadges.map((b) => b.textContent)).toEqual(['blocking', 'security', 'if-minor']);
@@ -768,7 +768,7 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     cfg.decorations.allowFree = false;
     const el = document.createElement('div');
     el.textContent = 'issue (foo, blocking): x';
-    decorateComment(el, 'issue (foo, blocking): x', cfg, profile);
+    decorateComment(el, 'issue (foo, blocking): x', cfg, profile, 'en');
 
     const decoBadges = [...el.querySelectorAll(':scope > .cct-badge-deco')];
     expect(decoBadges.map((b) => b.textContent)).toEqual(['blocking']); // (foo) absent
@@ -783,13 +783,13 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     const body = 'issue (blocking, security): x';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
     const labelBefore = el.querySelector(':scope > .cct-badge-label');
     const decoBefore = [...el.querySelectorAll(':scope > .cct-badge-deco')];
 
     // Un objet de configuration FRAIS mais structurellement identique — la comparaison doit
     // porter sur ce que analyze() en tire, pas sur l'identité de l'objet JS.
-    decorateComment(el, body, defaultConfig(), profile);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector(':scope > .cct-badge-label')).toBe(labelBefore); // même nœud
     expect([...el.querySelectorAll(':scope > .cct-badge-deco')]).toEqual(decoBefore); // mêmes nœuds
@@ -806,7 +806,7 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     el.textContent = body;
 
     const before = defaultConfig();
-    decorateComment(el, body, before, profile);
+    decorateComment(el, body, before, profile, 'en');
     const labelBefore = el.querySelector(':scope > .cct-badge-label')!;
     const securityBefore = [...el.querySelectorAll(':scope > .cct-badge-deco')][1]!;
     expect(securityBefore.className).toContain('cct-badge-deco-custom'); // encore libre
@@ -814,7 +814,7 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     const after = defaultConfig();
     after.decorations.known.push({ id: 'security', forces: 'blocking' });
     after.labels.find((l) => l.id === 'issue')!.color = '#123456';
-    decorateComment(el, body, after, profile);
+    decorateComment(el, body, after, profile, 'en');
 
     const labelAfter = el.querySelector(':scope > .cct-badge-label')!;
     const decoAfter = [...el.querySelectorAll(':scope > .cct-badge-deco')];
@@ -833,12 +833,69 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     const body = `issue (${ids.join(', ')}): x`;
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
 
     const decoBadges = [...el.querySelectorAll(':scope > .cct-badge-deco')];
     expect(decoBadges).toHaveLength(13); // 12 décorations affichées + 1 badge de dépassement
     expect(decoBadges.slice(0, 12).map((b) => b.textContent)).toEqual(ids.slice(0, 12));
     expect(decoBadges[12]!.textContent).toBe('+3'); // les 3 décorations restantes, repliées
+  });
+
+  it('decorateComment() : une décoration PORTEUSE au-delà du plafond reste affichée, jamais repliée (revue Codex, PR #38)', () => {
+    // Cas cité par la revue : issue (d1, ..., d12, blocking): x — une troncature naïve
+    // couperait juste avant `blocking`, effaçant le seul signal que les badges existent pour
+    // porter. Seules les décorations DESCRIPTIVES sont bornées : leur nombre est contrôlé par
+    // l'auteur du commentaire, jamais celui des porteuses, borné par la configuration.
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const ids = Array.from({ length: 12 }, (_, i) => `d${i + 1}`);
+    const body = `issue (${ids.join(', ')}, blocking): x`;
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    const decoBadges = [...el.querySelectorAll(':scope > .cct-badge-deco')];
+    expect(decoBadges).toHaveLength(13); // les 12 descriptives + blocking — aucun dépassement
+    expect(decoBadges[12]!.textContent).toBe('blocking');
+    expect(decoBadges[12]!.className).toContain('cct-badge-deco-blocking');
+
+    // Avec des descriptives EN EXCÈS en plus de la porteuse, seules les descriptives débordent.
+    const manyIds = Array.from({ length: 15 }, (_, i) => `d${i + 1}`);
+    const body2 = `issue (${manyIds.join(', ')}, blocking): x`;
+    const el2 = document.createElement('div');
+    el2.textContent = body2;
+    decorateComment(el2, body2, defaultConfig(), profile, 'en');
+
+    const decoBadges2 = [...el2.querySelectorAll(':scope > .cct-badge-deco')];
+    expect(decoBadges2).toHaveLength(14); // 12 descriptives affichées + blocking + « +3 »
+    expect(decoBadges2[12]!.textContent).toBe('blocking');
+    expect(decoBadges2[12]!.className).toContain('cct-badge-deco-blocking');
+    expect(decoBadges2[13]!.textContent).toBe('+3');
+  });
+
+  it('decorateComment() : l’infobulle du badge de dépassement suit la langue résolue (revue Codex, PR #38)', () => {
+    // Chaîne d'interface : chacune dans SA langue (CLAUDE.md) — un chiffre en dur en français
+    // ne doit jamais s'afficher à un lecteur en anglais.
+    const profile = { id: 'github', suggestionInfoString: 'suggestion' };
+    const ids = Array.from({ length: 15 }, (_, i) => `d${i + 1}`);
+    const body = `issue (${ids.join(', ')}): x`;
+
+    const elFr = document.createElement('div');
+    elFr.textContent = body;
+    decorateComment(elFr, body, defaultConfig(), profile, 'fr');
+    const overflowFr = [...elFr.querySelectorAll(':scope > .cct-badge-deco')][12] as HTMLElement;
+    expect(overflowFr.title).toBe('3 décoration(s) supplémentaire(s), non affichée(s)');
+
+    const elEn = document.createElement('div');
+    elEn.textContent = body;
+    decorateComment(elEn, body, defaultConfig(), profile, 'en');
+    const overflowEn = [...elEn.querySelectorAll(':scope > .cct-badge-deco')][12] as HTMLElement;
+    expect(overflowEn.title).toBe('3 more decoration(s), not shown');
+
+    // Un changement de langue SEUL, même config et même corps, doit rafraîchir l'infobulle —
+    // la langue résolue entre dans la signature au même titre que le style ou la couleur.
+    decorateComment(elFr, body, defaultConfig(), profile, 'en');
+    const overflowAfter = [...elFr.querySelectorAll(':scope > .cct-badge-deco')][12] as HTMLElement;
+    expect(overflowAfter.title).toBe('3 more decoration(s), not shown');
   });
 
   it('decorateComment() : restaure un badge de décoration effacé par une réhydratation de plateforme (revue Codex, PR #38)', () => {
@@ -849,7 +906,7 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     const body = 'issue (blocking, security): x';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
     expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(3); // label + 2 décorations
 
     // Simule une réhydratation qui emporte le badge « security », en laissant le label intact.
@@ -857,7 +914,7 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(1);
 
     // Même corps, même configuration — seul le DOM a divergé de ce que ce rendu produirait.
-    decorateComment(el, body, defaultConfig(), profile);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
 
     const decoAfter = [...el.querySelectorAll(':scope > .cct-badge-deco')];
     expect(decoAfter.map((b) => b.textContent)).toEqual(['blocking', 'security']); // réparé
@@ -884,7 +941,7 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     const profile = { id: 'github', suggestionInfoString: 'suggestion' };
 
     // Simule ce que le premier rendu a fait : decorateComment() a posé un badge.
-    decorateComment(bodyEl, 'issue: quelque chose ne va pas', defaultConfig(), profile);
+    decorateComment(bodyEl, 'issue: quelque chose ne va pas', defaultConfig(), profile, 'en');
     expect(bodyEl.querySelector('.cct-badge')).not.toBeNull();
 
     const threads = await adapter.getThreads();

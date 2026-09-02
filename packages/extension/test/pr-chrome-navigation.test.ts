@@ -232,6 +232,34 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
     );
   });
 
+  it('publishedSignatureOf réagit aussi à configFingerprint et activatedAt — non affichés, mais lus par decideGuard() (revue Codex, PR #39)', () => {
+    // Ni l'un ni l'autre ne change ce que le BANDEAU affiche, mais tous deux entrent dans
+    // `decideGuard()` (l'écart d'empreinte du §8.1.3 règle 2, le périmètre d'activation du
+    // §6.2.3) dont dépend le blocage des éditeurs déjà ouverts. Sans eux dans cette
+    // signature, un check serveur qui fait avancer SEULEMENT `configFingerprint` — le
+    // scénario même du §8.1.3 règle 2, l'extension ayant déjà adopté la config B avant que
+    // le serveur ne la publie — laisse `chromeSig` inchangé si state/count/mode/coreVersion
+    // ne bougent pas par ailleurs : `run()` ne re-rend jamais, `reconcile()` n'est donc
+    // jamais rappelée, et l'écart d'empreinte qui aurait dû se résorber reste vrai
+    // indéfiniment.
+    const base = publishedSummary({
+      state: 'success',
+      unresolvedBlockingCount: 1,
+      mode: 'assist',
+      coreVersion: '1.0.0',
+      configFingerprint: 'aaaa1111',
+      activatedAt: '2020-01-01T00:00:00Z',
+    });
+    const differentFingerprint = { ...base, configFingerprint: 'bbbb2222' };
+    const differentActivation = { ...base, activatedAt: '2021-01-01T00:00:00Z' };
+    expect(publishedSignatureOf(makeAdapter(() => pr(1), () => differentFingerprint))).not.toBe(
+      publishedSignatureOf(makeAdapter(() => pr(1), () => base))
+    );
+    expect(publishedSignatureOf(makeAdapter(() => pr(1), () => differentActivation))).not.toBe(
+      publishedSignatureOf(makeAdapter(() => pr(1), () => base))
+    );
+  });
+
   it('rend le bandeau dès le chargement quand une PR est déjà affichée', async () => {
     const doc = document;
     let current: PrRef | null = pr(1);

@@ -500,6 +500,14 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   const releaseDetached = (): void => {
     for (const entry of knownEditors) {
       if (entry.element.isConnected) continue;
+      // Générateur incrémenté AVANT le retrait (revue Codex, PR #39) : une réconciliation
+      // encore en vol pour cette entrée (`reconcile()`, en attente des lectures de stockage)
+      // ne connaît que la clé `entry`, jamais son appartenance à `knownEditors` — sans ce
+      // bump, elle passerait ses deux contrôles de génération après ce retrait et attacherait
+      // un contrôleur tout neuf à un sous-arbre DÉTACHÉ, sur une entrée que plus rien ne
+      // référence : ni `revoke()` (qui ne parcourt que `knownEditors`) ni un passage à `off`
+      // (qui doit trouver l'entrée pour la réconcilier) ne pourraient plus jamais le disposer.
+      entry.generation++;
       entry.controller?.dispose();
       knownEditors.delete(entry);
     }
@@ -842,13 +850,26 @@ export const CONFIG_POLL_MIN_INTERVAL_MS = 5000;
 
 /** Signature légère du résumé publié (§5.5, §6.5, §8.1.3 règle 2, CA-03) : par valeur, pas
  * par identité d'objet — l'adaptateur peut renvoyer un objet neuf à chaque lecture. Les
- * quatre champs sont EXACTEMENT ceux que le rendu affiche — `state` pilote le grisage
- * §6.5, `unresolvedBlockingCount` le titre du bandeau, `mode` et `coreVersion` la ligne
- * « jugée par … » (`ui/banner.ts`, `banner.judged`) : un check qui se termine à nouveau
- * avec le même décompte mais un `core` ou un `mode` différent doit rester détecté. */
+ * quatre premiers champs sont EXACTEMENT ceux que le rendu AFFICHE — `state` pilote le
+ * grisage §6.5, `unresolvedBlockingCount` le titre du bandeau, `mode` et `coreVersion` la
+ * ligne « jugée par … » (`ui/banner.ts`, `banner.judged`) : un check qui se termine à
+ * nouveau avec le même décompte mais un `core` ou un `mode` différent doit rester détecté.
+ *
+ * `configFingerprint` et `activatedAt` EN PLUS (revue Codex, PR #39) : ni l'un ni l'autre ne
+ * change ce que le bandeau AFFICHE, mais tous deux entrent dans `decideGuard()` — l'écart
+ * d'empreinte (§8.1.3 règle 2) et le périmètre d'activation (§6.2.3) — dont dépend le
+ * blocage des éditeurs déjà ouverts, relu à chaque réconciliation (`reconcile()`,
+ * `bootstrap()`). Sans eux, un check serveur qui fait avancer SEULEMENT `configFingerprint`
+ * (l'extension a déjà adopté la config B, le serveur la publie enfin) laisse `chromeSig`
+ * inchangé si state/count/mode/coreVersion ne bougent pas : `run()` ne re-rend jamais,
+ * `onPrChange` n'appelle donc jamais `reconcile()`, et l'écart d'empreinte qui aurait dû se
+ * résorber reste vrai indéfiniment — un blocage qui devrait se réarmer (ou se désarmer)
+ * ne le fait jamais tant qu'aucun AUTRE champ du résumé ne change par ailleurs. */
 export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
   const p = adapter.readPublishedResult();
-  return p ? `${p.state}|${p.unresolvedBlockingCount}|${p.mode}|${p.coreVersion}` : null;
+  return p
+    ? `${p.state}|${p.unresolvedBlockingCount}|${p.mode}|${p.coreVersion}|${p.configFingerprint}|${p.activatedAt ?? ''}`
+    : null;
 }
 
 /** Signature de tout ce que `renderPrChrome` peut afficher pour la PR courante — le résumé

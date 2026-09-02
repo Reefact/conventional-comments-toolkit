@@ -450,12 +450,25 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // seul son `dispose()` retire. Une première version ne coupait que les deux
   // observations, laissant toute cette surface vivante sur un hôte devenu non autorisé
   // jusqu'au rechargement de la page (revue Codex, PR #29).
-  const attached = new Set<{ controller: EditorController; element: Element }>();
+  //
+  // `controller` est `null` pour un éditeur CONNU mais SANS contrôleur — mode `off` au
+  // moment de sa découverte, ou depuis désarmé par un changement de configuration en direct
+  // (revue Reefact, PR #39) : sans cette troisième possibilité, un éditeur ignoré en `off`
+  // ne réapparaissait dans aucun registre, et un passage ultérieur à `enforce`/`warn` ne
+  // l'attachait donc jamais — jusqu'à sa fermeture/réouverture ou au rechargement de la
+  // page. L'éditeur (le handle brut de la plateforme) est conservé dans les deux cas : il
+  // suffit, à lui seul, à reconstruire un contrôleur si le mode redevient actif.
+  type EditorEntry = {
+    editor: Parameters<Parameters<PlatformAdapter['observeEditors']>[0]>[0];
+    element: Element;
+    controller: EditorController | null;
+  };
+  const knownEditors = new Set<EditorEntry>();
 
-  /** Libère les contrôleurs dont l'éditeur a quitté le document.
+  /** Libère les éditeurs dont l'élément a quitté le document — attachés ou non.
    *
    * Sans cela, le `Set` ci-dessus — introduit pour que la révocation défasse les
-   * contrôleurs — retenait aussi tous les contrôleurs MORTS, avec leur DOM détaché, leur
+   * contrôleurs — retenait aussi toutes les entrées MORTES, avec leur DOM détaché, leur
    * configuration et l'adaptateur, jusqu'à la fermeture de l'onglet. Sur une page de revue
    * en SPA, où l'on ouvre et referme des éditeurs en continu, cela grossit sans borne.
    * Avant l'introduction du `Set` ces objets étaient collectables : le correctif de la
@@ -464,24 +477,46 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
    * Le nettoyage se fait à chaque attachement plutôt que sur un minuteur : c'est le seul
    * instant où l'on sait qu'un éditeur vient d'apparaître, donc qu'un autre a pu partir. */
   const releaseDetached = (): void => {
-    for (const entry of attached) {
+    for (const entry of knownEditors) {
       if (entry.element.isConnected) continue;
-      entry.controller.dispose();
-      attached.delete(entry);
+      entry.controller?.dispose();
+      knownEditors.delete(entry);
     }
   };
 
-  const attach = async (editor: Parameters<Parameters<PlatformAdapter['observeEditors']>[0]>[0]) => {
+  /** (Ré)synchronise UN éditeur connu avec la configuration COURANTE — à sa découverte
+   * (`attach`, plus bas) ET à chaque ré-résolution de la configuration affichée (revue
+   * Reefact, PR #39, `onPrChange` ci-dessous) : symétrique dans les deux sens, l'attache
+   * si le mode redevient actif après avoir été ignoré (`off` → `warn`/`enforce`), le
+   * détache si le mode devient `off` après avoir été actif (§7 — extension entièrement
+   * inactive, `dispose()` retire déjà tout ce qu'`attach()` avait posé, barre d'outils et
+   * saisie rapide comprises). Sur un éditeur déjà attaché dont le mode reste actif, ne fait
+   * que repousser la configuration/le résumé publié les plus frais. */
+  const reconcile = async (entry: EditorEntry, resolved: ResolvedClientConfig): Promise<void> => {
     if (disposed) return;
-    // Résolution hors chemin critique : la NFR d'injection porte sur l'appel du cb (§10).
-    const resolved = await resolver.resolve(adapter, editor.context.pr);
-    writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
-    if (resolved.config.mode === 'off') return; // §7 — extension inactive
+    if (resolved.config.mode === 'off') {
+      // §7 : mode off = extension entièrement inactive. L'entrée reste connue — seul son
+      // contrôleur part — pour pouvoir réattacher sans réobserver le DOM si le mode
+      // redevient actif.
+      entry.controller?.dispose();
+      entry.controller = null;
+      return;
+    }
+    if (entry.controller) {
+      // Toujours attaché, mode toujours actif : seule la configuration bouge. `published`
+      // relu ICI, jamais gardé de l'attachement d'origine — sans quoi le résumé publié
+      // resterait figé pendant que la configuration, elle, avance (revue Reefact, PR #39) :
+      // le mode `enforce`/écart d'empreinte se jugerait alors sur un résumé périmé.
+      entry.controller.updateResolved(resolved, adapter.readPublishedResult());
+      return;
+    }
+    // Jamais attaché — découvert en `off`, ou tout juste réactivé : construit exactement
+    // comme `attach()` l'aurait fait à la découverte.
     const published = adapter.readPublishedResult();
     const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
     const controller = new EditorController({
       adapter,
-      editor,
+      editor: entry.editor,
       resolved,
       published,
       lang,
@@ -491,8 +526,19 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     });
     if (disposed) return; // révoqué pendant les lectures ci-dessus : ne rien installer
     controller.attach();
+    entry.controller = controller;
+  };
+
+  const attach = async (editor: Parameters<Parameters<PlatformAdapter['observeEditors']>[0]>[0]) => {
+    if (disposed) return;
+    // Résolution hors chemin critique : la NFR d'injection porte sur l'appel du cb (§10).
+    const resolved = await resolver.resolve(adapter, editor.context.pr);
+    writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
+    if (disposed) return;
+    const entry: EditorEntry = { editor, element: editor.element, controller: null };
     releaseDetached();
-    attached.add({ controller, element: editor.element });
+    knownEditors.add(entry);
+    await reconcile(entry, resolved);
   };
 
   const editors = adapter.observeEditors((editor) => void attach(editor));
@@ -591,14 +637,21 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // PR #31).
   const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc, Date.now, (pr, changed, resolved) => {
     void armFor(pr, changed ? 'pr' : 'refresh');
-    // Éditeurs DÉJÀ attachés (§5, revue Codex PR #39) : chacun garde la configuration
-    // capturée à son propre `attach()` tant que rien ne la lui repousse — sans ce geste, un
-    // éditeur ouvert avant une ré-résolution (TTL expiré, ou sondage périodique du §8.1.2)
-    // continuerait à valider et à bloquer l'envoi sur une configuration périmée jusqu'à sa
-    // fermeture/réouverture. `resolved` est `null` sur une navigation (`changed: true`,
-    // chaque éditeur de la page qui vient d'arriver reçoit la sienne, fraîche, via son
-    // propre `attach()`) ou sans PR affichée — rien à repousser dans les deux cas.
-    if (resolved) for (const { controller } of attached) controller.updateResolved(resolved);
+    // Éditeurs DÉJÀ CONNUS (§5, revue Codex et Reefact, PR #39) : chacun garde la
+    // configuration capturée à son propre `attach()` tant que rien ne la lui repousse —
+    // sans ce geste, un éditeur ouvert avant une ré-résolution (TTL expiré, ou sondage
+    // périodique du §8.1.2) continuerait à valider et à bloquer l'envoi sur une
+    // configuration périmée jusqu'à sa fermeture/réouverture. `reconcile()` couvre aussi
+    // les DEUX transitions de mode — attache un éditeur ignoré en `off` si le mode redevient
+    // actif, détache un éditeur actif si le mode passe à `off` — jamais seulement l'échange
+    // de configuration d'un éditeur qui resterait attaché. `resolved` est `null` sur une
+    // navigation (`changed: true`, chaque éditeur de la page qui vient d'arriver reçoit la
+    // sienne, fraîche, via son propre `attach()`) ou sans PR affichée — rien à resynchroniser
+    // dans les deux cas.
+    if (resolved) {
+      releaseDetached();
+      for (const entry of knownEditors) void reconcile(entry, resolved);
+    }
   });
 
   // Vidange : périodique, et à la fermeture de l'onglet. `pagehide` et non `unload` —
@@ -623,8 +676,8 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     telemetry.arm(null);
     editors.dispose();
     stopPrChrome();
-    for (const { controller } of attached) controller.dispose();
-    attached.clear();
+    for (const entry of knownEditors) entry.controller?.dispose();
+    knownEditors.clear();
   };
 
   // §2 — RETRAIT de la permission d'hôte, l'onglet restant ouvert. Désenregistrer le
@@ -692,7 +745,7 @@ export const RENDER_RETRY_WINDOW_MS = 5000;
  * du résumé publié — les deux restent immédiats. */
 export const RENDER_RETRY_THROTTLE_MS = 250;
 
-/** Intervalle de rattrapage de la configuration EFFECTIVE (§8.1.2) sur un onglet inerte :
+/** PLAFOND du rattrapage de la configuration EFFECTIVE (§8.1.2) sur un onglet inerte :
  * `run()` ne se déclenche que sur mutation DOM ou changement de PR — un onglet resté
  * ouvert sans nouvelle activité (pas de commentaire, pas de navigation, pas de changement
  * d'état de fil) ne relit donc jamais la configuration après l'expiration de son TTL
@@ -703,12 +756,25 @@ export const RENDER_RETRY_THROTTLE_MS = 250;
  *
  * Ce n'est PAS un sondage rapide : dix fois plus long que `RENDER_RETRY_THROTTLE_MS`
  * n'aurait aucun sens ici, la staleness tolérée se compte en minutes, pas en
- * millisecondes. Volontairement plus court que le TTL par défaut pour ne pas dépendre
- * d'une valeur d'entreprise qui peut être réduite : chaque réveil ne coûte qu'un
- * `resolver.resolve()`, sans effet tant que le cache du résolveur n'a pas expiré lui-même
- * — la fréquence réelle des lectures réseau reste bornée par le TTL, jamais par cette
- * constante. */
+ * millisecondes. UN PLAFOND, pas un rythme fixe (revue Reefact, PR #39) : un `setInterval`
+ * bloqué sur cette seule valeur laisserait, sous un `configCacheTtlSeconds` d'entreprise
+ * de 30 ou 60 s, jusqu'à cinq minutes s'écouler entre l'expiration RÉELLE du cache et le
+ * prochain réveil — une fenêtre de divergence bien plus large que le TTL que
+ * l'administration a choisi. `scheduleNextConfigPoll` (plus bas) reprogramme donc chaque
+ * réveil sur `min(CONFIG_POLL_INTERVAL_MS, dernier TTL connu)`, jamais sur cette constante
+ * seule : elle ne sert plus que de repli tant qu'aucune résolution n'a encore appris le TTL
+ * réel, et de PLAFOND une fois qu'il est connu, pour ne jamais descendre EN DESSOUS d'un
+ * TTL d'entreprise plus généreux (chaque réveil ne coûte qu'un `resolver.resolve()`, sans
+ * effet tant que le cache du résolveur n'a pas expiré lui-même). */
 export const CONFIG_POLL_INTERVAL_MS = 5 * 60 * 1000;
+
+/** PLANCHER du rattrapage — sans lui, un `configCacheTtlSeconds` de `0` (valeur légale,
+ * §8.1.2 : « aucun minimum ni maximum ») ferait reprogrammer le prochain réveil à `0` ms,
+ * un sondage en boucle serrée sur un onglet pourtant inerte. `0` demande déjà une fraîcheur
+ * maximale à chaque rendu DÉCLENCHÉ (mutation, navigation) ; un onglet SANS mutation n'a pas
+ * à sonder plus vite que cela pour autant — quelques secondes restent une fenêtre de
+ * divergence négligeable devant le reste du §8.1.3. */
+export const CONFIG_POLL_MIN_INTERVAL_MS = 5000;
 
 /** Signature légère du résumé publié (§5.5, §6.5, §8.1.3 règle 2, CA-03) : par valeur, pas
  * par identité d'objet — l'adaptateur peut renvoyer un objet neuf à chaque lecture. Les
@@ -878,10 +944,15 @@ export function observePrChromeNavigation(
    * ou une expiration de TTL ne change la configuration continuerait à valider et à bloquer
    * l'envoi sur celle, périmée, capturée à son propre `attach()`. */
   onPrChange: (pr: PrRef | null, changed: boolean, resolved: ResolvedClientConfig | null) => void = () => {},
-  /** Injectable pour les tests (une horloge réelle, pas `now`, gouverne `setInterval` — voir
+  /** Injectable pour les tests (une horloge réelle, pas `now`, gouverne `setTimeout` — voir
    * `CONFIG_POLL_INTERVAL_MS`) : une valeur courte y remplace les cinq minutes de production
    * sans attendre cette durée pour de vrai. `0` désactive le sondage. */
-  configPollIntervalMs: number = CONFIG_POLL_INTERVAL_MS
+  configPollIntervalMs: number = CONFIG_POLL_INTERVAL_MS,
+  /** Injectable pour les mêmes raisons que `configPollIntervalMs`, et pour la même raison
+   * qu'elle est SÉPARÉE de lui (voir `CONFIG_POLL_MIN_INTERVAL_MS`) : un test qui veut
+   * vérifier qu'un TTL COURT borne la cadence a besoin d'un plancher tout aussi court, sous
+   * peine que le plancher de production (5 s) masque l'effet du TTL qu'il teste. */
+  configPollMinIntervalMs: number = CONFIG_POLL_MIN_INTERVAL_MS
   /** Révoque l'observation : déconnecte l'observateur et annule un rattrapage en attente.
    * Sans emploi en production — l'observateur vit le temps de l'onglet — mais nécessaire à
    * tout appelant qui n'est PAS un onglet : deux observations concurrentes sur le même
@@ -929,28 +1000,70 @@ export function observePrChromeNavigation(
   // sortie (chromeSig/ownSig ignorent l'un comme l'autre la configuration résolue
   // localement) resterait invisible jusqu'à la prochaine navigation.
   let forceRender = false;
-  let configPollTimer: ReturnType<typeof setInterval> | null = null;
+  let configPollTimer: ReturnType<typeof setTimeout> | null = null;
+  // Dernier `configCacheTtlSeconds` appris, converti en ms — `null` tant qu'aucune
+  // résolution n'a encore répondu. Sert de PLAFOND au délai du prochain réveil (revue
+  // Reefact, PR #39) : voir `CONFIG_POLL_INTERVAL_MS`.
+  let knownConfigTtlMs: number | null = null;
+
+  /** Délai du PROCHAIN réveil — jamais `configPollIntervalMs` seul (revue Reefact, PR #39) :
+   * une fois le TTL effectif connu, il plafonne le délai, pour qu'un `configCacheTtlSeconds`
+   * d'entreprise plus court que `configPollIntervalMs` ne laisse pas s'écouler, entre
+   * l'expiration RÉELLE du cache et le prochain réveil, plus de temps que ce TTL lui-même.
+   *
+   * `CONFIG_POLL_MIN_INTERVAL_MS` borne le TTL, PAS le résultat final — sur `configPollIntervalMs`
+   * lui-même (l'override injecté par les tests, entre autres, pour ne pas attendre les cinq
+   * minutes de production pour de vrai) : le plancher protège contre un `configCacheTtlSeconds`
+   * de `0` (valeur légale) qui reprogrammerait sinon un réveil immédiat en boucle serrée,
+   * jamais contre un `configPollIntervalMs` délibérément COURT — les deux répondent à des
+   * questions différentes, et confondre les deux plafonds aurait fait remonter à cinq
+   * secondes minimum jusqu'au réglage explicite des tests. */
+  const nextConfigPollDelay = (): number => {
+    const effectiveTtlMs = knownConfigTtlMs === null ? configPollIntervalMs : Math.max(configPollMinIntervalMs, knownConfigTtlMs);
+    return Math.min(configPollIntervalMs, effectiveTtlMs);
+  };
 
   /** Réveil périodique, indépendant de toute mutation DOM (§8.1.2, revue Codex PR #38) :
    * un onglet resté inerte doit quand même remarquer qu'un plancher, une configuration
    * d'organisation ou de dépôt a changé une fois le TTL du résolveur écoulé. Ne lit QUE la
    * configuration — jamais `getThreads()` ni le DOM — pour rester bon marché tant que rien
-   * n'a changé : la plupart des réveils ne coûtent qu'un cache hit du résolveur. */
-  const pollConfig = (): void => {
-    if (disposed) return;
+   * n'a changé : la plupart des réveils ne coûtent qu'un cache hit du résolveur.
+   *
+   * Renvoie une promesse — jamais `void` — pour que `scheduleNextConfigPoll` reprogramme le
+   * réveil SUIVANT seulement une fois celui-ci conclu, avec un `knownConfigTtlMs` à jour
+   * (revue Reefact, PR #39) : reprogrammer avant coup l'aurait fait partir sur la valeur
+   * encore ANCIENNE, un cycle de retard derrière le TTL réellement en vigueur. */
+  const pollConfig = (): Promise<void> => {
+    if (disposed) return Promise.resolve();
     const pr = currentPrOf(adapter);
-    if (!pr) return; // rien à surveiller hors PR
+    if (!pr) return Promise.resolve(); // rien à surveiller hors PR
     // La référence n'est posée qu'APRÈS un rendu réel (voir `run()`, plus bas) — jamais ici :
     // sinon un changement survenu AVANT le tout premier réveil s'établirait lui-même comme
     // référence, sans jamais être détecté.
-    if (lastRenderConfigSignature === null) return;
-    void resolver.resolve(adapter, pr).then((resolved) => {
-      if (disposed || renderConfigSignatureOf(resolved) === lastRenderConfigSignature) return;
+    if (lastRenderConfigSignature === null) return Promise.resolve();
+    return resolver.resolve(adapter, pr).then((resolved) => {
+      if (disposed) return;
+      knownConfigTtlMs = resolved.config.configCacheTtlSeconds * 1000;
+      if (renderConfigSignatureOf(resolved) === lastRenderConfigSignature) return;
       forceRender = true;
       run();
     });
   };
-  if (configPollIntervalMs > 0) configPollTimer = setInterval(pollConfig, configPollIntervalMs);
+  /** Reprogramme le réveil à venir, en écrasant celui déjà en attente s'il y en a un
+   * (revue Reefact, PR #39) : sans ce remplacement, le tout premier réveil — programmé
+   * AVANT même le premier rendu, donc avant que `knownConfigTtlMs` ne soit connu — resterait
+   * calé sur le seul `configPollIntervalMs` jusqu'à son terme, quel que soit le TTL appris
+   * entre-temps par ce tout premier rendu. Rappelée depuis `run()` dès qu'un rendu apprend
+   * un TTL plus frais, elle raccourcit alors l'attente au lieu de laisser filer un délai
+   * déjà obsolète dès sa programmation. Idempotente sur un onglet actif : chaque rendu la
+   * rappelle, ce qui repousse d'autant le réveil — sans conséquence, puisqu'un onglet qui
+   * rend encore n'est justement pas la situation que ce réveil existe pour couvrir. */
+  const scheduleNextConfigPoll = (): void => {
+    if (disposed || configPollIntervalMs <= 0) return;
+    if (configPollTimer !== null) clearTimeout(configPollTimer);
+    configPollTimer = setTimeout(() => void pollConfig().finally(scheduleNextConfigPoll), nextConfigPollDelay());
+  };
+  scheduleNextConfigPoll();
 
   const run = (): void => {
     if (disposed) return;
@@ -1053,6 +1166,16 @@ export function observePrChromeNavigation(
         // fenêtre où `configCacheTtlSeconds: 0` (valeur légale) la ferait déjà diverger de
         // ce que la page affiche réellement (revue Codex, PR #39).
         lastRenderConfigSignature = resolved ? renderConfigSignatureOf(resolved) : null;
+        // TTL appris ICI aussi, pas seulement par `pollConfig` (revue Reefact, PR #39) :
+        // une navigation ou une mutation peuvent résoudre une config plus fraîche — donc un
+        // TTL plus fraîchement connu — bien avant le prochain réveil périodique.
+        if (resolved) {
+          knownConfigTtlMs = resolved.config.configCacheTtlSeconds * 1000;
+          // Raccourcit le réveil déjà programmé si ce TTL, fraîchement appris, est plus
+          // strict que ce sur quoi il était calé (revue Reefact, PR #39) — voir
+          // `scheduleNextConfigPoll`.
+          scheduleNextConfigPoll();
+        }
       })
       .finally(() => {
         inFlight = false;
@@ -1082,7 +1205,7 @@ export function observePrChromeNavigation(
       retryTimer = null;
     }
     if (configPollTimer !== null) {
-      clearInterval(configPollTimer);
+      clearTimeout(configPollTimer);
       configPollTimer = null;
     }
   };

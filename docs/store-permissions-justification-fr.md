@@ -112,12 +112,16 @@ d'aucun chemin identifié.
   origine répond `Access-Control-Allow-Origin: *` — un joker que le
   navigateur refuse dès que la requête porte des cookies. La lecture
   levait donc sur tout dépôt possédant une configuration. Elle part
-  désormais **sans cookies** (`credentials: 'omit'`), ce qui la fait
-  aboutir sur les dépôts publics. Sur un dépôt **privé**, elle est refusée
-  faute de session, et l'extension affiche l'état dégradé — elle dit
-  qu'elle n'a pas pu lire. Avec quel code GitHub refuse n'a pas été
+  désormais en **`credentials: 'same-origin'`**, et le détail est décisif :
+  le **premier saut**, de même origine que la page, emporte la session —
+  GitHub autorise — tandis que la **redirection**, qui franchit une
+  origine, ne l'emporte plus, si bien que le joker est accepté. Un dépôt
+  **privé** reste donc lisible tant qu'une session est ouverte, **sans
+  aucune permission d'hôte** ; c'est ce qu'un `credentials: 'omit'`,
+  écrit d'abord ici, sacrifiait sans rien obtenir en retour. Reste le
+  visiteur déconnecté, à qui la route refuse : avec quel code n'a pas été
   mesuré (le proxy de l'environnement de développement répond à sa
-  place) : les deux cas sont donc traités, le 403 directement, et le 404
+  place), donc les deux cas sont traités — le 403 directement, et le 404
   — GitHub masquant volontiers le privé en « inexistant » — en le
   reclassant dès que la page indique un dépôt privé, faute de quoi
   l'extension conclurait « pas de configuration » et appliquerait les

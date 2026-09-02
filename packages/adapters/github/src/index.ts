@@ -57,19 +57,22 @@ export interface GithubClientOptions {
 
 /** `credentials` d'une lecture de configuration — décidé PAR URL, et non une fois pour toutes.
  *
- * Le retrait des cookies n'est pas une bonne pratique générale : c'est la réponse à un
- * mécanisme précis, mesuré sur UNE route. La route `raw` de github.com redirige vers
- * `raw.githubusercontent.com` dès que le fichier existe, cette origine répond
- * `Access-Control-Allow-Origin: *`, et le navigateur refuse le joker quand la requête porte
- * des cookies (mesuré : `npm run check:content-script-cors`). Sur cette route, la session ne
- * sert donc à rien — elle empêche la lecture.
+ * La route `raw` de github.com redirige vers `raw.githubusercontent.com` dès que le fichier
+ * existe, cette origine répond `Access-Control-Allow-Origin: *`, et le navigateur refuse le
+ * joker quand la requête porte des cookies. `include` y échoue donc toujours.
+ *
+ * `'same-origin'` plutôt que `'omit'`, et la différence n'est pas cosmétique — elle est
+ * MESURÉE (`npm run check:content-script-cors`) : le PREMIER saut, de même origine que la
+ * page, part AVEC la session, donc GitHub autorise ; la redirection franchit une origine, le
+ * navigateur cesse alors d'envoyer les cookies, et le joker est accepté. La configuration
+ * d'un dépôt PRIVÉ redevient ainsi lisible, sans permission d'hôte et sans relais — ce que
+ * `'omit'`, écrit d'abord ici, sacrifiait sans rien obtenir en échange (revue Codex, PR #36,
+ * round 4).
  *
  * Partout ailleurs, `include` reste la règle, et l'absence de mesure est ici l'argument, pas
  * une négligence : sur un GitHub Enterprise Server accepté par `extraHosts`, nous n'avons
- * PAS observé de redirection hors origine, et la session y est justement ce qui rend lisible
- * la configuration d'un dépôt privé. Généraliser le `'omit'` à tous les hôtes retirerait un
- * accès qui fonctionne, au nom d'un fait établi sur un seul domaine (revue Codex, PR #36,
- * P1). Le défaut se corrige donc là où il est démontré, nulle part ailleurs. */
+ * PAS observé de redirection hors origine. Le défaut se corrige là où il est démontré,
+ * nulle part ailleurs. */
 export function configCredentials(url: string): RequestCredentials {
   let parsed: URL;
   try {
@@ -80,7 +83,7 @@ export function configCredentials(url: string): RequestCredentials {
   // Hôte ET chemin : sur github.com, seule la route `raw` redirige. Une autre URL du même
   // domaine (page HTML, route d'API) n'a aucune raison de perdre sa session.
   return parsed.hostname === 'github.com' && parsed.pathname.includes('/raw/')
-    ? 'omit'
+    ? 'same-origin'
     : 'include';
 }
 
@@ -121,8 +124,8 @@ export class GithubClientAdapter implements PlatformAdapter {
     return { id: 'github', suggestionInfoString: 'suggestion' };
   }
 
-  /** Route web `raw` — et sur github.com SANS cookies, ce qui demande une explication,
-   * parce que le contraire semble évident et ne marche pas. Le choix est fait par
+  /** Route web `raw` — et sur github.com en `same-origin`, ce qui demande une explication,
+   * parce que le réflexe (`include`) ne marche pas. Le choix est fait par
    * `configCredentials()`, qui dit aussi pourquoi il ne s'étend pas aux autres hôtes.
    *
    * La route `raw` de github.com **redirige** vers `raw.githubusercontent.com` dès que le
@@ -141,35 +144,36 @@ export class GithubClientAdapter implements PlatformAdapter {
    * cette lecture était « une requête same-origin » sans frontière CORS : vrai de la requête,
    * faux de la redirection.
    *
-   * Conséquence assumée du `'omit'` : sur un dépôt PRIVÉ de github.com, la route refuse, faute
-   * de session. Avec QUEL code, nous ne l'avons pas mesuré — le proxy de l'environnement de
-   * développement intercepte tout dépôt hors périmètre et répond lui-même, y compris pour un
-   * dépôt inexistant. Les deux réponses sont traitées : 403 rend `unreachable` directement, et
+   * Un dépôt PRIVÉ est lisible tant qu'une session est ouverte : c'est tout l'intérêt du
+   * `same-origin`. Il ne l'est plus pour un visiteur déconnecté, et la route refuse alors —
+   * avec QUEL code, nous ne l'avons pas mesuré (le proxy de l'environnement de développement
+   * intercepte tout dépôt hors périmètre et répond lui-même, y compris pour un dépôt
+   * inexistant). Les deux réponses sont donc traitées : 403 rend `unreachable` directement, et
    * un 404 — GitHub masquant volontiers le privé en « inexistant » — est reclassé plus bas dès
    * que la page dit le dépôt privé. Dans les deux cas l'extension DIT qu'elle n'a pas pu lire,
-   * au lieu de prétendre qu'il n'y a pas de fichier. La lecture authentifiée des dépôts privés
-   * demande une permission d'hôte et passe par le service worker ; elle n'est pas dans ce
-   * correctif. */
+   * au lieu de prétendre qu'il n'y a pas de fichier. */
   async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
     const url = `https://${pr.host}/${pr.scope.join('/')}/raw/HEAD/.conventional-comments.json`;
     const credentials = configCredentials(url);
     try {
       const res = await this.#fetch(url, { credentials });
       if (res.status === 404) {
-        // Un 404 ne dit pas toujours « pas de fichier ». Lue SANS session, une ressource
-        // privée est masquée par GitHub — le serveur répond ce qu'il répondrait pour un dépôt
-        // inexistant. Classer cela `absent` ferait pire que le bandeau : le résolveur mettrait
-        // `degraded: false` en cache et l'extension appliquerait les niveaux inférieurs en
-        // AFFIRMANT avoir lu la configuration du dépôt (revue Codex, PR #36, round 2).
+        // Un 404 ne dit pas toujours « pas de fichier ». `same-origin` authentifie le premier
+        // saut, ce qui rend ce 404 fiable POUR UNE SESSION OUVERTE — mais pas pour un visiteur
+        // déconnecté, à qui GitHub masque le privé en répondant ce qu'il répondrait pour un
+        // dépôt inexistant. Classer cela `absent` ferait pire que le bandeau : le résolveur
+        // mettrait `degraded: false` en cache et l'extension appliquerait les niveaux
+        // inférieurs en AFFIRMANT avoir lu la configuration du dépôt (revue Codex, round 2).
+        // Le cas est devenu rare ; il n'a pas disparu.
         //
         // La visibilité est donc lue dans la page, qui la porte. Et la conclusion ne se tire
         // que sur une preuve POSITIVE de dépôt privé : visibilité inconnue — sélecteur pourri,
         // page qui ne le dit plus — vaut `absent`, c'est-à-dire exactement le comportement
         // d'avant. Une dégradation de sélecteur ne peut pas faire apparaître un bandeau sur
         // les dépôts publics, qui sont le cas courant.
-        const masked = credentials === 'omit' && this.#repoIsPublic() === false;
+        const masked = credentials !== 'include' && this.#repoIsPublic() === false;
         return masked
-          ? { status: 'unreachable', reason: 'HTTP 404 (dépôt privé, lu sans session)' }
+          ? { status: 'unreachable', reason: 'HTTP 404 (dépôt privé : absence indiscernable)' }
           : { status: 'absent' };
       }
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
@@ -211,9 +215,9 @@ export class GithubClientAdapter implements PlatformAdapter {
       const res = await this.#fetch(url, { credentials });
       if (res.status === 404) {
         // Même ambiguïté que pour le dépôt — sans le moyen de la lever. Le `configUrl` désigne
-        // un AUTRE dépôt que celui affiché, dont la page ne dit pas la visibilité : lue sans
-        // session, une ressource privée y rend le même 404 qu'un fichier supprimé (revue Codex,
-        // PR #36, round 3).
+        // un AUTRE dépôt que celui affiché, dont la page ne dit pas la visibilité : sans
+        // session ouverte, une ressource privée y rend le même 404 qu'un fichier supprimé
+        // (revue Codex, PR #36, round 3).
         //
         // Faute de pouvoir distinguer, on refuse de conclure « pas de configuration
         // d'organisation ». Le vrai cas nominal est ailleurs et reste intact : aucune URL
@@ -222,8 +226,8 @@ export class GithubClientAdapter implements PlatformAdapter {
         // ne l'a pas lu. Coût assumé : un `configUrl` pointant sur un fichier réellement
         // supprimé affiche l'état dégradé au lieu de se taire ; c'est le bon sens de l'erreur
         // (§8.1.3, règle 2 — désarmer en le disant plutôt que bloquer sur une règle non lue).
-        return credentials === 'omit'
-          ? { status: 'unreachable', reason: 'HTTP 404 (lu sans session : absence indiscernable)' }
+        return credentials !== 'include'
+          ? { status: 'unreachable', reason: 'HTTP 404 (absence indiscernable d\'un accès refusé)' }
           : { status: 'absent' };
       }
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };

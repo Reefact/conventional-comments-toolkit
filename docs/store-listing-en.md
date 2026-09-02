@@ -120,12 +120,11 @@ wildcard whenever the request carries credentials: the `fetch` threw, the
 read returned `unreachable`, and the banner appeared on precisely those
 repositories that had a configuration to read.
 
-Fixed: the read is sent without cookies. On a **public** repository it
-succeeds and the banner disappears. On a **private** one the route
-refuses without a session, so the banner stays — and now says something
-true: the extension could not read. (GitHub readily masks private
-resources as missing, so a 404 there is reclassified as an unreadable
-configuration as soon as the page says the repository is private;
-otherwise the extension would conclude "no configuration".) Take
-screenshots on a public repository, or on one with no configuration
-file.
+Fixed: the read is sent with `credentials: 'same-origin'` — the session
+travels with the first hop, not with the redirect. The banner disappears
+on a **public** repository, and on a **private** one too as long as a
+session is open. It remains only for a signed-out visitor, and then says
+something true: the extension could not read. (GitHub readily masks
+private resources as missing, so a 404 there is reclassified as an
+unreadable configuration as soon as the page says the repository is
+private; otherwise the extension would conclude "no configuration".)

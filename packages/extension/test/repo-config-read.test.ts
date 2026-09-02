@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 //
-// LA LECTURE DE LA CONFIGURATION DE DÉPÔT (§8.2, niveau 3) — et pourquoi elle part sans
-// cookies.
+// LA LECTURE DE LA CONFIGURATION DE DÉPÔT (§8.2, niveau 3) — et pourquoi elle part en
+// `same-origin`.
 //
 // Ce niveau n'a JAMAIS été lisible sur GitHub. La route `raw` de github.com redirige vers
 // `raw.githubusercontent.com` dès que le fichier existe, cette origine répond
@@ -9,6 +9,10 @@
 // `credentials: 'include'`. Le `fetch` levait, la lecture rendait `unreachable`, et tout
 // dépôt POSSÉDANT une configuration affichait l'état dégradé du §5.4 — l'inverse exact de ce
 // que deux documents de ce dépôt affirmaient.
+//
+// `same-origin` et non `omit` : mesuré, le PREMIER saut part avec la session — GitHub
+// autorise — et la redirection, qui franchit une origine, n'emporte plus les cookies, si bien
+// que le joker est accepté. Un dépôt privé reste donc lisible, sans permission d'hôte.
 //
 // Le mécanisme est mesuré dans un vrai navigateur par `npm run check:content-script-cors` ;
 // ce test-ci verrouille ce que le code envoie, qui est la seule moitié qu'un test unitaire
@@ -42,14 +46,14 @@ function adapterWith(reply: (url: string) => Response): {
 }
 
 describe('§8.2 — lecture de la configuration de dépôt sur GitHub', () => {
-  it('part SANS cookies : le joker CORS de la redirection les refuse', async () => {
+  it('part en `same-origin` : authentifiée au premier saut, anonyme après la redirection', async () => {
     const { adapter, calls } = adapterWith(() => new Response('{"version":1}', { status: 200 }));
     await adapter.getRepoConfig(pr);
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe('https://github.com/acme/demo/raw/HEAD/.conventional-comments.json');
     // `include` renvoie la lecture dans le mur mesuré : ACAO `*` + cookies = refus.
-    expect(calls[0]!.init?.credentials).toBe('omit');
+    expect(calls[0]!.init?.credentials).toBe('same-origin');
   });
 
   it('un fichier absent (404) reste un cas nominal, jamais une dégradation (§10)', async () => {
@@ -84,11 +88,11 @@ describe('§8.2 — lecture de la configuration de dépôt sur GitHub', () => {
 // est de même origine que la page : `relayableFrom()` décline alors le relais — à raison, le
 // worker n'a pas de permission d'hôte — et la lecture directe partait avec ses cookies.
 describe('§8.1.1 — lecture du configUrl d\'organisation', () => {
-  it('un configUrl `raw` sur github.com part sans cookies, comme celui du dépôt', async () => {
+  it('un configUrl `raw` sur github.com part en `same-origin`, comme celui du dépôt', async () => {
     const { adapter, calls } = adapterWith(() => new Response('{"version":1}', { status: 200 }));
     await adapter.getOrgConfig('https://github.com/acme/config/raw/HEAD/cc.json');
 
-    expect(calls[0]!.init?.credentials).toBe('omit');
+    expect(calls[0]!.init?.credentials).toBe('same-origin');
   });
 
   it('un configUrl hors de cette route garde sa session', async () => {
@@ -105,7 +109,7 @@ describe('§8.1.1 — lecture du configUrl d\'organisation', () => {
     const { adapter } = adapterWith(() => new Response('', { status: 404 }));
     expect(await adapter.getOrgConfig('https://github.com/acme/config/raw/HEAD/cc.json')).toEqual({
       status: 'unreachable',
-      reason: 'HTTP 404 (lu sans session : absence indiscernable)',
+      reason: "HTTP 404 (absence indiscernable d'un accès refusé)",
     });
   });
 
@@ -153,7 +157,7 @@ describe('§8.2 — un 404 sans session, sur un dépôt privé, n\'est pas un fi
     const { adapter } = adapterWith(() => new Response('', { status: 404 }));
     expect(await adapter.getRepoConfig(pr)).toEqual({
       status: 'unreachable',
-      reason: 'HTTP 404 (dépôt privé, lu sans session)',
+      reason: 'HTTP 404 (dépôt privé : absence indiscernable)',
     });
   });
 
@@ -171,7 +175,7 @@ describe('§8.2 — un 404 sans session, sur un dépôt privé, n\'est pas un fi
     const { adapter } = adapterWith(() => new Response('', { status: 404 }));
     expect(await adapter.getRepoConfig(pr)).toEqual({
       status: 'unreachable',
-      reason: 'HTTP 404 (dépôt privé, lu sans session)',
+      reason: 'HTTP 404 (dépôt privé : absence indiscernable)',
     });
   });
 

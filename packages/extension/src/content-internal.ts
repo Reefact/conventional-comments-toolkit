@@ -1232,7 +1232,16 @@ export function observePrChromeNavigation(
       },
     })
       .then(({ showed, resolved }) => {
-        if (key !== lastPrKey) return; // supplanté par une navigation : ce rendu ne fait plus foi
+        // La PR AFFICHÉE MAINTENANT, jamais `lastPrKey` (revue Codex, PR #39) : `lastPrKey`
+        // n'est réécrite que par un `run()` qui PROCÈDE jusqu'à sa branche `navigated` — un
+        // `run()` qui arrive pendant que CE rendu-ci est encore `inFlight` se contente de
+        // poser `missedMutation` et ressort aussitôt, sans y toucher. Une navigation survenue
+        // pendant les lectures asynchrones de ce rendu (`getThreads()`, `resolver.resolve()`)
+        // laissait donc `lastPrKey` égal à `key` malgré le changement de PR réel : ce garde-fou
+        // ne détectait rien, et `onPrChange` plus bas publiait la configuration de l'ANCIENNE
+        // PR pour un éditeur déjà découvert sur la NOUVELLE — ses règles de dépôt restaient
+        // celles d'un autre repository jusqu'à un tout AUTRE changement visible.
+        if (key !== prKeyFor(currentPrOf(adapter))) return; // supplanté par une navigation : ce rendu ne fait plus foi
         // Ce rendu a résolu la configuration effective — éventuellement une NOUVELLE, le
         // cache du résolveur ayant expiré. La télémétrie doit s'aligner sur celle-là, sans
         // désarmer : `changed: false` recalcule la cible et ne vidange que si elle diffère.

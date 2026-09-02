@@ -537,6 +537,83 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     doc.body.appendChild(doc.createElement('span'));
     await flushAll();
   });
+
+  it('onPrChange ne publie jamais, pour une PR, la configuration résolue pour une AUTRE (revue Codex, PR #39)', async () => {
+    const doc = document;
+    // Deux DÉPÔTS distincts — le cache de `ClientConfigResolver` est scopé par
+    // `host/scope`, jamais par numéro de PR (deux PR du MÊME dépôt partagent la même
+    // configuration, à raison) : pour que les deux résolutions produisent des configurations
+    // reconnaissables l'une de l'autre, la navigation doit changer de dépôt, pas seulement de
+    // numéro.
+    const prA: PrRef = { platform: 'github', createdAt: '2026-01-01T00:00:00Z', host: 'github.com', scope: ['acme', 'demo'], number: 1 };
+    const prB: PrRef = { platform: 'github', createdAt: '2026-01-01T00:00:00Z', host: 'github.com', scope: ['acme', 'autre-depot'], number: 2 };
+    let current: PrRef | null = prA;
+    let getThreadsCalls = 0;
+    let releaseSecondRender: (() => void) | null = null;
+    const gate = new Promise<void>((resolve) => {
+      releaseSecondRender = resolve;
+    });
+    const adapter: PlatformAdapter & { currentPr(): PrRef | null } = {
+      matches: () => true,
+      platformProfile: () => ({ id: 'github', suggestionInfoString: null }),
+      getRepoConfig: async (requestedPr) => ({
+        status: 'found',
+        text: JSON.stringify({ mode: requestedPr.scope.join('/') === 'acme/demo' ? 'assist' : 'enforce' }),
+      }),
+      getOrgConfig: async () => ({ status: 'absent' }),
+      observeEditors: () => ({ dispose: () => {} }),
+      getSubmitControls: () => [],
+      readValue: () => '',
+      writeValue: () => {},
+      // Rien à montrer (pas de résumé publié, aucun fil) : `observePrChromeNavigation` reste
+      // dans sa fenêtre de rattrapage et retente à CHAQUE mutation tant qu'elle n'est pas
+      // écoulée — c'est ce second essai, sur la MÊME PR, que le gate bloque.
+      getThreads: async () => {
+        getThreadsCalls++;
+        if (getThreadsCalls === 2) await gate;
+        return [];
+      },
+      getCompletionControl: () => null,
+      getCurrentUser: async () => ({ id: 'u', login: 'u', isServiceAccount: false }),
+      readPublishedResult: () => null,
+      currentPr: () => current,
+    };
+    const resolver = new ClientConfigResolver(async () => null);
+    const calls: { pr: PrRef | null; changed: boolean; resolved: ResolvedClientConfig | null }[] = [];
+
+    observe(adapter, resolver, doc, undefined, (p, changed, resolved) => calls.push({ pr: p, changed, resolved }));
+    await flushAll(); // premier rendu de prA, complet (getThreads #1, non bloqué)
+    expect(getThreadsCalls).toBe(1);
+
+    // Toujours SUR prA : ce second rendu (rattrapage de l'hydratation, `navigated: false`
+    // pour LUI) se bloque sur son propre `getThreads()`.
+    doc.body.appendChild(doc.createElement('span'));
+    await flush();
+    expect(getThreadsCalls).toBe(2);
+
+    // La page navigue vers un AUTRE DÉPÔT PENDANT que ce second rendu de prA est encore en
+    // vol — cette mutation est coalescée (`missedMutation`), `lastPrKey` n'est PAS mise à
+    // jour avant que le rendu de prA ne se termine (revue Codex, PR #39).
+    current = prB;
+    doc.body.appendChild(doc.createElement('span'));
+    await flush();
+    expect(getThreadsCalls).toBe(2); // toujours pas de troisième rendu concurrent
+
+    releaseSecondRender!(); // le second rendu de prA se termine enfin
+    await flushAll();
+    await new Promise((resolve) => setTimeout(resolve, RENDER_RETRY_THROTTLE_MS + 100));
+    await flushAll();
+
+    // Sans le correctif, un appel `{ pr: prB, changed: false, resolved: <config assist de
+    // prA> }` se glisserait ici — la configuration de l'ANCIEN dépôt publiée comme si elle
+    // s'appliquait au NOUVEAU. Un éditeur déjà découvert sur prB reconstruirait alors ses
+    // règles de validation sur le mauvais dépôt.
+    for (const call of calls) {
+      if (call.changed || call.resolved === null) continue;
+      const expectedMode = call.pr?.scope.join('/') === 'acme/demo' ? 'assist' : 'enforce';
+      expect(call.resolved.config.mode).toBe(expectedMode);
+    }
+  });
 });
 
 describe('D3 — le résumé publié arrivé après coup est adopté, même une fois la barre déjà affichée (§5.5, §6.5, CA-03)', () => {

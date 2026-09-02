@@ -126,6 +126,26 @@ export class EditorController {
     return this.deps.resolved.config;
   }
 
+  /** Remplace la configuration résolue d'un éditeur DÉJÀ attaché (revue Codex, PR #39) :
+   * sans cela, un éditeur ouvert avant qu'un sondage périodique (§8.1.2) force un nouveau
+   * rendu de la barre continue de valider et de bloquer l'envoi sur la configuration
+   * capturée à `attach()` — figée dans `deps.resolved`, jamais relue ensuite. Un
+   * assouplissement du mode (`enforce` → `off`, §7) ne libérerait alors l'éditeur qu'à sa
+   * fermeture/réouverture ou au rechargement de la page, pas « en direct » comme le §8.1.3
+   * l'exige pour ce genre de changement.
+   *
+   * `refresh()` referme la boucle : décompte, grisage, infobulle et pastille (§5.3) sont
+   * tous dérivés de `this.config`/`this.deps.resolved`, donc tous à jour dès ce retour. La
+   * barre d'outils, elle, N'EST PAS reconstruite ici — ses boutons de label reflètent la
+   * configuration au moment où `attach()` a construit le DOM (`buildToolbar`), et seule une
+   * réouverture de l'éditeur les reconstruit. Un label retiré entre-temps continue donc de
+   * s'afficher, mais insérer son préfixe ne validerait plus (`this.config` fait foi) — un
+   * décalage cosmétique, jamais un contournement du blocage. */
+  updateResolved(resolved: ResolvedClientConfig): void {
+    this.deps.resolved = resolved;
+    this.refresh();
+  }
+
   attach(): void {
     const decision = this.evaluateNow();
     if (decision.inactive) return; // mode off : l'extension reste inactive (§7)

@@ -162,6 +162,27 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.dispose();
   });
 
+  it('revue Codex, PR #39 : updateResolved() applique une configuration nouvelle à un éditeur déjà attaché, sans le réattacher', async () => {
+    const { controller, textarea, submit } = setup('enforce');
+    controller.attach();
+    writeToTextField(textarea, 'pas de label ici');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(submit.getAttribute('aria-disabled')).toBe('true'); // bloqué sous la config initiale
+
+    // La configuration change PENDANT que l'éditeur reste ouvert (assouplissement du mode,
+    // §8.1.3, ligne « Élargissant ») — un scénario que seul `updateResolved()` peut refléter :
+    // `deps.resolved`, capturé une fois pour toutes à `attach()`, ne se relit jamais tout seul.
+    const offConfig = defaultConfig();
+    offConfig.mode = 'off';
+    offConfig.activation.activatedAt = '2026-09-01T00:00:00Z';
+    controller.updateResolved({ config: offConfig, notices: [], fingerprint: 'cccc3333', degraded: false });
+
+    // Sans le correctif, ce même éditeur continuerait de bloquer sur la configuration
+    // périmée jusqu'à sa fermeture/réouverture ou au rechargement de la page.
+    expect(submit.hasAttribute('aria-disabled')).toBe(false);
+    controller.dispose();
+  });
+
   it('§5.4 : Ctrl+Entrée intercepté quand le commentaire est en erreur (§4.3)', async () => {
     const { controller, textarea } = setup('enforce');
     controller.attach();

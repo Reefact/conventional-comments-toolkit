@@ -157,9 +157,18 @@ function observe(
   doc: Parameters<typeof observePrChromeNavigation>[2],
   now?: Parameters<typeof observePrChromeNavigation>[3],
   onPrChange?: Parameters<typeof observePrChromeNavigation>[4],
-  configPollIntervalMs?: Parameters<typeof observePrChromeNavigation>[5]
+  configPollIntervalMs?: Parameters<typeof observePrChromeNavigation>[5],
+  configPollMinIntervalMs?: Parameters<typeof observePrChromeNavigation>[6]
 ): () => void {
-  const dispose = observePrChromeNavigation(adapter, resolver, doc, now, onPrChange, configPollIntervalMs);
+  const dispose = observePrChromeNavigation(
+    adapter,
+    resolver,
+    doc,
+    now,
+    onPrChange,
+    configPollIntervalMs,
+    configPollMinIntervalMs
+  );
   openObservations.push(dispose);
   return dispose;
 }
@@ -1992,4 +2001,38 @@ describe('Codex #38 — sondage périodique de la configuration effective sur un
     expect(refreshes).toHaveLength(1);
     expect(refreshes[0]?.degraded).toBe(true);
   });
+
+  it('la cadence du sondage se borne au TTL effectif une fois connu, pas seulement à configPollIntervalMs (revue Reefact, PR #39)', async () => {
+    const doc = document;
+    const current = pr(35);
+    const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 }));
+    let repoConfigCalls = 0;
+    // TTL d'entreprise très court — 1 s, la plus petite valeur non nulle admise (entier de
+    // secondes, §8.1.2) — très en deçà du plafond `configPollIntervalMs` ci-dessous.
+    adapter.getRepoConfig = async () => {
+      repoConfigCalls++;
+      return { status: 'found', text: JSON.stringify({ configCacheTtlSeconds: 1 }) };
+    };
+    const resolver = new ClientConfigResolver(async () => null);
+    const CEILING_MS = 4000;
+    // Plancher de test, minuscule à dessein : le plancher de PRODUCTION
+    // (`CONFIG_POLL_MIN_INTERVAL_MS`, 5 s) masquerait ici l'effet du TTL d'1 s qu'on
+    // cherche justement à observer — les deux plafonds répondent à des questions
+    // différentes (voir le commentaire du paramètre sur `observePrChromeNavigation`).
+    const MIN_MS = 20;
+
+    observe(adapter, resolver, doc, undefined, undefined, CEILING_MS, MIN_MS);
+    await flushAll();
+    const callsAfterFirstRender = repoConfigCalls;
+    expect(callsAfterFirstRender).toBeGreaterThanOrEqual(1);
+
+    await new Promise((resolve) => setTimeout(resolve, 2200));
+    await flushAll();
+
+    // À une cadence bornée par le TTL effectif (~1 s), au moins deux réveils supplémentaires
+    // ont eu lieu en 2,2 s. Bornée par le seul plafond de repli (4 s, avant correctif), aucun
+    // n'aurait encore eu lieu — la fenêtre de divergence A/B dépasserait alors le TTL que
+    // l'administration a choisi.
+    expect(repoConfigCalls).toBeGreaterThanOrEqual(callsAfterFirstRender + 2);
+  }, 10000);
 });

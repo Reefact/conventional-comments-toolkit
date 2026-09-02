@@ -126,23 +126,34 @@ export class EditorController {
     return this.deps.resolved.config;
   }
 
-  /** Remplace la configuration résolue d'un éditeur DÉJÀ attaché (revue Codex, PR #39) :
-   * sans cela, un éditeur ouvert avant qu'un sondage périodique (§8.1.2) force un nouveau
-   * rendu de la barre continue de valider et de bloquer l'envoi sur la configuration
-   * capturée à `attach()` — figée dans `deps.resolved`, jamais relue ensuite. Un
-   * assouplissement du mode (`enforce` → `off`, §7) ne libérerait alors l'éditeur qu'à sa
-   * fermeture/réouverture ou au rechargement de la page, pas « en direct » comme le §8.1.3
-   * l'exige pour ce genre de changement.
+  /** Remplace la configuration résolue — ET le résumé publié — d'un éditeur DÉJÀ attaché
+   * (revue Codex et Reefact, PR #39) : sans cela, un éditeur ouvert avant qu'un sondage
+   * périodique (§8.1.2) force un nouveau rendu de la barre continue de valider et de
+   * bloquer l'envoi sur la configuration capturée à `attach()` — figée dans `deps.resolved`,
+   * jamais relue ensuite. Un assouplissement du mode (`enforce` → `off`, §7) ne libérerait
+   * alors l'éditeur qu'à sa fermeture/réouverture ou au rechargement de la page, pas « en
+   * direct » comme le §8.1.3 l'exige pour ce genre de changement.
+   *
+   * `published` DOIT être relu au moment de l'appel, jamais gardé de l'attachement d'origine
+   * (revue Reefact, PR #39) : `deps.published`, sinon inchangé, est comparé à `deps.resolved
+   * .fingerprint` par `decideGuard()` (§8.1.3, règle 2) — un scénario de propagation où
+   * l'extension adopte une configuration B avant que le composant B ne publie lui-même
+   * l'empreinte B laisserait cet éditeur comparer la NOUVELLE configuration à l'ANCIEN
+   * résumé indéfiniment, l'écart d'empreinte ne se résorbant jamais même une fois les deux
+   * composants d'accord.
    *
    * `refresh()` referme la boucle : décompte, grisage, infobulle et pastille (§5.3) sont
-   * tous dérivés de `this.config`/`this.deps.resolved`, donc tous à jour dès ce retour. La
-   * barre d'outils, elle, N'EST PAS reconstruite ici — ses boutons de label reflètent la
-   * configuration au moment où `attach()` a construit le DOM (`buildToolbar`), et seule une
-   * réouverture de l'éditeur les reconstruit. Un label retiré entre-temps continue donc de
-   * s'afficher, mais insérer son préfixe ne validerait plus (`this.config` fait foi) — un
-   * décalage cosmétique, jamais un contournement du blocage. */
-  updateResolved(resolved: ResolvedClientConfig): void {
+   * tous dérivés de `this.config`/`this.deps.resolved`/`this.deps.published`, donc tous à
+   * jour dès ce retour. La barre d'outils, elle, N'EST PAS reconstruite ici — ses boutons de
+   * label reflètent la configuration au moment où `attach()` a construit le DOM
+   * (`buildToolbar`) ; un mode qui bascule à `off` ou en revient est traité par
+   * `bootstrap()` en défaisant/reconstruisant le contrôleur lui-même (revue Reefact, PR #39),
+   * jamais par cette méthode. Sur un éditeur qui RESTE actif, un label retiré entre-temps
+   * continue donc de s'afficher dans la barre, mais insérer son préfixe ne validerait plus
+   * (`this.config` fait foi) — un décalage cosmétique, jamais un contournement du blocage. */
+  updateResolved(resolved: ResolvedClientConfig, published: PublishedSummary | null): void {
     this.deps.resolved = resolved;
+    this.deps.published = published;
     this.refresh();
   }
 

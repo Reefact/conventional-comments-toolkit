@@ -141,21 +141,59 @@ export class GithubClientAdapter implements PlatformAdapter {
    * cette lecture était « une requête same-origin » sans frontière CORS : vrai de la requête,
    * faux de la redirection.
    *
-   * Conséquence assumée du `'omit'` : sur un dépôt PRIVÉ de github.com, la route rend 403 faute de session
-   * — donc `unreachable`, et l'état dégradé. C'est le comportement honnête : l'extension dit
-   * qu'elle n'a pas pu lire, au lieu de prétendre qu'il n'y a pas de fichier. La lecture
-   * authentifiée des dépôts privés demande une permission d'hôte et passe par le service
-   * worker ; elle n'est pas dans ce correctif. */
+   * Conséquence assumée du `'omit'` : sur un dépôt PRIVÉ de github.com, la route refuse, faute
+   * de session. Avec QUEL code, nous ne l'avons pas mesuré — le proxy de l'environnement de
+   * développement intercepte tout dépôt hors périmètre et répond lui-même, y compris pour un
+   * dépôt inexistant. Les deux réponses sont traitées : 403 rend `unreachable` directement, et
+   * un 404 — GitHub masquant volontiers le privé en « inexistant » — est reclassé plus bas dès
+   * que la page dit le dépôt privé. Dans les deux cas l'extension DIT qu'elle n'a pas pu lire,
+   * au lieu de prétendre qu'il n'y a pas de fichier. La lecture authentifiée des dépôts privés
+   * demande une permission d'hôte et passe par le service worker ; elle n'est pas dans ce
+   * correctif. */
   async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
     const url = `https://${pr.host}/${pr.scope.join('/')}/raw/HEAD/.conventional-comments.json`;
+    const credentials = configCredentials(url);
     try {
-      const res = await this.#fetch(url, { credentials: configCredentials(url) });
-      if (res.status === 404) return { status: 'absent' };
+      const res = await this.#fetch(url, { credentials });
+      if (res.status === 404) {
+        // Un 404 ne dit pas toujours « pas de fichier ». Lue SANS session, une ressource
+        // privée est masquée par GitHub — le serveur répond ce qu'il répondrait pour un dépôt
+        // inexistant. Classer cela `absent` ferait pire que le bandeau : le résolveur mettrait
+        // `degraded: false` en cache et l'extension appliquerait les niveaux inférieurs en
+        // AFFIRMANT avoir lu la configuration du dépôt (revue Codex, PR #36, round 2).
+        //
+        // La visibilité est donc lue dans la page, qui la porte. Et la conclusion ne se tire
+        // que sur une preuve POSITIVE de dépôt privé : visibilité inconnue — sélecteur pourri,
+        // page qui ne le dit plus — vaut `absent`, c'est-à-dire exactement le comportement
+        // d'avant. Une dégradation de sélecteur ne peut pas faire apparaître un bandeau sur
+        // les dépôts publics, qui sont le cas courant.
+        const masked = credentials === 'omit' && this.#repoIsPublic() === false;
+        return masked
+          ? { status: 'unreachable', reason: 'HTTP 404 (dépôt privé, lu sans session)' }
+          : { status: 'absent' };
+      }
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
       return { status: 'found', text: await res.text() };
     } catch (e) {
       return { status: 'unreachable', reason: String(e) };
     }
+  }
+
+  /** Le dépôt affiché est-il public ? `null` quand la page ne le dit pas — et ce troisième
+   * cas est le défaut sûr, pas un oubli : voir `getRepoConfig()`. */
+  #repoIsPublic(): boolean | null {
+    const meta = queryChain(this.#doc, selectors.repositoryPublicMeta).element;
+    const flag = meta?.getAttribute('content')?.trim().toLowerCase();
+    if (flag === 'true') return true;
+    if (flag === 'false') return false;
+    // Repli par le badge visible : filtré par TEXTE, ses classes étant partagées.
+    for (const el of queryChainAll(this.#doc, selectors.repositoryVisibilityLabel)) {
+      const text = el.textContent?.trim().toLowerCase();
+      if (text === 'public') return true;
+      if (text === 'private') return false;
+    }
+    this.log.degraded(selectors.repositoryPublicMeta);
+    return null;
   }
 
   async getOrgConfig(url: string | null): Promise<ConfigRead> {

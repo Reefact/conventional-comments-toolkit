@@ -24,6 +24,26 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
+  /** Visibilité du dépôt affiché — MESURÉE sur une page réelle de github.com (2026-09) :
+   * `<meta name="octolytics-dimension-repository_public" content="true">`, en un exemplaire.
+   * Ne sert qu'à interpréter un 404 de la lecture sans session (§8.2) : sur un dépôt privé,
+   * GitHub masque ce qu'on n'a pas le droit de voir, et « pas de fichier » est alors
+   * indiscernable de « pas le droit ». */
+  repositoryPublicMeta: {
+    name: 'repository-public-meta',
+    candidates: ['meta[name="octolytics-dimension-repository_public"]'],
+  } satisfies SelectorChain,
+
+  /** Repli visible de la même information : le badge à côté du nom du dépôt. La page mesurée
+   * porte `<span class="Label Label--secondary v-align-middle mr-1">Public</span>` — mais
+   * d'autres badges partagent ces classes (« Bot »), donc l'appelant filtre par TEXTE et ne
+   * conclut que sur « public »/« private ». Un repli muet laisse la lecture au comportement
+   * d'avant : il ne peut pas mettre un bandeau là où il n'y en avait pas. */
+  repositoryVisibilityLabel: {
+    name: 'repository-visibility-label',
+    candidates: ['span.Label--secondary', 'span.Label'],
+  } satisfies SelectorChain,
+
   /** Conteneur d'un fil existant — décide de la zone `reply` (§4.1). */
   threadContainer: {
     name: 'thread-container',

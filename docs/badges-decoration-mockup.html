@@ -225,6 +225,10 @@ body {
   color: var(--text);
 }
 
+.comment-text .prefix {
+  color: var(--text-muted);
+}
+
 footer {
   margin-top: 48px;
   padding-top: 16px;
@@ -246,12 +250,12 @@ footer code {
     <p class="eyebrow">Conventional Comments Toolkit — exploration visuelle</p>
     <h1>Badge de label vs badges de décoration</h1>
     <p>
-      Huit commentaires publiés, tels qu'ils s'afficheraient avec l'extension active :
-      un badge label plein contour + icône, et à sa droite, plus petits, sans fond et
-      sans gras, les badges de décoration — liseré rouge uniquement quand la décoration
-      force le caractère bloquant. Le préfixe <code>label (décorations):</code> n'est plus
-      répété dans le texte : les badges portent seuls cette information structurée, le
-      corps du commentaire ne garde que le sujet libre.
+      Huit commentaires publiés, tels que rendus par <code>decorateComment()</code> : un badge
+      label plein contour + icône, et à sa droite, plus petits, sans fond et sans gras, les
+      badges de décoration — liseré rouge uniquement quand la décoration force le caractère
+      bloquant. Le texte brut du commentaire, préfixe <code>label (décorations):</code> compris,
+      reste affiché tel quel sous les badges — l'extension ne modifie jamais le contenu stocké
+      côté serveur (§5.5) ; les badges s'ajoutent, ils ne remplacent rien.
     </p>
   </div>
 
@@ -275,8 +279,8 @@ footer code {
         <span class="badge-label" style="--cct-color: var(--label-praise)">🙌 praise</span>
       </div>
       <div class="comment-text">
-        The decision is now both rigorous and appropriately scoped. I have no remaining design
-        blocker on this PR.
+        <span class="prefix">praise:</span> The decision is now both rigorous and appropriately
+        scoped. I have no remaining design blocker on this PR.
       </div>
     </div>
   </div>
@@ -294,7 +298,8 @@ footer code {
         <span class="badge-deco blocking">blocking</span>
       </div>
       <div class="comment-text">
-        Le nom de la fonction est ambigu, il entre en collision avec le label du module voisin.
+        <span class="prefix">issue (blocking):</span> Le nom de la fonction est ambigu, il entre
+        en collision avec le label du module voisin.
       </div>
     </div>
   </div>
@@ -312,8 +317,8 @@ footer code {
         <span class="badge-deco nonblocking">non-blocking</span>
       </div>
       <div class="comment-text">
-        On pourrait extraire cette validation dans une fonction partagée, à voir si ça vaut le
-        coup ici.
+        <span class="prefix">suggestion (non-blocking):</span> On pourrait extraire cette
+        validation dans une fonction partagée, à voir si ça vaut le coup ici.
       </div>
     </div>
   </div>
@@ -331,8 +336,8 @@ footer code {
         <span class="badge-deco">a11y</span>
       </div>
       <div class="comment-text">
-        Ce bouton n'a pas de <code>aria-label</code>, l'icône seule ne suffit pas au lecteur
-        d'écran.
+        <span class="prefix">nitpick (a11y):</span> Ce bouton n'a pas de <code>aria-label</code>,
+        l'icône seule ne suffit pas au lecteur d'écran.
       </div>
     </div>
   </div>
@@ -351,7 +356,8 @@ footer code {
         <span class="badge-deco">security</span>
       </div>
       <div class="comment-text">
-        Le token n'est jamais purgé du stockage local à la déconnexion.
+        <span class="prefix">issue (blocking, security):</span> Le token n'est jamais purgé du
+        stockage local à la déconnexion.
       </div>
     </div>
   </div>
@@ -371,8 +377,8 @@ footer code {
         <span class="badge-deco">a11y</span>
       </div>
       <div class="comment-text">
-        A-t-on mesuré l'impact de ce re-render sur la liste virtualisée avant de valider cette
-        approche ?
+        <span class="prefix">question (perf, ux, a11y):</span> A-t-on mesuré l'impact de ce
+        re-render sur la liste virtualisée avant de valider cette approche ?
       </div>
     </div>
   </div>
@@ -391,7 +397,8 @@ footer code {
         <span class="badge-deco custom">spike-follow-up</span>
       </div>
       <div class="comment-text">
-        On pourra creuser après le spike de la semaine dernière, pas bloquant maintenant.
+        <span class="prefix">nitpick (perf, spike-follow-up):</span> On pourra creuser après le
+        spike de la semaine dernière, pas bloquant maintenant.
       </div>
     </div>
   </div>
@@ -409,7 +416,8 @@ footer code {
         <span class="badge-deco nonblocking">if-minor</span>
       </div>
       <div class="comment-text">
-        Le message d'erreur pourrait être plus précis, à corriger seulement si c'est rapide.
+        <span class="prefix">nitpick (if-minor):</span> Le message d'erreur pourrait être plus
+        précis, à corriger seulement si c'est rapide.
       </div>
     </div>
   </div>
@@ -418,8 +426,8 @@ footer code {
     Style de base repris de <code>.cct-badge</code> (badge label : contour + couleur du label,
     fond transparent). Les badges décoration réutilisent la même forme en plus petit, en poids
     normal et sans couleur propre — seul <code>forces: "blocking"</code> déclenche le liseré
-    rouge. Le texte affiché n'inclut plus le préfixe structuré : c'est un choix délibéré qui
-    fait dépendre la lisibilité complète du commentaire de la présence de l'extension — à
-    trancher explicitement avant implémentation, pas juste une conséquence du rendu.
+    rouge. Le préfixe structuré reste visible dans le texte, sous les badges : masquer le
+    préfixe a été exploré puis écarté pour l'implémentation (packages/extension/src/ui/badges.ts)
+    — cette page ne montre donc que ce que le code livré rend réellement.
   </footer>
 </div>

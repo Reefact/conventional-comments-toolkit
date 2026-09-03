@@ -258,6 +258,11 @@ export class AzdoClientAdapter implements PlatformAdapter {
     return queryChainAll(this.#doc, selectors.commentBody).length;
   }
 
+  /** Les mêmes éléments sans leur `bodyText`, pour `ownOutputSignatureOf` — voir le même
+   * commentaire côté GithubClientAdapter. */
+  getRenderedCommentElements(): Element[] {
+    return queryChainAll(this.#doc, selectors.commentBody);
+  }
 
   /** Élément après lequel insérer le bandeau (§5.5) — surface d'affichage, hors du contrat
    * normatif §9.2.3. Null quand rien n'apparie : l'appelant se replie sur le haut du

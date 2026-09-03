@@ -369,6 +369,17 @@ export class GithubClientAdapter implements PlatformAdapter {
     return queryChainAll(this.#doc, selectors.commentBody).length;
   }
 
+  /** Les mêmes éléments, sans leur `bodyText` — pour la signature de NOTRE propre sortie
+   * (content-internal.ts, ownOutputSignatureOf), qui doit remarquer qu'un corps réécrit par
+   * la plateforme (mise à jour d'un commentaire) a emporté nos badges et notre masquage de
+   * préfixe. Même raison qu'au-dessus d'écarter `getRenderedComments()` : le clone qu'elle
+   * fait par commentaire décoré n'a pas à être payé à chaque mutation. Ces corps ne sont
+   * PAS un sous-ensemble de `getRenderedThreadElements()` : un commentaire de la
+   * conversation n'appartient à aucun fil de revue. */
+  getRenderedCommentElements(): Element[] {
+    return queryChainAll(this.#doc, selectors.commentBody);
+  }
+
   /** Élément après lequel insérer le bandeau (§5.5) — surface d'affichage, hors du contrat
    * normatif §9.2.3. Null quand rien n'apparie : l'appelant se replie sur le haut du
    * document plutôt que de ne rien afficher. */

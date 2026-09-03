@@ -297,6 +297,16 @@
   border-style: dashed;
 }
 
+/* Préfixe structuré masqué à l'affichage (§5.5) : son information est déjà portée, de façon
+   accessible (icône + texte, jamais la seule couleur, §10), par les badges posés juste avant
+   lui. `display: none`, pas `visibility: hidden` : aucune trace dans l'arbre d'accessibilité
+   non plus, pas de redondance pour un lecteur d'écran. Ne touche QUE ce nœud, purement côté
+   client (badges.ts, applyPrefixVisibility) : le texte stocké côté serveur reste intact, et
+   le formulaire d'édition d'un commentaire existant est un sous-arbre distinct du DOM de la
+   plateforme, jamais dérivé de celui-ci — rouvrir l'édition réaffiche donc tout le texte,
+   préfixe compris. */
+.cct-hidden-prefix { display: none; }
+
 .cct-merge-blocked { opacity: 0.5; }
 
 .cct-quick-list {

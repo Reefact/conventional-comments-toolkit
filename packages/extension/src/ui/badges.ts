@@ -177,6 +177,17 @@ function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
   return rawEnd;
 }
 
+/** Signale, depuis `firstTextNode()`, un abandon qui doit remonter jusqu'à la racine de la
+ * recherche — jamais retomber sur un nœud frère suivant. Un simple `null` ne le peut pas : il
+ * signifie déjà « rien trouvé dans cette branche, essayer la suivante », le sens normal et
+ * voulu pour un `.cct-badge` (notre propre décoration, le vrai contenu la suit) ou un nœud de
+ * texte purement blanc. `ABORT` porte le sens opposé et incompatible : « aucune conclusion de
+ * cette recherche ne serait fiable, n'en cherche pas d'autre » (revue Reefact, PR #40— un
+ * `return null` sur `<pre>` remonte, dans l'appelant, un `found` faux comme un autre, dont la
+ * boucle `if (found) return found;` poursuit alors sur le frère suivant : exactement le
+ * contraire de l'abandon voulu). */
+const ABORT = Symbol('firstTextNode.abort');
+
 /** Premier nœud de texte SIGNIFICATIF (au moins un caractère non blanc) du sous-arbre, en
  * profondeur — celui qui porte le début du corps réellement affiché. `.trim()`, pas une
  * simple longueur non nulle : le HTML rendu par GitHub porte une indentation entre la balise
@@ -192,25 +203,28 @@ function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
  * PEUT être celui d'un badge — son propre texte ("issue", "blocking"…) n'est jamais le corps
  * réel du commentaire.
  *
- * Renonce ENTIÈREMENT (retourne `null` sans chercher plus loin) dès qu'un `<pre>`/`<code>` se
- * présente avant tout texte significatif — jamais en le traversant pour atteindre un nœud
- * suivant (revue Reefact, PR #40) : `bodyText` vient de `commentBodyText()`, donc du DOM
- * RENDU, où les délimiteurs ``` de la source Markdown n'existent plus — `analyze()` (§3.4.1
- * étape 2, qui cherche ces délimiteurs littéralement) peut alors traiter à tort le contenu
- * d'un bloc de code comme la ligne de préfixe. Continuer la recherche au-delà risquerait de
- * masquer un fragment sans rapport qui commencerait, par coïncidence, de la même façon ; s'y
- * arrêter net évite en plus, et surtout, d'écrire quoi que ce soit DANS le code affiché. */
-function firstTextNode(node: Node): Text | null {
+ * Renonce ENTIÈREMENT (`ABORT`, jamais un simple `null` qui laisserait la recherche reprendre
+ * chez un frère suivant) dès qu'un `<pre>`/`<code>`/`<blockquote>` se présente avant tout texte
+ * significatif (revue Reefact, PR #40) : `bodyText` vient de `commentBodyText()`, donc du DOM
+ * RENDU, où les marqueurs Markdown que `splitBody()` (§3.4.1 étape 2 — `FENCE_RE`, ```` ``` ````
+ * ou `~~~`, et `QUOTE_RE`, `>`) écarte littéralement n'existent plus — `analyze()` peut alors
+ * traiter à tort le contenu d'un bloc de code ou d'une citation comme la ligne de préfixe.
+ * Continuer la recherche au-delà risquerait de masquer un fragment sans rapport qui
+ * commencerait, par coïncidence, de la même façon ; s'arrêter net évite en plus, et surtout,
+ * d'écrire quoi que ce soit DANS un bloc de code ou une citation affichés. Les deux seuls
+ * déclencheurs de cette étape d'écartement (aucun autre) : rien d'autre à couvrir ici. */
+function firstTextNode(node: Node): Text | typeof ABORT | null {
   if (node.nodeType === 3 /* Node.TEXT_NODE */) {
     return (node as Text).data.trim().length > 0 ? (node as Text) : null;
   }
   if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
     const element = node as Element;
     if (element.classList.contains('cct-badge')) return null;
-    if (element.tagName === 'PRE' || element.tagName === 'CODE') return null;
+    if (element.tagName === 'PRE' || element.tagName === 'CODE' || element.tagName === 'BLOCKQUOTE') return ABORT;
   }
   for (const child of node.childNodes) {
     const found = firstTextNode(child);
+    if (found === ABORT) return ABORT; // remonte l'abandon jusqu'à la racine, jamais un frère suivant
     if (found) return found;
   }
   return null;
@@ -276,7 +290,7 @@ function applyPrefixVisibility(commentBodyElement: Element, prefixLine: string |
   }
   if (existing) return;
   const first = firstTextNode(commentBodyElement);
-  if (!first) return;
+  if (!first || first === ABORT) return;
   const end = hiddenPrefixEnd(first.data, prefixLine);
   if (end === null) return;
   const trimmedHidden = first.data.slice(0, end).trim();

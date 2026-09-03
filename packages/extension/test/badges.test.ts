@@ -150,6 +150,35 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
   });
 
+  it('ne masque jamais à l’intérieur d’une citation — le marqueur ">" non plus n’existe plus dans le texte RENDU (revue Reefact, PR #40)', () => {
+    // Même mécanisme que pour un bloc de code : QUOTE_RE (§3.4.1 étape 2) écarte une ligne
+    // commençant par ">" dans la source, mais GitHub rend "> issue: fake" en
+    // <blockquote><p>issue: fake</p></blockquote> — le ">" a disparu du texte que
+    // commentBodyText() relit, donc analyze() le traite comme une ligne normale.
+    const el = document.createElement('div');
+    el.innerHTML = '<blockquote><p>issue: fake</p></blockquote><p>real subject, not a prefix</p>';
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('blockquote')?.textContent).toBe('issue: fake'); // la citation reste intacte
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+  });
+
+  it('un abandon sur bloc de code/citation ne doit PAS reprendre sur un frère suivant qui ressemble, lui aussi, à un préfixe (revue Reefact, PR #40)', () => {
+    // Le bug précis signalé : renoncer sur <pre>/<code> en retournant `null` remonte, dans
+    // l'appelant, un `found` faux comme un autre — sa boucle continue alors sur le frère
+    // suivant. Ici, ce frère (un second paragraphe) commence LUI AUSSI par "issue: ", par pure
+    // coïncidence : sans la propagation de l'abandon jusqu'à la racine, son "issue: " serait
+    // masqué sur la base d'une analyse faite du CODE, pas de ce paragraphe.
+    const el = document.createElement('div');
+    el.innerHTML = '<pre><code>issue: fake</code></pre><p>issue: also looks like a prefix, but is not the one analyzed</p>';
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+    expect(el.querySelector('p')?.textContent).toBe('issue: also looks like a prefix, but is not the one analyzed');
+  });
+
   it('masque le préfixe même quand une mise en forme inline suit dans le sujet (revue Reefact, PR #40)', () => {
     // `expectedPrefix` (label + décorations + ":" + blancs) ne doit exiger l'égalité qu'avec
     // CETTE portion, jamais avec la ligne entière : dès qu'un `code`/lien/gras/mention suit le

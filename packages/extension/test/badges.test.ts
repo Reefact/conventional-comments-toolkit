@@ -177,6 +177,47 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
   });
 
+  it('ne masque jamais à l’intérieur d’un élément de liste — la puce n’existe plus non plus dans le texte RENDU (revue Reefact, PR #40)', () => {
+    // Même mécanisme, une nouvelle fois : la source "- issue: fake" ne matcherait JAMAIS
+    // matchPrefix() (la ligne brute commence par "-", pas une lettre ni un émoji), mais GitHub
+    // rend une liste en <ul><li>issue: fake</li></ul> — la puce a disparu du texte que
+    // commentBodyText() relit, donc analyze() la traite comme une ligne normale.
+    const el = document.createElement('div');
+    el.innerHTML = '<ul><li>issue: fake</li></ul><p>real subject, not a prefix</p>';
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('li')?.textContent).toBe('issue: fake'); // l'élément de liste reste intact
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+  });
+
+  it('ne masque jamais à l’intérieur d’un titre — le "#" non plus n’existe plus dans le texte RENDU (revue Reefact, PR #40)', () => {
+    // "# issue: fake" ne matcherait pas non plus matchPrefix() sur la source brute (le "#" n'est
+    // ni une lettre ni un émoji), mais GitHub rend un titre en <h1>issue: fake</h1> — le "#" a
+    // disparu du texte rendu, exactement comme la puce d'une liste ou le ">" d'une citation.
+    const el = document.createElement('div');
+    el.innerHTML = '<h1>issue: fake</h1><p>real subject, not a prefix</p>';
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('h1')?.textContent).toBe('issue: fake'); // le titre reste intact
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+  });
+
+  it('ne masque jamais à l’intérieur d’un tableau — le "|" non plus n’existe plus dans le texte RENDU (revue Reefact, PR #40)', () => {
+    // Même famille de défaut que liste/titre/citation/code, pour un tableau GFM cette fois :
+    // "| issue: fake |" ne matcherait pas matchPrefix() sur la source brute ("|" n'est ni une
+    // lettre ni un émoji), mais le "|" a disparu du texte que commentBodyText() relit une fois
+    // rendu en <table><tbody><tr><td>issue: fake</td></tr></tbody></table>.
+    const el = document.createElement('div');
+    el.innerHTML = '<table><tbody><tr><td>issue: fake</td></tr></tbody></table><p>real subject, not a prefix</p>';
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('td')?.textContent).toBe('issue: fake'); // la cellule reste intacte
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+  });
+
   it('un abandon sur bloc de code/citation ne doit PAS reprendre sur un frère suivant qui ressemble, lui aussi, à un préfixe (revue Reefact, PR #40)', () => {
     // Le bug précis signalé : renoncer sur <pre>/<code> en retournant `null` remonte, dans
     // l'appelant, un `found` faux comme un autre — sa boucle continue alors sur le frère

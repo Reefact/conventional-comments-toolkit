@@ -203,6 +203,36 @@ function hiddenPrefixSpan(rawLine: string, prefixLine: string): { start: number;
  * contraire de l'abandon voulu). */
 const ABORT = Symbol('firstTextNode.abort');
 
+/** Tags correspondant à un CONSTRUCT DE BLOC Markdown dont la syntaxe de tête ne survit pas
+ * dans le texte RENDU — pas seulement le bloc de code et la citation : une liste (`- x` /
+ * `1. x` → `<li>`, puce/numéro perdu) et un titre (`# x` → `<h1>`, dièse perdu) suivent
+ * exactement le même mécanisme (revue Reefact, PR #40 — `- issue: fake` rendu en
+ * `<ul><li>issue: fake</li></ul>` faisait masquer `issue: ` DANS l'élément de liste). Un
+ * tableau GFM (`| issue: fake |`) suit le même principe, le `|` disparaissant de même.
+ *
+ * Fermé, pas amené à grossir au fil des cas rencontrés : CommonMark + GFM ne définissent
+ * qu'un nombre BORNÉ de constructs de bloc, et cet ensemble les couvre tous sauf un — le
+ * paragraphe, seul à n'avoir aucun marqueur de tête à perdre, en est donc délibérément
+ * absent. `UL`/`OL`/`TABLE` arrêtent la recherche au même titre que `LI` (ou une cellule)
+ * qu'ils contiennent : aucun texte n'est jamais un enfant DIRECT du groupe, seul le point
+ * d'arrêt le plus tôt rencontré importe — inutile d'énumérer aussi `TR`/`TD`/`TH`/`THEAD`/
+ * `TBODY`. */
+const LOST_MARKER_TAGS = new Set([
+  'PRE',
+  'CODE',
+  'BLOCKQUOTE',
+  'LI',
+  'UL',
+  'OL',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+  'TABLE',
+]);
+
 /** Premier nœud de texte SIGNIFICATIF (au moins un caractère non blanc) du sous-arbre, en
  * profondeur — celui qui porte le début du corps réellement affiché. `.trim()`, pas une
  * simple longueur non nulle : le HTML rendu par GitHub porte une indentation entre la balise
@@ -219,26 +249,33 @@ const ABORT = Symbol('firstTextNode.abort');
  * réel du commentaire.
  *
  * Renonce ENTIÈREMENT (`ABORT`, jamais un simple `null` qui laisserait la recherche reprendre
- * chez un frère suivant) dès qu'un `<pre>`/`<code>`/`<blockquote>` se présente avant tout texte
+ * chez un frère suivant) dès qu'un élément de `LOST_MARKER_TAGS` se présente avant tout texte
  * significatif (revue Reefact, PR #40) : `bodyText` vient de `commentBodyText()`, donc du DOM
- * RENDU, où les marqueurs Markdown que `splitBody()` (§3.4.1 étape 2 — `FENCE_RE`, ```` ``` ````
- * ou `~~~`, et `QUOTE_RE`, `>`) écarte littéralement n'existent plus — `analyze()` peut alors
- * traiter à tort le contenu d'un bloc de code ou d'une citation comme la ligne de préfixe.
- * Continuer la recherche au-delà risquerait de masquer un fragment sans rapport qui
- * commencerait, par coïncidence, de la même façon ; s'arrêter net évite en plus, et surtout,
- * d'écrire quoi que ce soit DANS un bloc de code ou une citation affichés. Les deux seuls
- * déclencheurs de cette étape d'écartement (aucun autre) : rien d'autre à couvrir ici. */
-function firstTextNode(node: Node): Text | typeof ABORT | null {
+ * RENDU, où la syntaxe de tête de ces constructs de bloc — ```` ``` ````/`~~~`/retrait de 4
+ * espaces d'un bloc de code, `>` d'une citation, puce/numéro d'une liste, `#` d'un titre, `|`
+ * d'un tableau — n'existe plus. `analyze()` peut alors traiter à tort ce contenu comme la
+ * ligne de préfixe, alors que la même ligne, lue sur la source BRUTE, ne commence jamais par
+ * une lettre ou un émoji et ne matcherait donc jamais `matchPrefix()`. Continuer la recherche
+ * au-delà risquerait de masquer un fragment sans rapport qui commencerait, par coïncidence, de
+ * la même façon ; s'arrêter net évite en plus, et surtout, d'écrire quoi que ce soit DANS l'un
+ * de ces constructs affiché.
+ *
+ * `isRoot` excepte uniquement l'appel de DÉPART de cette vérification : c'est le conteneur de
+ * commentaire de la PLATEFORME (`.comment-body`, un `<td>` sur GitHub réel), jamais lui-même
+ * un construct Markdown rendu — le soumettre à la même règle romprait la recherche pour
+ * CHAQUE commentaire le jour où son tag coïnciderait avec l'un de `LOST_MARKER_TAGS` (c'est
+ * déjà le cas de `<td>`, si une cellule de tableau y figurait un jour). */
+function firstTextNode(node: Node, isRoot = true): Text | typeof ABORT | null {
   if (node.nodeType === 3 /* Node.TEXT_NODE */) {
     return (node as Text).data.trim().length > 0 ? (node as Text) : null;
   }
   if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
     const element = node as Element;
     if (element.classList.contains('cct-badge')) return null;
-    if (element.tagName === 'PRE' || element.tagName === 'CODE' || element.tagName === 'BLOCKQUOTE') return ABORT;
+    if (!isRoot && LOST_MARKER_TAGS.has(element.tagName)) return ABORT;
   }
   for (const child of node.childNodes) {
-    const found = firstTextNode(child);
+    const found = firstTextNode(child, false);
     if (found === ABORT) return ABORT; // remonte l'abandon jusqu'à la racine, jamais un frère suivant
     if (found) return found;
   }

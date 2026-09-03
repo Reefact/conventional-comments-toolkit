@@ -108,12 +108,43 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.textContent).toContain('issue:');
   });
 
-  it('renonce quand une ligne vide précède le préfixe (hors du cas simple couvert)', () => {
+  it('avale une ligne vide en tête avec le préfixe, quand les deux vivent dans le même nœud de texte', () => {
     const body = '\nissue: fix this';
     const el = document.createElement('div');
-    el.textContent = body;
+    el.textContent = body; // un seul nœud de texte : "\nissue: " est un bandeau blanc unique
     decorateComment(el, body, defaultConfig(), profile, 'en');
 
-    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+    expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('\nissue: ');
+    expect(el.querySelector('.cct-hidden-prefix')?.nextSibling?.textContent).toBe('fix this');
+  });
+
+  it('masque le préfixe même quand il vit dans un <p> précédé d’un nœud de texte blanc FRÈRE (indentation GitHub réelle, PR #40)', () => {
+    // Mesuré sur une vraie page github.com, pas une supposition : `.comment-body` porte un nœud
+    // de texte "\n          " comme enfant DIRECT, avant le <p> qui contient le texte réel — un
+    // décalage calculé sur la chaîne CONCATÉNÉE (bodyText) aurait scindé le <p> une dizaine de
+    // caractères trop loin, corrompant le sujet, sans qu'aucun test à un seul nœud ne le voie.
+    const el = document.createElement('td');
+    el.innerHTML = '\n          <p dir="auto">issue (blocking, security): Manual rendering check.</p>\n';
+    const body = el.textContent!; // "\n          issue (blocking, security): Manual rendering check.\n"
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    const hidden = el.querySelector('.cct-hidden-prefix');
+    expect(hidden?.textContent).toBe('issue (blocking, security): ');
+    expect(hidden?.parentElement?.tagName).toBe('P'); // scindé DANS le <p>, pas dans le nœud blanc qui le précède
+    expect(hidden?.nextSibling?.textContent).toBe('Manual rendering check.');
+    expect(commentBodyText(el)).toBe(body); // le nœud blanc précédent, lui, n'a pas bougé
+  });
+
+  it('renonce quand le nœud de texte trouvé ne correspond pas à la ligne reconnue par analyze()', () => {
+    // Un bloc de code délimité est écarté par analyze() (§3.4.1 étape 2) mais reste le premier
+    // texte VISIBLE du DOM — s'il contenait par coïncidence un mot qui ressemble à un label,
+    // le nœud trouvé ne doit jamais être confondu avec la ligne réellement reconnue.
+    const el = document.createElement('div');
+    el.innerHTML = '<pre><code>issue tracker note</code></pre><p>issue: fix this</p>';
+    const body = '```\nissue tracker note\n```\nissue: fix this';
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull(); // le label est bien résolu…
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais rien n'est masqué pour autant
   });
 });

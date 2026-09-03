@@ -225,10 +225,6 @@ body {
   color: var(--text);
 }
 
-.comment-text .prefix {
-  color: var(--text-muted);
-}
-
 footer {
   margin-top: 48px;
   padding-top: 16px;
@@ -254,10 +250,12 @@ footer code {
       label à bordure colorée + icône — le texte, lui, reste toujours dans la couleur de premier
       plan par défaut, jamais dans la couleur du label —, et à sa droite, plus petits, sans fond
       et sans gras, les badges de décoration : liseré rouge quand la décoration force le
-      caractère bloquant, vert quand elle force le non-bloquant, incolore sinon. Le texte brut du
-      commentaire, préfixe <code>label (décorations):</code> compris, reste affiché tel quel sous
-      les badges — l'extension ne modifie jamais le contenu stocké côté serveur (§5.5) ; les
-      badges s'ajoutent, ils ne remplacent rien.
+      caractère bloquant, vert quand elle force le non-bloquant, incolore sinon. Le préfixe
+      structuré <code>label (décorations):</code> disparaît de l'affichage — les badges en
+      portent déjà l'information, de façon accessible — mais uniquement à l'écran : c'est un
+      nœud purement client, ajouté au rendu, qui ne touche jamais le texte stocké côté serveur
+      (§5.5). Revenir en édition réaffiche donc le texte complet, préfixe compris, puisque le
+      champ d'édition est un sous-arbre distinct du DOM, jamais dérivé de ce rendu.
     </p>
   </div>
 
@@ -281,7 +279,7 @@ footer code {
         <span class="badge-label" style="--cct-color: var(--label-praise)">🙌 praise</span>
       </div>
       <div class="comment-text">
-        <span class="prefix">praise:</span> The decision is now both rigorous and appropriately
+        The decision is now both rigorous and appropriately
         scoped. I have no remaining design blocker on this PR.
       </div>
     </div>
@@ -300,7 +298,7 @@ footer code {
         <span class="badge-deco blocking">blocking</span>
       </div>
       <div class="comment-text">
-        <span class="prefix">issue (blocking):</span> Le nom de la fonction est ambigu, il entre
+        Le nom de la fonction est ambigu, il entre
         en collision avec le label du module voisin.
       </div>
     </div>
@@ -319,7 +317,7 @@ footer code {
         <span class="badge-deco nonblocking">non-blocking</span>
       </div>
       <div class="comment-text">
-        <span class="prefix">suggestion (non-blocking):</span> On pourrait extraire cette
+        On pourrait extraire cette
         validation dans une fonction partagée, à voir si ça vaut le coup ici.
       </div>
     </div>
@@ -338,7 +336,7 @@ footer code {
         <span class="badge-deco">a11y</span>
       </div>
       <div class="comment-text">
-        <span class="prefix">nitpick (a11y):</span> Ce bouton n'a pas de <code>aria-label</code>,
+        Ce bouton n'a pas de <code>aria-label</code>,
         l'icône seule ne suffit pas au lecteur d'écran.
       </div>
     </div>
@@ -358,7 +356,7 @@ footer code {
         <span class="badge-deco">security</span>
       </div>
       <div class="comment-text">
-        <span class="prefix">issue (blocking, security):</span> Le token n'est jamais purgé du
+        Le token n'est jamais purgé du
         stockage local à la déconnexion.
       </div>
     </div>
@@ -379,7 +377,7 @@ footer code {
         <span class="badge-deco">a11y</span>
       </div>
       <div class="comment-text">
-        <span class="prefix">question (perf, ux, a11y):</span> A-t-on mesuré l'impact de ce
+        A-t-on mesuré l'impact de ce
         re-render sur la liste virtualisée avant de valider cette approche ?
       </div>
     </div>
@@ -399,7 +397,7 @@ footer code {
         <span class="badge-deco custom">spike-follow-up</span>
       </div>
       <div class="comment-text">
-        <span class="prefix">nitpick (perf, spike-follow-up):</span> On pourra creuser après le
+        On pourra creuser après le
         spike de la semaine dernière, pas bloquant maintenant.
       </div>
     </div>
@@ -418,7 +416,7 @@ footer code {
         <span class="badge-deco nonblocking">if-minor</span>
       </div>
       <div class="comment-text">
-        <span class="prefix">nitpick (if-minor):</span> Le message d'erreur pourrait être plus
+        Le message d'erreur pourrait être plus
         précis, à corriger seulement si c'est rapide.
       </div>
     </div>
@@ -430,8 +428,11 @@ footer code {
     dont le contraste sur la page n'est pas garanti, §10 —, fond transparent). Les badges
     décoration réutilisent la même forme en plus petit, en poids normal et sans couleur propre —
     <code>forces: "blocking"</code> déclenche le liseré rouge, <code>forces: "non-blocking"</code>
-    le liseré vert. Le préfixe structuré reste visible dans le texte, sous les badges : masquer le
-    préfixe a été exploré puis écarté pour l'implémentation (packages/extension/src/ui/badges.ts)
-    — cette page ne montre donc que ce que le code livré rend réellement.
+    le liseré vert. Le préfixe structuré est retiré de l'affichage par
+    <code>applyPrefixVisibility()</code> (packages/extension/src/ui/badges.ts) quand il tient
+    entièrement dans le premier nœud de texte du commentaire ; sinon (mise en forme imbriquée
+    avant le « : », BOM interne, sujet vide) le rendu y renonce et laisse le texte complet
+    visible plutôt que de risquer une coupure au mauvais endroit — cette page ne montre donc que
+    le cas le plus courant, pas les replis défensifs.
   </footer>
 </div>

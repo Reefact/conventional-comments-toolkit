@@ -189,7 +189,7 @@ body {
   padding: 2px 9px;
   border-radius: 999px;
   border: 1px solid var(--cct-color, var(--border));
-  color: var(--cct-color, var(--text));
+  color: var(--text);
   background: transparent;
 }
 
@@ -251,16 +251,18 @@ footer code {
     <h1>Badge de label vs badges de décoration</h1>
     <p>
       Huit commentaires publiés, tels que rendus par <code>decorateComment()</code> : un badge
-      label plein contour + icône, et à sa droite, plus petits, sans fond et sans gras, les
-      badges de décoration — liseré rouge uniquement quand la décoration force le caractère
-      bloquant. Le texte brut du commentaire, préfixe <code>label (décorations):</code> compris,
-      reste affiché tel quel sous les badges — l'extension ne modifie jamais le contenu stocké
-      côté serveur (§5.5) ; les badges s'ajoutent, ils ne remplacent rien.
+      label à bordure colorée + icône — le texte, lui, reste toujours dans la couleur de premier
+      plan par défaut, jamais dans la couleur du label —, et à sa droite, plus petits, sans fond
+      et sans gras, les badges de décoration : liseré rouge quand la décoration force le
+      caractère bloquant, vert quand elle force le non-bloquant, incolore sinon. Le texte brut du
+      commentaire, préfixe <code>label (décorations):</code> compris, reste affiché tel quel sous
+      les badges — l'extension ne modifie jamais le contenu stocké côté serveur (§5.5) ; les
+      badges s'ajoutent, ils ne remplacent rien.
     </p>
   </div>
 
   <div class="legend">
-    <div class="legend-item"><span class="badge-label" style="--cct-color: var(--label-issue)">🐛 issue</span> badge label — plein contour, coloré, icône</div>
+    <div class="legend-item"><span class="badge-label" style="--cct-color: var(--label-issue)">🐛 issue</span> badge label — bordure colorée, texte par défaut, icône</div>
     <div class="legend-item"><span class="badge-deco blocking">blocking</span> porteuse, force bloquant — rouge</div>
     <div class="legend-item"><span class="badge-deco nonblocking">non-blocking</span> porteuse, force non-bloquant — vert</div>
     <div class="legend-item"><span class="badge-deco">perf</span> connue, déclarée dans <code>decorations.known</code></div>
@@ -423,10 +425,12 @@ footer code {
   </div>
 
   <footer>
-    Style de base repris de <code>.cct-badge</code> (badge label : contour + couleur du label,
-    fond transparent). Les badges décoration réutilisent la même forme en plus petit, en poids
-    normal et sans couleur propre — seul <code>forces: "blocking"</code> déclenche le liseré
-    rouge. Le préfixe structuré reste visible dans le texte, sous les badges : masquer le
+    Style de base repris de <code>.cct-badge</code> (badge label : bordure dans la couleur du
+    label, texte dans la couleur de premier plan par défaut — jamais dans la couleur du label,
+    dont le contraste sur la page n'est pas garanti, §10 —, fond transparent). Les badges
+    décoration réutilisent la même forme en plus petit, en poids normal et sans couleur propre —
+    <code>forces: "blocking"</code> déclenche le liseré rouge, <code>forces: "non-blocking"</code>
+    le liseré vert. Le préfixe structuré reste visible dans le texte, sous les badges : masquer le
     préfixe a été exploré puis écarté pour l'implémentation (packages/extension/src/ui/badges.ts)
     — cette page ne montre donc que ce que le code livré rend réellement.
   </footer>

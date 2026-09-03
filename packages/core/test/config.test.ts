@@ -53,6 +53,66 @@ describe('§8.2 — valeurs par défaut du produit', () => {
     const colors = c.labels.map((l) => l.color);
     expect(new Set(colors).size).toBe(colors.length);
   });
+
+  // Garde de contraste (issue #18, review PR #41) : un premier choix de palette satisfaisait
+  // « forme hexadécimale + unicité » (test ci-dessus) tout en étant proche de l'invisible en
+  // thème sombre — jusqu'à 1,23:1 pour une teinte contre le fond réel d'un bouton Primer non
+  // pressé en thème dark-dimmed. Ni la forme ni l'unicité ne peuvent attraper ça ; seul un
+  // calcul de contraste le peut, donc c'en est un.
+  //
+  // Fonds mesurés en DIRECT sur github.com (light.css/dark.css/dark_dimmed.css réels, servis
+  // sous les mêmes attributs data-color-mode/data-light-theme/data-dark-theme que la page
+  // elle-même applique) le 2026-09-03 — jamais recopiés d'un chiffre cité ailleurs sans
+  // vérification. `--button-default-bgColor-rest` résout vers `--control-bgColor-rest` ;
+  // « canvas » et « muted » sont les fonds candidats les plus proches pour `.cct-badge`, qui
+  // n'a pas de fond propre et prend celui du conteneur de commentaire qui le porte. Ces 9
+  // fonds sont ceux de l'état NON pressé de `.cct-label-button` et de `.cct-badge` — l'état
+  // pressé (fond `--bgColor-accent-emphasis`, un bleu d'emphase) n'y satisfait aucune teinte
+  // possible en nombre suffisant pour rester une palette de treize couleurs distinctes, et
+  // n'est donc délibérément pas gardé ici (cf. commentaire de defaults.ts).
+  const GITHUB_PRIMER_BACKGROUNDS: Record<string, string> = {
+    'light/canvas': '#ffffff',
+    'light/muted': '#f6f8fa',
+    'light/button-rest': '#f6f8fa',
+    'dark/canvas': '#0d1117',
+    'dark/muted': '#151b23',
+    'dark/button-rest': '#212830',
+    'dimmed/canvas': '#212830',
+    'dimmed/muted': '#262c36',
+    'dimmed/button-rest': '#2a313c',
+  };
+
+  // Luminance relative et ratio de contraste — formule WCAG 2.1 telle quelle (pas de
+  // bibliothèque : quatre lignes, et l'auto-test ci-dessous vaut vérification directe).
+  function srgbToLinear(c: number): number {
+    const cs = c / 255;
+    return cs <= 0.03928 ? cs / 12.92 : Math.pow((cs + 0.055) / 1.055, 2.4);
+  }
+  function relativeLuminance(hex: string): number {
+    const n = parseInt(hex.slice(1), 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(srgbToLinear);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function contrastRatio(hexA: string, hexB: string): number {
+    const [la, lb] = [relativeLuminance(hexA), relativeLuminance(hexB)];
+    const [lighter, darker] = la > lb ? [la, lb] : [lb, la];
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  it('la formule de contraste elle-même est correcte (auto-test, valeurs de référence connues)', () => {
+    expect(contrastRatio('#000000', '#ffffff')).toBeCloseTo(21, 1);
+    expect(contrastRatio('#4C2889', '#4C2889')).toBeCloseTo(1, 5);
+  });
+
+  it('la bordure colorée de chaque label reste perceptible sur les fonds Primer clair/sombre/dark-dimmed (§10, issue #18) — WCAG 2.1 SC 1.4.11, 3:1', () => {
+    const c = defaultConfig();
+    for (const l of c.labels) {
+      for (const [bgName, bg] of Object.entries(GITHUB_PRIMER_BACKGROUNDS)) {
+        const ratio = contrastRatio(l.color!, bg);
+        expect(ratio, `${l.id} (${l.color}) contre ${bgName} (${bg}) : ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
 });
 
 describe('§8.1.2 / §8.1.4 — précédence et fusion', () => {

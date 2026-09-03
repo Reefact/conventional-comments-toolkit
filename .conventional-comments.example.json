@@ -3,7 +3,7 @@
   "version": 1,
   "mode": "assist",
   "labels": [
-    { "id": "issue", "enabled": true, "blockingByDefault": true, "alwaysNonBlocking": false, "icon": "🔨", "color": "#B3261E", "aliases": ["bug"] },
+    { "id": "issue", "enabled": true, "blockingByDefault": true, "alwaysNonBlocking": false, "icon": "🔨", "color": "#E04E45", "aliases": ["bug"] },
     { "id": "nitpick", "enabled": true, "blockingByDefault": false, "alwaysNonBlocking": true },
     { "id": "decision", "enabled": true, "blockingByDefault": false, "alwaysNonBlocking": true },
     { "id": "typo", "enabled": false, "blockingByDefault": false }

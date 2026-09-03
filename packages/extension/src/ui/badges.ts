@@ -203,49 +203,6 @@ function hiddenPrefixSpan(rawLine: string, prefixLine: string): { start: number;
  * contraire de l'abandon voulu). */
 const ABORT = Symbol('firstTextNode.abort');
 
-/** Tags correspondant à un CONSTRUCT DE BLOC Markdown, OU À UN ÉLÉMENT HTML BRUT documenté
- * comme syntaxe de commentaire valide par GitHub, dont la syntaxe de tête ne survit pas dans
- * le texte RENDU — pas seulement le bloc de code et la citation : une liste (`- x` / `1. x` →
- * `<li>`, puce/numéro perdu), un titre (`# x` → `<h1>`, dièse perdu) et une section repliable
- * (`<details>\n<summary>x</summary>...`, balises perdues) suivent exactement le même
- * mécanisme (revue Reefact, PR #40 — `- issue: fake` rendu en `<ul><li>issue: fake</li></ul>`
- * faisait masquer `issue: ` DANS l'élément de liste). Un tableau GFM (`| issue: fake |`) suit
- * le même principe, le `|` disparaissant de même.
- *
- * PAS un ensemble fermé pour autant (revue Reefact, PR #40 — corrigeant une affirmation trop
- * forte tenue ici même) : GitHub accepte du HTML brut sanitisé au milieu du Markdown, un
- * espace que cette énumération ne peut jamais clore complètement — `DETAILS`/`SUMMARY` en est
- * un exemple documenté, pas la preuve que la liste couvre désormais tout ce que GitHub
- * autorise. `UL`/`OL`/`TABLE` arrêtent la recherche au même titre que `LI` (ou une cellule)
- * qu'ils contiennent : aucun texte n'est jamais un enfant DIRECT du groupe, seul le point
- * d'arrêt le plus tôt rencontré importe — inutile d'énumérer aussi `TR`/`TD`/`TH`/`THEAD`/
- * `TBODY`.
- *
- * Une limite RESTE hors de portée de toute liste de tags, aussi complète soit-elle : une
- * ligne Markdown qui ne produit AUCUN nœud dans le rendu (définition de référence de lien
- * `[ref]: /url`, commentaire HTML `<!-- ... -->`) ne laisse tout simplement rien à intercepter
- * — voir la note de `firstTextNode()` à ce sujet, ce n'est pas un défaut de CETTE liste mais
- * une limite structurelle de toute analyse fondée sur le DOM rendu (comme l'angle mort de
- * `analyze()` sur un bloc de code sans fences, déjà noté plus haut — préexistant, hors
- * périmètre du masquage lui-même). */
-const LOST_MARKER_TAGS = new Set([
-  'PRE',
-  'CODE',
-  'BLOCKQUOTE',
-  'LI',
-  'UL',
-  'OL',
-  'H1',
-  'H2',
-  'H3',
-  'H4',
-  'H5',
-  'H6',
-  'TABLE',
-  'DETAILS',
-  'SUMMARY',
-]);
-
 /** Premier nœud de texte SIGNIFICATIF (au moins un caractère non blanc) du sous-arbre, en
  * profondeur — celui qui porte le début du corps réellement affiché. `.trim()`, pas une
  * simple longueur non nulle : le HTML rendu par GitHub porte une indentation entre la balise
@@ -262,37 +219,48 @@ const LOST_MARKER_TAGS = new Set([
  * réel du commentaire.
  *
  * Renonce ENTIÈREMENT (`ABORT`, jamais un simple `null` qui laisserait la recherche reprendre
- * chez un frère suivant) dès qu'un élément de `LOST_MARKER_TAGS` se présente avant tout texte
- * significatif (revue Reefact, PR #40) : `bodyText` vient de `commentBodyText()`, donc du DOM
- * RENDU, où la syntaxe de tête de ces constructs de bloc — ```` ``` ````/`~~~`/retrait de 4
- * espaces d'un bloc de code, `>` d'une citation, puce/numéro d'une liste, `#` d'un titre, `|`
- * d'un tableau — n'existe plus. `analyze()` peut alors traiter à tort ce contenu comme la
- * ligne de préfixe, alors que la même ligne, lue sur la source BRUTE, ne commence jamais par
- * une lettre ou un émoji et ne matcherait donc jamais `matchPrefix()`. Continuer la recherche
- * au-delà risquerait de masquer un fragment sans rapport qui commencerait, par coïncidence, de
- * la même façon ; s'arrêter net évite en plus, et surtout, d'écrire quoi que ce soit DANS l'un
- * de ces constructs affiché.
+ * chez un frère suivant) dès que le PREMIER niveau d'élément rencontré n'est pas un `<p>`, ou
+ * qu'un DEUXIÈME niveau apparaît avant tout texte significatif — une ALLOW-LIST, pas une
+ * deny-list (revue Reefact, PR #40, qui a fait tomber trois versions successives de cette
+ * dernière : une énumération explicite de constructs de bloc — `PRE`/`CODE`/`BLOCKQUOTE`/`LI`/
+ * `UL`/`OL`/`H1`-`H6`/`TABLE` —, étendue à `DETAILS`/`SUMMARY` pour couvrir aussi le HTML brut
+ * documenté par GitHub, puis à une règle de profondeur pour couvrir en plus le Markdown INLINE
+ * — gras, lien, emphase — dont l'ensemble de tags concevables est ouvert ; il restait pourtant
+ * un HTML brut de PREMIER niveau non couvert, `<div>issue: fake</div>` rendu littéralement en
+ * `<div>issue: fake</div>`, `DIV` n'étant dans AUCUNE version de la deny-list. Aucune de ces
+ * trois versions n'était fausse dans ce qu'elle couvrait — chacune ratait seulement un membre
+ * de plus d'un ensemble qui n'est, de fait, jamais fermé : GitHub accepte du HTML brut
+ * sanitisé arbitraire en tête de commentaire, pas seulement les quelques constructs Markdown
+ * ou HTML déjà rencontrés en revue.
  *
- * `depth` referme le trou que `LOST_MARKER_TAGS` seule ne pouvait pas fermer (revue Reefact,
- * PR #40) : une mise en forme Markdown INLINE — gras, italique, lien — perd sa syntaxe de tête
- * exactement de la même façon (`**issue: fake**` → `<strong>issue: fake</strong>`, le `**`
- * disparu de `textContent`) mais avec un nombre de tags potentiels ouvert (STRONG, EM, A, DEL,
- * du HTML brut arbitraire…) qu'aucune liste ne peut jamais clore — le défaut même que la
- * doc de `LOST_MARKER_TAGS` reconnaît ci-dessus. Plutôt que d'y ajouter des tags un par un,
- * la recherche n'autorise qu'UN SEUL niveau d'élément entre la racine et le texte : celui du
- * conteneur de ligne (typiquement le `<p>` du rendu Markdown, ou la racine elle-même). Un
- * second niveau — qu'il s'agisse d'un tag de `LOST_MARKER_TAGS` ou de n'importe quel autre —
- * ABORT, quel que soit son nom : le texte "issue: use `Foo`" (finding #1, plus haut) reste
- * accepté parce que son PREMIER nœud de texte, "issue: use ", est un enfant DIRECT du `<p>` —
- * `<code>Foo</code>` le suit en frère, jamais en ancêtre.
+ * `<p>` est le seul conteneur dont on sait, MESURÉ à plusieurs reprises sur github.com (pas
+ * supposé), qu'il enveloppe une ligne de texte Markdown ordinaire sans y avoir consommé de
+ * syntaxe de tête — le paragraphe n'a lui-même aucun marqueur à perdre. Tout le reste (bloc de
+ * code, citation, liste, titre, tableau, section repliable, `<div>` ou tout autre HTML brut, ou
+ * une seconde balise imbriquée sous ce `<p>` — gras, lien, emphase…) est refusé, sans avoir
+ * besoin d'en connaître le nom : `bodyText` vient de `commentBodyText()`, donc du DOM RENDU, où
+ * la syntaxe de tête d'un construct qui N'EST PAS un paragraphe simple a de bonnes chances
+ * d'avoir disparu, et `analyze()` peut alors traiter à tort ce contenu comme la ligne de
+ * préfixe alors que la même ligne, lue sur la source BRUTE, ne matcherait jamais
+ * `matchPrefix()`. S'arrêter net évite, en plus d'une correspondance fausse, d'écrire quoi que
+ * ce soit DANS un tel élément affiché — le texte "issue: use `Foo`" (finding #1, plus haut)
+ * reste accepté parce que son PREMIER nœud de texte, "issue: use ", est un enfant DIRECT du
+ * `<p>` ; `<code>Foo</code>` le suit en frère, jamais en ancêtre.
  *
- * `isRoot` excepte uniquement l'appel de DÉPART de cette vérification (tags ET profondeur) :
- * c'est le conteneur de commentaire de la PLATEFORME (`.comment-body`, un `<td>` sur GitHub
- * réel), jamais lui-même un construct Markdown rendu — le soumettre à la même règle romprait
- * la recherche pour CHAQUE commentaire le jour où son tag coïnciderait avec l'un de
- * `LOST_MARKER_TAGS` (c'est déjà le cas de `<td>`, si une cellule de tableau y figurait un
- * jour), ou compterait le conteneur de la plateforme lui-même comme le premier niveau
- * autorisé, privant le VRAI premier niveau (le `<p>` du rendu Markdown) du sien. */
+ * N'exclut PAS de renoncer aussi sur des plateformes ou des DOM légitimes qu'aucune mesure
+ * n'a encore couverts (Azure DevOps, notamment — jamais vérifié en direct dans ce dépôt) : mais
+ * y renoncer est TOUJOURS l'issue sûre (§9.4, CA-11 — dégradation silencieuse, jamais un
+ * blocage de l'usage normal) puisque le masquage n'est qu'un affinage cosmétique du rendu
+ * (§5.5) — son absence laisse le texte complet visible, jamais corrompu. Élargir cette
+ * allow-list à un autre tag qu'un jour mesuré confirmerait coûte une ligne ; la resserrer après
+ * l'avoir élargie à tort, une fois qu'un utilisateur a vu un texte corrompu, ne coûte jamais
+ * rien de comparable.
+ *
+ * `isRoot` excepte uniquement l'appel de DÉPART de cette vérification : c'est le conteneur de
+ * commentaire de la PLATEFORME (`.comment-body`, un `<td>` sur GitHub réel), jamais lui-même
+ * un `<p>` de rendu Markdown — le soumettre à la même règle romprait la recherche pour CHAQUE
+ * commentaire (`<td>` n'est pas `<p>`), et compterait à tort le conteneur de la plateforme
+ * comme le premier niveau autorisé, privant le VRAI premier niveau du sien. */
 function firstTextNode(node: Node, isRoot = true, depth = 0): Text | typeof ABORT | null {
   if (node.nodeType === 3 /* Node.TEXT_NODE */) {
     return (node as Text).data.trim().length > 0 ? (node as Text) : null;
@@ -300,7 +268,7 @@ function firstTextNode(node: Node, isRoot = true, depth = 0): Text | typeof ABOR
   if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
     const element = node as Element;
     if (element.classList.contains('cct-badge')) return null;
-    if (!isRoot && (LOST_MARKER_TAGS.has(element.tagName) || depth >= 1)) return ABORT;
+    if (!isRoot && (depth >= 1 || element.tagName !== 'P')) return ABORT;
   }
   const nextDepth = isRoot ? depth : depth + 1;
   for (const child of node.childNodes) {

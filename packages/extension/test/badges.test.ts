@@ -233,6 +233,23 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
   });
 
+  it('ne masque jamais à l’intérieur d’un <div> — du HTML brut de premier niveau, jamais un préfixe dans la source (revue Reefact, PR #40)', () => {
+    // "<div>issue: fake</div>" écrit tel quel dans un commentaire : la source commence par "<",
+    // jamais une lettre ni un émoji, donc jamais un préfixe. GitHub sanitise mais conserve <div>
+    // dans le rendu — contrairement à LI/H1/TABLE/DETAILS, DIV ne correspond à AUCUN construct
+    // Markdown ni à aucune syntaxe de tête perdue : c'est littéralement ce que l'auteur a écrit,
+    // au premier niveau, sans qu'aucune deny-list n'ait jamais pu l'anticiper. Seule une
+    // allow-list du premier niveau (uniquement <p>, seul conteneur mesuré comme fidèle à une
+    // ligne Markdown ordinaire) le refuse structurellement, sans avoir besoin de connaître DIV.
+    const el = document.createElement('div');
+    el.innerHTML = '<div>issue: fake</div><p>real subject, not a prefix</p>';
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector(':scope > div')?.textContent).toBe('issue: fake'); // le <div> reste intact
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+  });
+
   it('masque normalement quand une ligne Markdown SANS AUCUNE TRACE DOM précède le vrai préfixe (revue Reefact, PR #40)', () => {
     // Cas structurellement différent de LI/H1/TABLE/DETAILS ci-dessus, délibérément traité
     // autrement : une définition de référence de lien ("[ref]: /url") ou un commentaire HTML
@@ -270,10 +287,11 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     // "**issue: fake**" ne matcherait pas non plus matchPrefix() sur la source brute (elle
     // commence par "*", ni une lettre ni un émoji), mais GitHub la rend en
     // <p><strong>issue: fake</strong></p> : les "**" ont disparu du texte RENDU, laissant le
-    // texte en gras "issue: fake" sembler être la première ligne. Contrairement à LI/H1/TABLE/
-    // DETAILS, aucune deny-list de tags ne peut fermer ce trou (STRONG, EM, A, DEL… une liste
-    // ouverte) — d'où la règle de PROFONDEUR : le texte doit être un enfant DIRECT du <p>,
-    // jamais niché un niveau plus loin, quel que soit le tag de ce niveau supplémentaire.
+    // texte en gras "issue: fake" sembler être la première ligne. Même mécanisme désormais que
+    // pour liste/titre/tableau/résumé ci-dessus — une allow-list, pas une deny-list : le texte
+    // doit être un enfant DIRECT du <p>, jamais niché un niveau plus loin, quel que soit le tag
+    // de ce niveau supplémentaire (STRONG ici, mais EM/A/DEL/n'importe quel autre tag inline
+    // échoueraient de la même façon, sans avoir besoin d'être nommés un par un).
     const el = document.createElement('div');
     el.innerHTML = '<p><strong>issue: fake</strong></p><p>real subject, not a prefix</p>';
     const body = commentBodyText(el);

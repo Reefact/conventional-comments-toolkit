@@ -144,13 +144,32 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   // Le SEUL état de la barre. Il ne s'écrit qu'en un endroit : `selectorFor()`.
   let decoration: DecorationState = { origin: 'pending', ids: [] };
 
-  // Un bouton par label, avec icône, libellé et couleur distincts (§5.1).
+  // Un bouton par label, avec libellé et couleur distincts (§5.1) — mais SANS son icône,
+  // délibérément, là où le badge d'un commentaire publié la garde (badges.ts, `labelBadge()`).
+  //
+  // Les deux surfaces n'ont pas la même contrainte de place. Un badge est SEUL en tête de son
+  // commentaire : l'icône y est un repère qui ne coûte rien, et c'est ce que montre le mockup
+  // de référence (docs/badges-decoration-mockup.html). Les boutons, eux, sont une RANGÉE — dix
+  // dans la configuration par défaut, treize si les labels optionnels sont activés (§3.2) —
+  // posée au-dessus du sélecteur de décoration, et ce qu'un bouton prend en largeur, il le
+  // prend à tous les autres. Sur la largeur d'une boîte de commentaire GitHub, ces icônes
+  // suffisaient à renvoyer le dernier label à la ligne suivante, où il se mêlait alors aux
+  // segments de décoration : deux commandes de natures différentes sur une même rangée, pour un
+  // repère dont le texte du bouton dit déjà tout (retour utilisateur, capture à l'appui).
+  // Mesuré dans Chromium sur cette barre-ci, hors github.com (pile de polices système, donc
+  // l'ordre de grandeur et non le pixel) : les dix boutons par défaut passent de 762 à 579 px
+  // cumulés, et la largeur en dessous de laquelle la rangée se casse tombe de ~816 à ~633 px.
+  //
+  // L'accessibilité ne perd rien : l'information est portée par le TEXTE, jamais par la couleur
+  // seule (§10), et l'infobulle ci-dessous porte définition et exemple. Le §5.1 écrit encore
+  // « avec icône » : c'est un écart assumé avec la spécification normative, à y reporter par
+  // une PR qui ne touche QU'ELLE (garde `conformance.yml`).
   for (const label of enabledLabels(opts.config)) {
     const button = doc.createElement('button');
     button.type = 'button';
     button.className = 'cct-label-button';
     button.dataset['label'] = label.id;
-    button.textContent = `${label.icon ?? ''} ${label.id}`.trim();
+    button.textContent = label.id;
     if (label.color) button.style.setProperty('--cct-label-color', label.color);
     // Infobulle : définition + exemple, dans la langue de l'interface (§5.1).
     const description = ui(opts.lang, `label.${label.id}`);

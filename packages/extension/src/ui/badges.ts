@@ -203,20 +203,31 @@ function hiddenPrefixSpan(rawLine: string, prefixLine: string): { start: number;
  * contraire de l'abandon voulu). */
 const ABORT = Symbol('firstTextNode.abort');
 
-/** Tags correspondant à un CONSTRUCT DE BLOC Markdown dont la syntaxe de tête ne survit pas
- * dans le texte RENDU — pas seulement le bloc de code et la citation : une liste (`- x` /
- * `1. x` → `<li>`, puce/numéro perdu) et un titre (`# x` → `<h1>`, dièse perdu) suivent
- * exactement le même mécanisme (revue Reefact, PR #40 — `- issue: fake` rendu en
- * `<ul><li>issue: fake</li></ul>` faisait masquer `issue: ` DANS l'élément de liste). Un
- * tableau GFM (`| issue: fake |`) suit le même principe, le `|` disparaissant de même.
+/** Tags correspondant à un CONSTRUCT DE BLOC Markdown, OU À UN ÉLÉMENT HTML BRUT documenté
+ * comme syntaxe de commentaire valide par GitHub, dont la syntaxe de tête ne survit pas dans
+ * le texte RENDU — pas seulement le bloc de code et la citation : une liste (`- x` / `1. x` →
+ * `<li>`, puce/numéro perdu), un titre (`# x` → `<h1>`, dièse perdu) et une section repliable
+ * (`<details>\n<summary>x</summary>...`, balises perdues) suivent exactement le même
+ * mécanisme (revue Reefact, PR #40 — `- issue: fake` rendu en `<ul><li>issue: fake</li></ul>`
+ * faisait masquer `issue: ` DANS l'élément de liste). Un tableau GFM (`| issue: fake |`) suit
+ * le même principe, le `|` disparaissant de même.
  *
- * Fermé, pas amené à grossir au fil des cas rencontrés : CommonMark + GFM ne définissent
- * qu'un nombre BORNÉ de constructs de bloc, et cet ensemble les couvre tous sauf un — le
- * paragraphe, seul à n'avoir aucun marqueur de tête à perdre, en est donc délibérément
- * absent. `UL`/`OL`/`TABLE` arrêtent la recherche au même titre que `LI` (ou une cellule)
+ * PAS un ensemble fermé pour autant (revue Reefact, PR #40 — corrigeant une affirmation trop
+ * forte tenue ici même) : GitHub accepte du HTML brut sanitisé au milieu du Markdown, un
+ * espace que cette énumération ne peut jamais clore complètement — `DETAILS`/`SUMMARY` en est
+ * un exemple documenté, pas la preuve que la liste couvre désormais tout ce que GitHub
+ * autorise. `UL`/`OL`/`TABLE` arrêtent la recherche au même titre que `LI` (ou une cellule)
  * qu'ils contiennent : aucun texte n'est jamais un enfant DIRECT du groupe, seul le point
  * d'arrêt le plus tôt rencontré importe — inutile d'énumérer aussi `TR`/`TD`/`TH`/`THEAD`/
- * `TBODY`. */
+ * `TBODY`.
+ *
+ * Une limite RESTE hors de portée de toute liste de tags, aussi complète soit-elle : une
+ * ligne Markdown qui ne produit AUCUN nœud dans le rendu (définition de référence de lien
+ * `[ref]: /url`, commentaire HTML `<!-- ... -->`) ne laisse tout simplement rien à intercepter
+ * — voir la note de `firstTextNode()` à ce sujet, ce n'est pas un défaut de CETTE liste mais
+ * une limite structurelle de toute analyse fondée sur le DOM rendu (comme l'angle mort de
+ * `analyze()` sur un bloc de code sans fences, déjà noté plus haut — préexistant, hors
+ * périmètre du masquage lui-même). */
 const LOST_MARKER_TAGS = new Set([
   'PRE',
   'CODE',
@@ -231,6 +242,8 @@ const LOST_MARKER_TAGS = new Set([
   'H5',
   'H6',
   'TABLE',
+  'DETAILS',
+  'SUMMARY',
 ]);
 
 /** Premier nœud de texte SIGNIFICATIF (au moins un caractère non blanc) du sous-arbre, en

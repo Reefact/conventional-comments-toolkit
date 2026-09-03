@@ -17,6 +17,7 @@ import {
   normalizePrefixLine,
   parseDecorations,
   type CommentAnalysis,
+  type Diagnostic,
   type EffectiveConfig,
   type PlatformProfile,
   type ResolvedDecoration,
@@ -239,8 +240,21 @@ function firstTextNode(node: Node): Text | typeof ABORT | null {
  * le texte ferait disparaître une information — la décoration rejetée, ou le nom d'une
  * décoration repliée — que les badges affichés ne portent PAS. `shown` (déjà borné par
  * `selectDecorationsForRender`), jamais `a.decorations` seul : c'est ce qui sera VISIBLE PAR
- * SON NOM qui compte, pas ce qui a été résolu en amont. */
-function isLosslessBadgeProjection(prefixLine: string, shown: ResolvedDecoration[]): boolean {
+ * SON NOM qui compte, pas ce qui a été résolu en amont.
+ *
+ * `diagnostics` couvre un troisième cas, différent des deux premiers : `a.resolved`/`shown`
+ * sont déjà sous forme CANONIQUE (§3.1), donc `ISSUE: x`, `issue (Blocking): x`,
+ * `issue(blocking): x` ou `issue (blocking, blocking): x` produisent les MÊMES badges propres
+ * qu'une saisie parfaite — rien n'est rejeté ni replié, les deux vérifications ci-dessus
+ * passeraient. Pourtant `W-CASE`/`W-DECORATION-STYLE` (§3.5.2) existent précisément parce que
+ * la CASSE ou la PONCTUATION écrites comptent : les masquer avec le texte remplacerait de fait
+ * la saisie fautive par une saisie propre qu'elle n'était pas — et `config.severities` peut
+ * promouvoir l'un ou l'autre en `error`, rendant le commentaire bloquant sans que la vue
+ * publiée ne montre plus pourquoi (revue Reefact, PR #40). `a.diagnostics` déjà filtré par
+ * `severities` (`off` n'y figure jamais, §3.5.2) : un `W-*` désactivé par configuration ne
+ * bloque donc pas le masquage, conformément à ce choix. */
+function isLosslessBadgeProjection(prefixLine: string, shown: ResolvedDecoration[], diagnostics: Diagnostic[]): boolean {
+  if (diagnostics.some((d) => d.code === 'W-CASE' || d.code === 'W-DECORATION-STYLE')) return false;
   const match = matchPrefix(prefixLine);
   if (!match) return false; // ne devrait pas arriver si le label est résolu ; on renonce prudemment sinon
   if (match.decorations === null) return true; // aucune décoration écrite : rien à perdre
@@ -337,7 +351,8 @@ export function decorateComment(
   // décoration syntaxiquement valide mais REJETÉE (E-UNKNOWN-DECORATION), ou repliée dans le
   // badge « +N » au-delà de MAX_RENDERED_DECORATIONS, ne doit jamais disparaître à la fois du
   // texte ET des badges — ce serait perdre l'information, pas seulement la déplacer.
-  const canHidePrefix = a.resolved !== null && a.prefixLine !== null && isLosslessBadgeProjection(a.prefixLine, shown);
+  const canHidePrefix =
+    a.resolved !== null && a.prefixLine !== null && isLosslessBadgeProjection(a.prefixLine, shown, a.diagnostics);
   // Inconditionnel, AVANT tout retour anticipé — chemin rapide compris (revue Reefact, PR #40) :
   // une réhydratation de plateforme peut remplacer le sous-arbre de texte natif (et donc effacer
   // le wrapper `.cct-hidden-prefix`) sans toucher aux badges CCT, restés en place à côté — même

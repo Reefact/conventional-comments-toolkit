@@ -283,4 +283,33 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais la virgule fautive reste visible
     expect(el.textContent).toContain('issue (blocking,): x');
   });
+
+  it('renonce quand le label est écrit dans une casse non canonique (W-CASE) — le badge propre ne doit pas remplacer la saisie fautive (revue Reefact, PR #40)', () => {
+    // "Issue: x" résout le même label "issue" que "issue: x" (§3.1, résolution insensible à la
+    // casse) et produit exactement le même badge propre — mais aussi un diagnostic W-CASE
+    // (§3.5.2). Masquer le texte ferait disparaître la SEULE preuve que la casse était fautive.
+    const body = 'Issue: x';
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector(':scope > .cct-badge-label')?.textContent).toBe('issue'); // badge déjà canonique…
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais "Issue" reste visible, pas remplacé
+    expect(el.textContent).toContain('Issue: x');
+  });
+
+  it('renonce quand une décoration est dupliquée (W-DECORATION-STYLE) — un seul badge ne doit pas faire disparaître la répétition fautive (revue Reefact, PR #40)', () => {
+    // "issue (blocking, blocking): x" : a.decorations déduplique (§3.5, doc de CommentAnalysis)
+    // en UN SEUL "blocking", syntaxiquement valide et montré — ni REJET ni troncature, les deux
+    // vérifications précédentes passeraient. Le diagnostic W-DECORATION-STYLE (duplicate,
+    // §3.5.2) existe précisément parce que la répétition écrite compte.
+    const body = 'issue (blocking, blocking): x';
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(1); // dédupliqué en un seul badge…
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais la répétition fautive reste visible
+    expect(el.textContent).toContain('issue (blocking, blocking): x');
+  });
 });

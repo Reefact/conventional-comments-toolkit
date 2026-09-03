@@ -139,11 +139,6 @@ function badgeSignature(
  * Un BOM interne (seul cas qui changerait la longueur ailleurs qu'en bord de ligne) fait
  * renoncer plutôt que risquer de masquer la mauvaise frontière. */
 function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
-  // `rawLine` doit ÊTRE la ligne reconnue, pas seulement la contenir : sans ce garde, un texte
-  // de tête sans rapport (bloc de code écarté par §3.4.1 étape 2, contenu d'un élément imbriqué
-  // que le premier nœud de texte ne représente pas fidèlement) où `m.label` apparaîtrait par
-  // coïncidence produirait une frontière calculée sur du texte qui n'est pas le préfixe.
-  if (normalizePrefixLine(rawLine) !== prefixLine) return null;
   const m = matchPrefix(prefixLine);
   if (!m) return null;
   const labelStart = prefixLine.indexOf(m.label);
@@ -160,8 +155,23 @@ function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
   while (normalizedEnd < prefixLine.length && (prefixLine[normalizedEnd] === ' ' || prefixLine[normalizedEnd] === '\t')) {
     normalizedEnd++;
   }
+  // Seule la portion structurée (`label (décorations): `), jamais la ligne entière : le SUJET
+  // qui la suit peut être scindé sur un autre nœud DOM par la moindre mise en forme inline
+  // (code, lien, gras, mention, référence…) — cas courant (revue Reefact, PR #40) — auquel cas
+  // `rawLine` s'arrête net à la fin du préfixe, plus court que la ligne normalisée complète.
+  const expectedPrefix = prefixLine.slice(0, normalizedEnd);
+  // `rawLine` doit CORRESPONDRE à ce préfixe, pas seulement le contenir par coïncidence : sans
+  // ce garde, un texte de tête sans rapport (bloc de code écarté par §3.4.1 étape 2, contenu
+  // d'un élément imbriqué que le premier nœud de texte ne représente pas fidèlement) où le
+  // label apparaîtrait par hasard produirait une frontière calculée sur du texte qui n'est pas
+  // le préfixe. Les deux sens de `startsWith` couvrent : (a) le sujet continue dans CE nœud —
+  // son normalisé est alors plus LONG que `expectedPrefix` ; (b) `rawLine` s'arrête pile à la
+  // fin du préfixe — son bord de fin est alors rogné par le trim de `normalizePrefixLine`, donc
+  // plus COURT que `expectedPrefix`.
+  const normalizedRawLine = normalizePrefixLine(rawLine);
+  if (!normalizedRawLine.startsWith(expectedPrefix) && !expectedPrefix.startsWith(normalizedRawLine)) return null;
   const leadingStrip = rawLine.length - rawLine.replace(/^[\p{White_Space}\uFEFF]+/u, '').length;
-  const rawEnd = leadingStrip + normalizedEnd;
+  const rawEnd = leadingStrip + expectedPrefix.length;
   if (rawEnd > rawLine.length || rawLine.slice(0, rawEnd).includes('\uFEFF')) return null;
   return rawEnd;
 }
@@ -173,9 +183,20 @@ function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
  * purement blanc, enfant DIRECT du conteneur, avant même le `<p>` (mesuré sur une vraie PR,
  * pas une supposition). Un nœud non vide mais purement blanc n'est ni la ligne de préfixe ni
  * une partie utile de son calcul : le sauter pour atteindre le nœud suivant est correct,
- * jamais une perte d'information. */
+ * jamais une perte d'information.
+ *
+ * Ignore aussi tout `.cct-badge` déjà posé : appelée AVANT le retrait des anciens badges
+ * (revue Reefact, PR #40 — l'entretien du masquage doit survivre au chemin rapide, où les
+ * badges existants ne sont ni retirés ni reconstruits), le premier nœud de texte du sous-arbre
+ * PEUT être celui d'un badge — son propre texte ("issue", "blocking"…) n'est jamais le corps
+ * réel du commentaire. */
 function firstTextNode(node: Node): Text | null {
-  if (node.nodeType === 3 /* Node.TEXT_NODE */ && (node as Text).data.trim().length > 0) return node as Text;
+  if (node.nodeType === 3 /* Node.TEXT_NODE */) {
+    return (node as Text).data.trim().length > 0 ? (node as Text) : null;
+  }
+  if (node.nodeType === 1 /* Node.ELEMENT_NODE */ && (node as Element).classList.contains('cct-badge')) {
+    return null;
+  }
   for (const child of node.childNodes) {
     const found = firstTextNode(child);
     if (found) return found;
@@ -251,12 +272,19 @@ export function decorateComment(
     config
   );
   const stale = [...commentBodyElement.querySelectorAll(':scope > .cct-badge')] as HTMLElement[];
+  // Inconditionnel, AVANT tout retour anticipé — chemin rapide compris (revue Reefact, PR #40) :
+  // une réhydratation de plateforme peut remplacer le sous-arbre de texte natif (et donc effacer
+  // le wrapper `.cct-hidden-prefix`) sans toucher aux badges CCT, restés en place à côté — même
+  // risque que celui déjà pris en compte pour les badges de décoration eux-mêmes (revue Codex,
+  // PR #38). Un simple retour sur signature/compte inchangés laisserait alors le préfixe
+  // réapparu tel quel. Idempotent (firstTextNode ignore les `.cct-badge` déjà posés, encore
+  // présents ici), donc gratuit quand rien n'a bougé.
+  applyPrefixVisibility(commentBodyElement, a.resolved ? a.prefixLine : null, bodyText);
   if (!a.resolved) {
     // Un changement de configuration a pu rendre ce commentaire non résolu (label
     // désactivé, par exemple) : un badge qui décrivait un état qui n'existe plus ne doit
     // pas survivre à ce changement, même si aucun nouveau badge ne le remplace.
     for (const badge of stale) badge.remove();
-    applyPrefixVisibility(commentBodyElement, null, bodyText);
     return;
   }
   const { shown, hiddenDescriptive } = selectDecorationsForRender(a.decorations);
@@ -273,17 +301,13 @@ export function decorateComment(
   // (revue Codex, PR #38). Le compte de badges effectivement présents doit donc correspondre
   // à ce que CE rendu produirait, pas seulement la signature du premier.
   if (stale.length === 1 + expectedCount && stale[0]?.dataset['cctSig'] === signature) {
-    return; // inchangé — aucune écriture DOM, aucun badge construit pour rien
+    return; // inchangé — aucune écriture DOM de badge ; le préfixe a déjà été réentretenu plus haut
   }
 
   const badge = labelBadge(a.resolved.label, config);
   badge.dataset['blocking'] = a.blocking ? 'true' : 'false';
   badge.dataset['cctSig'] = signature;
   for (const old of stale) old.remove();
-  // AVANT le prepend() des badges ci-dessous : applyPrefixVisibility() cherche le premier
-  // nœud de texte du sous-arbre, qui doit encore être celui du corps réel — posé après, ce
-  // serait celui d'un badge fraîchement inséré.
-  applyPrefixVisibility(commentBodyElement, a.prefixLine, bodyText);
   // prepend() insère tous les badges en une fois, dans l'ordre donné (label, puis les
   // décorations dans l'ordre d'écriture) — contrairement à insertAdjacentElement('afterbegin'),
   // répété, qui les aurait posés en ordre inverse.

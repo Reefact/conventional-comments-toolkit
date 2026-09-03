@@ -147,4 +147,46 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull(); // le label est bien résolu…
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais rien n'est masqué pour autant
   });
+
+  it('masque le préfixe même quand une mise en forme inline suit dans le sujet (revue Reefact, PR #40)', () => {
+    // `expectedPrefix` (label + décorations + ":" + blancs) ne doit exiger l'égalité qu'avec
+    // CETTE portion, jamais avec la ligne entière : dès qu'un `code`/lien/gras/mention suit le
+    // préfixe, GitHub scinde la ligne sur un autre nœud DOM — cas courant, pas un cas limite.
+    const el = document.createElement('div');
+    el.innerHTML = '<p>issue: use <code>Foo</code></p>';
+    const body = el.textContent!; // "issue: use Foo"
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    const hidden = el.querySelector('.cct-hidden-prefix');
+    expect(hidden?.textContent).toBe('issue: ');
+    expect(hidden?.nextSibling?.textContent).toBe('use ');
+    expect(el.querySelector('code')?.textContent).toBe('Foo'); // la mise en forme inline reste intacte
+  });
+
+  it('réentretient le masquage sur le chemin rapide, quand une réhydratation de plateforme a effacé le wrapper sans toucher aux badges (revue Reefact, PR #40)', () => {
+    // Même risque que celui déjà pris en compte pour les badges de décoration eux-mêmes (revue
+    // Codex, PR #38) : un remplacement partiel du sous-arbre natif peut laisser les badges CCT
+    // intacts tout en faisant réapparaître le texte complet. Le chemin rapide (signature ET
+    // compte de badges inchangés) ne doit pas laisser le préfixe démasqué pour autant.
+    const body = 'praise: nice work';
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+    const badgeBefore = el.querySelector(':scope > .cct-badge-label');
+    expect(el.querySelector('.cct-hidden-prefix')).not.toBeNull();
+
+    // Réhydratation simulée : les badges (enfants directs) survivent, le reste (span masqué +
+    // sujet) est remplacé par un nœud de texte neuf portant de nouveau le corps complet.
+    const hidden = el.querySelector('.cct-hidden-prefix')!;
+    const rest = hidden.nextSibling!;
+    hidden.remove();
+    rest.remove();
+    el.appendChild(document.createTextNode(body));
+
+    decorateComment(el, body, defaultConfig(), profile, 'en'); // même config, même corps
+
+    expect(el.querySelector(':scope > .cct-badge-label')).toBe(badgeBefore); // badges inchangés : chemin rapide pris
+    expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('praise: '); // …le préfixe, lui, est remasqué
+    expect(el.querySelector('.cct-hidden-prefix')?.nextSibling?.textContent).toBe('nice work');
+  });
 });

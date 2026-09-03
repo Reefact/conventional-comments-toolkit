@@ -189,4 +189,37 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('praise: '); // …le préfixe, lui, est remasqué
     expect(el.querySelector('.cct-hidden-prefix')?.nextSibling?.textContent).toBe('nice work');
   });
+
+  it('renonce quand une décoration écrite est REJETÉE — sa disparition des badges ne doit pas s’accompagner de sa disparition du texte (revue Reefact, PR #40)', () => {
+    // allowFree=false : "security" est syntaxiquement valide mais rejeté (E-UNKNOWN-DECORATION,
+    // absente de decorations.known) — le label "issue" reste résolu, mais a.decorations exclut
+    // "security" (§3.5, doc de CommentAnalysis). Masquer "issue (security): " ferait disparaître
+    // la SEULE trace de ce qui a été réellement écrit et rejeté.
+    const cfg = defaultConfig();
+    cfg.decorations.allowFree = false;
+    const body = 'issue (security): x';
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, cfg, profile, 'en');
+
+    expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull(); // "issue" est bien résolu…
+    expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(0); // …"security", rejetée, n'a pas de badge…
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …donc le texte écrit reste l'unique trace
+    expect(el.textContent).toContain('issue (security): x');
+  });
+
+  it('renonce quand des décorations descriptives débordent MAX_RENDERED_DECORATIONS — leurs noms ne survivent que dans le texte (revue Reefact, PR #40)', () => {
+    // 13 décorations libres et descriptives (aucune ne force le caractère bloquant) : le rendu
+    // en badges en plafonne 12 et replie la 13e dans un badge « +1 » sans nom (§5.5,
+    // selectDecorationsForRender). Masquer le texte ferait perdre le nom de celle-là.
+    const ids = Array.from({ length: 13 }, (_, i) => `d${i + 1}`);
+    const body = `issue (${ids.join(', ')}): x`;
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(13); // 12 nommées + 1 badge "+1"
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+    expect(el.textContent).toContain(`issue (${ids.join(', ')}): x`);
+  });
 });

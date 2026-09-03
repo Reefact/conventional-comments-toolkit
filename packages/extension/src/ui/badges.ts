@@ -15,6 +15,7 @@ import {
   analyze,
   matchPrefix,
   normalizePrefixLine,
+  parseDecorations,
   type CommentAnalysis,
   type EffectiveConfig,
   type PlatformProfile,
@@ -204,6 +205,28 @@ function firstTextNode(node: Node): Text | null {
   return null;
 }
 
+/** La projection en badges est-elle SANS PERTE pour ce préfixe — seule condition sous laquelle
+ * le masquer est correct (revue Reefact, PR #40) ? `a.decorations` (§3.5, doc de
+ * `CommentAnalysis`) est délibérément une projection FILTRÉE : une décoration syntaxiquement
+ * valide mais REJETÉE (`E-UNKNOWN-DECORATION`, `decorations.allowFree` à `false`) n'y figure
+ * jamais, et `selectDecorationsForRender()` replie ensuite les descriptives en excès de
+ * `MAX_RENDERED_DECORATIONS` dans un badge « +N » sans leurs noms. Dans les deux cas, masquer
+ * le texte ferait disparaître une information — la décoration rejetée, ou le nom d'une
+ * décoration repliée — que les badges affichés ne portent PAS. `shown` (déjà borné par
+ * `selectDecorationsForRender`), jamais `a.decorations` seul : c'est ce qui sera VISIBLE PAR
+ * SON NOM qui compte, pas ce qui a été résolu en amont. */
+function isLosslessBadgeProjection(prefixLine: string, shown: ResolvedDecoration[]): boolean {
+  const match = matchPrefix(prefixLine);
+  if (!match) return false; // ne devrait pas arriver si le label est résolu ; on renonce prudemment sinon
+  if (match.decorations === null) return true; // aucune décoration écrite : rien à perdre
+  const written = new Set(parseDecorations(match.decorations).canonical);
+  const shownIds = new Set(shown.map((d) => d.id));
+  for (const id of written) {
+    if (!shownIds.has(id)) return false;
+  }
+  return true;
+}
+
 /** Masque le préfixe structuré du corps AFFICHÉ (§5.5) — jamais le corps STOCKÉ côté serveur,
  * qu'aucune de ces écritures n'atteint : ce nœud est purement client, ajouté au rendu, jamais
  * renvoyé à la plateforme. Le formulaire d'édition d'un commentaire existant est un sous-arbre
@@ -272,6 +295,17 @@ export function decorateComment(
     config
   );
   const stale = [...commentBodyElement.querySelectorAll(':scope > .cct-badge')] as HTMLElement[];
+  // Calculé AVANT le retour anticipé sur `!a.resolved` : `isLosslessBadgeProjection()` (ci-
+  // dessous) a besoin de `shown` pour savoir ce qui sera VISIBLE PAR SON NOM, que le label soit
+  // résolu ou non ne change rien à cette question — un tableau vide quand il ne l'est pas.
+  const { shown, hiddenDescriptive } = a.resolved
+    ? selectDecorationsForRender(a.decorations)
+    : { shown: [] as ResolvedDecoration[], hiddenDescriptive: 0 };
+  // Masquer n'est correct que si CETTE projection est sans perte (revue Reefact, PR #40) : une
+  // décoration syntaxiquement valide mais REJETÉE (E-UNKNOWN-DECORATION), ou repliée dans le
+  // badge « +N » au-delà de MAX_RENDERED_DECORATIONS, ne doit jamais disparaître à la fois du
+  // texte ET des badges — ce serait perdre l'information, pas seulement la déplacer.
+  const canHidePrefix = a.resolved !== null && a.prefixLine !== null && isLosslessBadgeProjection(a.prefixLine, shown);
   // Inconditionnel, AVANT tout retour anticipé — chemin rapide compris (revue Reefact, PR #40) :
   // une réhydratation de plateforme peut remplacer le sous-arbre de texte natif (et donc effacer
   // le wrapper `.cct-hidden-prefix`) sans toucher aux badges CCT, restés en place à côté — même
@@ -279,7 +313,7 @@ export function decorateComment(
   // PR #38). Un simple retour sur signature/compte inchangés laisserait alors le préfixe
   // réapparu tel quel. Idempotent (firstTextNode ignore les `.cct-badge` déjà posés, encore
   // présents ici), donc gratuit quand rien n'a bougé.
-  applyPrefixVisibility(commentBodyElement, a.resolved ? a.prefixLine : null, bodyText);
+  applyPrefixVisibility(commentBodyElement, canHidePrefix ? a.prefixLine : null, bodyText);
   if (!a.resolved) {
     // Un changement de configuration a pu rendre ce commentaire non résolu (label
     // désactivé, par exemple) : un badge qui décrivait un état qui n'existe plus ne doit
@@ -287,7 +321,6 @@ export function decorateComment(
     for (const badge of stale) badge.remove();
     return;
   }
-  const { shown, hiddenDescriptive } = selectDecorationsForRender(a.decorations);
   const signature = badgeSignature({ ...a, resolved: a.resolved }, shown, hiddenDescriptive, config, lang);
   // Compte attendu SANS construire les badges : decorateComment() tourne pour CHAQUE
   // commentaire à CHAQUE passage de rendu, y compris ceux déjà à jour — leur bâtir jusqu'à

@@ -1,35 +1,60 @@
 // Valeurs par défaut du produit (§8.2). Ce ne sont PAS celles du bloc d'exemple de la
 // spécification, qui n'illustre que la forme des clés : ici les treize labels du §3.2,
 // les décorations du §3.3 et les sévérités du tableau §3.5.2.
+//
+// `icon`/`color` par label (issue #18) : sans eux, `defaultConfig()` ne fournissait jamais
+// aucune des deux clés — le rendu que `badges.ts`/`toolbar.ts` savent produire à partir
+// d'elles (bordure du badge, bouton actif de la barre d'outils, §5.1/§5.5) restait donc
+// invisible sur tout dépôt sans configuration `.conventional-comments.json` propre, y
+// compris le mockup de référence qu'elles sont censées reprendre. Les deux clés sont déjà
+// exclues de `fingerprint()` (§9.2.2) et de la liste plancher-able (§8.1.3) : purement
+// cosmétiques, elles ne peuvent donc jamais faire diverger un verdict ni être verrouillées
+// par un plancher — les fournir ici est sans risque pour ces deux garanties.
+//
+// La couleur ne teinte jamais un FOND (`styles.css` : `.cct-badge`, `.cct-label-button` et
+// son état actif ne l'appliquent qu'à `border-color` — vérifié dans le fichier au moment
+// d'écrire ceci, pas supposé), donc aucune des deux teintes n'a besoin de satisfaire un
+// ratio de contraste de TEXTE (§10) : le texte reste toujours la couleur par défaut de la
+// page. Le seul critère est une luminosité moyenne (ni trop pâle sur fond clair, ni trop
+// sombre sur fond sombre) : une couleur hex fixe, contrairement au repli
+// `var(--borderColor-default, currentColor)` qu'elle remplace, ne s'adapte plus au thème.
 
 import type { EffectiveConfig, LabelConfig } from '../types.js';
 
 const label = (
   id: string,
+  icon: string,
+  color: string,
   blockingByDefault: boolean,
   alwaysNonBlocking: boolean,
   enabled = true
-): LabelConfig => ({ id, enabled, blockingByDefault, alwaysNonBlocking, aliases: [] });
+): LabelConfig => ({ id, enabled, blockingByDefault, alwaysNonBlocking, icon, color, aliases: [] });
 
 export function defaultConfig(): EffectiveConfig {
   return {
     version: 1,
     mode: 'assist',
     labels: [
-      label('praise', false, false),
-      label('nitpick', false, true),
-      label('suggestion', false, false),
-      label('issue', true, false),
-      label('todo', true, false),
-      label('question', false, false),
-      label('thought', false, true),
-      label('chore', true, false),
-      label('note', false, true),
-      label('decision', false, true),
-      // Labels optionnels, livrés désactivés (§3.2, §8.1.4).
-      label('typo', false, false, false),
-      label('polish', false, false, false),
-      label('quibble', false, false, false),
+      label('praise', '\u{1F389}', '#2E7D32', false, false),
+      label('nitpick', '\u{1F50D}', '#57606A', false, true),
+      label('suggestion', '\u{1F4A1}', '#9A6700', false, false),
+      // Icône et couleur identiques à celles de l'exemple normatif
+      // (.conventional-comments.example.json) : issue est le seul label que la spécification
+      // illustre, autant rester cohérent avec elle plutôt que de choisir une valeur différente
+      // sans raison.
+      label('issue', '\u{1F528}', '#B3261E', true, false),
+      label('todo', '\u{1F4CC}', '#BC4C00', true, false),
+      label('question', '\u{2753}', '#0969DA', false, false),
+      label('thought', '\u{1F4AD}', '#8250DF', false, true),
+      label('chore', '\u{1F9F9}', '#845D29', true, false),
+      label('note', '\u{1F4DD}', '#1B7C83', false, true),
+      label('decision', '\u{1F3C1}', '#4C2889', false, true),
+      // Labels optionnels, livrés désactivés (§3.2, §8.1.4) — icône et couleur assignées
+      // quand même : (re)activer un label ne doit pas exiger de configurer aussi son
+      // apparence pour sortir du rendu monochrome que #18 décrit.
+      label('typo', '\u{1F524}', '#BF3989', false, false, false),
+      label('polish', '\u{2728}', '#0B8793', false, false, false),
+      label('quibble', '\u{1FAB6}', '#4B6A53', false, false, false),
     ],
     decorations: {
       allowFree: true,

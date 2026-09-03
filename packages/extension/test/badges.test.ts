@@ -118,6 +118,19 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelector('.cct-hidden-prefix')?.nextSibling?.textContent).toBe('fix this');
   });
 
+  it('laisse un émoji de tête visible, hors du span masqué — il est TOLÉRÉ en entrée mais IGNORÉ pour l’analyse, sans rapport avec l’icône du badge (revue Reefact, PR #40)', () => {
+    const body = '🔥 issue: fix this';
+    const el = document.createElement('div');
+    el.textContent = body; // un seul nœud de texte : émoji, label et sujet y vivent tous ensemble
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    const hidden = el.querySelector('.cct-hidden-prefix');
+    expect(hidden?.textContent).toBe('issue: '); // l'émoji n'entre pas dans le masquage…
+    expect(hidden?.previousSibling?.textContent).toBe('🔥 '); // …il reste un nœud FRÈRE visible…
+    expect(hidden?.nextSibling?.textContent).toBe('fix this');
+    expect(commentBodyText(el)).toBe(body); // …et rien n'est perdu pour la relecture au tour suivant
+  });
+
   it('masque le préfixe même quand il vit dans un <p> précédé d’un nœud de texte blanc FRÈRE (indentation GitHub réelle, PR #40)', () => {
     // Mesuré sur une vraie page github.com, pas une supposition : `.comment-body` porte un nœud
     // de texte "\n          " comme enfant DIRECT, avant le <p> qui contient le texte réel — un

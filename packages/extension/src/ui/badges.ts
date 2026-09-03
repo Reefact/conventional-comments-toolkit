@@ -14,7 +14,7 @@
 import {
   analyze,
   matchPrefix,
-  splitBody,
+  normalizePrefixLine,
   type CommentAnalysis,
   type EffectiveConfig,
   type PlatformProfile,
@@ -129,16 +129,21 @@ function badgeSignature(
   });
 }
 
-/** Repère la fin du préfixe structuré dans la ligne BRUTE (non normalisée) du corps affiché,
- * pour le masquage ci-dessous — jamais pour l'analyse elle-même, déjà faite par `analyze()`.
- * `prefixLine` est la ligne normalisée (§3.4.1, étapes 4-6) que porte déjà `CommentAnalysis` ;
- * retrouver la même frontière dans le texte BRUT du DOM demande de défaire seulement ce que la
- * normalisation fait réellement : (a) retirer un bandeau d'espaces/BOM en bord de ligne, (b)
- * remplacer un à un chaque caractère d'espacement Unicode par un espace ordinaire — jamais
- * fusionné, jamais scindé, donc sans effet sur la position d'un caractère qui suit. Un BOM
- * interne (seul cas qui changerait la longueur ailleurs qu'en bord de ligne) fait renoncer
- * plutôt que risquer de masquer la mauvaise frontière. */
+/** Repère la fin du préfixe structuré dans `rawLine` — un texte dont on n'est pas encore
+ * certain qu'il correspond bien à la ligne que `analyze()` a reconnue, d'où la première
+ * vérification. `prefixLine` est la ligne normalisée (§3.4.1, étapes 4-6) que porte déjà
+ * `CommentAnalysis` ; retrouver la même frontière dans `rawLine` demande de défaire seulement
+ * ce que la normalisation fait réellement : (a) retirer un bandeau d'espaces/BOM en bord de
+ * ligne, (b) remplacer un à un chaque caractère d'espacement Unicode par un espace ordinaire
+ * — jamais fusionné, jamais scindé, donc sans effet sur la position d'un caractère qui suit.
+ * Un BOM interne (seul cas qui changerait la longueur ailleurs qu'en bord de ligne) fait
+ * renoncer plutôt que risquer de masquer la mauvaise frontière. */
 function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
+  // `rawLine` doit ÊTRE la ligne reconnue, pas seulement la contenir : sans ce garde, un texte
+  // de tête sans rapport (bloc de code écarté par §3.4.1 étape 2, contenu d'un élément imbriqué
+  // que le premier nœud de texte ne représente pas fidèlement) où `m.label` apparaîtrait par
+  // coïncidence produirait une frontière calculée sur du texte qui n'est pas le préfixe.
+  if (normalizePrefixLine(rawLine) !== prefixLine) return null;
   const m = matchPrefix(prefixLine);
   if (!m) return null;
   const labelStart = prefixLine.indexOf(m.label);
@@ -161,29 +166,16 @@ function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
   return rawEnd;
 }
 
-/** Longueur, en tête de `bodyText`, à masquer à l'affichage (§5.5) — seulement quand le
- * préfixe reconnu par `analyze()` occupe la toute première ligne du corps : une ligne vide ou
- * écartée avant lui (§3.4.1, étapes 2-3) sortirait du cas simple couvert ici, et l'affichage y
- * renonce plutôt que de mal compter (§9.4, dégradation silencieuse — jamais une exception, et
- * jamais un mauvais découpage du texte affiché). */
-function hiddenPrefixLength(bodyText: string, prefixLine: string | null): number | null {
-  if (prefixLine === null) return null;
-  const split = splitBody(bodyText);
-  if (split.prefixLineIndex !== 0 || split.rawPrefixLine === null) return null;
-  const end = hiddenPrefixEnd(split.rawPrefixLine, prefixLine);
-  if (end === null) return null;
-  // Ne jamais masquer la totalité du contenu visible d'un commentaire (sujet vide, aucune
-  // autre ligne) : le lecteur verrait une bulle sans aucun texte, alors que rien n'empêche de
-  // publier "issue:" seul (§3.5 signale E-EMPTY-SUBJECT, mais ne bloque pas la publication).
-  if (bodyText.slice(end).trim() === '') return null;
-  return end;
-}
-
-/** Premier nœud de texte non vide du sous-arbre, en profondeur — celui qui porte le début du
- * corps réellement affiché, généralement sous une balise de bloc (`<p>`) plutôt qu'en enfant
- * direct. */
+/** Premier nœud de texte SIGNIFICATIF (au moins un caractère non blanc) du sous-arbre, en
+ * profondeur — celui qui porte le début du corps réellement affiché. `.trim()`, pas une
+ * simple longueur non nulle : le HTML rendu par GitHub porte une indentation entre la balise
+ * de bloc (`<td class="comment-body">`) et le `<p>` qu'elle contient — un nœud de texte
+ * purement blanc, enfant DIRECT du conteneur, avant même le `<p>` (mesuré sur une vraie PR,
+ * pas une supposition). Un nœud non vide mais purement blanc n'est ni la ligne de préfixe ni
+ * une partie utile de son calcul : le sauter pour atteindre le nœud suivant est correct,
+ * jamais une perte d'information. */
 function firstTextNode(node: Node): Text | null {
-  if (node.nodeType === 3 /* Node.TEXT_NODE */ && (node as Text).data.length > 0) return node as Text;
+  if (node.nodeType === 3 /* Node.TEXT_NODE */ && (node as Text).data.trim().length > 0) return node as Text;
   for (const child of node.childNodes) {
     const found = firstTextNode(child);
     if (found) return found;
@@ -198,14 +190,22 @@ function firstTextNode(node: Node): Text | null {
  * jamais dérivé de ce corps rendu — rouvrir l'édition réaffiche donc le texte complet, préfixe
  * compris, sans le concours de cette fonction ni aucun risque qu'elle l'ait altéré.
  *
+ * Le calcul se fait sur `first.data` LUI-MÊME, jamais sur une ligne dérivée de `bodyText` par
+ * découpage de chaînes : sur une vraie page GitHub, le texte que `analyze()` reconnaît comme
+ * « première ligne » peut être réparti sur DEUX nœuds DOM frères (l'indentation entre la
+ * balise de bloc et son `<p>`, puis le `<p>` lui-même) sans qu'aucun élément ne les sépare
+ * autrement — un décalage calculé sur la chaîne concaténée aurait scindé le sujet quelques
+ * caractères trop loin, silencieusement (vérifié sur PR #40, jamais vu par les tests jsdom :
+ * leurs corps sont toujours un nœud de texte unique).
+ *
  * Idempotent : un wrapper déjà posé n'est jamais refait ni doublé (`bodyText` est immuable une
- * fois le commentaire publié, la longueur à masquer ne peut donc pas changer sous lui) ; une
- * fois retiré — résolution perdue sur un changement de configuration en direct, §8.1.1 — le
- * texte redevient un nœud ordinaire, `normalize()` referme la coupure plutôt que de laisser
- * deux nœuds de texte adjacents. */
-function applyPrefixVisibility(commentBodyElement: Element, hiddenLength: number | null): void {
+ * fois le commentaire publié, la frontière ne peut donc pas changer sous lui) ; une fois retiré
+ * — résolution perdue sur un changement de configuration en direct, §8.1.1 — le texte redevient
+ * un nœud ordinaire, `normalize()` referme la coupure plutôt que de laisser deux nœuds de texte
+ * adjacents. */
+function applyPrefixVisibility(commentBodyElement: Element, prefixLine: string | null, bodyText: string): void {
   const existing = commentBodyElement.querySelector('.cct-hidden-prefix');
-  if (hiddenLength === null) {
+  if (prefixLine === null) {
     if (existing) {
       existing.replaceWith(globalThis.document.createTextNode(existing.textContent ?? ''));
       commentBodyElement.normalize();
@@ -214,11 +214,19 @@ function applyPrefixVisibility(commentBodyElement: Element, hiddenLength: number
   }
   if (existing) return;
   const first = firstTextNode(commentBodyElement);
-  // Le préfixe déborde du premier nœud de texte — un élément (émoji rendu en <g-emoji>, mise
-  // en forme déclenchée par le contenu des décorations) s'intercale avant sa fin : on renonce
-  // plutôt que de scinder ailleurs qu'à la frontière voulue.
-  if (!first || first.data.length < hiddenLength) return;
-  first.splitText(hiddenLength); // `first` ne garde que le préfixe ; la suite devient un nœud frère, déjà en place
+  if (!first) return;
+  const end = hiddenPrefixEnd(first.data, prefixLine);
+  if (end === null) return;
+  const trimmedHidden = first.data.slice(0, end).trim();
+  const trimmedBody = bodyText.trim();
+  // Ne jamais masquer la totalité du contenu visible d'un commentaire (sujet vide, aucune
+  // autre ligne) : le lecteur verrait une bulle sans aucun texte, alors que rien n'empêche de
+  // publier "issue:" seul (§3.5 signale E-EMPTY-SUBJECT, mais ne bloque pas la publication).
+  // `startsWith`, pas une simple comparaison de longueur : une incohérence entre `first.data`
+  // et `bodyText` (qui ne devrait plus se produire, mais que ce garde coûte peu à vérifier)
+  // doit renoncer plutôt que masquer un fragment qui ne commence pas vraiment le commentaire.
+  if (!trimmedBody.startsWith(trimmedHidden) || trimmedBody.slice(trimmedHidden.length).trim() === '') return;
+  first.splitText(end); // `first` ne garde que le préfixe ; la suite devient un nœud frère, déjà en place
   const hidden = globalThis.document.createElement('span');
   hidden.className = 'cct-hidden-prefix';
   first.replaceWith(hidden);
@@ -248,7 +256,7 @@ export function decorateComment(
     // désactivé, par exemple) : un badge qui décrivait un état qui n'existe plus ne doit
     // pas survivre à ce changement, même si aucun nouveau badge ne le remplace.
     for (const badge of stale) badge.remove();
-    applyPrefixVisibility(commentBodyElement, null);
+    applyPrefixVisibility(commentBodyElement, null, bodyText);
     return;
   }
   const { shown, hiddenDescriptive } = selectDecorationsForRender(a.decorations);
@@ -275,7 +283,7 @@ export function decorateComment(
   // AVANT le prepend() des badges ci-dessous : applyPrefixVisibility() cherche le premier
   // nœud de texte du sous-arbre, qui doit encore être celui du corps réel — posé après, ce
   // serait celui d'un badge fraîchement inséré.
-  applyPrefixVisibility(commentBodyElement, hiddenPrefixLength(bodyText, a.prefixLine));
+  applyPrefixVisibility(commentBodyElement, a.prefixLine, bodyText);
   // prepend() insère tous les badges en une fois, dans l'ordre donné (label, puis les
   // décorations dans l'ordre d'écriture) — contrairement à insertAdjacentElement('afterbegin'),
   // répété, qui les aurait posés en ordre inverse.

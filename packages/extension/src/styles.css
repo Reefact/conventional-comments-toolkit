@@ -267,16 +267,30 @@
 .cct-badge-pill { border-radius: 999px; }
 .cct-badge-flat { border-radius: var(--borderRadius-small, 2px); }
 
+/* Taille du badge de label — mêmes valeurs que .badge-label du mockup de référence
+   (docs/badges-decoration-mockup.html) : plus grand ET en semi-gras, pour qu'il reste ce qui
+   saute aux yeux face aux badges de décoration ci-dessous. Sans cette règle, `.cct-badge-label`
+   n'est qu'un nom de classe posé par labelBadge() sans effet visuel propre, et le label hérite
+   tel quel du gabarit neutre de `.cct-badge` — à peine 1px de plus qu'une décoration, jamais en
+   gras : la mise en avant voulue par le mockup n'existe alors pas dans le rendu livré. */
+.cct-badge-label {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+}
+
 /* Badges de décoration (§3.3, §5.5) : posés après le badge de label par decorateComment(),
    toujours plus discrets que lui — taille réduite, jamais en gras — pour que le label reste
-   la seule chose qui saute aux yeux. La couleur ne suit que `forces` (le seul effet réel
-   d'une décoration sur le caractère bloquant, §3.3), jamais l'identité de la décoration :
-   ni `(non-blocking)` ni `(if-minor)` n'ont de couleur propre, les deux forcent le même
-   `forces: "non-blocking"` et partagent donc le même vert — leur donner des teintes
-   distinctes suggérerait un troisième état bloquant qui n'existe pas dans le modèle. */
+   la seule chose qui saute aux yeux. Taille reprise du mockup (.badge-deco) comme ci-dessus.
+   La couleur ne suit que `forces` (le seul effet réel d'une décoration sur le caractère
+   bloquant, §3.3), jamais l'identité de la décoration : ni `(non-blocking)` ni `(if-minor)`
+   n'ont de couleur propre, les deux forcent le même `forces: "non-blocking"` et partagent donc
+   le même vert — leur donner des teintes distinctes suggérerait un troisième état bloquant qui
+   n'existe pas dans le modèle. */
 .cct-badge-deco {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 400;
+  padding: 1px 7px;
   color: var(--fgColor-muted, var(--color-fg-muted, currentColor));
 }
 

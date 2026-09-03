@@ -218,6 +218,54 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
   });
 
+  it('ne masque jamais à l’intérieur d’un résumé repliable — les balises <details>/<summary> non plus n’existent pas dans le texte RENDU (revue Reefact, PR #40)', () => {
+    // <details>/<summary> est du HTML BRUT, pas un construct Markdown, mais GitHub le
+    // documente comme syntaxe de commentaire valide et le même défaut s'applique : la VRAIE
+    // première ligne de la source ("<details>") ne matche jamais matchPrefix() (elle commence
+    // par "<"), mais ses balises disparaissent du texte RENDU, laissant "issue: fake" (le
+    // contenu de <summary>) sembler être la première ligne.
+    const el = document.createElement('div');
+    el.innerHTML = '<details><summary>issue: fake</summary><p>real subject, not a prefix</p></details>';
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('summary')?.textContent).toBe('issue: fake'); // le résumé reste intact
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+  });
+
+  it('masque normalement quand une ligne Markdown SANS AUCUNE TRACE DOM précède le vrai préfixe (revue Reefact, PR #40)', () => {
+    // Cas structurellement différent de LI/H1/TABLE/DETAILS ci-dessus, délibérément traité
+    // autrement : une définition de référence de lien ("[ref]: /url") ou un commentaire HTML
+    // ("<!-- ... -->") en tête de source ne produit AUCUN nœud dans le document rendu — mesuré
+    // en direct sur github.com (PR #40, issuecomment-5530393268 et -5530394303) : le DOM final
+    // est BYTE POUR BYTE celui d'un commentaire qui aurait commencé directement par "issue:
+    // real subject", sans le moindre nœud vide ou marqueur résiduel pour la ligne invisible.
+    // Aucun tag ne peut donc jamais signaler ce cas : contrairement à LI/H1/TABLE/DETAILS, où
+    // le TAG DU CONTENEUR est justement l'indice observable qu'une syntaxe de tête a pu
+    // disparaître, une ligne invisible ne laisse RIEN à intercepter, dans AUCUN cas — y
+    // compris le cas nominal, en tout point identique dans le DOM. « Renoncer quand la
+    // correspondance ne peut pas être établie » (revue Reefact, PR #40) équivaudrait donc ici à
+    // renoncer TOUJOURS, y compris sur un commentaire "issue: real subject" parfaitement normal.
+    //
+    // Le badge "issue" apparaît ici que le masquage ait lieu ou non : `analyze()` le résout à
+    // partir du même `bodyText` dérivé du DOM, qu'aucune loi n'oblige à s'accorder avec le
+    // verdict qu'un serveur tirerait de la source brute complète (où la ligne invisible, non
+    // écartée par `splitBody()`, resterait la première ligne et ferait échouer matchPrefix()).
+    // C'est un désaccord de VERDICT entre l'analyse sur texte rendu et la validation sur source
+    // brute — la même famille d'angle mort, déjà noté hors périmètre pour un bloc de code sans
+    // fences (plus haut) que pour une ligne invisible : il précède et dépasse le masquage,
+    // affecte le calcul du BADGE identiquement, et existe que ce fichier existe ou non. Le
+    // masquer ou pas ne change rien à ce défaut ; le texte réellement affiché, lui, reste
+    // cohérent avec lui-même dans les deux cas.
+    const el = document.createElement('div');
+    el.innerHTML = '<p>issue: real subject</p>'; // DOM indiscernable, avec ou sans ligne invisible en amont
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('issue: ');
+    expect(el.querySelector('.cct-hidden-prefix')?.nextSibling?.textContent).toBe('real subject');
+  });
+
   it('un abandon sur bloc de code/citation ne doit PAS reprendre sur un frère suivant qui ressemble, lui aussi, à un préfixe (revue Reefact, PR #40)', () => {
     // Le bug précis signalé : renoncer sur <pre>/<code> en retournant `null` remonte, dans
     // l'appelant, un `found` faux comme un autre — sa boucle continue alors sur le frère

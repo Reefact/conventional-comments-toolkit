@@ -266,6 +266,36 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelector('.cct-hidden-prefix')?.nextSibling?.textContent).toBe('real subject');
   });
 
+  it('ne masque jamais à l’intérieur d’un gras/lien — l’astérisque et le crochet n’existent pas non plus dans le texte RENDU (revue Reefact, PR #40)', () => {
+    // "**issue: fake**" ne matcherait pas non plus matchPrefix() sur la source brute (elle
+    // commence par "*", ni une lettre ni un émoji), mais GitHub la rend en
+    // <p><strong>issue: fake</strong></p> : les "**" ont disparu du texte RENDU, laissant le
+    // texte en gras "issue: fake" sembler être la première ligne. Contrairement à LI/H1/TABLE/
+    // DETAILS, aucune deny-list de tags ne peut fermer ce trou (STRONG, EM, A, DEL… une liste
+    // ouverte) — d'où la règle de PROFONDEUR : le texte doit être un enfant DIRECT du <p>,
+    // jamais niché un niveau plus loin, quel que soit le tag de ce niveau supplémentaire.
+    const el = document.createElement('div');
+    el.innerHTML = '<p><strong>issue: fake</strong></p><p>real subject, not a prefix</p>';
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('strong')?.textContent).toBe('issue: fake'); // le gras reste intact
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+  });
+
+  it('ne masque jamais à l’intérieur d’un lien complet — le "[" et le "](url)" non plus n’existent pas dans le texte RENDU (revue Reefact, PR #40)', () => {
+    // Même défaut, pour un lien Markdown qui couvre TOUT le préfixe cette fois :
+    // "[issue: fake](url)" ne matcherait pas matchPrefix() sur la source brute ("[" n'est ni
+    // une lettre ni un émoji), mais GitHub le rend en <p><a href="url">issue: fake</a></p>.
+    const el = document.createElement('div');
+    el.innerHTML = '<p><a href="/url">issue: fake</a></p><p>real subject, not a prefix</p>';
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('a')?.textContent).toBe('issue: fake'); // le lien reste intact
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+  });
+
   it('un abandon sur bloc de code/citation ne doit PAS reprendre sur un frère suivant qui ressemble, lui aussi, à un préfixe (revue Reefact, PR #40)', () => {
     // Le bug précis signalé : renoncer sur <pre>/<code> en retournant `null` remonte, dans
     // l'appelant, un `found` faux comme un autre — sa boucle continue alors sur le frère

@@ -273,22 +273,38 @@ const LOST_MARKER_TAGS = new Set([
  * la même façon ; s'arrêter net évite en plus, et surtout, d'écrire quoi que ce soit DANS l'un
  * de ces constructs affiché.
  *
- * `isRoot` excepte uniquement l'appel de DÉPART de cette vérification : c'est le conteneur de
- * commentaire de la PLATEFORME (`.comment-body`, un `<td>` sur GitHub réel), jamais lui-même
- * un construct Markdown rendu — le soumettre à la même règle romprait la recherche pour
- * CHAQUE commentaire le jour où son tag coïnciderait avec l'un de `LOST_MARKER_TAGS` (c'est
- * déjà le cas de `<td>`, si une cellule de tableau y figurait un jour). */
-function firstTextNode(node: Node, isRoot = true): Text | typeof ABORT | null {
+ * `depth` referme le trou que `LOST_MARKER_TAGS` seule ne pouvait pas fermer (revue Reefact,
+ * PR #40) : une mise en forme Markdown INLINE — gras, italique, lien — perd sa syntaxe de tête
+ * exactement de la même façon (`**issue: fake**` → `<strong>issue: fake</strong>`, le `**`
+ * disparu de `textContent`) mais avec un nombre de tags potentiels ouvert (STRONG, EM, A, DEL,
+ * du HTML brut arbitraire…) qu'aucune liste ne peut jamais clore — le défaut même que la
+ * doc de `LOST_MARKER_TAGS` reconnaît ci-dessus. Plutôt que d'y ajouter des tags un par un,
+ * la recherche n'autorise qu'UN SEUL niveau d'élément entre la racine et le texte : celui du
+ * conteneur de ligne (typiquement le `<p>` du rendu Markdown, ou la racine elle-même). Un
+ * second niveau — qu'il s'agisse d'un tag de `LOST_MARKER_TAGS` ou de n'importe quel autre —
+ * ABORT, quel que soit son nom : le texte "issue: use `Foo`" (finding #1, plus haut) reste
+ * accepté parce que son PREMIER nœud de texte, "issue: use ", est un enfant DIRECT du `<p>` —
+ * `<code>Foo</code>` le suit en frère, jamais en ancêtre.
+ *
+ * `isRoot` excepte uniquement l'appel de DÉPART de cette vérification (tags ET profondeur) :
+ * c'est le conteneur de commentaire de la PLATEFORME (`.comment-body`, un `<td>` sur GitHub
+ * réel), jamais lui-même un construct Markdown rendu — le soumettre à la même règle romprait
+ * la recherche pour CHAQUE commentaire le jour où son tag coïnciderait avec l'un de
+ * `LOST_MARKER_TAGS` (c'est déjà le cas de `<td>`, si une cellule de tableau y figurait un
+ * jour), ou compterait le conteneur de la plateforme lui-même comme le premier niveau
+ * autorisé, privant le VRAI premier niveau (le `<p>` du rendu Markdown) du sien. */
+function firstTextNode(node: Node, isRoot = true, depth = 0): Text | typeof ABORT | null {
   if (node.nodeType === 3 /* Node.TEXT_NODE */) {
     return (node as Text).data.trim().length > 0 ? (node as Text) : null;
   }
   if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
     const element = node as Element;
     if (element.classList.contains('cct-badge')) return null;
-    if (!isRoot && LOST_MARKER_TAGS.has(element.tagName)) return ABORT;
+    if (!isRoot && (LOST_MARKER_TAGS.has(element.tagName) || depth >= 1)) return ABORT;
   }
+  const nextDepth = isRoot ? depth : depth + 1;
   for (const child of node.childNodes) {
-    const found = firstTextNode(child, false);
+    const found = firstTextNode(child, false, nextDepth);
     if (found === ABORT) return ABORT; // remonte l'abandon jusqu'à la racine, jamais un frère suivant
     if (found) return found;
   }

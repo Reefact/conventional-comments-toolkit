@@ -190,13 +190,24 @@ function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
  * (revue Reefact, PR #40 — l'entretien du masquage doit survivre au chemin rapide, où les
  * badges existants ne sont ni retirés ni reconstruits), le premier nœud de texte du sous-arbre
  * PEUT être celui d'un badge — son propre texte ("issue", "blocking"…) n'est jamais le corps
- * réel du commentaire. */
+ * réel du commentaire.
+ *
+ * Renonce ENTIÈREMENT (retourne `null` sans chercher plus loin) dès qu'un `<pre>`/`<code>` se
+ * présente avant tout texte significatif — jamais en le traversant pour atteindre un nœud
+ * suivant (revue Reefact, PR #40) : `bodyText` vient de `commentBodyText()`, donc du DOM
+ * RENDU, où les délimiteurs ``` de la source Markdown n'existent plus — `analyze()` (§3.4.1
+ * étape 2, qui cherche ces délimiteurs littéralement) peut alors traiter à tort le contenu
+ * d'un bloc de code comme la ligne de préfixe. Continuer la recherche au-delà risquerait de
+ * masquer un fragment sans rapport qui commencerait, par coïncidence, de la même façon ; s'y
+ * arrêter net évite en plus, et surtout, d'écrire quoi que ce soit DANS le code affiché. */
 function firstTextNode(node: Node): Text | null {
   if (node.nodeType === 3 /* Node.TEXT_NODE */) {
     return (node as Text).data.trim().length > 0 ? (node as Text) : null;
   }
-  if (node.nodeType === 1 /* Node.ELEMENT_NODE */ && (node as Element).classList.contains('cct-badge')) {
-    return null;
+  if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
+    const element = node as Element;
+    if (element.classList.contains('cct-badge')) return null;
+    if (element.tagName === 'PRE' || element.tagName === 'CODE') return null;
   }
   for (const child of node.childNodes) {
     const found = firstTextNode(child);
@@ -219,7 +230,14 @@ function isLosslessBadgeProjection(prefixLine: string, shown: ResolvedDecoration
   const match = matchPrefix(prefixLine);
   if (!match) return false; // ne devrait pas arriver si le label est résolu ; on renonce prudemment sinon
   if (match.decorations === null) return true; // aucune décoration écrite : rien à perdre
-  const written = new Set(parseDecorations(match.decorations).canonical);
+  const parsed = parseDecorations(match.decorations);
+  // Une erreur de syntaxe (parenthèses vides, élément vide entre deux virgules, caractère
+  // invalide, espace interne — §3.3, E-DECORATION-SYNTAX) ne produit ni ne modifie AUCUN badge :
+  // ce n'est pas une décoration qui disparaîtrait de l'affichage, c'est la PREUVE du défaut
+  // elle-même — la virgule ou la parenthèse fautive — qui disparaîtrait avec le texte (revue
+  // Reefact, PR #40 — "issue (): x", "issue (blocking,): x").
+  if (parsed.syntaxIssues.length > 0) return false;
+  const written = new Set(parsed.canonical);
   const shownIds = new Set(shown.map((d) => d.id));
   for (const id of written) {
     if (!shownIds.has(id)) return false;

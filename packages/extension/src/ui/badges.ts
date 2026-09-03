@@ -131,7 +131,7 @@ function badgeSignature(
   });
 }
 
-/** Repère la fin du préfixe structuré dans `rawLine` — un texte dont on n'est pas encore
+/** Repère la portion structurée à masquer dans `rawLine` — un texte dont on n'est pas encore
  * certain qu'il correspond bien à la ligne que `analyze()` a reconnue, d'où la première
  * vérification. `prefixLine` est la ligne normalisée (§3.4.1, étapes 4-6) que porte déjà
  * `CommentAnalysis` ; retrouver la même frontière dans `rawLine` demande de défaire seulement
@@ -139,8 +139,15 @@ function badgeSignature(
  * ligne, (b) remplacer un à un chaque caractère d'espacement Unicode par un espace ordinaire
  * — jamais fusionné, jamais scindé, donc sans effet sur la position d'un caractère qui suit.
  * Un BOM interne (seul cas qui changerait la longueur ailleurs qu'en bord de ligne) fait
- * renoncer plutôt que risquer de masquer la mauvaise frontière. */
-function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
+ * renoncer plutôt que risquer de masquer la mauvaise frontière.
+ *
+ * `start` peut être non nul : un émoji de tête (`🔥 issue: x`) est TOLÉRÉ en entrée mais
+ * IGNORÉ pour l'analyse (§3.1, `PrefixMatch.emoji`) — ce n'est pas une partie de « label
+ * (décorations): » et il ne doit donc jamais entrer dans le span masqué. Le badge affiche
+ * `resolved.label.icon`, une icône de CONFIGURATION, potentiellement absente ou différente de
+ * l'émoji réellement écrit par l'auteur : le masquer donnerait l'impression que l'un a
+ * remplacé l'autre, alors qu'ils n'ont aucun rapport (revue Reefact, PR #40). */
+function hiddenPrefixSpan(rawLine: string, prefixLine: string): { start: number; end: number } | null {
   const m = matchPrefix(prefixLine);
   if (!m) return null;
   const labelStart = prefixLine.indexOf(m.label);
@@ -157,25 +164,32 @@ function hiddenPrefixEnd(rawLine: string, prefixLine: string): number | null {
   while (normalizedEnd < prefixLine.length && (prefixLine[normalizedEnd] === ' ' || prefixLine[normalizedEnd] === '\t')) {
     normalizedEnd++;
   }
-  // Seule la portion structurée (`label (décorations): `), jamais la ligne entière : le SUJET
-  // qui la suit peut être scindé sur un autre nœud DOM par la moindre mise en forme inline
-  // (code, lien, gras, mention, référence…) — cas courant (revue Reefact, PR #40) — auquel cas
-  // `rawLine` s'arrête net à la fin du préfixe, plus court que la ligne normalisée complète.
-  const expectedPrefix = prefixLine.slice(0, normalizedEnd);
+  // La validation porte sur la ligne ENTIÈRE reconnue (émoji toléré compris, depuis l'index 0) —
+  // seule la frontière de DÉPART du masquage, plus bas, exclut cet émoji. Le SUJET qui suit
+  // peut être scindé sur un autre nœud DOM par la moindre mise en forme inline (code, lien,
+  // gras, mention, référence…) — cas courant (revue Reefact, PR #40) — auquel cas `rawLine`
+  // s'arrête net à la fin du préfixe, plus court que la ligne normalisée complète.
+  const expectedFullMatch = prefixLine.slice(0, normalizedEnd);
   // `rawLine` doit CORRESPONDRE à ce préfixe, pas seulement le contenir par coïncidence : sans
   // ce garde, un texte de tête sans rapport (bloc de code écarté par §3.4.1 étape 2, contenu
   // d'un élément imbriqué que le premier nœud de texte ne représente pas fidèlement) où le
   // label apparaîtrait par hasard produirait une frontière calculée sur du texte qui n'est pas
   // le préfixe. Les deux sens de `startsWith` couvrent : (a) le sujet continue dans CE nœud —
-  // son normalisé est alors plus LONG que `expectedPrefix` ; (b) `rawLine` s'arrête pile à la
-  // fin du préfixe — son bord de fin est alors rogné par le trim de `normalizePrefixLine`, donc
-  // plus COURT que `expectedPrefix`.
+  // son normalisé est alors plus LONG que `expectedFullMatch` ; (b) `rawLine` s'arrête pile à
+  // la fin du préfixe — son bord de fin est alors rogné par le trim de `normalizePrefixLine`,
+  // donc plus COURT que `expectedFullMatch`.
   const normalizedRawLine = normalizePrefixLine(rawLine);
-  if (!normalizedRawLine.startsWith(expectedPrefix) && !expectedPrefix.startsWith(normalizedRawLine)) return null;
+  if (!normalizedRawLine.startsWith(expectedFullMatch) && !expectedFullMatch.startsWith(normalizedRawLine)) return null;
   const leadingStrip = rawLine.length - rawLine.replace(/^[\p{White_Space}\uFEFF]+/u, '').length;
-  const rawEnd = leadingStrip + expectedPrefix.length;
+  const rawEnd = leadingStrip + normalizedEnd;
   if (rawEnd > rawLine.length || rawLine.slice(0, rawEnd).includes('\uFEFF')) return null;
-  return rawEnd;
+  // `labelStart` n'est non nul QUE si `prefixLine` porte un \u00E9moji de t\u00EAte : la ligne est d\u00E9j\u00E0
+  // bord-trim\u00E9e (\u00A73.4.1), donc sans \u00E9moji `m.label` commence forc\u00E9ment \u00E0 l'index 0. Repousser
+  // `leadingStrip` (espaces bruts en t\u00EAte de `rawLine`, sans rapport avec un \u00E9moji) dans le
+  // d\u00E9part du span uniquement quand un \u00E9moji existe r\u00E9ellement \u00E9vite de faire r\u00E9appara\u00EEtre,
+  // pour tout pr\u00E9fixe SANS \u00E9moji, un n\u0153ud \u00AB t\u00EAte vide \u00BB scind\u00E9 pour rien.
+  const rawLabelStart = labelStart > 0 ? leadingStrip + labelStart : 0;
+  return { start: rawLabelStart, end: rawEnd };
 }
 
 /** Signale, depuis `firstTextNode()`, un abandon qui doit remonter jusqu'à la racine de la
@@ -305,22 +319,29 @@ function applyPrefixVisibility(commentBodyElement: Element, prefixLine: string |
   if (existing) return;
   const first = firstTextNode(commentBodyElement);
   if (!first || first === ABORT) return;
-  const end = hiddenPrefixEnd(first.data, prefixLine);
-  if (end === null) return;
-  const trimmedHidden = first.data.slice(0, end).trim();
-  const trimmedBody = bodyText.trim();
+  const span = hiddenPrefixSpan(first.data, prefixLine);
+  if (span === null) return;
+  const hiddenText = first.data.slice(span.start, span.end);
   // Ne jamais masquer la totalité du contenu visible d'un commentaire (sujet vide, aucune
-  // autre ligne) : le lecteur verrait une bulle sans aucun texte, alors que rien n'empêche de
-  // publier "issue:" seul (§3.5 signale E-EMPTY-SUBJECT, mais ne bloque pas la publication).
-  // `startsWith`, pas une simple comparaison de longueur : une incohérence entre `first.data`
-  // et `bodyText` (qui ne devrait plus se produire, mais que ce garde coûte peu à vérifier)
-  // doit renoncer plutôt que masquer un fragment qui ne commence pas vraiment le commentaire.
-  if (!trimmedBody.startsWith(trimmedHidden) || trimmedBody.slice(trimmedHidden.length).trim() === '') return;
-  first.splitText(end); // `first` ne garde que le préfixe ; la suite devient un nœud frère, déjà en place
+  // autre ligne, aucun émoji de tête) : le lecteur verrait une bulle sans aucun texte, alors
+  // que rien n'empêche de publier "issue:" seul (§3.5 signale E-EMPTY-SUBJECT, mais ne bloque
+  // pas la publication). `replace()`, pas `startsWith` : `bodyText` peut commencer par un
+  // émoji de tête (§3.1) qui reste VISIBLE, hors de `hiddenText` — retirer ce dernier de
+  // `bodyText`, où qu'il commence, dit correctement si quelque chose d'autre resterait visible
+  // (l'émoji conservé compris).
+  if (bodyText.replace(hiddenText, '').trim() === '') return;
+  let target = first;
+  if (span.start > 0) {
+    // `first` ne garde que l'émoji toléré (§3.1), VISIBLE — jamais dans le span masqué, qui
+    // ne couvre que « label (décorations): » (revue Reefact, PR #40). `target` porte la suite,
+    // déjà en place comme nœud frère.
+    target = first.splitText(span.start);
+  }
+  target.splitText(span.end - span.start); // `target` ne garde que le préfixe ; la suite devient un nœud frère
   const hidden = globalThis.document.createElement('span');
   hidden.className = 'cct-hidden-prefix';
-  first.replaceWith(hidden);
-  hidden.appendChild(first);
+  target.replaceWith(hidden);
+  hidden.appendChild(target);
 }
 
 export function decorateComment(

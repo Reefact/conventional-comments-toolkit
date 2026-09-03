@@ -11,13 +11,26 @@
 // cosmétiques, elles ne peuvent donc jamais faire diverger un verdict ni être verrouillées
 // par un plancher — les fournir ici est sans risque pour ces deux garanties.
 //
-// La couleur ne teinte jamais un FOND (`styles.css` : `.cct-badge`, `.cct-label-button` et
-// son état actif ne l'appliquent qu'à `border-color` — vérifié dans le fichier au moment
-// d'écrire ceci, pas supposé), donc aucune des deux teintes n'a besoin de satisfaire un
-// ratio de contraste de TEXTE (§10) : le texte reste toujours la couleur par défaut de la
-// page. Le seul critère est une luminosité moyenne (ni trop pâle sur fond clair, ni trop
-// sombre sur fond sombre) : une couleur hex fixe, contrairement au repli
-// `var(--borderColor-default, currentColor)` qu'elle remplace, ne s'adapte plus au thème.
+// La couleur ne teinte jamais un FOND au repos (`styles.css` : `.cct-badge` et
+// `.cct-label-button` à l'état non pressé n'appliquent `--cct-label-color` qu'à
+// `border-color` — vérifié dans le fichier, pas supposé), donc aucune des deux teintes n'a
+// besoin de satisfaire le ratio de contraste de TEXTE (§10, WCAG 2.1 SC 1.4.3, 4,5:1) : le
+// texte reste toujours la couleur par défaut de la page. Le critère qui s'applique est celui
+// d'une bordure de composant d'interface : WCAG 2.1 SC 1.4.11 (Non-text Contrast), 3:1
+// minimum — contre le fond RÉEL du composant qui la porte, pas contre une estimation à l'œil.
+//
+// Chaque teinte ci-dessous est vérifiée par un test dédié (packages/core/test/config.test.ts)
+// contre les 9 fonds Primer clair/sombre/dark-dimmed × canvas/muted/button-rest, mesurés en
+// direct sur github.com (light.css/dark.css/dark_dimmed.css servis sous les mêmes attributs
+// data-color-mode/data-dark-theme que la page elle-même) le 2026-09-03 — PAS recopiés d'une
+// mémoire de session précédente : une première palette choisie ici s'est révélée invisible en
+// thème sombre (jusqu'à 1,23:1 pour `decision`), l'écart entre « luminosité qui semble
+// correcte à l'œil » et un ratio mesuré est resté invisible tant que personne n'avait fait le
+// calcul. L'état PRESSÉ de `.cct-label-button` (fond `--bgColor-accent-emphasis`, un bleu
+// d'emphase) n'est délibérément pas couvert par ce seuil : aucune palette de treize teintes
+// distinctes ne peut satisfaire 3:1 contre ce fond précis sans s'effondrer vers une poignée de
+// couleurs quasi identiques — l'état pressé se distingue déjà par son fond et son texte
+// inversés (§5.1), la bordure y est un simple rappel, pas le seul signal.
 
 import type { EffectiveConfig, LabelConfig } from '../types.js';
 
@@ -35,26 +48,26 @@ export function defaultConfig(): EffectiveConfig {
     version: 1,
     mode: 'assist',
     labels: [
-      label('praise', '\u{1F389}', '#2E7D32', false, false),
-      label('nitpick', '\u{1F50D}', '#57606A', false, true),
-      label('suggestion', '\u{1F4A1}', '#9A6700', false, false),
-      // Icône et couleur identiques à celles de l'exemple normatif
-      // (.conventional-comments.example.json) : issue est le seul label que la spécification
-      // illustre, autant rester cohérent avec elle plutôt que de choisir une valeur différente
-      // sans raison.
-      label('issue', '\u{1F528}', '#B3261E', true, false),
-      label('todo', '\u{1F4CC}', '#BC4C00', true, false),
-      label('question', '\u{2753}', '#0969DA', false, false),
-      label('thought', '\u{1F4AD}', '#8250DF', false, true),
-      label('chore', '\u{1F9F9}', '#845D29', true, false),
-      label('note', '\u{1F4DD}', '#1B7C83', false, true),
-      label('decision', '\u{1F3C1}', '#4C2889', false, true),
+      label('praise', '\u{1F389}', '#36933B', false, false),
+      label('nitpick', '\u{1F50D}', '#76818E', false, true),
+      label('suggestion', '\u{1F4A1}', '#B07600', false, false),
+      // Icône identique à celle de l'exemple normatif (.conventional-comments.example.json,
+      // qui n'illustre que la FORME des clés, cf. en-tête de fichier) ; la couleur n'a en
+      // revanche pas pu rester celle de l'exemple (#B3261E, ~2,00:1 au pire, cf. plus haut) —
+      // l'exemple a été aligné sur celle-ci plutôt que l'inverse.
+      label('issue', '\u{1F528}', '#E04E45', true, false),
+      label('todo', '\u{1F4CC}', '#D95800', true, false),
+      label('question', '\u{2753}', '#197EF5', false, false),
+      label('thought', '\u{1F4AD}', '#9368E3', false, true),
+      label('chore', '\u{1F9F9}', '#A97735', true, false),
+      label('note', '\u{1F4DD}', '#1F8E96', false, true),
+      label('decision', '\u{1F3C1}', '#936DD4', false, true),
       // Labels optionnels, livrés désactivés (§3.2, §8.1.4) — icône et couleur assignées
       // quand même : (re)activer un label ne doit pas exiger de configurer aussi son
       // apparence pour sortir du rendu monochrome que #18 décrit.
-      label('typo', '\u{1F524}', '#BF3989', false, false, false),
-      label('polish', '\u{2728}', '#0B8793', false, false, false),
-      label('quibble', '\u{1FAB6}', '#4B6A53', false, false, false),
+      label('typo', '\u{1F524}', '#CC549C', false, false, false),
+      label('polish', '\u{2728}', '#0C8E9A', false, false, false),
+      label('quibble', '\u{1FAB6}', '#61896C', false, false, false),
     ],
     decorations: {
       allowFree: true,

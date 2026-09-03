@@ -572,6 +572,17 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     // n'existera jamais dans ce cas.
     const previousController = entry.controller;
     const published = adapter.readPublishedResult();
+    // La garde de l'ancien contrôleur passe IMMÉDIATEMENT à la NOUVELLE configuration
+    // (revue Reefact, PR #39) : le laisser en place ne devait éviter qu'une fenêtre SANS
+    // AUCUNE garde (revue Codex, PR #39, ci-dessus) — pas geler sa décision sur l'ANCIENNE
+    // configuration pendant toute la durée des deux lectures qui suivent. Sans ce rappel,
+    // un passage `warn → enforce` laissait un commentaire invalide publiable jusqu'à leur
+    // fin, et un passage à l'état dégradé (ou `enforce → warn`) pouvait continuer de
+    // bloquer alors que le §5.4 exige déjà de désarmer. `updateResolved()` ne touche que la
+    // validation (`deps.resolved`/`deps.published`, `refresh()`) — jamais la barre d'outils
+    // ni la saisie rapide, qui restent celles de l'ANCIENNE configuration le temps que le
+    // remplaçant soit prêt, exactement comme voulu.
+    previousController?.updateResolved(resolved, published);
     const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
     const directShortcuts = await readDirectShortcuts(); // §5.2 — préférence locale (§8.1.2)
     // Supplanté par une réconciliation plus récente sur la MÊME entrée, ou révoqué, pendant

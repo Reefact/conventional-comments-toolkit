@@ -592,4 +592,86 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     // plus jamais retrouver pour le disposer.
     expect(host.querySelector('.cct-toolbar')).toBeNull();
   });
+
+  it('J. la garde de l’ancien contrôleur passe à la NOUVELLE configuration dès le début de sa reconstruction (revue Reefact, PR #39)', async () => {
+    const element = document.createElement('textarea');
+    element.className = 'CommentBox-input';
+    const host = document.createElement('div');
+    const submit = document.createElement('button');
+    host.append(element, submit);
+    document.body.append(host);
+
+    const initialConfigText = JSON.stringify({
+      mode: 'warn', // pas de blocage, même avec un diagnostic présent
+      configCacheTtlSeconds: 0,
+      activation: { activatedAt: '2019-01-01T00:00:00Z' },
+    });
+    const state: FakeState = {
+      configText: initialConfigText,
+      // Comme dans les tests A/H : aucun résumé publié à l'attachement, pas d'écart
+      // d'empreinte possible tant qu'aucun résumé n'existe (§8.1.3, règle 2).
+      published: null,
+    };
+    installAdapter(state, element, submit);
+
+    // Même dispositif que G/H/I : seul le SECOND appel de `chrome.storage.sync.get` après
+    // armement (celui de `reconcile()`) est bloqué.
+    let armed = false;
+    let callsSinceArmed = 0;
+    let releaseBlockedRead: (() => void) | null = null;
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        sync: {
+          get: (_keys: string[], cb: (items: Record<string, unknown>) => void) => {
+            if (armed) {
+              callsSinceArmed++;
+              if (callsSinceArmed === 2) {
+                releaseBlockedRead = () => cb({});
+                return;
+              }
+            }
+            cb({});
+          },
+        },
+      },
+    };
+
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
+    element.value = 'pas de label ici'; // diagnostic présent, mais `warn` ne bloque jamais
+    disposers.push(await bootstrap(document));
+    await flushAll();
+    expect(submit.hasAttribute('aria-disabled')).toBe(false); // warn : jamais de blocage
+
+    // Le mode passe à `enforce` — la reconstruction qui en découle attend la lecture de
+    // langue, bloquée pour observer l'état de la garde PENDANT cette attente.
+    armed = true;
+    const nextConfigText = JSON.stringify({
+      mode: 'enforce',
+      configCacheTtlSeconds: 0,
+      activation: { activatedAt: '2019-01-01T00:00:00Z' },
+    });
+    state.configText = nextConfigText;
+    state.published = published({
+      state: 'failure',
+      unresolvedBlockingCount: 1,
+      configFingerprint: fingerprintFor(nextConfigText),
+    });
+    document.body.appendChild(document.createElement('span'));
+    await flushAll();
+    expect(releaseBlockedRead).not.toBeNull(); // la reconstruction attend bien
+
+    // PENDANT la reconstruction, AVANT que le remplaçant ne soit prêt : la garde de
+    // l'ANCIEN contrôleur, elle, a déjà basculé sur la NOUVELLE configuration — sans
+    // attendre la fin des lectures de stockage (revue Reefact, PR #39). Sans ce rappel
+    // immédiat, `submit` resterait débloqué ici, un commentaire invalide restant
+    // publiable jusqu'à la fin de ces lectures.
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+
+    releaseBlockedRead!();
+    await flushAll();
+
+    // Le remplaçant est en place, et bloque toujours le même diagnostic.
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+  });
 });

@@ -135,17 +135,19 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(commentBodyText(el)).toBe(body); // le nœud blanc précédent, lui, n'a pas bougé
   });
 
-  it('renonce quand le nœud de texte trouvé ne correspond pas à la ligne reconnue par analyze()', () => {
-    // Un bloc de code délimité est écarté par analyze() (§3.4.1 étape 2) mais reste le premier
-    // texte VISIBLE du DOM — s'il contenait par coïncidence un mot qui ressemble à un label,
-    // le nœud trouvé ne doit jamais être confondu avec la ligne réellement reconnue.
+  it('ne masque jamais à l’intérieur d’un bloc de code — les délimiteurs ``` n’existent plus dans le texte RENDU (revue Reefact, PR #40)', () => {
+    // bodyText vient de commentBodyText(), donc du DOM RENDU : les ``` de la source Markdown
+    // ont disparu, absorbés par la mise en forme <pre><code> — analyze() (§3.4.1 étape 2, qui
+    // cherche ces délimiteurs littéralement) peut alors traiter à tort le contenu d'un bloc de
+    // code comme la ligne de préfixe. `body` est dérivé par commentBodyText(el), comme le fait
+    // réellement l'adaptateur — jamais tapé à la main avec des fences qui n'existeraient plus.
     const el = document.createElement('div');
-    el.innerHTML = '<pre><code>issue tracker note</code></pre><p>issue: fix this</p>';
-    const body = '```\nissue tracker note\n```\nissue: fix this';
+    el.innerHTML = '<pre><code>issue: fake</code></pre><p>real subject, not a prefix</p>';
+    const body = commentBodyText(el);
     decorateComment(el, body, defaultConfig(), profile, 'en');
 
-    expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull(); // le label est bien résolu…
-    expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais rien n'est masqué pour autant
+    expect(el.querySelector('pre')?.textContent).toBe('issue: fake'); // le code affiché reste intact
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
   });
 
   it('masque le préfixe même quand une mise en forme inline suit dans le sujet (revue Reefact, PR #40)', () => {
@@ -221,5 +223,35 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(13); // 12 nommées + 1 badge "+1"
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
     expect(el.textContent).toContain(`issue (${ids.join(', ')}): x`);
+  });
+
+  it('renonce quand les parenthèses de décoration sont VIDES — canonical vide dirait "sans perte" à tort (revue Reefact, PR #40)', () => {
+    // "issue (): x" : parseDecorations('') pose un syntaxIssues (empty-parens) et canonical=[].
+    // Un test borné à `canonical` ne verrait AUCUNE décoration écrite, donc "rien à perdre" —
+    // alors que la parenthèse vide est elle-même la preuve du défaut (E-DECORATION-SYNTAX),
+    // qui disparaîtrait avec le texte masqué.
+    const body = 'issue (): x';
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull();
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+    expect(el.textContent).toContain('issue (): x');
+  });
+
+  it('renonce quand un élément de décoration est VIDE entre deux virgules — la virgule fautive ne doit pas disparaître (revue Reefact, PR #40)', () => {
+    // "issue (blocking,): x" : canonical=["blocking"] (syntaxiquement valide, résolu, montré en
+    // badge) MAIS un syntaxIssues (empty-element) accompagne la virgule surnuméraire. Comparer
+    // canonical à `shown` seul dirait "sans perte" (blocking EST montré) et masquerait la
+    // virgule fautive avec le reste — exactement la cause de la non-conformité.
+    const body = 'issue (blocking,): x';
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelectorAll(':scope > .cct-badge-deco').length).toBeGreaterThan(0); // "blocking" est bien montré…
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais la virgule fautive reste visible
+    expect(el.textContent).toContain('issue (blocking,): x');
   });
 });

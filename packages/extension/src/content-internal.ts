@@ -922,9 +922,21 @@ function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boo
   return `${published}|${completion}|${threadIds}|${commentCount}`;
 }
 
+/** Corps de commentaire rendus — les éléments SEULS, jamais `getRenderedComments()` : cette
+ * dernière calcule aussi `bodyText`, donc un clone de sous-arbre par commentaire décoré, un
+ * coût que `ownOutputSignatureOf` paierait à chaque mutation pour la durée de vie de
+ * l'onglet (même raison que la sonde de COMPTE de `chromeSignatureOf`). Vide pour un
+ * adaptateur qui ne l'expose pas : la surface d'affichage du §5.5 est hors du contrat
+ * normatif §9.2.3, un adaptateur n'a pas à la porter pour être valide. */
+function renderedCommentElementsOf(adapter: PlatformAdapter): Element[] {
+  const withElements = adapter as PlatformAdapter & { getRenderedCommentElements?: () => Element[] };
+  return withElements.getRenderedCommentElements?.() ?? [];
+}
+
 /** Ce que NOTRE rendu écrit dans la page, et que la plateforme peut défaire : le texte des
- * fils — nos badges y entrent — et la présence de nos deux surfaces (§5.5). Deux angles
- * morts que le décompte seul laissait ouverts (revue Codex, PR #26) :
+ * fils et des corps de commentaire — nos badges et notre masquage de préfixe y entrent — et
+ * la présence de nos deux surfaces (§5.5). Trois angles morts que le décompte seul laissait
+ * ouverts (revue Codex, PR #26 ; puis le défaut d'édition ci-dessous) :
  *
  * - une racine éditée SUR PLACE (`issue: a` corrigé en `issue: b`) ne change ni le nombre de
  *   fils, ni leurs identifiants, ni le nombre de commentaires — la signature de plateforme
@@ -932,7 +944,21 @@ function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boo
  *   désormais le SUJET, gardait un texte périmé ;
  * - une réhydratation React qui remplace le parent auquel le bandeau est adossé
  *   (`bannerMount`) emporte notre élément sans rien changer à cet état de plateforme : rien
- *   ne le faisait revenir.
+ *   ne le faisait revenir ;
+ * - un commentaire de la CONVERSATION mis à jour par son auteur : la plateforme réécrit le
+ *   corps rendu, ce qui emporte nos badges ET le masquage du préfixe, sans changer le nombre
+ *   de commentaires ni rien de ce que porte `chromeSignatureOf`. Les fils RENDUS
+ *   (`getRenderedThreadElements`) ne couvrent pas ce cas : sur GitHub ils ne désignent que
+ *   les fils de revue (`[data-testid="review-thread"]`,
+ *   `.js-resolvable-timeline-thread-container`), jamais un commentaire de premier niveau.
+ *   Rien ne bougeait donc dans aucune des deux signatures, `run()` sortait, et le
+ *   commentaire restait DÉFINITIVEMENT sans badge, préfixe structuré réapparu en clair.
+ *
+ * Le texte, et pas seulement la PRÉSENCE de nos nœuds (un simple compte de `.cct-badge`
+ * suffirait à rattraper un corps réécrit) : nous n'avons pas MESURÉ comment chaque
+ * plateforme applique une édition — remplacement du sous-arbre rendu, ou correctif ciblé sur
+ * les seuls nœuds de texte. Le second laisserait nos badges en place et PÉRIMÉS, un défaut
+ * qu'aucun compte ne verrait ; le digest de texte couvre les deux sans avoir à trancher.
  *
  * **Capturée APRÈS le rendu, jamais avant.** C'est tout l'intérêt de la séparer de
  * `chromeSignatureOf` : nos badges et nos insertions modifient précisément ce qu'elle
@@ -941,16 +967,19 @@ function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boo
  * coalescence des mutations et retarde d'autant le retrait d'un bandeau périmé. Comparée à
  * l'état laissé par le rendu précédent, seule une main EXTÉRIEURE la fait bouger. */
 function ownOutputSignatureOf(adapter: PlatformAdapter, doc: Document): string {
-  return `${textDigestOf(renderedThreadsOf(adapter))}|${injectedSurfacesOf(doc)}`;
+  const surfaces = [...renderedThreadsOf(adapter).map((t) => t.element), ...renderedCommentElementsOf(adapter)];
+  return `${textDigestOf(surfaces)}|${injectedSurfacesOf(doc)}`;
 }
 
-/** Empreinte 32 bits (FNV-1a) du texte des fils rendus. Le coût est assumé et reste bien
- * inférieur à celui que `getRenderedComments()` fait rejeter plus haut : une lecture de
- * `textContent` par conteneur de fil et un passage sur ses caractères, là où l'autre CLONE
- * le sous-arbre de chaque commentaire. */
-function textDigestOf(renderedThreads: { id: string; element: Element }[]): string {
+/** Empreinte 32 bits (FNV-1a) du texte des éléments où notre rendu écrit. Le coût est assumé
+ * et reste bien inférieur à celui que `getRenderedComments()` fait rejeter plus haut : une
+ * lecture de `textContent` par élément et un passage sur ses caractères, là où l'autre CLONE
+ * le sous-arbre de chaque commentaire. Un corps de commentaire déjà contenu dans un conteneur
+ * de fil est parcouru deux fois : le dédoublonner coûterait un `closest()` par commentaire,
+ * plus cher que le second passage qu'il éviterait. */
+function textDigestOf(elements: Element[]): string {
   let hash = 0x811c9dc5;
-  for (const { element } of renderedThreads) {
+  for (const element of elements) {
     const text = element.textContent ?? '';
     for (let i = 0; i < text.length; i++) {
       hash ^= text.charCodeAt(i);
@@ -1512,14 +1541,27 @@ async function renderPrChrome(
   const withRendered = adapter as PlatformAdapter & {
     getRenderedComments?: () => { element: Element; bodyText: string }[];
   };
+  let renderedComments = 0;
   if (withRendered.getRenderedComments) {
     for (const { element, bodyText } of withRendered.getRenderedComments()) {
       decorateComment(element, bodyText, resolved.config, profile, lang);
+      renderedComments++;
     }
   }
 
   applyCompletionState(adapter.getCompletionControl(), published, lang);
-  return { showed: hasSomethingToShow, resolved };
+  // Des commentaires rendus valent, EUX AUSSI, une issue définitive — au même titre qu'un
+  // bandeau affiché. `hasSomethingToShow` ne regardait que le bandeau et son décompte
+  // (résumé publié, fils) : sur une PR dont l'extension ne montre RIEN D'AUTRE que les
+  // badges de ses commentaires — composant B non déployé (§10), aucun fil de revue —, ce
+  // rendu concluait `showed: false` indéfiniment. `observePrChromeNavigation` traite ce
+  // `false` comme « la page s'hydrate encore, réessaie » : passé `RENDER_RETRY_WINDOW_MS`,
+  // il cesse alors de rendre TOUT COURT, et plus aucune mise à jour de commentaire ne
+  // reçoit ses badges — la fenêtre d'hydratation devenait une date de péremption pour la
+  // seule surface que cette PR affichait. `showed: true` ne fige rien : la reprise passe
+  // alors par les signatures (`chromeSignatureOf`/`ownOutputSignatureOf`), qui rendent dès
+  // que quoi que ce soit change — strictement plus réactif que l'expiration d'une fenêtre.
+  return { showed: hasSomethingToShow || renderedComments > 0, resolved };
 }
 
 /** Porte le `title`/`aria-disabled` NATIFS du bouton (branche protégée, revue requise…)

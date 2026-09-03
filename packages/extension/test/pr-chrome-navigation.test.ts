@@ -2141,3 +2141,134 @@ describe('Codex #38 — sondage périodique de la configuration effective sur un
     expect(repoConfigCalls).toBeGreaterThanOrEqual(callsAfterFirstRender + 2);
   }, 10000);
 });
+
+describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut signalé : badges disparus, préfixe réapparu en clair)', () => {
+  // VRAI GithubClientAdapter, jamais un faux : le défaut tient précisément à ce que les
+  // deux listes de cet adaptateur ne recouvrent PAS le même DOM — les fils rendus
+  // (`[data-testid="review-thread"]`, `.js-resolvable-timeline-thread-container`) ne
+  // contiennent aucun commentaire de la CONVERSATION, que ses corps de commentaire
+  // (`[data-testid="comment-body"]`, `.comment-body`) couvrent pourtant. Un faux qui
+  // exposerait les deux selon notre idée du DOM de GitHub testerait cette idée, pas le
+  // rapport entre les deux sélecteurs réellement livrés.
+  const fetchImpl = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+
+  function onPullRequest(): void {
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/acme/demo/pull/71'),
+      configurable: true,
+    });
+  }
+
+  /** Commentaire de premier niveau de l'onglet Conversation : un corps de commentaire, hors
+   * de tout conteneur de fil de revue. Le corps rendu par GitHub enveloppe chaque ligne
+   * Markdown dans un `<p>` — la seule forme que le masquage du préfixe accepte (ui/badges.ts,
+   * `firstTextNode`), et donc la seule qui vérifie vraiment quelque chose ici. */
+  function conversationComment(subject: string): Element {
+    document.body.innerHTML =
+      `<div class="js-comment"><div data-testid="comment-body"><p>nitpick (test): ${subject}</p><p>une discussion</p></div></div>`;
+    return document.querySelector('[data-testid="comment-body"]')!;
+  }
+
+  afterEach(async () => {
+    // `currentPr()` d'un VRAI adaptateur relit `document.location` à chaque appel : le
+    // laisser pointer sur cette PR ferait revivre, à la prochaine mutation, tout observateur
+    // dormant armé par un autre test sur ce document PARTAGÉ (voir l'en-tête de fichier).
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/acme/demo/pulls'),
+      configurable: true,
+    });
+    document.body.innerHTML = '';
+    await flushAll();
+  });
+
+  it('la réécriture du corps par la plateforme fait reposer les badges et le masquage du préfixe', async () => {
+    onPullRequest();
+    const body = conversationComment('un sujet de test');
+    // Résumé publié présent dès le départ : ce rendu a donc « montré quelque chose » quoi
+    // qu'il arrive, et seule la signature de NOTRE sortie peut encore remarquer la mise à
+    // jour du commentaire.
+    const check = document.createElement('div');
+    check.setAttribute('data-testid', 'check-run-item');
+    check.textContent = summaryLine(0);
+    document.body.appendChild(check);
+    const adapter = new GithubClientAdapter({ documentRef: document, fetchImpl });
+
+    observe(adapter, new ClientConfigResolver(async () => null), document);
+    await flushAll();
+    expect(body.querySelector('.cct-badge')).not.toBeNull();
+    expect(body.querySelector('.cct-hidden-prefix')).not.toBeNull();
+
+    // L'auteur met son commentaire à jour : GitHub réécrit le corps RENDU, ce qui emporte
+    // nos badges et notre masquage. Rien d'autre ne bouge — même nombre de commentaires,
+    // même résumé publié, toujours aucun fil de revue : avant correctif, ni
+    // `chromeSignatureOf` ni `ownOutputSignatureOf` ne changeaient, `run()` sortait, et ce
+    // commentaire restait DÉFINITIVEMENT sans badge, préfixe structuré affiché en clair.
+    body.innerHTML = '<p>nitpick (test): un sujet corrigé</p><p>une discussion</p>';
+    await flushAll();
+
+    expect(body.querySelector('.cct-badge')).not.toBeNull();
+    expect(body.querySelector('.cct-hidden-prefix')?.textContent).toBe('nitpick (test): ');
+    // Le sujet corrigé reste visible : seul le préfixe est masqué.
+    expect(body.querySelector('p')?.textContent).toContain('un sujet corrigé');
+  });
+
+  it('et cela vaut aussi passé la fenêtre d’hydratation, sur une PR où les badges sont la seule chose affichée', async () => {
+    onPullRequest();
+    const body = conversationComment('un sujet de test');
+    // Composant B non déployé (§10) : aucune ligne cc/1, aucun fil de revue — les badges
+    // des commentaires sont la SEULE chose que l'extension affiche sur cette PR. Avant
+    // correctif, un tel rendu concluait « rien à montrer », et `observePrChromeNavigation`
+    // cessait de rendre TOUT COURT une fois `RENDER_RETRY_WINDOW_MS` écoulée : la fenêtre
+    // d'hydratation devenait une date de péremption pour la seule surface affichée.
+    const adapter = new GithubClientAdapter({ documentRef: document, fetchImpl });
+    const clock = makeClock();
+
+    observe(adapter, new ClientConfigResolver(async () => null), document, clock.now);
+    await flushAll();
+    expect(body.querySelector('.cct-badge')).not.toBeNull();
+
+    clock.advance(RENDER_RETRY_WINDOW_MS + 1);
+    body.innerHTML = '<p>nitpick (test): un sujet corrigé</p><p>une discussion</p>';
+    await flushAll();
+
+    expect(body.querySelector('.cct-badge')).not.toBeNull();
+    expect(body.querySelector('.cct-hidden-prefix')?.textContent).toBe('nitpick (test): ');
+
+    // Une SECONDE mise à jour, et ce n'est pas une redite : passé la fenêtre, la sonde du
+    // bouton de complétion se fige (`chromeSignatureOf`, `probeCompletionControl`) — cette
+    // transition-là, à elle seule, provoque un rendu au tout premier réveil qui suit
+    // l'expiration, quelle que soit la cause. C'est ce deuxième tour, où plus rien ne bouge
+    // que le commentaire lui-même, qui vérifie que la mise à jour EST la cause du rendu.
+    body.innerHTML = '<p>nitpick (test): un sujet corrigé deux fois</p><p>une discussion</p>';
+    await flushAll();
+
+    expect(body.querySelector('.cct-badge')).not.toBeNull();
+    expect(body.querySelector('.cct-hidden-prefix')?.textContent).toBe('nitpick (test): ');
+    expect(body.querySelector('p')?.textContent).toContain('un sujet corrigé deux fois');
+  });
+
+  // Invariant dont dépend tout ce qui précède, dans LES DEUX adaptateurs : la sonde bon
+  // marché employée par `ownOutputSignatureOf` doit désigner EXACTEMENT les corps que le
+  // rendu décore (`getRenderedComments`). Deux listes qui divergeraient feraient surveiller
+  // des nœuds où rien n'est écrit — la signature resterait stable pendant que les badges
+  // disparaissent, c'est-à-dire le défaut d'origine, à nouveau, sans qu'aucun des deux tests
+  // ci-dessus ne le voie. Azure DevOps n'a jamais été vérifié en direct dans ce dépôt
+  // (§9.4) : c'est une raison de plus de contrôler au moins l'accord des deux sondes.
+  it('la sonde d’éléments et la lecture décorante désignent les mêmes corps (GitHub et Azure DevOps)', () => {
+    onPullRequest();
+    document.body.innerHTML =
+      '<div data-testid="comment-body"><p>issue: un sujet de test</p></div>' +
+      '<div data-testid="review-thread"><div class="comment-body"><p>nitpick: un autre sujet</p></div></div>' +
+      '<div class="markdown-content"><p>issue: un sujet Azure</p></div>';
+
+    const github = new GithubClientAdapter({ documentRef: document, fetchImpl });
+    expect(github.getRenderedCommentElements()).toEqual(github.getRenderedComments().map((c) => c.element));
+    expect(github.getRenderedCommentElements()).toHaveLength(github.getRenderedCommentCount());
+    expect(github.getRenderedCommentElements().length).toBeGreaterThan(0);
+
+    const azdo = new AzdoClientAdapter({ documentRef: document });
+    expect(azdo.getRenderedCommentElements()).toEqual(azdo.getRenderedComments().map((c) => c.element));
+    expect(azdo.getRenderedCommentElements()).toHaveLength(azdo.getRenderedCommentCount());
+    expect(azdo.getRenderedCommentElements().length).toBeGreaterThan(0);
+  });
+});

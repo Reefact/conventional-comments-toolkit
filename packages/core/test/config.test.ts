@@ -41,6 +41,18 @@ describe('§8.2 — valeurs par défaut du produit', () => {
     expect(abbr['?que']).toBe('question: ');
     expect(abbr['?qui']).toBe('quibble: ');
   });
+
+  it('chaque label porte une icône et une couleur par défaut (issue #18) — sans elles, le rendu du §5.1/§5.5 reste monochrome sur tout dépôt sans configuration propre', () => {
+    const c = defaultConfig();
+    for (const l of c.labels) {
+      expect(l.icon).toBeTruthy();
+      expect(l.color).toMatch(/^#[0-9A-Fa-f]{6}$/);
+    }
+    // Treize teintes distinctes : la couleur existe pour reconnaître un label sans lire le
+    // texte, un doublon irait à l'encontre de cet objectif.
+    const colors = c.labels.map((l) => l.color);
+    expect(new Set(colors).size).toBe(colors.length);
+  });
 });
 
 describe('§8.1.2 / §8.1.4 — précédence et fusion', () => {

@@ -443,7 +443,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     el.textContent = body;
     decorateComment(el, body, defaultConfig(), profile, 'en');
 
-    expect(el.querySelector(':scope > .cct-badge-label')?.textContent).toBe('issue'); // badge déjà canonique…
+    expect(el.querySelector(':scope > .cct-badge-label')?.textContent).toBe('🔨 issue'); // badge déjà canonique…
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais "Issue" reste visible, pas remplacé
     expect(el.textContent).toContain('Issue: x');
   });

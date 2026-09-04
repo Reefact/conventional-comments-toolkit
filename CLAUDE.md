@@ -103,6 +103,11 @@ Deux gardes mécanisent la part mécanisable :
   échappe au CORS quand il a la permission d'hôte » : vrai de l'URL demandée, faux de la CIBLE
   d'une redirection, qu'aucune permission ne couvre. Le relais `cct-fetch-config` prenait donc
   le mur du script de contenu, dans le contexte même qui était censé y échapper.
+- `npm run check:subject-line` — une affirmation de MISE EN PAGE, que happy-dom ne peut pas
+  trancher : il sait dire de quel élément un nœud est enfant, jamais sur quelle ligne il tombe.
+  Le même commentaire y est rendu des DEUX façons — badges dans le paragraphe du sujet, badges
+  au-dessus de lui — pour que la géométrie distingue réellement les deux, plutôt que de constater
+  qu'une page s'affiche.
 - `npm run smoke:mv3` — l'extension **empaquetée** chargée dans un vrai Chromium,
   qui vérifie les prémisses de l'architecture (le service worker voit bien
   `chrome.permissions`, il publie bien la répartition, la page d'options n'impose
@@ -123,9 +128,11 @@ npm run check:github-theme-vars # variables Primer de styles.css toujours prése
 npm run check:beacon            # un POST no-cors cross-origin part et arrive, sans referer ni cookie
 npm run check:content-script-cors # ce qu'un script de contenu a le droit de LIRE (redirections, cookies)
 npm run check:relay-cors        # la même question pour le service worker du relais
+npm run check:subject-line      # badges et sujet sur UNE seule ligne, mesuré (§5.5)
 ```
 
-`spike`, `smoke:mv3`, `check:beacon`, les deux `check:*-cors` et `check:github-theme-vars` pilotent un vrai Chromium via
+`spike`, `smoke:mv3`, `check:beacon`, les deux `check:*-cors`, `check:subject-line` et
+`check:github-theme-vars` pilotent un vrai Chromium via
 `playwright-core`, qui ne le télécharge pas à l'install : une fois par machine, `npx
 playwright-core install chromium` (comme le fait la CI avant ces commandes). `smoke:mv3`
 charge `packages/extension/dist-ext/` : lancer `npm run build:extension` d'abord.
@@ -133,8 +140,8 @@ charge `packages/extension/dist-ext/` : lancer `npm run build:extension` d'abord
 La CI rejoue ces commandes (`.github/workflows/`) : `ci.yml` (build + tests, Node 20 et
 22), `conformance.yml` (les gardes ci-dessus + spécification non modifiée par une PR de
 code), `extension-package.yml` (bundle MV3, aucun code distant), `browser-smoke.yml`
-(spike + fumée MV3 + transport de la télémétrie dans Chromium, quotidiennement et sur toute PR touchant
-`packages/extension/` ou `packages/adapters/`), `theme-vars-canary.yml` (variables de
+(spike + fumée MV3 + transport de la télémétrie + ligne du sujet dans Chromium, quotidiennement et sur
+toute PR touchant `packages/extension/` ou `packages/adapters/`), `theme-vars-canary.yml` (variables de
 thème GitHub hebdomadaire, ouvre une issue en cas d'échec). Les faire passer en local
 avant de pousser.
 

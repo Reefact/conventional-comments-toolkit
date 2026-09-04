@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { commentBodyText } from '@cct/adapter-shared';
 import { defaultConfig } from '@cct/core';
-import { decorateComment } from '../src/ui/badges.js';
+import { clearCommentDecorations, decorateComment } from '../src/ui/badges.js';
 
 const profile = { id: 'github', suggestionInfoString: 'suggestion' };
 
@@ -340,8 +340,12 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
 
     const hidden = el.querySelector('.cct-hidden-prefix');
     expect(hidden?.textContent).toBe('issue: ');
-    expect(hidden?.nextSibling?.textContent).toBe('use ');
+    // Le sujet mis en avant couvre la ligne ENTIÈRE, mise en forme inline comprise — la borner
+    // au premier nœud de texte laisserait « Foo » hors du gras, au milieu d'une même phrase.
+    expect(hidden?.nextSibling?.textContent).toBe('use Foo');
+    expect(el.querySelector('.cct-subject')?.textContent).toBe('use Foo');
     expect(el.querySelector('code')?.textContent).toBe('Foo'); // la mise en forme inline reste intacte
+    expect(el.querySelector('code')?.parentElement?.className).toBe('cct-subject'); // déplacée, pas recréée
   });
 
   it('réentretient le masquage sur le chemin rapide, quand une réhydratation de plateforme a effacé le wrapper sans toucher aux badges (revue Reefact, PR #40)', () => {
@@ -461,5 +465,412 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(1); // dédupliqué en un seul badge…
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais la répétition fautive reste visible
     expect(el.textContent).toContain('issue (blocking, blocking): x');
+  });
+});
+
+describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  /** DOM d'un commentaire GitHub rendu, tel que mesuré sur une vraie PR (voir le test du <td>
+   * plus haut) : un `<td>` de corps, une indentation, un `<p>` par paragraphe, un `<br>` pour
+   * chaque simple fin de ligne à l'intérieur d'un paragraphe. C'est le seul agencement où la
+   * différence entre « badges au-dessus » et « badges sur la ligne du sujet » est observable —
+   * un corps réduit à un nœud de texte n'a pas de paragraphe où les poser. */
+  function githubComment(html: string): Element {
+    const el = document.createElement('td');
+    el.innerHTML = html;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  it('pose les badges DANS le paragraphe du sujet — c’est ce qui les met sur sa ligne', () => {
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    // Le fond de l'affaire : tant que les badges sont FRÈRES du <p>, ce dernier est un bloc et
+    // son texte repart à la ligne sous eux, quoi qu'en dise la feuille de style. Dans le <p>,
+    // ils sont en flux inline avec le sujet, donc sur sa ligne.
+    const p = el.querySelector('p')!;
+    expect([...p.querySelectorAll(':scope > .cct-badge')].map((b) => b.textContent)).toEqual([
+      '🔍 nitpick',
+      'test',
+    ]);
+    expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(0); // plus aucun au-dessus du texte
+
+    // …et dans cet ordre : badges, puis le sujet, à leur droite.
+    const order = [...p.childNodes].map((n) => (n.nodeType === 1 ? (n as Element).className : '#text'));
+    expect(order.slice(0, 4)).toEqual([
+      'cct-badge cct-badge-label cct-badge-pill',
+      'cct-badge cct-badge-deco cct-badge-deco-custom cct-badge-pill',
+      'cct-hidden-prefix',
+      'cct-subject',
+    ]);
+  });
+
+  it('met le sujet en gras dans un <span>, jamais un <strong> — la mise en avant est cosmétique (§10)', () => {
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    const subject = el.querySelector('.cct-subject')!;
+    expect(subject.tagName).toBe('SPAN'); // <strong> annoncerait une emphase que l'auteur n'a pas écrite
+    expect(subject.textContent).toBe('subject');
+  });
+
+  it('le sujet s’arrête au premier <br> : la suite du paragraphe ne passe pas en gras avec lui', () => {
+    // Défaut visé, et la raison d'être de la frontière : une simple fin de ligne dans un
+    // commentaire GitHub devient un <br> DANS le même paragraphe — sans cette borne, tout le
+    // paragraphe se retrouverait en gras, « discussion » compris (capture Reefact).
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-subject')?.textContent).toBe('subject');
+    expect(el.querySelector('.cct-subject')?.nextSibling?.nodeName).toBe('BR');
+    expect(el.querySelector('p')?.textContent).toContain('discussion'); // toujours là, hors du gras
+  });
+
+  it('le sujet s’arrête aussi à une fin de ligne À L’INTÉRIEUR d’un nœud de texte', () => {
+    // Deuxième frontière, pour un corps rendu d'un seul tenant — ce que produit toute plateforme
+    // qui ne réécrit pas les sauts de ligne en <br>, et ce que produisent les DOM de test.
+    const body = 'praise: nice work\nand a second line';
+    const el = document.createElement('div');
+    el.textContent = body;
+    document.body.appendChild(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-subject')?.textContent).toBe('nice work');
+    expect(el.textContent).toContain('and a second line'); // la suite reste, hors du gras
+    expect(commentBodyText(el)).toBe(body); // et rien n'a bougé pour la relecture au tour suivant
+  });
+
+  it('ne modifie pas le texte relu, badges posés DANS le paragraphe compris', () => {
+    // `commentBodyText()` (adapter-shared) exclut les badges des DEUX emplacements possibles.
+    // Sans cette exclusion, le corps relu commencerait par « 🔍 nitpick test », analyze() ne
+    // reconnaîtrait plus le préfixe au tour suivant, et les badges seraient retirés puis reposés
+    // à chaque passage de rendu.
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    const before = el.textContent;
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(commentBodyText(el)).toBe(before);
+    expect(el.querySelector('.cct-badge')).not.toBeNull(); // les badges sont bien là, mais exclus
+  });
+
+  it('badges au-dessus du texte, sujet non mis en avant, quand le masquage est refusé (§9.4)', () => {
+    // Sans frontière de préfixe fiable — ici une décoration REJETÉE, dont le texte reste l'unique
+    // trace —, il n'y a pas non plus de sujet à border : le rendu retombe intégralement sur
+    // l'agencement d'avant, badges en tête du corps.
+    const cfg = defaultConfig();
+    cfg.decorations.allowFree = false;
+    const el = githubComment('<p dir="auto">issue (security): x</p>');
+    decorateComment(el, commentBodyText(el), cfg, profile, 'en');
+
+    expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(1); // au-dessus du <p>
+    expect(el.querySelector('p')?.querySelector('.cct-badge')).toBeNull();
+    expect(el.querySelector('.cct-subject')).toBeNull();
+  });
+
+  it('déplace les badges quand le masquage APPARAÎT sous une signature de badges inchangée', () => {
+    // Le chemin rapide ne peut pas se fier au seul couple signature/compte : « issue (blocking,):
+    // x » et « issue (blocking): x » produisent EXACTEMENT les mêmes badges (même label, même
+    // décoration résolue, même caractère bloquant), mais seule la seconde autorise le masquage —
+    // donc seule la seconde met les badges sur la ligne du sujet. Sans le contrôle du parent, les
+    // badges resteraient au-dessus d'un sujet passé en gras : deux moitiés d'agencements.
+    const el = githubComment('<p dir="auto">issue (blocking,): x</p>');
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(2); // virgule fautive : pas de masquage
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+
+    // Édition du commentaire : la plateforme réécrit le TEXTE du paragraphe, les badges (qui n'y
+    // sont pas encore) survivent intacts au-dessus de lui.
+    (el.querySelector('p')!.firstChild as Text).data = 'issue (blocking): x';
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(0); // aucun résidu au-dessus
+    expect(el.querySelector('p')?.querySelectorAll(':scope > .cct-badge')).toHaveLength(2);
+    expect(el.querySelector('.cct-subject')?.textContent).toBe('x');
+  });
+
+  it('idempotent : un second rendu ne double pas le sujet ni ne redéplace les badges', () => {
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+    const first = el.querySelector('.cct-subject');
+    const label = el.querySelector('.cct-badge-label');
+
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelectorAll('.cct-subject')).toHaveLength(1);
+    expect(el.querySelector('.cct-subject')).toBe(first); // même nœud, pas reconstruit
+    expect(el.querySelector('.cct-badge-label')).toBe(label);
+  });
+
+  it('rend le texte intact quand la résolution est perdue en direct — gras et masquage partent ensemble (§8.1.1)', () => {
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    const before = el.textContent;
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    expect(el.querySelector('.cct-subject')).not.toBeNull();
+
+    const disabled = defaultConfig();
+    disabled.labels.find((l) => l.id === 'nitpick')!.enabled = false;
+    decorateComment(el, commentBodyText(el), disabled, profile, 'en');
+
+    expect(el.querySelector('.cct-subject')).toBeNull();
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+    expect(el.querySelector('.cct-badge')).toBeNull();
+    expect(el.textContent).toBe(before); // texte reconstitué à l'identique, rien perdu
+    // Nœuds de texte recollés, pas seulement leur concaténation : deux frères adjacents feraient
+    // échouer le prochain masquage, qui calcule sa frontière sur UN nœud (hiddenPrefixSpan).
+    expect(el.querySelector('p')?.childNodes).toHaveLength(3); // texte, <br>, texte
+  });
+
+  it('réentretient le sujet quand une réhydratation l’a défait sans toucher au préfixe masqué', () => {
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    const subject = el.querySelector('.cct-subject')!;
+    subject.replaceWith(document.createTextNode(subject.textContent ?? ''));
+    expect(el.querySelector('.cct-subject')).toBeNull();
+
+    decorateComment(el, body, defaultConfig(), profile, 'en'); // chemin rapide : badges inchangés
+
+    expect(el.querySelector('.cct-subject')?.textContent).toBe('subject');
+  });
+
+  it('n’emballe jamais le sujet deux fois quand le préfixe masqué, lui, a disparu', () => {
+    // Le wrapper de sujet resté seul n'est ni un `<br>` ni une fin de ligne : le passage suivant
+    // le prendrait pour une partie du sujet et l'emballerait dans un NOUVEAU wrapper, une couche
+    // de plus à chaque rendu. Il est défait avant, pas contourné.
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    const hidden = el.querySelector('.cct-hidden-prefix')!;
+    hidden.replaceWith(document.createTextNode(hidden.textContent ?? ''));
+
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelectorAll('.cct-subject')).toHaveLength(1);
+    expect(el.querySelector('.cct-subject')?.querySelector('.cct-subject')).toBeNull(); // jamais imbriqué
+    expect(el.querySelector('.cct-subject')?.textContent).toBe('subject');
+    expect(commentBodyText(el)).toBe(body);
+  });
+
+  it('aucun wrapper de sujet quand il n’y a pas de sujet — « issue: » seul', () => {
+    // Le masquage y renonce déjà (il ne reste rien de visible) ; le gras n'a pas davantage de
+    // matière. Un span vide serait un nœud posé pour rien dans le DOM de chaque lecteur.
+    const body = 'issue:';
+    const el = document.createElement('div');
+    el.textContent = body;
+    document.body.appendChild(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-subject')).toBeNull();
+    expect(el.textContent).toContain('issue:');
+  });
+});
+
+describe('decorateComment() — la respiration sous la ligne du sujet (§5.5)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  function githubComment(html: string): Element {
+    const el = document.createElement('td');
+    el.innerHTML = html;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  it('pose un espaceur quand le corps reprend sur la ligne suivante du MÊME paragraphe', () => {
+    // C’est le cas de la capture d’origine : « subject » et « discussion » séparés par une
+    // simple fin de ligne, que GitHub rend en `<br>` DANS le paragraphe — sans espaceur, le
+    // corps se lit collé sous les badges.
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    const spacer = el.querySelector('.cct-subject-break');
+    expect(spacer).not.toBeNull();
+    expect(spacer?.previousSibling?.nodeName).toBe('BR'); // juste après le saut, avant le corps
+    expect(spacer?.textContent).toBe(''); // décoratif : n’ajoute aucun texte au corps relu
+  });
+
+  it('n’en pose AUCUN quand le corps reprend au paragraphe suivant — la plateforme espace déjà', () => {
+    // « s’il y en a déjà un, pas besoin d’en rajouter un autre » : une ligne vide dans la source
+    // produit un second `<p>`, dont la marge de bloc sépare déjà les deux. En ajouter un ici
+    // doublerait un écart qui existe.
+    const el = githubComment('<p dir="auto">nitpick (test): subject</p><p dir="auto">discussion</p>');
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-subject')?.textContent).toBe('subject');
+    expect(el.querySelector('.cct-subject-break')).toBeNull();
+  });
+
+  it('ne modifie pas le corps relu — l’espaceur est sans texte', () => {
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    const before = el.textContent;
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-subject-break')).not.toBeNull();
+    expect(commentBodyText(el)).toBe(before);
+  });
+
+  it('idempotent : un second rendu ne double pas l’espaceur', () => {
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    const body = commentBodyText(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+    const first = el.querySelector('.cct-subject-break');
+
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    expect(el.querySelectorAll('.cct-subject-break')).toHaveLength(1);
+    expect(el.querySelector('.cct-subject-break')).toBe(first);
+  });
+
+  it('retire l’espaceur quand le saut de ligne qui le justifiait disparaît', () => {
+    // Édition du commentaire : la ligne vide remplace la simple fin de ligne, le `<br>` s’en va.
+    // Un espaceur qui lui survivrait ajouterait un blanc que plus rien ne justifie.
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    expect(el.querySelector('.cct-subject-break')).not.toBeNull();
+
+    el.querySelector('br')!.remove();
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-subject-break')).toBeNull();
+  });
+
+  it('part avec le reste quand la résolution est perdue en direct (§8.1.1)', () => {
+    const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
+    const before = el.textContent;
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    const disabled = defaultConfig();
+    disabled.labels.find((l) => l.id === 'nitpick')!.enabled = false;
+    decorateComment(el, commentBodyText(el), disabled, profile, 'en');
+
+    expect(el.querySelector('.cct-subject-break')).toBeNull();
+    expect(el.textContent).toBe(before);
+  });
+});
+
+describe('clearCommentDecorations() — l’extension inactive ne laisse RIEN derrière elle (§7)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('rend le texte entier : badges, espaceur, sujet et préfixe masqué défaits', () => {
+    // Le défaut corrigé : `clearBadges()` ne retirait que les `.cct-badge`. Le préfixe
+    // structuré restait `display: none` — une partie du texte de l’auteur rendue invisible par
+    // une extension qui se déclare inactive (§7), jusqu’au rechargement de la page.
+    const el = document.createElement('td');
+    el.innerHTML = '<p dir="auto">nitpick (test): subject<br>discussion</p>';
+    document.body.appendChild(el);
+    const before = el.textContent;
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    expect(el.querySelector('.cct-hidden-prefix')).not.toBeNull();
+
+    clearCommentDecorations(document);
+
+    expect(el.querySelector('.cct-badge')).toBeNull();
+    expect(el.querySelector('.cct-subject-break')).toBeNull();
+    expect(el.querySelector('.cct-subject')).toBeNull();
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+    expect(el.textContent).toBe(before); // texte reconstitué à l’identique
+  });
+
+  it('recolle les nœuds de texte, pour qu’un rendu ULTÉRIEUR sache encore border le préfixe', () => {
+    // `hiddenPrefixSpan()` calcule sa frontière sur UN nœud de texte : deux frères adjacents
+    // laissés derrière feraient renoncer le masquage suivant (retour au mode assist, §7).
+    const body = 'praise: nice work';
+    const el = document.createElement('div');
+    el.textContent = body;
+    document.body.appendChild(el);
+    decorateComment(el, body, defaultConfig(), profile, 'en');
+
+    clearCommentDecorations(document);
+    expect(el.childNodes).toHaveLength(1); // un seul nœud, pas trois morceaux
+
+    decorateComment(el, body, defaultConfig(), profile, 'en'); // l’extension redevient active
+    expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('praise: ');
+    expect(el.querySelector('.cct-subject')?.textContent).toBe('nice work');
+  });
+
+  it('ne touche pas un commentaire que l’extension n’avait pas décoré', () => {
+    const el = document.createElement('div');
+    el.innerHTML = '<p>un commentaire ordinaire, sans préfixe</p>';
+    document.body.appendChild(el);
+    const before = el.innerHTML;
+
+    clearCommentDecorations(document);
+
+    expect(el.innerHTML).toBe(before);
+  });
+});
+
+describe('decorateComment() — une borne de ligne INTERNE à la mise en forme (revue Reefact, PR #45)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  function githubComment(html: string): Element {
+    const el = document.createElement('td');
+    el.innerHTML = html;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  it('renonce quand le saut de ligne vit DANS une emphase, plutôt que de mettre le corps en gras', () => {
+    // GFM autorise un saut de ligne dur à l’intérieur d’une emphase : « issue: **sujet  \ncorps** »
+    // rend un `<strong>` unique dont le `<br>` est INTERNE. La boucle ne voyant que ses frères
+    // directs, elle embarquait le `<strong>` entier — « corps » passait en gras avec le sujet, et
+    // aucune respiration n’était posée puisque plus aucun `<br>` ne suivait le wrapper.
+    const el = githubComment('<p dir="auto">issue: <strong>subject<br>body</strong></p>');
+    const before = el.textContent;
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-subject')).toBeNull(); // rien n’est mis en avant…
+    expect(el.querySelector('.cct-subject-break')).toBeNull();
+    expect(el.querySelector('strong')?.textContent).toBe('subjectbody'); // …et l’emphase reste intacte
+    expect(el.querySelector('strong')?.parentElement?.tagName).toBe('P'); // jamais déplacée dans un wrapper
+    expect(commentBodyText(el)).toBe(before);
+  });
+
+  it('les badges restent AU-DESSUS du texte quand le sujet n’a pas pu être borné', () => {
+    // Sinon : badges en flux inline devant un sujet qui n’est pas en gras — la moitié d’un
+    // agencement. Les badges suivent le sujet, pas le préfixe masqué.
+    const el = githubComment('<p dir="auto">issue: <strong>subject<br>body</strong></p>');
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(1);
+    expect(el.querySelector('p')?.querySelector('.cct-badge')).toBeNull();
+  });
+
+  it('renonce aussi quand le saut de ligne vit dans un LIEN — le scinder en ferait deux', () => {
+    // Même borne interne, sur l’élément où la scission serait le plus coûteuse : cloner un `<a>`
+    // pour répartir son contenu de part et d’autre du saut donnerait deux liens là où l’auteur
+    // en a écrit un.
+    const el = githubComment('<p dir="auto">issue: <a href="/x">subject<br>body</a></p>');
+    const before = el.textContent;
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-subject')).toBeNull();
+    expect(el.querySelectorAll('a')).toHaveLength(1); // un seul lien, celui de l’auteur
+    expect(el.querySelector('a')?.getAttribute('href')).toBe('/x');
+    expect(commentBodyText(el)).toBe(before);
+  });
+
+  it('borne toujours normalement quand la mise en forme ne porte AUCUN saut de ligne', () => {
+    // Le cas courant ne doit rien perdre au passage : « issue: use `Foo` » garde son sujet en
+    // gras, mise en forme inline comprise, et les badges sur sa ligne.
+    const el = githubComment('<p dir="auto">issue: use <code>Foo</code><br>discussion</p>');
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+
+    expect(el.querySelector('.cct-subject')?.textContent).toBe('use Foo');
+    expect(el.querySelector('.cct-subject-break')).not.toBeNull();
+    expect(el.querySelector('p')?.querySelectorAll(':scope > .cct-badge')).toHaveLength(1);
   });
 });

@@ -167,19 +167,28 @@ export function queryChainAll(root: ParentNode, chain: SelectorChain): Element[]
   return [];
 }
 
+/** Les DEUX seuls emplacements où `decorateComment` pose ses badges, jamais un troisième :
+ * enfant direct du corps de commentaire, ou enfant direct de son premier `<p>` — c'est là
+ * qu'ils vont quand le préfixe a pu être masqué, pour partager la ligne du sujet plutôt que
+ * de former un bandeau au-dessus de lui (§5.5). `:scope > p >`, et non un descendant
+ * quelconque : un `.cct-badge` plus profond (citation, bloc de code d'un autre commentaire
+ * cité) est du texte normal, pas notre propre badge, et le retirer amputerait le corps relu. */
+export const OWN_BADGES = ':scope > .cct-badge, :scope > p > .cct-badge';
+
 /** Texte d'un corps de commentaire, badges de l'extension EXCLUS (§5.5) : `decorateComment`
  * (extension/src/ui/badges.ts) insère un badge de label, suivi d'un badge par décoration
- * résolue (§3.3) — tous enfants DIRECTS de ce même élément, celui que `getThreads()`/
- * `getRenderedComments()` lisent ensuite. Un rendu répété sur la même PR (résumé publié
- * changé après coup, §5.5) relirait sinon leur texte mêlé au corps réel, cassant la
- * reconnaissance du préfixe par `analyze()` au tour suivant — d'où `querySelectorAll` : un
- * commentaire à plusieurs décorations pose plusieurs badges, il faut tous les retirer, pas
- * seulement le premier trouvé. `:scope >` : seuls les badges posés en enfant DIRECT —
- * jamais un badge hérité d'une citation ou d'un bloc de code imbriqué. */
+ * résolue (§3.3), dans l'élément que `getThreads()`/`getRenderedComments()` lisent ensuite.
+ * Un rendu répété sur la même PR (résumé publié changé après coup, §5.5) relirait sinon
+ * leur texte mêlé au corps réel, cassant la reconnaissance du préfixe par `analyze()` au
+ * tour suivant — d'où `querySelectorAll` : un commentaire à plusieurs décorations pose
+ * plusieurs badges, il faut tous les retirer, pas seulement le premier trouvé.
+ *
+ * Le sujet mis en avant (`.cct-subject`), lui, n'est JAMAIS retiré : ce wrapper n'ajoute
+ * aucun texte, il enveloppe celui que l'auteur a écrit. */
 export function commentBodyText(element: Element): string {
-  if (!element.querySelector(':scope > .cct-badge')) return element.textContent ?? '';
+  if (!element.querySelector(OWN_BADGES)) return element.textContent ?? '';
   const clone = element.cloneNode(true) as Element;
-  clone.querySelectorAll(':scope > .cct-badge').forEach((badge) => badge.remove());
+  clone.querySelectorAll(OWN_BADGES).forEach((badge) => badge.remove());
   return clone.textContent ?? '';
 }
 

@@ -91,5 +91,12 @@ jobs:
       - name: Transport de la télémétrie — POST no-cors vers une autre origine (§10)
         run: npm run check:beacon
 
+      # « Les badges partagent la ligne du sujet » est une affirmation de MISE EN PAGE : les
+      # tests happy-dom savent dire de quel élément un nœud est enfant, jamais sur quelle ligne
+      # il tombe. Cette mesure-ci est différentielle — le même commentaire rendu des deux
+      # façons — pour que la géométrie distingue réellement les deux agencements.
+      - name: Ligne du sujet — badges et sujet sur une seule ligne (§5.5)
+        run: npm run check:subject-line
+
       - name: Smoke test de sélecteurs (§9.4)
         run: node spikes/p1-prime/smoke.mjs

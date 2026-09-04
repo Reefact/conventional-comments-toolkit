@@ -172,12 +172,24 @@ body {
   padding: 14px;
 }
 
-.badge-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+/* Ligne du sujet : les badges y sont INLINE, le sujet à leur droite, en gras. C'est le
+   paragraphe rendu par la plateforme lui-même — l'extension y insère ses badges plutôt que de
+   poser un bandeau au-dessus de lui, ce qui laissait le sujet repartir à la ligne. */
+.subject-line {
+  /* Une ligne vide sous la ligne du sujet — ce que l'extension obtient soit de la marge de bloc
+     de la plateforme (corps au paragraphe suivant), soit de son propre espaceur quand le corps
+     reprend sur la ligne suivante du MÊME paragraphe. Les deux cas se ressemblent, à dessein. */
+  margin: 0 0 14px;
+}
+
+/* Le sujet — le texte de l'auteur, en plus marqué. Même graisse que le badge de label qui
+   ouvre la ligne : un seul niveau d'information, un seul poids. Un <span>, jamais un
+   <strong> : la mise en avant est cosmétique, elle n'ajoute aucune emphase au propos. */
+.subject {
+  font-weight: 600;
+  /* Écart doublé avec le badge qui précède : ses 6 px de `margin-right`, plus ces 6 px-ci. Les
+     badges restent groupés entre eux, le sujet commence autre chose. */
+  margin-left: 6px;
 }
 
 .badge-label {
@@ -187,6 +199,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   padding: 2px 9px;
+  margin-right: 6px;
   border-radius: 999px;
   border: 1px solid var(--cct-color, var(--border));
   color: var(--text);
@@ -199,6 +212,7 @@ body {
   font-size: 10.5px;
   font-weight: 400;
   padding: 1px 7px;
+  margin-right: 6px;
   border-radius: 999px;
   border: 1px solid var(--border-muted);
   color: var(--text-faint);
@@ -222,6 +236,7 @@ body {
 }
 
 .comment-text {
+  margin: 0;
   color: var(--text);
 }
 
@@ -257,6 +272,15 @@ footer code {
       (§5.5). Revenir en édition réaffiche donc le texte complet, préfixe compris, puisque le
       champ d'édition est un sous-arbre distinct du DOM, jamais dérivé de ce rendu.
     </p>
+    <p style="margin-top: 12px">
+      Les badges et le <strong>sujet</strong> partagent une seule ligne, qui se lit d'une traite :
+      badges, puis de quoi il s'agit, en gras. L'extension pose ses badges DANS le paragraphe que
+      la plateforme a rendu, plutôt qu'en bandeau au-dessus de lui — un bandeau laissait le sujet
+      repartir à la ligne, séparé de ce qui le qualifie. La suite du commentaire, elle, garde son
+      poids normal. Quand le masquage du préfixe est refusé (projection en badges avec perte,
+      premier niveau qui n'est pas un paragraphe simple), rien de tout cela n'a lieu : les badges
+      restent en tête du corps et le texte reste entier en dessous, inchangé.
+    </p>
   </div>
 
   <div class="legend">
@@ -275,13 +299,11 @@ footer code {
       <strong>reefact</strong> a laissé un commentaire
     </div>
     <div class="comment-body">
-      <div class="badge-row">
+      <p class="subject-line">
         <span class="badge-label" style="--cct-color: var(--label-praise)">🙌 praise</span>
-      </div>
-      <div class="comment-text">
-        The decision is now both rigorous and appropriately
-        scoped. I have no remaining design blocker on this PR.
-      </div>
+        <span class="subject">The decision is now both rigorous and appropriately scoped.</span>
+      </p>
+      <p class="comment-text">I have no remaining design blocker on this PR.</p>
     </div>
   </div>
 
@@ -293,14 +315,12 @@ footer code {
       <strong>reefact</strong> a laissé un commentaire
     </div>
     <div class="comment-body">
-      <div class="badge-row">
+      <p class="subject-line">
         <span class="badge-label" style="--cct-color: var(--label-issue)">🐛 issue</span>
         <span class="badge-deco blocking">blocking</span>
-      </div>
-      <div class="comment-text">
-        Le nom de la fonction est ambigu, il entre
-        en collision avec le label du module voisin.
-      </div>
+        <span class="subject">Le nom de la fonction est ambigu</span>
+      </p>
+      <p class="comment-text">Il entre en collision avec le label du module voisin.</p>
     </div>
   </div>
 
@@ -312,14 +332,12 @@ footer code {
       <strong>reefact</strong> a laissé un commentaire
     </div>
     <div class="comment-body">
-      <div class="badge-row">
+      <p class="subject-line">
         <span class="badge-label" style="--cct-color: var(--label-suggestion)">💡 suggestion</span>
         <span class="badge-deco nonblocking">non-blocking</span>
-      </div>
-      <div class="comment-text">
-        On pourrait extraire cette
-        validation dans une fonction partagée, à voir si ça vaut le coup ici.
-      </div>
+        <span class="subject">On pourrait extraire cette validation dans une fonction partagée</span>
+      </p>
+      <p class="comment-text">À voir si ça vaut le coup ici, la duplication est courte.</p>
     </div>
   </div>
 
@@ -331,14 +349,12 @@ footer code {
       <strong>reefact</strong> a laissé un commentaire
     </div>
     <div class="comment-body">
-      <div class="badge-row">
+      <p class="subject-line">
         <span class="badge-label" style="--cct-color: var(--label-nitpick)">🔍 nitpick</span>
         <span class="badge-deco">a11y</span>
-      </div>
-      <div class="comment-text">
-        Ce bouton n'a pas de <code>aria-label</code>,
-        l'icône seule ne suffit pas au lecteur d'écran.
-      </div>
+        <span class="subject">Ce bouton n'a pas de <code>aria-label</code></span>
+      </p>
+      <p class="comment-text">L'icône seule ne suffit pas au lecteur d'écran.</p>
     </div>
   </div>
 
@@ -350,15 +366,13 @@ footer code {
       <strong>reefact</strong> a laissé un commentaire
     </div>
     <div class="comment-body">
-      <div class="badge-row">
+      <p class="subject-line">
         <span class="badge-label" style="--cct-color: var(--label-issue)">🐛 issue</span>
         <span class="badge-deco blocking">blocking</span>
         <span class="badge-deco">security</span>
-      </div>
-      <div class="comment-text">
-        Le token n'est jamais purgé du
-        stockage local à la déconnexion.
-      </div>
+        <span class="subject">Le token n'est jamais purgé du stockage local</span>
+      </p>
+      <p class="comment-text">À la déconnexion, il y reste lisible par n'importe quel script de la page.</p>
     </div>
   </div>
 
@@ -370,16 +384,14 @@ footer code {
       <strong>reefact</strong> a laissé un commentaire
     </div>
     <div class="comment-body">
-      <div class="badge-row">
+      <p class="subject-line">
         <span class="badge-label" style="--cct-color: var(--label-question)">❓ question</span>
         <span class="badge-deco">perf</span>
         <span class="badge-deco">ux</span>
         <span class="badge-deco">a11y</span>
-      </div>
-      <div class="comment-text">
-        A-t-on mesuré l'impact de ce
-        re-render sur la liste virtualisée avant de valider cette approche ?
-      </div>
+        <span class="subject">A-t-on mesuré l'impact de ce re-render sur la liste virtualisée ?</span>
+      </p>
+      <p class="comment-text">Un chiffre avant de valider cette approche éviterait de la refaire dans un mois.</p>
     </div>
   </div>
 
@@ -391,15 +403,13 @@ footer code {
       <strong>reefact</strong> a laissé un commentaire
     </div>
     <div class="comment-body">
-      <div class="badge-row">
+      <p class="subject-line">
         <span class="badge-label" style="--cct-color: var(--label-nitpick)">🔍 nitpick</span>
         <span class="badge-deco">perf</span>
         <span class="badge-deco custom">spike-follow-up</span>
-      </div>
-      <div class="comment-text">
-        On pourra creuser après le
-        spike de la semaine dernière, pas bloquant maintenant.
-      </div>
+        <span class="subject">On pourra creuser après le spike de la semaine dernière</span>
+      </p>
+      <p class="comment-text">Pas bloquant maintenant.</p>
     </div>
   </div>
 
@@ -411,14 +421,12 @@ footer code {
       <strong>reefact</strong> a laissé un commentaire
     </div>
     <div class="comment-body">
-      <div class="badge-row">
+      <p class="subject-line">
         <span class="badge-label" style="--cct-color: var(--label-nitpick)">🔍 nitpick</span>
         <span class="badge-deco nonblocking">if-minor</span>
-      </div>
-      <div class="comment-text">
-        Le message d'erreur pourrait être plus
-        précis, à corriger seulement si c'est rapide.
-      </div>
+        <span class="subject">Le message d'erreur pourrait être plus précis</span>
+      </p>
+      <p class="comment-text">À corriger seulement si c'est rapide.</p>
     </div>
   </div>
 
@@ -433,6 +441,12 @@ footer code {
     entièrement dans le premier nœud de texte du commentaire ; sinon (mise en forme imbriquée
     avant le « : », BOM interne, sujet vide) le rendu y renonce et laisse le texte complet
     visible plutôt que de risquer une coupure au mauvais endroit — cette page ne montre donc que
-    le cas le plus courant, pas les replis défensifs.
+    le cas le plus courant, pas les replis défensifs. Le sujet mis en gras (<code>.cct-subject</code>)
+    et les badges descendus dans son paragraphe suivent exactement la même condition : ils
+    n'existent que là où le masquage a eu lieu, et le quatrième exemple montre qu'une mise en
+    forme inline (<code>aria-label</code>) reste intacte à l'intérieur du sujet. La ligne vide qui
+    sépare le sujet du corps vient de la plateforme quand celui-ci reprend au paragraphe suivant,
+    et d'un espaceur posé par l'extension (<code>.cct-subject-break</code>) quand il reprend sur la
+    ligne suivante du même paragraphe — jamais des deux à la fois.
   </footer>
 </div>

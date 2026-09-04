@@ -34,7 +34,7 @@ import {
 import { appendToJournal, writeCurrentState } from './storage.js';
 import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
-import { decorateComment } from './ui/badges.js';
+import { clearCommentDecorations, decorateComment } from './ui/badges.js';
 import { ui } from './ui/strings.js';
 
 declare const chrome: {
@@ -953,8 +953,9 @@ function renderedCommentElementsOf(adapter: PlatformAdapter): Element[] {
  *   `.js-resolvable-timeline-thread-container`), jamais un commentaire de premier niveau.
  *   Rien ne bougeait donc dans aucune des deux signatures, `run()` sortait, et le
  *   commentaire restait DÉFINITIVEMENT sans badge, préfixe structuré réapparu en clair ;
- * - le masquage du préfixe SEUL défait, texte et badges intacts — voir `hiddenPrefixMapOf`,
- *   qui dit pourquoi le digest de texte est aveugle à ce cas-là par construction.
+ * - une de nos écritures SANS TEXTE défaite seule, texte et badges intacts — masquage du
+ *   préfixe, mise en avant du sujet, respiration : voir `textlessWritesMapOf`, qui dit
+ *   pourquoi le digest de texte est aveugle à ce cas-là par construction.
  *
  * Le texte, et pas seulement la PRÉSENCE de nos nœuds (un simple compte de `.cct-badge`
  * suffirait à rattraper un corps réécrit) : nous n'avons pas MESURÉ comment chaque
@@ -973,31 +974,46 @@ function renderedCommentElementsOf(adapter: PlatformAdapter): Element[] {
 function ownOutputSignatureOf(adapter: PlatformAdapter, doc: Document): string {
   const comments = renderedCommentElementsOf(adapter);
   const surfaces = [...renderedThreadsOf(adapter).map((t) => t.element), ...comments];
-  return `${textDigestOf(surfaces)}|${hiddenPrefixMapOf(comments)}|${injectedSurfacesOf(doc)}`;
+  return `${textDigestOf(surfaces)}|${textlessWritesMapOf(comments)}|${injectedSurfacesOf(doc)}`;
 }
 
-/** Où le masquage du préfixe (§5.5) est POSÉ, commentaire par commentaire — la seule de nos
- * écritures qu'un digest de texte ne peut pas voir disparaître, et il faut dire pourquoi.
- * `.cct-hidden-prefix` masque son contenu par `display: none`, une propriété de RENDU :
- * `textContent` continue de le rapporter mot pour mot. Remplacer le wrapper par son propre
- * texte — ce que fait une réhydratation qui reconstruit le sous-arbre de texte natif sans
- * toucher à nos badges, restés à côté en enfants directs — laisse donc `textContent`
- * RIGOUREUSEMENT identique. Le préfixe structuré redevient visible et rien ne bougeait dans
- * aucune des deux signatures : `run()` sortait avant `decorateComment()`, dont l'entretien
- * inconditionnel du masquage (ui/badges.ts, revue Reefact PR #40) n'était alors jamais
- * atteint — la réparation existait, la porte pour y arriver, non (revue Reefact, PR #42).
+/** Nos écritures SANS TEXTE, commentaire par commentaire — celles qu'un digest de texte ne
+ * peut pas voir disparaître, et il faut dire pourquoi chacune y échappe :
+ *
+ * - `.cct-hidden-prefix` masque son contenu par `display: none`, une propriété de RENDU :
+ *   `textContent` continue de le rapporter mot pour mot. Remplacer le wrapper par son propre
+ *   texte — ce que fait une réhydratation qui reconstruit le sous-arbre de texte natif sans
+ *   toucher à nos badges, restés à côté — laisse donc `textContent` RIGOUREUSEMENT identique.
+ *   Le préfixe structuré redevenait visible sans que rien ne bouge dans aucune des deux
+ *   signatures : `run()` sortait avant `decorateComment()`, dont l'entretien inconditionnel du
+ *   masquage (ui/badges.ts, revue Reefact PR #40) n'était alors jamais atteint — la réparation
+ *   existait, la porte pour y arriver, non (revue Reefact, PR #42) ;
+ * - `.cct-subject` n'AJOUTE aucun texte : il enveloppe celui que l'auteur a écrit. Le défaire
+ *   rend ses enfants au parent, `textContent` inchangé — le sujet perd son gras, et la ligne
+ *   des badges le sujet qu'elle porte, en silence ;
+ * - `.cct-subject-break` est vide par construction : sa présence ou son absence ne change
+ *   jamais un seul caractère.
+ *
+ * Trois `querySelector` par corps au lieu d'un, à chaque mutation : c'est le prix d'une
+ * couverture qui suit ce que le rendu pose réellement, et il reste très en deçà du digest de
+ * texte déjà payé sur les mêmes éléments (une lecture de `textContent` et un passage sur tous
+ * ses caractères).
  *
  * Par COMMENTAIRE, pas un compte global : un compte suffirait à voir une perte sèche, mais
- * pas un échange — un corps qui perd son wrapper pendant qu'un autre le gagne dans la même
- * salve. Une chaîne positionnelle distingue les deux pour le prix d'un `querySelector` par
- * corps, très en deçà du digest de texte déjà payé sur les mêmes éléments.
+ * pas un échange — un corps qui perd un wrapper pendant qu'un autre le gagne dans la même
+ * salve. Une chaîne positionnelle distingue les deux.
  *
- * Un `0` n'est PAS une anomalie à rattraper indéfiniment : un commentaire sans préfixe, ou
- * dont la projection en badges serait à perte (§5.5), n'a jamais de wrapper, et son `0` est
- * le même d'un rendu au suivant — stable, donc sans boucle. */
-function hiddenPrefixMapOf(commentElements: Element[]): string {
+ * Un `0` n'est PAS une anomalie à rattraper indéfiniment : un commentaire sans préfixe, dont
+ * la projection en badges serait à perte, dont le sujet n'a pas pu être borné, ou dont le
+ * corps reprend au paragraphe suivant (donc sans espaceur), n'a jamais le wrapper
+ * correspondant — et son `0` est le même d'un rendu au suivant, stable, donc sans boucle. */
+const TEXTLESS_WRITES = ['.cct-hidden-prefix', '.cct-subject', '.cct-subject-break'];
+
+function textlessWritesMapOf(commentElements: Element[]): string {
   let map = '';
-  for (const element of commentElements) map += element.querySelector('.cct-hidden-prefix') === null ? '0' : '1';
+  for (const element of commentElements) {
+    for (const selector of TEXTLESS_WRITES) map += element.querySelector(selector) === null ? '0' : '1';
+  }
   return map;
 }
 
@@ -1429,19 +1445,23 @@ async function renderPrChrome(
     for (const stale of doc.querySelectorAll('.cct-banner')) stale.remove();
     for (const stale of doc.querySelectorAll('.cct-thread-filter')) stale.remove();
   };
-  // Retire les badges posés par un rendu antérieur (§5.5) — seulement quand on quitte le
-  // contexte qui les justifiait (plus de PR, ou extension désactivée) : un rendu normal
-  // ne doit JAMAIS passer par ici, sous peine de retirer puis réinsérer les mêmes badges à
-  // chaque relecture, sans bénéfice, juste du DOM churn.
-  const clearBadges = () => {
-    for (const badge of doc.querySelectorAll('.cct-badge')) badge.remove();
+  // Défait le rendu des commentaires publiés (§5.5) — seulement quand on quitte le contexte
+  // qui le justifiait (plus de PR, ou extension désactivée) : un rendu normal ne doit JAMAIS
+  // passer par ici, sous peine de défaire puis refaire le même rendu à chaque relecture, sans
+  // bénéfice, juste du DOM churn.
+  //
+  // TOUT ce que pose `decorateComment`, pas seulement ce qui se voit : ne retirer que les
+  // badges laissait le préfixe structuré masqué, donc une partie du texte de l'auteur invisible,
+  // posée par une extension qui se déclare pourtant inactive (§7).
+  const clearDecorations = () => {
+    clearCommentDecorations(doc);
   };
 
   const pr = currentPrOf(adapter);
   if (!pr) {
     if (isCurrent()) {
       clearStaleBanner();
-      clearBadges();
+      clearDecorations();
     }
     return { showed: true, resolved: null }; // pas de PR : rien à retenter tant que la navigation ne change pas
   }
@@ -1450,7 +1470,7 @@ async function renderPrChrome(
   if (resolved.config.mode === 'off') {
     if (isCurrent()) {
       clearStaleBanner();
-      clearBadges();
+      clearDecorations();
       // §7 : mode off = extension entièrement inactive. Un grisage posé par un rendu
       // ANTÉRIEUR (mode enforce/warn encore actif à ce moment-là) ne doit pas survivre au
       // passage à off — sinon aria-disabled/cct-merge-blocked/title restent affichés par

@@ -1,0 +1,121 @@
+# Release notes — Conventional Comments Toolkit, 1.x
+
+What changed for you, release by release. For the full record — every constraint, every edge case,
+every section of the specification an entry rests on — see
+[CHANGELOG.md](https://github.com/Reefact/conventional-comments-toolkit/blob/main/CHANGELOG.md).
+
+The extension starts in `assist` mode: it helps and it flags, it never blocks a submission. The
+source of truth for conformance stays the server companion (component B).
+
+## 1.0.0-beta.8 — September 4, 2026
+
+_Published comments read like titles — badges, then the subject in bold on the same line — and
+three ways a comment could silently lose its badges are closed._
+
+### ✨ Features
+
+- A published comment's subject is now shown **in bold on the badge line**, to the right of the
+  badges, instead of starting on the line below them. A blank line separates it from the rest of
+  the comment. Where the subject cannot be delimited safely — inline formatting carrying its own
+  line break, for instance — the previous layout is kept rather than risking a wrong cut.
+
+### 🐛 Bug fixes
+
+- Editing a comment no longer strips its badges. The platform rewrites the rendered body on an
+  update; the badges and the structured prefix went with it, and nothing brought them back until
+  you reloaded the page.
+- The structured prefix is re-hidden when the platform restores it on its own, which previously
+  left `issue (blocking):` visible in the middle of an otherwise decorated comment.
+- Leaving a pull request, or switching the extension to `mode: off`, no longer leaves part of a
+  comment invisible. The badges were removed but the prefix stayed hidden, so an extension that
+  declares itself inactive went on concealing text you had written.
+
+### 🔧 Changed
+
+- The composer toolbar now stacks **two rows** — labels, then decorations — so a narrow window or
+  a side panel can no longer put a label button next to a decoration segment as if they were one
+  kind of control.
+- Label buttons no longer show their icon; badges on published comments still do. The buttons
+  share one row's width, where an icon costs every other button; a badge stands alone at the head
+  of its comment, where it costs nothing.
+
+## 1.0.0-beta.7 — September 3, 2026
+
+_The structured prefix disappears from a published comment — the badges already say it — except everywhere saying it twice was the safer answer._
+
+### ✨ Features
+
+- `issue (blocking): ` no longer appears in a published comment: the badges carry that information, so the text is hidden on screen. On screen only — the comment stored on the platform is untouched, and reopening the edit form shows it in full.
+- Where the badges would not say the same thing, the text stays: a decoration you wrote that the configuration rejects, a case or punctuation defect the tool is meant to flag, decorations folded into a `+N` badge. Hiding those would erase the only trace of what you actually typed.
+- A line that merely looks like a prefix — inside a code block, a quote, a list, a heading, a table or a `<details>` summary — is left alone.
+
+### 🔧 Changed
+
+- Every default label now has an icon and a colour, contrast-checked against WCAG 1.4.11.
+
+## 1.0.0-beta.6 — September 3, 2026
+
+_Decorations get badges of their own, and the whole display follows a configuration change while you watch._
+
+### ✨ Features
+
+- Each decoration on a published comment now gets its own badge beside the label: red where it forces the blocking character, green where it forces non-blocking, dashed where the decoration is declared nowhere.
+
+### 🐛 Bug fixes
+
+- Changing the configuration now refreshes what is already on screen — including on a tab you left open on a pull request. A label disabled mid-review loses its badge instead of keeping one for a state that no longer exists.
+
+## 1.0.0-beta.5 — September 2, 2026
+
+_Repository configuration is readable again on private repositories._
+
+### 🐛 Bug fixes
+
+- The extension reads your repository's and organisation's configuration on private repositories again. The read follows a redirect the browser refuses to authenticate; credentials are now dropped on that hop alone, so the file stays readable without asking you for any host permission.
+- A configuration file that could not be read for lack of a session is no longer taken for a file that does not exist — which silently applied the wrong configuration.
+
+## 1.0.0-beta.4 — September 1, 2026
+
+_The decoration selector says what your comment carries, not what you last clicked._
+
+### 🐛 Bug fixes
+
+- The decoration selector now reflects the comment itself. A decoration you removed by editing the text, or one that left with a label the configuration disabled, no longer stays lit in the toolbar.
+
+## 1.0.0-beta.3 — September 1, 2026
+
+_Two permissions dropped from the manifest, telemetry that only exists if you ask for it, and the material for a store submission._
+
+### 🔧 Changed
+
+- **`activeTab` and the permanent `github.com` host permission are gone.** Hosts are granted optionally instead — the extension asks for what it needs, when it needs it.
+- The pull-request banner is a summary, not a merge gate. The verdict belongs to the platform's own check, which is already red and already blocking; restating it here devalued both.
+
+### ✨ Features
+
+- Optional telemetry, off unless you turn it on, bound to the endpoint you consented to and configured by your organisation's policy rather than by a repository file.
+- The version shown in `chrome://extensions` now distinguishes pre-releases: `1.0.0-beta.1` and `1.0.0-beta.2` no longer both read `1.0.0`.
+
+## 1.0.0-beta.2 — August 24, 2026
+
+_Bot and tool comments stop being flagged, and the toolbar stops sitting flush against the box._
+
+### ✨ Features
+
+- **A tool command is no longer reported as a malformed comment.** A slash command, or a mention from a bot you list in `toolCommands`, is exempt from validation — `/rebase` and `@dependabot recreate` go through untouched.
+
+### 🐛 Bug fixes
+
+- The toolbar and the live feedback line up with the comment box's own text instead of touching its border.
+- A label's colour now paints the border of the active button rather than its background: the colour comes from your configuration, and using it as a background produced contrast as low as 1.54 where 4.5 is required.
+- The toolbar's buttons are spaced again — a CSS comment closed one character early was silently eating the rule that spaced them.
+
+## 1.0.0-beta.1 — August 24, 2026
+
+_First installable build._
+
+### ✨ Features
+
+- The extension for GitHub and Azure DevOps: a toolbar over the comment box, quick keyboard entry, live feedback as you type, and a submission guard in `enforce` mode.
+- The server companion (component B), self-hostable, which is the source of truth for conformance and for blocking a pull request's completion.
+- Chromium and Firefox archives published on every tag, loadable without Node or npm.

@@ -31,6 +31,11 @@ GitHub qui les porte.
    node scripts/release-notes.mjs 1.1.0
    ```
 
+   Le skill [`prepare-release`](../.claude/skills/prepare-release/SKILL.md) porte la procédure
+   complète — comment lire la plage de commits, regrouper par histoire, et les règles qui ne se
+   devinent pas (une seule ligne physique par puce, liens absolus, un fichier par majeure).
+   `/prepare-release` le déclenche ; demander « prépare la release 1.1.0 » aussi.
+
 1. Mettre à jour `version` dans `packages/extension/src/manifest.json` — c'est cette
    valeur que le navigateur affichera une fois l'extension chargée. **Uniquement des
    chiffres** : un à quatre entiers de 0 à 65535 séparés par des points, pas tous nuls

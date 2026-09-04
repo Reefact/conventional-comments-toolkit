@@ -9,35 +9,22 @@ source of truth for conformance stays the server companion (component B).
 
 ## 1.0.0-beta.8 — September 4, 2026
 
-_Published comments read like titles — badges, then the subject in bold on the same line — and
-three ways a comment could silently lose its badges are closed._
+_Published comments read like titles — badges, then the subject in bold on the same line — and three ways a comment could silently lose its badges are closed._
 
 ### ✨ Features
 
-- A published comment's subject is now shown **in bold on the badge line**, to the right of the
-  badges, instead of starting on the line below them. A blank line separates it from the rest of
-  the comment. Where the subject cannot be delimited safely — inline formatting carrying its own
-  line break, for instance — the previous layout is kept rather than risking a wrong cut.
+- A published comment's subject is now shown **in bold on the badge line**, to the right of the badges, instead of starting on the line below them. A blank line separates it from the rest of the comment. Where the subject cannot be delimited safely — inline formatting carrying its own line break, for instance — the previous layout is kept rather than risking a wrong cut.
 
 ### 🐛 Bug fixes
 
-- Editing a comment no longer strips its badges. The platform rewrites the rendered body on an
-  update; the badges and the structured prefix went with it, and nothing brought them back until
-  you reloaded the page.
-- The structured prefix is re-hidden when the platform restores it on its own, which previously
-  left `issue (blocking):` visible in the middle of an otherwise decorated comment.
-- Leaving a pull request, or switching the extension to `mode: off`, no longer leaves part of a
-  comment invisible. The badges were removed but the prefix stayed hidden, so an extension that
-  declares itself inactive went on concealing text you had written.
+- Editing a comment no longer strips its badges. The platform rewrites the rendered body on an update; the badges and the structured prefix went with it, and nothing brought them back until you reloaded the page.
+- The structured prefix is re-hidden when the platform restores it on its own, which previously left `issue (blocking):` visible in the middle of an otherwise decorated comment.
+- Leaving a pull request, or switching the extension to `mode: off`, no longer leaves part of a comment invisible. The badges were removed but the prefix stayed hidden, so an extension that declares itself inactive went on concealing text you had written.
 
 ### 🔧 Changed
 
-- The composer toolbar now stacks **two rows** — labels, then decorations — so a narrow window or
-  a side panel can no longer put a label button next to a decoration segment as if they were one
-  kind of control.
-- Label buttons no longer show their icon; badges on published comments still do. The buttons
-  share one row's width, where an icon costs every other button; a badge stands alone at the head
-  of its comment, where it costs nothing.
+- The composer toolbar now stacks **two rows** — labels, then decorations — so a narrow window or a side panel can no longer put a label button next to a decoration segment as if they were one kind of control.
+- Label buttons no longer show their icon; badges on published comments still do. The buttons share one row's width, where an icon costs every other button; a badge stands alone at the head of its comment, where it costs nothing.
 
 ## 1.0.0-beta.7 — September 3, 2026
 

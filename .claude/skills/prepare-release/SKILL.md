@@ -36,6 +36,13 @@ rien à un lecteur qui décide d'installer.
    `### Fixed`, `### Changed`). Une puce ouvre sur une phrase d'issue en gras, puis explique.
    Citer la section de `specifications-fr.md` sur laquelle elle s'appuie quand il y en a une.
 
+   Le changelog, LUI, porte une section `[Unreleased]` où les changements s'accumulent au fil
+   des PR. Préparer une version, c'est donc la RENOMMER en `## [<version>] - <AAAA-MM-JJ>` —
+   le format du changelog, que la note n'a pas — plutôt qu'écrire une entrée neuve au-dessus
+   d'elle : sinon ce qui y était accumulé reste orphelin, absent de la version qu'il compose
+   et faussement porté au crédit de la suivante. On repart ensuite sans section
+   `[Unreleased]` ; la prochaine PR la recrée.
+
 4. **Écrire la note de version**, dans les DEUX fichiers, à partir de l'entrée du changelog —
    jamais l'inverse, et sans jamais y ajouter ce que le changelog ne dit pas.
 
@@ -58,8 +65,9 @@ _<une ligne : ce dont cette version parle, comme on le résumerait à quelqu'un 
 ```
 
 Ne garder que les rubriques qui ont du contenu ; ne jamais imprimer un titre vide. Versions les
-plus récentes en premier. Toute section porte un NUMÉRO DE VERSION — jamais `[Unreleased]`, jamais
-un titre d'attente. Celle de la version qu'on prépare s'écrit à l'étape 4, donc AVANT le tag :
+plus récentes en premier. Toute section D'UNE NOTE porte un NUMÉRO DE VERSION — jamais
+`[Unreleased]`, qui est la convention du changelog et n'a pas cours ici, jamais un titre
+d'attente. Celle de la version qu'on prépare s'écrit à l'étape 4, donc AVANT le tag :
 c'est précisément elle que `release.yml` ira lire, et son absence est ce qui fait refuser.
 
 ## Les règles qui ne se devinent pas

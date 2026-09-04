@@ -179,9 +179,17 @@
   cursor: pointer;
 }
 
-.cct-border-ok { outline: 1px solid var(--fgColor-success, var(--color-success-fg, #2e7d32)) !important; }
-.cct-border-warn { outline: 1px solid var(--fgColor-attention, var(--color-attention-fg, #f9a825)) !important; }
-.cct-border-error { outline: 2px solid var(--fgColor-danger, var(--color-danger-fg, #b3261e)) !important; }
+/* Bordure d'état du §5.3, en `outline` et non en `border` : elle ne doit rien pousser dans la
+   page — un `border` ajouterait sa largeur à la boîte du champ et décalerait tout ce qui suit.
+   Mais un `outline` se dessine À L'EXTÉRIEUR de la boîte, et c'est ce qui l'a fait disparaître
+   sur la vue `/pull/N/changes` de GitHub : le champ y est enveloppé d'un conteneur Primer en
+   `overflow: hidden` qui a EXACTEMENT la même boîte (MESURÉ : 563 px de large, même `left`,
+   2026-09-04). Le trait était bien peint, puis rogné par ce parent.
+   `outline-offset` négatif le ramène à l'intérieur de la boîte : plus rien à rogner. Il vaut
+   la largeur du trait, pour que celui-ci affleure le bord sans mordre sur le texte. */
+.cct-border-ok { outline: 1px solid var(--fgColor-success, var(--color-success-fg, #2e7d32)) !important; outline-offset: -1px !important; }
+.cct-border-warn { outline: 1px solid var(--fgColor-attention, var(--color-attention-fg, #f9a825)) !important; outline-offset: -1px !important; }
+.cct-border-error { outline: 2px solid var(--fgColor-danger, var(--color-danger-fg, #b3261e)) !important; outline-offset: -2px !important; }
 
 /* Bandeau du §5.5 — un sommaire, pas une alarme. Le verdict de conformité appartient au
    check de la plateforme, déjà rouge et déjà bloquant ; le rejouer ici en « danger »

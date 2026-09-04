@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 // @ts-expect-error — script d'outillage en JavaScript simple, sans déclarations de types.
-import { extractSection, notesPathOf } from '../scripts/release-notes.mjs';
+import { closesFence, extractSection, fenceOpener, notesPathOf } from '../scripts/release-notes.mjs';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 const NOTES = `# Release notes — 1.x
@@ -167,6 +167,13 @@ describe('les notes réellement livrées', () => {
     // ordinaire replié alors que la règle vaut aussi pour lui (revue Reefact, PR #47) — mais
     // « cette ligne suit-elle une ligne non vide sans ouvrir un bloc à elle ? ». Des puces
     // consécutives ouvrent chacune le leur ; une continuation, non.
+    //
+    // Les blocs de code se suivent avec `fenceOpener` / `closesFence`, les fonctions MÊMES
+    // d'`extractSection`, plutôt qu'avec un basculement sur tout préfixe de fence — qui prenait
+    // ```` ````pas-une-clôture ```` pour une clôture, désynchronisait l'état, et rendait le garde
+    // MUET sur tout ce qui suivait le bloc (revue Reefact, PR #47). Un garde qui se tait sans
+    // le dire est pire que pas de garde ; et deux définitions de « qu'est-ce qu'un bloc de
+    // code » dans le même dépôt divergent tôt ou tard, alors on n'en garde qu'une.
     const OUVRE_UN_BLOC = /^ {0,3}(#|[-*+] |\d+[.)] |\||>)/;
     for (const major of deliveredMajors()) {
       for (const lang of ['en', 'fr']) {
@@ -174,15 +181,19 @@ describe('les notes réellement livrées', () => {
         const lines = readFileSync(path, 'utf8').split('\n');
         const première = lines.findIndex((line) => line.startsWith('## '));
         expect(première, `${path} sans aucune section`).toBeGreaterThanOrEqual(0);
-        let dansUnBloc = false;
+        let ouvert: string | null = null; // délimiteur du bloc en cours, ou null
         lines.forEach((line, index) => {
           if (index < première) return;
           // Dans un bloc de code, le retour à la ligne est le contenu : il ne se déplie pas.
-          if (/^ {0,3}(```|~~~)/.test(line)) {
-            dansUnBloc = !dansUnBloc;
+          if (ouvert !== null) {
+            if (closesFence(line, ouvert)) ouvert = null;
             return;
           }
-          if (dansUnBloc) return;
+          const ouverture = fenceOpener(line);
+          if (ouverture !== null) {
+            ouvert = ouverture;
+            return;
+          }
           const previous = lines[index - 1] ?? '';
           const isContinuation =
             previous.trim() !== '' && line.trim() !== '' && !OUVRE_UN_BLOC.test(line);

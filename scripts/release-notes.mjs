@@ -31,7 +31,7 @@ export function notesPathOf(version) {
 /** OUVERTURE de bloc de code, ou null : trois caractères ou plus, `` ` `` ou `~`, indentés d'au
  * plus trois espaces. Ce qui suit sur la ligne est une info string (```` ```sh ````), sans
  * effet ici. */
-function fenceOpener(line) {
+export function fenceOpener(line) {
   const match = /^ {0,3}(`{3,}|~{3,})/.exec(line);
   return match === null ? null : match[1];
 }
@@ -44,7 +44,7 @@ function fenceOpener(line) {
  * quatre backticks — du CONTENU Markdown parfaitement valide — refermait le bloc. Le `## ` qui
  * suivait redevenait une frontière de section, et la note repartait tronquée, fence ouverte :
  * exactement le défaut que la conscience des fences venait corriger, une couche plus bas. */
-function closesFence(line, open) {
+export function closesFence(line, open) {
   const match = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
   return match !== null && match[1][0] === open[0] && match[1].length >= open.length;
 }

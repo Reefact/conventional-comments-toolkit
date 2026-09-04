@@ -434,7 +434,7 @@ Le blocage d'envoi du mode `enforce` est donc un **garde-fou, pas un mur** : il 
 
 ### 5.5 Affichage des commentaires publiés
 
-- Les labels des commentaires déjà publiés sont rendus sous forme de badges colorés portant **l'icône du label et son identifiant** (`labels[].icon` et option `badgeStyle`, voir schéma §8.2), sans modifier le contenu stocké côté serveur.
+- Les labels des commentaires déjà publiés sont rendus sous forme de badges colorés (option `badgeStyle`, voir schéma §8.2), sans modifier le contenu stocké côté serveur. Un badge porte **l'identifiant du label et, lorsqu'elle est configurée, son icône** : `labels[].icon` est optionnel, et un label qui n'en déclare pas donne un badge à l'identifiant seul.
 - Un bandeau en tête de PR récapitule : *N **fils** bloquants non résolus*, avec liens d'ancrage vers chacun. Des **fils**, et non des commentaires : c'est ce que compte le critère 2 (§6.2.1) et ce que porte `unresolvedBlockingCount`, et `CA-03` exige que les trois décomptes concordent — en valeur comme en sens. **Sa source est le résumé publié par le composant B** (`readPublishedResult()`, §9.2.3) dès qu'il est présent sur la page : c'est ce qui garantit que le bandeau et le check comptent la même chose (`CA-03`). Le **décompte** vient toujours de ce résumé, qui fait autorité ; les **liens d'ancrage** viennent du DOM de la page, qui porte les fils — un fil dont l'état n'y est pas rendu (`resolution: 'unknown'`) recevant quand même son ancre, puisque rien n'est compté ici.
 
   **Les deux divergent, et c'est assumé.** Trois règles du document garantissent que l'extension ne peut pas retrouver localement l'ensemble exact des fils que le serveur compte : une **résolution refusée** (§6.1) laisse le fil marqué *Resolved* dans la page ; une **édition affaiblissante** (§6.1) affiche `note:` là où le serveur maintient `issue:` ; et l'**épinglage** (§8.1.3) fait juger le serveur sur une configuration que l'extension n'a plus. Vouloir la concordance exacte imposerait à l'extension de trancher des autorisations, ce que le §10 lui interdit.
@@ -1622,7 +1622,7 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 
 **Accessibilité**
 - Conformité RGAA 4.1.2 (qui transpose WCAG 2.1 AA) : navigation clavier complète, contrastes suffisants, rôles ARIA, messages d'erreur associés au champ (`aria-describedby`).
-- L'information ne repose jamais uniquement sur la couleur : **tout élément qui distingue par la couleur porte aussi un texte**. L'icône, là où elle est rendue — badge du §5.5, pastille du §5.3 —, s'ajoute à ce texte et ne le remplace jamais ; son absence, sur les boutons du §5.1, ne retire donc rien.
+- L'information ne repose jamais uniquement sur la couleur : **toute information qu'une couleur distingue est aussi dite par un texte**, porté par l'élément lui-même ou par un élément qui lui est associé — la bordure de la zone de saisie et la pastille qui en énonce l'état (§5.3) sont un seul signal, à deux endroits. L'icône, là où elle est rendue, s'ajoute à ce texte et ne le remplace jamais ; son absence, sur les boutons du §5.1, ne retire donc rien.
 - Respect des thèmes clair / sombre et des réglages `prefers-reduced-motion`.
 - RGAA 5, qui transposera WCAG 2.2, est attendu dans la fenêtre du phasage (§14) : les nouveaux critères sont à intégrer au fil de leur publication plutôt qu'en reprise finale.
 

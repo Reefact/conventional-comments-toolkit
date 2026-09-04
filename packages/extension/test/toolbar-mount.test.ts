@@ -60,11 +60,17 @@ describe('stackingMountFor — où poser ce qui doit tomber au-dessus', () => {
     expect((mount.anchor as HTMLElement).id).toBe('champ');
   });
 
-  it('un parent en rangée est traversé jusqu’au premier ancêtre qui empile', () => {
+  // `InlineAutocomplete-module__container` empile (block) mais tient dans une rangée : la
+  // barre y prendrait la largeur de la seule colonne du champ. On monte donc jusqu'à celui qui
+  // empile ET vit dans une colonne, c'est-à-dire la boîte du composeur entier.
+  it('un ancêtre qui empile mais tient dans une rangée est traversé lui aussi', () => {
     document.body.innerHTML = COMPOSER;
-    const mount = stackingMountFor(document.getElementById('champ')!)!;
-    expect(mount.container.className).toBe('InlineAutocomplete-module__container');
-    expect((mount.anchor as HTMLElement).tagName).toBe('SPAN'); // l'enfant qui contient le champ
+    const champ = document.getElementById('champ')!;
+    const mount = stackingMountFor(champ)!;
+    expect(mount.container.className).toContain('AddCommentEditor-module__ConversationCommentBox');
+    // L'invariant, quel que soit le conteneur retenu : l'ancre est l'enfant qui porte le champ.
+    expect(mount.anchor.parentElement).toBe(mount.container);
+    expect(mount.anchor.contains(champ)).toBe(true);
   });
 
   // `display: contents` n'a pas de boîte : y insérer ne déciderait de rien.
@@ -77,6 +83,16 @@ describe('stackingMountFor — où poser ce qui doit tomber au-dessus', () => {
       </div>`;
     const mount = stackingMountFor(document.getElementById('champ')!)!;
     expect((mount.container as HTMLElement).id).toBe('empile');
+  });
+
+  it('le même ancêtre, posé dans une COLONNE, est retenu', () => {
+    document.body.innerHTML = `
+      <div style="display:flex;flex-direction:column">
+        <div id="candidat" style="display:block">
+          <span style="display:inline-flex"><textarea id="champ"></textarea></span>
+        </div>
+      </div>`;
+    expect((stackingMountFor(document.getElementById('champ')!)!.container as HTMLElement).id).toBe('candidat');
   });
 
   it('sans ancêtre qui empile, rien n’est proposé — l’appelant garde son repli', () => {
@@ -125,18 +141,18 @@ describe('§5.1 / §5.3 — barre et pastille dans le composeur de la nouvelle v
     document.body.innerHTML = '';
   });
 
-  it('la barre se pose dans le conteneur qui empile, jamais dans la rangée du champ', () => {
+  it('la barre se pose dans la colonne du composeur, jamais dans une rangée', () => {
     const { toolbar, champ } = attachOn(COMPOSER);
-    expect(toolbar.parentElement!.className).toBe('InlineAutocomplete-module__container');
+    expect(toolbar.parentElement!.className).toContain('AddCommentEditor-module__ConversationCommentBox');
     expect(champ.parentElement!.contains(toolbar)).toBe(false); // pas dans le <span> en rangée
-    // Au-DESSUS : elle précède l'élément qui porte le champ.
-    expect(toolbar.nextElementSibling).toBe(champ.parentElement);
+    // Au-DESSUS : elle précède le sous-arbre qui porte le champ.
+    expect(toolbar.nextElementSibling!.contains(champ)).toBe(true);
   });
 
   it('la pastille se pose sous le champ, dans le même conteneur', () => {
-    const { feedback, champ } = attachOn(COMPOSER);
-    expect(feedback.parentElement!.className).toBe('InlineAutocomplete-module__container');
-    expect(feedback.previousElementSibling).toBe(champ.parentElement);
+    const { feedback, toolbar, champ } = attachOn(COMPOSER);
+    expect(feedback.parentElement).toBe(toolbar.parentElement);
+    expect(feedback.previousElementSibling!.contains(champ)).toBe(true);
   });
 
   it('sur un composeur dont le parent empile, rien ne change', () => {

@@ -187,9 +187,19 @@
    2026-09-04). Le trait était bien peint, puis rogné par ce parent.
    `outline-offset` négatif le ramène à l'intérieur de la boîte : plus rien à rogner. Il vaut
    la largeur du trait, pour que celui-ci affleure le bord sans mordre sur le texte. */
-.cct-border-ok { outline: 1px solid var(--fgColor-success, var(--color-success-fg, #2e7d32)) !important; outline-offset: -1px !important; }
-.cct-border-warn { outline: 1px solid var(--fgColor-attention, var(--color-attention-fg, #f9a825)) !important; outline-offset: -1px !important; }
-.cct-border-error { outline: 2px solid var(--fgColor-danger, var(--color-danger-fg, #b3261e)) !important; outline-offset: -2px !important; }
+.cct-border-ok { outline: 1px solid var(--fgColor-success, var(--color-success-fg, #2e7d32)) !important; }
+.cct-border-warn { outline: 1px solid var(--fgColor-attention, var(--color-attention-fg, #f9a825)) !important; }
+.cct-border-error { outline: 2px solid var(--fgColor-danger, var(--color-danger-fg, #b3261e)) !important; }
+
+/* Le trait rentré DANS la boîte, et seulement là où il serait sinon rogné — classe posée par
+   `ringIsClipped()` (ui/stacking.ts), jamais en règle générale. La première version de ce
+   correctif décalait les trois traits partout : sur le DOM hérité, où `cct-editor` met le
+   padding horizontal du champ à zéro pour aligner son texte sur la barre, le trait rentré
+   mordait sur la première lettre — un « m » coupé en deux, vu en capture. Là où le trait est
+   rogné, le champ a en revanche son propre padding, et le trait rentré ne touche rien. */
+.cct-ring-inset.cct-border-ok,
+.cct-ring-inset.cct-border-warn { outline-offset: -1px !important; }
+.cct-ring-inset.cct-border-error { outline-offset: -2px !important; }
 
 /* Bandeau du §5.5 — un sommaire, pas une alarme. Le verdict de conformité appartient au
    check de la plateforme, déjà rouge et déjà bloquant ; le rejouer ici en « danger »

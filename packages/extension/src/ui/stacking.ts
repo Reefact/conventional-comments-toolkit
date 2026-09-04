@@ -50,3 +50,34 @@ function stacks(el: Element, view: (Window & typeof globalThis) | null): boolean
   // leurs enfants sur une ligne comme le faisait le `<span>` de la vue `…/changes`.
   return !display.startsWith('inline');
 }
+
+/** « Le trait d'état posé sur ce champ sera-t-il rogné ? » — question de PEINTURE, et la
+ * réponse se calcule sur des boîtes, pas sur des noms de classe.
+ *
+ * Un `outline` se dessine à l'extérieur de la boîte de son élément (c'est pourquoi le §5.3 le
+ * préfère à un `border` : il ne pousse rien). Un ancêtre qui coupe ce qui dépasse et dont la
+ * boîte épouse celle du champ le fait donc disparaître — MESURÉ sur la vue `…/changes` de
+ * GitHub, où le champ est enveloppé d'un conteneur Primer en `overflow: hidden`, large de
+ * 563 px comme lui et au même `left` (2026-09-04).
+ *
+ * On exige que les DEUX bords horizontaux soient collés, à `tolerance` près. Un seul bord
+ * commun se produit par accident dans n'importe quelle mise en page ; les deux signalent un
+ * conteneur qui gaine le champ. La distinction compte : là où le trait n'est pas rogné, le
+ * rentrer le ferait mordre sur le texte quand le champ n'a pas de padding — c'est le cas du
+ * DOM hérité, où `cct-editor` met justement ce padding à zéro. */
+export function ringIsClipped(editor: Element, tolerance = 2, limit = 4): boolean {
+  const view = editor.ownerDocument?.defaultView ?? null;
+  if (!view) return false;
+  const box = editor.getBoundingClientRect();
+  let el = editor.parentElement;
+  for (let i = 0; el && i < limit; i++) {
+    const style = view.getComputedStyle(el);
+    const clips = [style.overflow, style.overflowX, style.overflowY].some((v) => v !== '' && v !== 'visible');
+    if (clips) {
+      const r = el.getBoundingClientRect();
+      if (Math.abs(r.left - box.left) <= tolerance && Math.abs(r.right - box.right) <= tolerance) return true;
+    }
+    el = el.parentElement;
+  }
+  return false;
+}

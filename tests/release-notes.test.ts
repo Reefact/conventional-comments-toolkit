@@ -150,6 +150,30 @@ describe('les notes réellement livrées', () => {
     }
   });
 
+  it('n’ont AUCUNE puce ni paragraphe replié à la main', () => {
+    // Une note est collée telle quelle dans un corps de Release, qui est du « user content »
+    // comme un commentaire : GitHub y rend une simple fin de ligne en SAUT DE LIGNE littéral —
+    // le fait même sur lequel repose le rendu du §5.5 de ce dépôt. Une puce repliée à la main,
+    // qui se lit comme de la prose dans un fichier du dépôt, arrive donc hachée en plein milieu
+    // d'une phrase sur la page de la Release. Huit releases ont été publiées ainsi avant que
+    // cette règle ne soit écrite (skill release-notes de Reefact/just-dummies).
+    //
+    // La longueur des lignes n'est PAS bornée en retour : c'est l'éditeur qui replie à
+    // l'affichage, pas le fichier.
+    for (const major of deliveredMajors()) {
+      for (const lang of ['en', 'fr']) {
+        const path = `docs/release-notes-${major}.x-${lang}.md`;
+        const lines = readFileSync(path, 'utf8').split('\n');
+        lines.forEach((line, index) => {
+          const previous = lines[index - 1] ?? '';
+          const continues = previous.startsWith('- ') || (previous.startsWith('_') && !previous.trimEnd().endsWith('_'));
+          const isContinuation = continues && line.trim() !== '' && !/^(#|-\s|\||```|_|\[)/.test(line);
+          expect(isContinuation, `${path}:${index + 1} replie la ligne précédente`).toBe(false);
+        });
+      }
+    }
+  });
+
   it('portent une section NON VIDE pour chaque version, dans les DEUX langues', () => {
     // Sur les deux fichiers, pas seulement l'anglais que lit le garde (revue Reefact, PR #46) :
     // une section française réduite à son titre garde exactement la même LISTE de versions, donc

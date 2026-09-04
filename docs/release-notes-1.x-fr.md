@@ -9,36 +9,22 @@ source de vérité sur la conformité reste le compagnon serveur (composant B).
 
 ## 1.0.0-beta.8 — 4 septembre 2026
 
-_Un commentaire publié se lit comme un titre — les badges, puis le sujet en gras sur la même
-ligne — et trois façons de perdre silencieusement ses badges sont refermées._
+_Un commentaire publié se lit comme un titre — les badges, puis le sujet en gras sur la même ligne — et trois façons de perdre silencieusement ses badges sont refermées._
 
 ### ✨ Nouveautés
 
-- Le sujet d'un commentaire publié s'affiche désormais **en gras sur la ligne des badges**, à leur
-  droite, au lieu de commencer à la ligne en dessous. Une ligne vide le sépare de la suite du
-  commentaire. Quand le sujet ne peut pas être borné sans risque — une mise en forme inline qui
-  porte son propre saut de ligne, par exemple — la mise en page précédente est conservée plutôt
-  que de risquer une coupure au mauvais endroit.
+- Le sujet d'un commentaire publié s'affiche désormais **en gras sur la ligne des badges**, à leur droite, au lieu de commencer à la ligne en dessous. Une ligne vide le sépare de la suite du commentaire. Quand le sujet ne peut pas être borné sans risque — une mise en forme inline qui porte son propre saut de ligne, par exemple — la mise en page précédente est conservée plutôt que de risquer une coupure au mauvais endroit.
 
 ### 🐛 Corrections
 
-- Modifier un commentaire ne lui retire plus ses badges. La plateforme réécrit le corps rendu lors
-  d'une mise à jour ; les badges et le préfixe structuré partaient avec, et rien ne les ramenait
-  avant un rechargement de la page.
-- Le préfixe structuré est remasqué quand la plateforme le rétablit d'elle-même, ce qui laissait
-  auparavant `issue (blocking):` visible au milieu d'un commentaire par ailleurs décoré.
-- Quitter une pull request, ou passer l'extension en `mode: off`, ne laisse plus une partie d'un
-  commentaire invisible. Les badges étaient retirés mais le préfixe restait masqué : une extension
-  qui se déclare inactive continuait donc de cacher du texte que vous aviez écrit.
+- Modifier un commentaire ne lui retire plus ses badges. La plateforme réécrit le corps rendu lors d'une mise à jour ; les badges et le préfixe structuré partaient avec, et rien ne les ramenait avant un rechargement de la page.
+- Le préfixe structuré est remasqué quand la plateforme le rétablit d'elle-même, ce qui laissait auparavant `issue (blocking):` visible au milieu d'un commentaire par ailleurs décoré.
+- Quitter une pull request, ou passer l'extension en `mode: off`, ne laisse plus une partie d'un commentaire invisible. Les badges étaient retirés mais le préfixe restait masqué : une extension qui se déclare inactive continuait donc de cacher du texte que vous aviez écrit.
 
 ### 🔧 Changements
 
-- La barre d'outils de rédaction est désormais sur **deux rangées** — les labels, puis les
-  décorations — pour qu'une fenêtre étroite ou un panneau latéral ne puisse plus mettre un bouton
-  de label à côté d'un segment de décoration comme s'il s'agissait d'une même commande.
-- Les boutons de label n'affichent plus leur icône ; les badges des commentaires publiés, si. Les
-  boutons se partagent la largeur d'une rangée, où une icône se paie sur tous les autres ; un
-  badge est seul en tête de son commentaire, où elle ne coûte rien.
+- La barre d'outils de rédaction est désormais sur **deux rangées** — les labels, puis les décorations — pour qu'une fenêtre étroite ou un panneau latéral ne puisse plus mettre un bouton de label à côté d'un segment de décoration comme s'il s'agissait d'une même commande.
+- Les boutons de label n'affichent plus leur icône ; les badges des commentaires publiés, si. Les boutons se partagent la largeur d'une rangée, où une icône se paie sur tous les autres ; un badge est seul en tête de son commentaire, où elle ne coûte rien.
 
 ## 1.0.0-beta.7 — 3 septembre 2026
 

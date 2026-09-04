@@ -153,7 +153,10 @@ describe('§8.2 — un 404 sans session, sur un dépôt privé, n\'est pas un fi
   }
 
   it('dépôt privé (méta) : la lecture est impossible, pas nominale', async () => {
-    withMarkup('<meta name="octolytics-dimension-repository_public" content="false">');
+    withMarkup(
+      '<meta name="user-login" content="">' +
+        '<meta name="octolytics-dimension-repository_public" content="false">',
+    );
     const { adapter } = adapterWith(() => new Response('', { status: 404 }));
     expect(await adapter.getRepoConfig(pr)).toEqual({
       status: 'unreachable',
@@ -169,7 +172,8 @@ describe('§8.2 — un 404 sans session, sur un dépôt privé, n\'est pas un fi
 
   it('repli par le badge visible, filtré par texte et non par classe', async () => {
     withMarkup(
-      '<span class="Label Label--secondary">Bot</span>' +
+      '<meta name="user-login" content="">' +
+        '<span class="Label Label--secondary">Bot</span>' +
         '<span class="Label Label--secondary v-align-middle mr-1">Private</span>',
     );
     const { adapter } = adapterWith(() => new Response('', { status: 404 }));
@@ -235,6 +239,17 @@ describe('§8.2 — une session ouverte rend au 404 son sens ordinaire', () => {
       '<meta name="user-login" content="octocat">' +
         '<span class="Label Label--secondary">Private</span>',
     );
+    const { adapter } = adapterWith(() => new Response('', { status: 404 }));
+    expect(await adapter.getRepoConfig(pr)).toEqual({ status: 'absent' });
+  });
+
+  // LE FINDING DE REVUE (Reefact, PR #48), en test. Le capteur de session doit être POSITIF :
+  // traité comme « pas de session » lorsqu'il ne sait pas répondre, un sélecteur pourri suffisait
+  // à simuler une déconnexion — et, combiné au capteur de visibilité qu'on vient de mesurer
+  // faillible, à ressusciter le bandeau sur un dépôt public. Deux signaux dont l'un se contente
+  // de son propre silence, cela n'en fait qu'un.
+  it('méta de session ABSENT (signal inconnu) : pas de reclassement, même dépôt dit privé', async () => {
+    withMarkup('<meta name="octolytics-dimension-repository_public" content="false">');
     const { adapter } = adapterWith(() => new Response('', { status: 404 }));
     expect(await adapter.getRepoConfig(pr)).toEqual({ status: 'absent' });
   });

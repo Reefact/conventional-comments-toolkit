@@ -36,8 +36,9 @@ and what a reader needs from them is the behaviour, not the thirteen.
   records a degradation whenever it does not find the merge button, and it runs on every DOM
   mutation: on a closed pull request, where that absence is the norm, a single visit filled the
   50-line journal with `merge-button` and evicted every real degradation. One line per selector
-  now, carrying its most recent occurrence, bounded both within a tab and across the shared
-  journal — and the opt-in telemetry, which inflated for the same reason, with it.
+  now, timestamped at the most recent page load that saw it fail, bounded both within a tab and
+  across the shared journal — and the opt-in telemetry, which inflated for the same reason, with
+  it.
 
 ### Added
 

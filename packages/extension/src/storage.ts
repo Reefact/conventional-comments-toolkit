@@ -81,10 +81,15 @@ export function appendToJournal<T>(
           area.get([key], (items) => {
             const existing = Array.isArray(items?.[key]) ? (items[key] as T[]) : [];
             try {
-              // `dedupeBy` : UNE ligne par clé, portant la dernière occurrence. Le journal de
-              // dégradation répond « quels sélecteurs ont échoué, et quand pour la dernière
-              // fois » — jamais « combien de fois », un compte que le rythme des mutations de
-              // la page dicte et qui ne mesure rien. Sans cette clause, une PR fermée, où
+              // `dedupeBy` : UNE ligne par clé, celle de l'écriture la plus récente. Le journal
+              // de dégradation répond « quels sélecteurs ont échoué, et à quel chargement de page
+              // pour la dernière fois » — jamais « combien de fois », un compte que le rythme des
+              // mutations de la page dicte et qui ne mesure rien. PAS « la dernière occurrence » :
+              // `SelectorLog` ne notifie qu'une fois par chaîne et par onglet, si bien qu'un
+              // onglet ouvert des heures garde l'horodatage de sa première dégradation ; c'est le
+              // chargement suivant qui le rafraîchit (revue Reefact, PR #48). Rafraîchir en
+              // continu coûterait une écriture de stockage PAR MUTATION du DOM — la churn même que
+              // cette déduplication existe pour supprimer. Sans cette clause, une PR fermée, où
               // l'absence du bouton de fusion est la norme, remplissait les 50 lignes de
               // `merge-button` à chaque rechargement et ÉVINÇAIT toute vraie dégradation.
               // La déduplication de `SelectorLog` borne un onglet ; celle-ci borne le journal

@@ -199,3 +199,57 @@ describe('§8.2 — un 404 sans session, sur un dépôt privé, n\'est pas un fi
     });
   });
 });
+
+// ...ET LA SESSION EST LE SECOND SIGNAL, celui qui manquait. Le masque de GitHub n'existe que
+// pour une requête ANONYME : session ouverte, le premier saut part authentifié (`same-origin`)
+// et le 404 dit ce qu'il dit. Sans cette condition, le reclassement dépendait du seul capteur
+// de visibilité — un capteur de PAGE, donc faillible, et il a effectivement menti : sur un
+// dépôt PUBLIC, une page de PR connectée a fait répondre `false` à `#repoIsPublic()`, le 404
+// nominal est devenu `unreachable`, et le bandeau du §5.4 s'affichait sur un dépôt SANS
+// configuration — le cas le plus courant qui soit. Deux capteurs indépendants doivent
+// maintenant dire oui pour que le reclassement ait lieu.
+//
+// `meta[name="user-login"]` est MESURÉ sur une page réelle de github.com (2026-09) : présent
+// avec `content=""` pour un visiteur déconnecté, renseigné dès qu'une session existe. C'est le
+// même sélecteur que `getCurrentUser()`.
+describe('§8.2 — une session ouverte rend au 404 son sens ordinaire', () => {
+  function withMarkup(html: string) {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    document.body.insertAdjacentHTML('afterbegin', html);
+  }
+
+  it('session ouverte + dépôt dit privé : le 404 reste un fichier absent', async () => {
+    withMarkup(
+      '<meta name="user-login" content="octocat">' +
+        '<meta name="octolytics-dimension-repository_public" content="false">',
+    );
+    const { adapter } = adapterWith(() => new Response('', { status: 404 }));
+    expect(await adapter.getRepoConfig(pr)).toEqual({ status: 'absent' });
+  });
+
+  // Le défaut livré, réduit à sa forme minimale : un badge lu « Private » sur un dépôt public.
+  // Sans le capteur de session, ce test rend `unreachable` et l'utilisateur voit le bandeau.
+  it('session ouverte + capteur de visibilité qui ment : toujours un fichier absent', async () => {
+    withMarkup(
+      '<meta name="user-login" content="octocat">' +
+        '<span class="Label Label--secondary">Private</span>',
+    );
+    const { adapter } = adapterWith(() => new Response('', { status: 404 }));
+    expect(await adapter.getRepoConfig(pr)).toEqual({ status: 'absent' });
+  });
+
+  // La protection reste entière là où elle sert : sans session, un 404 sur un dépôt privé est
+  // indiscernable d'un accès refusé.
+  it('méta de session vide (visiteur déconnecté) : le reclassement s\'applique', async () => {
+    withMarkup(
+      '<meta name="user-login" content="">' +
+        '<meta name="octolytics-dimension-repository_public" content="false">',
+    );
+    const { adapter } = adapterWith(() => new Response('', { status: 404 }));
+    expect(await adapter.getRepoConfig(pr)).toEqual({
+      status: 'unreachable',
+      reason: 'HTTP 404 (dépôt privé : absence indiscernable)',
+    });
+  });
+});

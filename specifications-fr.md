@@ -384,7 +384,8 @@ La validation doit s'appliquer **à chaque point de sortie**, y compris :
 
 Injectée au-dessus ou en dessous de chaque zone de saisie concernée.
 
-- Un bouton par label, avec icône, libellé et couleur distincts.
+- Un bouton par label, avec libellé et couleur distincts, **sans icône** : les boutons forment une rangée où la largeur prise par l'un est prise à tous les autres, et le libellé suffit à désigner le label. L'icône configurée (`labels[].icon`, §8.2) reste rendue là où elle ne coûte aucune place — le badge d'un commentaire publié (§5.5), seul en tête de son commentaire.
+- **Deux rangées empilées, jamais une seule** : les boutons de label d'abord, les commandes de décoration ensuite. Elles ne se mêlent jamais, quelle que soit la largeur disponible ; ce qui déborde d'une rangée passe à la ligne **dans cette rangée**. Une suite unique de commandes, coupée là où la place manque, finit par rendre un bouton de label et un segment de décoration côte à côte — deux gestes de natures différentes présentés comme s'ils n'en formaient qu'un.
 - Sélecteur de décoration segmenté : *aucune*, puis **un segment par décoration dont `forces` n'est pas `null`** (§8.2) — soit `blocking`, `non-blocking` et `if-minor` par défaut. Il se construit depuis la configuration, sans quoi une décoration porteuse ajoutée par une organisation n'aurait aucune commande. Complété d'un champ libre lorsque `decorations.allowFree` vaut `true`, sans quoi les décorations libres autorisées resteraient inaccessibles à la souris.
 - Le clic sur un label **insère ou remplace** le préfixe existant sans détruire le texte déjà saisi. En l'absence de sélection, le curseur est repositionné en fin de préfixe ; avec une sélection active, le texte sélectionné n'est pas remplacé et la sélection est **restaurée, décalée de la longueur du préfixe inséré**.
 - Un second clic sur un label déjà actif le retire (toggle).
@@ -433,7 +434,7 @@ Le blocage d'envoi du mode `enforce` est donc un **garde-fou, pas un mur** : il 
 
 ### 5.5 Affichage des commentaires publiés
 
-- Les labels des commentaires déjà publiés sont rendus sous forme de badges colorés (option `badgeStyle`, voir schéma §8.2), sans modifier le contenu stocké côté serveur.
+- Les labels des commentaires déjà publiés sont rendus sous forme de badges colorés portant **l'icône du label et son identifiant** (`labels[].icon` et option `badgeStyle`, voir schéma §8.2), sans modifier le contenu stocké côté serveur.
 - Un bandeau en tête de PR récapitule : *N **fils** bloquants non résolus*, avec liens d'ancrage vers chacun. Des **fils**, et non des commentaires : c'est ce que compte le critère 2 (§6.2.1) et ce que porte `unresolvedBlockingCount`, et `CA-03` exige que les trois décomptes concordent — en valeur comme en sens. **Sa source est le résumé publié par le composant B** (`readPublishedResult()`, §9.2.3) dès qu'il est présent sur la page : c'est ce qui garantit que le bandeau et le check comptent la même chose (`CA-03`). Le **décompte** vient toujours de ce résumé, qui fait autorité ; les **liens d'ancrage** viennent du DOM de la page, qui porte les fils — un fil dont l'état n'y est pas rendu (`resolution: 'unknown'`) recevant quand même son ancre, puisque rien n'est compté ici.
 
   **Les deux divergent, et c'est assumé.** Trois règles du document garantissent que l'extension ne peut pas retrouver localement l'ensemble exact des fils que le serveur compte : une **résolution refusée** (§6.1) laisse le fil marqué *Resolved* dans la page ; une **édition affaiblissante** (§6.1) affiche `note:` là où le serveur maintient `issue:` ; et l'**épinglage** (§8.1.3) fait juger le serveur sur une configuration que l'extension n'a plus. Vouloir la concordance exacte imposerait à l'extension de trancher des autorisations, ce que le §10 lui interdit.
@@ -1621,7 +1622,7 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 
 **Accessibilité**
 - Conformité RGAA 4.1.2 (qui transpose WCAG 2.1 AA) : navigation clavier complète, contrastes suffisants, rôles ARIA, messages d'erreur associés au champ (`aria-describedby`).
-- L'information ne repose jamais uniquement sur la couleur (icône + texte systématiques).
+- L'information ne repose jamais uniquement sur la couleur : **tout élément qui distingue par la couleur porte aussi un texte**. L'icône, là où elle est rendue — badge du §5.5, pastille du §5.3 —, s'ajoute à ce texte et ne le remplace jamais ; son absence, sur les boutons du §5.1, ne retire donc rien.
 - Respect des thèmes clair / sombre et des réglages `prefers-reduced-motion`.
 - RGAA 5, qui transposera WCAG 2.2, est attendu dans la fenêtre du phasage (§14) : les nouveaux critères sont à intégrer au fil de leur publication plutôt qu'en reprise finale.
 

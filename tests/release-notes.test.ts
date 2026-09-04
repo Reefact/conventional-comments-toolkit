@@ -150,7 +150,7 @@ describe('les notes réellement livrées', () => {
     }
   });
 
-  it('n’ont AUCUNE puce ni paragraphe replié à la main', () => {
+  it('n’ont AUCUNE puce ni paragraphe replié à la main dans une section PUBLIÉE', () => {
     // Une note est collée telle quelle dans un corps de Release, qui est du « user content »
     // comme un commentaire : GitHub y rend une simple fin de ligne en SAUT DE LIGNE littéral —
     // le fait même sur lequel repose le rendu du §5.5 de ce dépôt. Une puce repliée à la main,
@@ -160,14 +160,32 @@ describe('les notes réellement livrées', () => {
     //
     // La longueur des lignes n'est PAS bornée en retour : c'est l'éditeur qui replie à
     // l'affichage, pas le fichier.
+    //
+    // Le garde ne lit QUE les sections de version, jamais le préambule qui les précède : lui
+    // n'est collé nulle part, et il est replié depuis toujours. Et il ne demande pas « la ligne
+    // précédente est-elle une puce ? » — première rédaction, qui laissait passer un paragraphe
+    // ordinaire replié alors que la règle vaut aussi pour lui (revue Reefact, PR #47) — mais
+    // « cette ligne suit-elle une ligne non vide sans ouvrir un bloc à elle ? ». Des puces
+    // consécutives ouvrent chacune le leur ; une continuation, non.
+    const OUVRE_UN_BLOC = /^ {0,3}(#|[-*+] |\d+[.)] |\||>)/;
     for (const major of deliveredMajors()) {
       for (const lang of ['en', 'fr']) {
         const path = `docs/release-notes-${major}.x-${lang}.md`;
         const lines = readFileSync(path, 'utf8').split('\n');
+        const première = lines.findIndex((line) => line.startsWith('## '));
+        expect(première, `${path} sans aucune section`).toBeGreaterThanOrEqual(0);
+        let dansUnBloc = false;
         lines.forEach((line, index) => {
+          if (index < première) return;
+          // Dans un bloc de code, le retour à la ligne est le contenu : il ne se déplie pas.
+          if (/^ {0,3}(```|~~~)/.test(line)) {
+            dansUnBloc = !dansUnBloc;
+            return;
+          }
+          if (dansUnBloc) return;
           const previous = lines[index - 1] ?? '';
-          const continues = previous.startsWith('- ') || (previous.startsWith('_') && !previous.trimEnd().endsWith('_'));
-          const isContinuation = continues && line.trim() !== '' && !/^(#|-\s|\||```|_|\[)/.test(line);
+          const isContinuation =
+            previous.trim() !== '' && line.trim() !== '' && !OUVRE_UN_BLOC.test(line);
           expect(isContinuation, `${path}:${index + 1} replie la ligne précédente`).toBe(false);
         });
       }

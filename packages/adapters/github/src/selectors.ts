@@ -183,6 +183,48 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
+  /** ————— Vue `/pull/N/changes` : les quatre chaînes ci-dessous y étaient TOUTES à zéro —————
+   *
+   * MESURÉ sur `https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes`
+   * (session ouverte, fil de `adapters/shared/src/index.ts` ligne 257 déplié, 2026-09-04).
+   * Structure relevée, classes de modules CSS abrégées de leur hachage :
+   *
+   *   div.rounded-2.bgColor-default
+   *     div[data-testid="review-thread"]              ← RECONNU : le premier candidat tient
+   *       div.ReviewThread-module__ReviewThreadContainer
+   *         div.ReviewThreadComment-module__ReviewThreadContainer      ← un par commentaire
+   *           div.ReviewThreadComment-module__ReviewThreadInnerContainer
+   *             div[data-testid="comment-header"]
+   *               a[data-testid="avatar-link"].ActivityHeader-module__AuthorName  « Reefact »
+   *           div.ReviewThreadComment-module__ReviewThreadWrapper
+   *             div.ReviewThreadComment-module__BodyHTMLContainer
+   *               div.markdown-body.ReviewThreadComment-module__SafeHTMLBox      ← le corps
+   *         div.rounded-bottom-2 > … AddCommentEditor-module__AddCommentEditor    ← répondre
+   *     div[data-testid="unified-comment-actions"]    ← SŒUR du fil, PAS dedans
+   *       button[data-testid="unified-comment-unresolve-button"]
+   *
+   * Deux relevés valent d'être écrits parce qu'ils ne se devinent pas :
+   *
+   *   • le marqueur de résolution est **hors** de `review-thread` — `getThreads()` le
+   *     cherchait dedans, d'où `resolution: 'unknown'` sur un fil manifestement résolu.
+   *     Le bouton a été mesuré dans les DEUX états (résolu : 1, non résolu : 0, re-résolu :
+   *     1) : c'est un marqueur, pas un ornement. `resolved-badge` vaut 0 dans les deux, et
+   *     `unified-comment-actions` 1 dans les deux — ni l'un ni l'autre ne marque rien ;
+   *   • le champ d'ÉDITION d'un commentaire est à l'intérieur de son
+   *     `ReviewThreadComment-module__ReviewThreadContainer`, alors que le champ de RÉPONSE
+   *     est ailleurs, sous `AddCommentEditor-module__AddCommentEditor`. C'est ce qui
+   *     distingue une édition d'une composition sur cette vue, et donc ce qui rend à
+   *     l'édition d'une RACINE sa zone `thread-root` (§4.1, §4.3).
+   *
+   * Comme pour `editors`, les candidats mesurés sont AJOUTÉS EN FIN de chaîne : sur une page
+   * servie par la génération héritée, le premier candidat qui matche gagne, et l'ajout ne
+   * peut donc rien défaire de ce qui fonctionne.
+   *
+   * Restent NON mesurés, et donc non traités ici : aucun conteneur de cette vue ne porte
+   * d'attribut `id` — `threadId`/`commentId` y sont vides, `getThreads()` retombe sur ses
+   * identifiants synthétiques — et le permalien d'un commentaire (`threadAnchor`) n'a pas
+   * été relevé : `a[href*="#discussion_r"]` y vaut 0. */
+
   /** Fils rendus sur la page — pour les ancres du bandeau (§5.5). */
   renderedThreads: {
     name: 'rendered-threads',
@@ -211,32 +253,58 @@ export const selectors = {
   /** Marqueur « résolu » d'un fil rendu. */
   resolvedMarker: {
     name: 'resolved-marker',
-    candidates: ['[data-testid="resolved-badge"]', 'summary [title*="esolved"]', '.Details--on .color-fg-muted'],
+    candidates: [
+      '[data-testid="resolved-badge"]',
+      'summary [title*="esolved"]',
+      '.Details--on .color-fg-muted',
+      '[data-testid="unified-comment-unresolve-button"]', // MESURÉ dans les deux états
+    ],
   } satisfies SelectorChain,
 
   /** Formulaire d'édition d'un commentaire existant (§4.3). */
   editForm: {
     name: 'edit-form',
-    candidates: ['.js-comment-edit-form', 'form[data-testid*="edit"]', '[data-testid*="edit-form"]'],
+    candidates: [
+      '.js-comment-edit-form',
+      'form[data-testid*="edit"]',
+      '[data-testid*="edit-form"]',
+      // MESURÉ : cette vue n'a pas de formulaire d'édition nommé. Ce qui distingue une
+      // édition d'une composition est la POSITION du champ — dans le commentaire édité,
+      // là où les champs de réponse et de nouveau commentaire sont ailleurs.
+      '[class*="ReviewThreadComment-module__ReviewThreadContainer"]',
+    ],
   } satisfies SelectorChain,
 
   /** Un commentaire rendu dans un fil — pour distinguer l'édition d'une RACINE de celle
    * d'une réponse (§4.1), et porter les badges (§5.5). */
   renderedComment: {
     name: 'rendered-comment',
-    candidates: ['[data-testid="review-thread-comment"]', '.review-comment', '.js-comment'],
+    candidates: [
+      '[data-testid="review-thread-comment"]',
+      '.review-comment',
+      '.js-comment',
+      '[class*="ReviewThreadComment-module__ReviewThreadContainer"]', // MESURÉ
+    ],
   } satisfies SelectorChain,
 
   /** Corps d'un commentaire rendu — badges du §5.5. */
   commentBody: {
     name: 'comment-body',
-    candidates: ['[data-testid="comment-body"]', '.comment-body'],
+    candidates: [
+      '[data-testid="comment-body"]',
+      '.comment-body',
+      '[class*="ReviewThreadComment-module__SafeHTMLBox"]', // MESURÉ — porte aussi `.markdown-body`
+    ],
   } satisfies SelectorChain,
 
   /** Auteur d'un commentaire rendu. */
   commentAuthor: {
     name: 'comment-author',
-    candidates: ['[data-testid="comment-author"]', '.author'],
+    candidates: [
+      '[data-testid="comment-author"]',
+      '.author',
+      '[data-testid="avatar-link"]', // MESURÉ — le lien du NOM de l'auteur, pas son image
+    ],
   } satisfies SelectorChain,
 
   /** Login de l'utilisateur courant — lu dans le DOM, jamais par API (§10). */

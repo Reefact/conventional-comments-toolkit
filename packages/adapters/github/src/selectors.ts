@@ -24,6 +24,50 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
+  /** **Description de la PR — hors périmètre** (§4.1, dernière ligne du tableau : format non
+   * validé, aucun état bloquant). L'éditeur qu'on y ouvre n'est pas une zone du §4.1 : il ne
+   * doit recevoir ni barre d'outils, ni saisie rapide, ni garde d'envoi. Sans cette chaîne, il
+   * tombait dans le REPLI de `#contextOf()` — « ni fil, ni corps de revue, ni conversation,
+   * donc commentaire de ligne de diff » — et se retrouvait classé `thread-root`, la zone la
+   * plus privilégiée : en mode `enforce`, mettre à jour la description d'une PR devenait
+   * impossible, faute d'un `label:` en tête.
+   *
+   * MESURÉ sur `https://github.com/Reefact/conventional-comments-toolkit/pull/39` (page
+   * anonyme, 2026-09), où les trois candidats matchent **un seul** élément chacun, tous
+   * ancêtres du formulaire d'édition de la description, et aucun ancêtre d'un autre
+   * commentaire :
+   *
+   *   <div class="TimelineItem … js-command-palette-pull-body">      ← candidat 1
+   *     <div class="timeline-comment-group …" id="issue-5321598100">
+   *       <div id="pullrequest-4420243102" class="… js-comment …">   ← candidat 2
+   *         …
+   *         <form class="js-comment-update" id="issue-5321598100-edit-form">  ← candidat 3
+   *           <include-fragment src="…/edit_form?textarea_id=issue-5321598100-body">
+   *
+   * Les trois ne sont donc PAS trois générations de DOM (§A.5) mais trois emboîtements du
+   * MÊME rendu : `closestChain` s'arrêtant au premier qui matche, un renommage de la classe
+   * la plus extérieure laisse les deux autres attraper le cas.
+   *
+   * Deux limites, écrites parce qu'elles ne sont pas mesurées et ne doivent pas être crues :
+   * le `<textarea>` lui-même est servi par le `<include-fragment>` ci-dessus, que GitHub
+   * refuse sans session — ses attributs propres n'ont donc pas été observés, et c'est
+   * précisément pourquoi l'exclusion porte sur les ANCÊTRES, qui le seront quels qu'ils
+   * soient ; la génération React de la page de conversation, elle, n'a pas été observée du
+   * tout (la page mesurée est rendue côté serveur), et si elle nomme autrement ce conteneur,
+   * aucun candidat ne matchera — l'éditeur redeviendra visible comme avant ce correctif,
+   * jamais pire.
+   *
+   * `[id^="issue-"]` ne matche pas `issuecomment-…` — vérifié sur la page mesurée, qui porte
+   * les deux : le candidat 3 y compte exactement une occurrence. */
+  prDescription: {
+    name: 'pr-description',
+    candidates: [
+      '.js-command-palette-pull-body',
+      '[id^="pullrequest-"].js-comment',
+      'form.js-comment-update[id^="issue-"]',
+    ],
+  } satisfies SelectorChain,
+
   /** Visibilité du dépôt affiché — MESURÉE sur une page réelle de github.com (2026-09) :
    * `<meta name="octolytics-dimension-repository_public" content="true">`, en un exemplaire.
    * Ne sert qu'à interpréter un 404 de la lecture sans session (§8.2) : sur un dépôt privé,

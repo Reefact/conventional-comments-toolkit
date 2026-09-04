@@ -241,6 +241,31 @@ describe('§5.5 — écarter la description ne rend pas l’extension sourde', (
     await waitFor(() => document.querySelector('#discussion_r42 .cct-badge') !== null);
     expect(document.querySelector('#discussion_r42 .cct-badge')).not.toBeNull();
   });
+
+  // Le même réveil, par l'autre porte (revue Reefact, PR #49, second [P2]) : une navigation
+  // SPA d'un onglet à l'autre de la MÊME PR. `prKeyFor()` ne porte que host/scope/numéro,
+  // donc revenir de `Files changed` à `Conversation` ne compte pas pour une navigation et ne
+  // remet pas la fenêtre à zéro — c'est bien la comparaison de contenu, et elle seule, qui
+  // doit rattraper la description et les commentaires soudain rendus.
+  it('revenir sur Conversation après la fenêtre réveille l’observateur, à clé de PR inchangée', async () => {
+    document.body.innerHTML = '<div class="js-diff-progressive-container"></div>';
+    const adapter = new GithubClientAdapter({
+      documentRef: document,
+      fetchImpl: async () => new Response('', { status: 404 }),
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+    let t = 0;
+    disposers.push(observePrChromeNavigation(adapter, resolver, document, () => t));
+    await settle();
+
+    t += RENDER_RETRY_WINDOW_MS + 1;
+    // L'onglet change, l'URL de la PR ne change pas : même clé, DOM entièrement remplacé.
+    document.body.innerHTML = DESCRIPTION_BODY('## Summary') + COMMENT_BODY('issue: le build casse');
+
+    await waitFor(() => document.querySelector('#issuecomment-5513165152 .cct-badge') !== null);
+    expect(document.querySelector('#issuecomment-5513165152 .cct-badge')).not.toBeNull();
+    expect(document.querySelectorAll('.js-command-palette-pull-body .cct-badge')).toHaveLength(0);
+  });
 });
 
 /** Attente RÉELLE, et non un simple vidage de microtâches : une mutation qui arrive pendant

@@ -286,6 +286,20 @@ export class GithubClientAdapter implements PlatformAdapter {
     const scan = () => {
       for (const el of queryChainAll(this.#doc, selectors.editors)) {
         if (seen.has(el)) continue;
+        // Description de la PR : HORS PÉRIMÈTRE (§4.1). `Zone` n'a que les quatre
+        // emplacements du tableau (§9.2.3) — il n'existe donc pas de contexte « hors
+        // zone » à produire, et le seul moyen de tenir le contrat est de ne pas remonter
+        // l'éditeur du tout. Ne PAS le marquer « vu », pour la même raison que
+        // ci-dessous : rien n'a été remis à l'appelant, et un balayage ultérieur doit
+        // pouvoir le réexaminer. Le coût est un `closest()` par mutation sur cet unique
+        // élément, négligeable devant le `querySelectorAll` de tout le document que
+        // `queryChainAll` vient de faire.
+        //
+        // Aucune dégradation journalisée quand rien ne matche (§9.4) : cette chaîne ne
+        // matche RIEN sur la quasi-totalité des pages — celle des fichiers modifiés n'a
+        // pas de description de PR —, et le contraire noierait CA-11 sous des échecs qui
+        // sont le cas nominal.
+        if (closestChain(el, selectors.prDescription).element) continue;
         // Marquer « vu » APRÈS #toHandle() : un élément balayé avant que currentPr() ne
         // trouve de PR (page pas encore navigée) doit rester réexaminable au prochain
         // balayage, pas définitivement ignoré (§9.2.3).

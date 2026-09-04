@@ -14,6 +14,39 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The "Configuration unread" banner no longer appears on every repository.** Both client
+  adapters held the global `fetch` in a private field and called it as a method, which passes the
+  adapter instance as the receiver. In the isolated world of a content script Chromium refuses
+  that receiver — `Failed to execute 'fetch' on 'Window': Illegal invocation` — so every
+  configuration read threw, every read returned `unreachable`, and the degraded state of §5.4 was
+  permanent: on public repositories and private ones, with a configuration file and without. The
+  repository level of §8.2 was not merely unreadable on GitHub, it never left the browser.
+  `npm run check:content-script-cors` now measures both call shapes inside a real content script,
+  which is the only place the difference exists — probed in a page's main world, Chromium accepts
+  the very same receiver.
+- **A 404 is no longer reclassified as an unreadable configuration while a session is open**
+  (§8.2). GitHub masks a private resource as missing, so a 404 was treated as unreadable as soon
+  as the page reported a private repository. That is a page-scraped signal, and it can lie: it
+  answered "private" on a signed-in pull request page of a public repository. The mask only
+  exists for an anonymous request, so the reclassification now needs two independent signals to
+  agree — no session in the page, and a repository reported private.
+- **The selector degradation journal is usable again** (§9.4). The completion-control probe
+  records a degradation whenever it does not find the merge button, and it runs on every DOM
+  mutation: on a closed pull request, where that absence is the norm, a single visit filled the
+  50-line journal with `merge-button` and evicted every real degradation. One line per selector
+  now, carrying its most recent occurrence, bounded both within a tab and across the shared
+  journal — and the opt-in telemetry, which inflated for the same reason, with it.
+
+### Added
+
+- **The degraded state says why.** The adapters build a reason on every unreadable read
+  (`HTTP 429`, `TypeError: …`, a 404 indistinguishable from a refusal) and it was discarded on the
+  spot. The options page now shows it with the level it came from — `repo: …`, `org: …` — instead
+  of the bare word `unreachable`. The string stays local: it goes to `chrome.storage.local` and
+  nowhere else (§10).
+
 ## [1.0.0-beta.8] - 2026-09-04
 
 ### Added

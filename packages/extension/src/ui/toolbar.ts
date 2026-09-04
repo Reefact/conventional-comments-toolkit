@@ -172,8 +172,8 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   const labelRow = newRow();
   const decorationRow = newRow();
 
-  // Un bouton par label, avec libellé et couleur distincts (§5.1) — mais SANS son icône,
-  // délibérément, là où le badge d'un commentaire publié la garde (badges.ts, `labelBadge()`).
+  // Un bouton par label, avec libellé et couleur distincts et SANS son icône (§5.1) — là où le
+  // badge d'un commentaire publié la garde (§5.5 ; badges.ts, `labelBadge()`).
   //
   // Les deux surfaces n'ont pas la même contrainte de place. Un badge est SEUL en tête de son
   // commentaire : l'icône y est un repère qui ne coûte rien, et c'est ce que montre le mockup
@@ -189,9 +189,9 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   // cumulés, et la largeur en dessous de laquelle la rangée se casse tombe de ~816 à ~633 px.
   //
   // L'accessibilité ne perd rien : l'information est portée par le TEXTE, jamais par la couleur
-  // seule (§10), et l'infobulle ci-dessous porte définition et exemple. Le §5.1 écrit encore
-  // « avec icône » : c'est un écart assumé avec la spécification normative, à y reporter par
-  // une PR qui ne touche QU'ELLE (garde `conformance.yml`).
+  // seule (§10), et l'infobulle ci-dessous porte définition et exemple. C'est ce que la
+  // spécification décrit : le §5.1 dit « avec libellé et couleur distincts, sans icône », et le
+  // §5.5 dit où l'icône est rendue — sur le badge, lorsqu'elle est configurée.
   for (const label of enabledLabels(opts.config)) {
     const button = doc.createElement('button');
     button.type = 'button';

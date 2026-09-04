@@ -284,7 +284,20 @@ export class GithubClientAdapter implements PlatformAdapter {
   observeEditors(cb: (editor: EditorHandle) => void): Disposable {
     const seen = new WeakSet<Element>();
     const scan = () => {
-      for (const el of queryChainAll(this.#doc, selectors.editors)) {
+      const found = queryChainAll(this.#doc, selectors.editors);
+      // Aucun éditeur reconnu ALORS QUE la page porte une surface de saisie : la chaîne a
+      // pourri. C'est exactement ce qu'a fait la nouvelle vue des fichiers modifiés
+      // (`/pull/N/changes`, cf. `selectors.editors`) — et sans cette ligne, l'extension y
+      // était inerte ET muette : ni barre d'outils, ni trace au journal (§9.4).
+      //
+      // La condition porte sur la PRÉSENCE d'une surface de saisie, jamais sur le seul échec
+      // de la chaîne : sur une PR dont aucun composeur n'est ouvert, ne rien trouver est le
+      // cas nominal, et le journaliser noierait CA-11 sous des non-événements. Le second
+      // membre n'est donc évalué que dans le cas d'échec — le chemin nominal ne paie rien.
+      if (found.length === 0 && queryChain(this.#doc, selectors.editingSurfaces).element) {
+        this.log.degraded(selectors.editors);
+      }
+      for (const el of found) {
         if (seen.has(el)) continue;
         // Description de la PR : HORS PÉRIMÈTRE (§4.1). `Zone` n'a que les quatre
         // emplacements du tableau (§9.2.3) — il n'existe donc pas de contexte « hors

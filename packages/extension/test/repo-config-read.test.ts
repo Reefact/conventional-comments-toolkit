@@ -253,3 +253,53 @@ describe('§8.2 — une session ouverte rend au 404 son sens ordinaire', () => {
     });
   });
 });
+
+
+// LE RECEVEUR DE `fetch` — le défaut qui rendait TOUTE lecture impossible, sur tout dépôt.
+//
+// L'adaptateur rangeait le `fetch` global dans un champ privé et l'appelait comme méthode :
+// `this.#fetch(url, init)` passe donc l'instance en receveur. Dans le monde isolé d'un script
+// de contenu, Chromium refuse — « Failed to execute 'fetch' on 'Window': Illegal invocation ».
+// Chaque lecture levait, rendait `unreachable`, et le bandeau du §5.4 s'affichait en
+// permanence, avec ou sans fichier de configuration.
+//
+// CE TEST NE PROUVE PAS L'ENVIRONNEMENT, et c'est important de le dire : le `fetch` posé
+// ci-dessous est un faux, donc une AFFIRMATION sur le navigateur. L'affirmation est mesurée
+// ailleurs, dans un vrai script de contenu, par `npm run check:content-script-cors` (« `fetch`
+// rangé dans un champ et appelé comme méthode LÈVE dans le monde isolé »). Ce test-ci est le
+// verrou rapide qui empêche le code de repartir en arrière entre deux passages du spike.
+describe('§8.2 — le `fetch` global est appelé avec SON receveur, jamais avec l\'adaptateur', () => {
+  /** Le contrôle de receveur que fait un vrai `fetch` de navigateur, et rien d'autre. */
+  function withBrandCheckedFetch<T>(run: (seen: unknown[]) => Promise<T>): Promise<T> {
+    const original = globalThis.fetch;
+    const receivers: unknown[] = [];
+    globalThis.fetch = function (this: unknown) {
+      receivers.push(this);
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      }
+      return Promise.resolve(new Response('', { status: 404 }));
+    } as unknown as typeof fetch;
+    return run(receivers).finally(() => {
+      globalThis.fetch = original;
+    });
+  }
+
+  it('sans `fetchImpl`, la lecture aboutit — et le receveur n\'est pas l\'adaptateur', async () => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    await withBrandCheckedFetch(async (receivers) => {
+      // PAS de `fetchImpl` : c'est le chemin de production, le seul où le défaut existait.
+      const adapter = new GithubClientAdapter({ documentRef: document });
+      expect(await adapter.getRepoConfig(pr)).toEqual({ status: 'absent' });
+      expect(receivers).toHaveLength(1);
+      expect(receivers[0] === globalThis || receivers[0] === undefined).toBe(true);
+    });
+  });
+
+  it('une substitution de test est rendue telle quelle, jamais liée de force', async () => {
+    const { adapter, calls } = adapterWith(() => new Response('', { status: 404 }));
+    await adapter.getRepoConfig(pr);
+    expect(calls).toHaveLength(1); // le faux reçoit bien l'appel : `adapterFetch` ne l'enveloppe pas
+  });
+});

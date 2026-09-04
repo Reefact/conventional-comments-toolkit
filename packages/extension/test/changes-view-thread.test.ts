@@ -17,13 +17,17 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import type { EditorHandle } from '@cct/adapter-shared';
 
-const COMMENT = (opts: { body?: string; author?: string; editor?: string; reply?: boolean; corpsReconnu?: boolean } = {}) => `
+const COMMENT = (opts: { body?: string; author?: string; editor?: string; reply?: boolean; corpsReconnu?: boolean; permalien?: string } = {}) => `
   <div class="ReviewThreadComment-module__ReviewThreadContainer__m2xlo ReviewThreadComment-module__anchorable__kHiVn${
     opts.reply ? ' ReviewThreadComment-module__isReply__tjdPF' : ''
   }">
     <div class="ReviewThreadComment-module__ReviewThreadInnerContainer__ONuV_">
       <div data-testid="comment-header" class="ActivityHeader-module__ActivityHeaderContainer__BnNwC">
-        <a data-testid="avatar-link" class="ActivityHeader-module__AuthorName__VJr9h">${opts.author ?? 'Reefact'}</a>
+        <a class="Avatar-module__avatarLink__LpV3I prc-Link-Link-9ZwDx" href="/Reefact"><img data-testid="github-avatar"></a>
+        <a data-testid="avatar-link" class="ActivityHeader-module__AuthorName__VJr9h" href="/Reefact">${opts.author ?? 'Reefact'}</a>
+        <span class="ActivityHeader-module__HeaderMutedText__D3G5r"><a class="ActivityHeader-module__HeaderLink__WnxQu prc-Link-Link-9ZwDx" href="${
+          opts.permalien ?? 'https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes#r3932637709'
+        }">on Sep 4, 2026</a></span>
       </div>
     </div>
     <div class="ReviewThreadComment-module__ReviewThreadWrapper__maToZ">
@@ -95,6 +99,18 @@ describe('§9.2.3 — un fil de la nouvelle vue se lit', () => {
   // Le marqueur mesuré est le bouton de DÉ-résolution : présent quand le fil est résolu,
   // absent sinon (mesuré dans les deux états). Son absence ne dit pas « ouvert » mais
   // « non su » — `getThreads()` ne produit que 'resolved' et 'unknown' (§9.2.1).
+  // Test de CARACTÉRISATION, et il faut le dire : il passe aussi SANS le candidat mesuré
+  // ajouté à `threadAnchor`, le repli large `a[href*="#"]` attrapant déjà ce lien-ci — les
+  // liens d'avatar et d'auteur n'ayant pas de fragment. Il fixe ce que la vue rend
+  // aujourd'hui (permalien de la DATE, fragment `#r<id>`), il ne prouve pas un correctif.
+  it('l’ancre du fil est le permalien du premier commentaire, jamais le lien de l’auteur', async () => {
+    document.body.innerHTML = THREAD();
+    const threads = await adapter().getThreads();
+    expect(threads[0]!.root.permalink).toBe(
+      'https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes#r3932637709'
+    );
+  });
+
   it('sans le bouton de dé-résolution, la résolution reste inconnue', async () => {
     document.body.innerHTML = THREAD({ resolu: false });
     const threads = await adapter().getThreads();
@@ -174,5 +190,6 @@ describe('CA-11 — ce que l’extension ne sait plus lire, elle l’écrit', ()
     const chains = a.log.failures.map((f) => f.chain);
     expect(chains).not.toContain('comment-body');
     expect(chains).not.toContain('comment-author');
+    expect(chains).not.toContain('thread-anchor');
   });
 });

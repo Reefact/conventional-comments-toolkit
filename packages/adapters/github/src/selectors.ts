@@ -220,10 +220,14 @@ export const selectors = {
    * servie par la génération héritée, le premier candidat qui matche gagne, et l'ajout ne
    * peut donc rien défaire de ce qui fonctionne.
    *
-   * Restent NON mesurés, et donc non traités ici : aucun conteneur de cette vue ne porte
-   * d'attribut `id` — `threadId`/`commentId` y sont vides, `getThreads()` retombe sur ses
-   * identifiants synthétiques — et le permalien d'un commentaire (`threadAnchor`) n'a pas
-   * été relevé : `a[href*="#discussion_r"]` y vaut 0. */
+   * Le badge « Resolved » visible dans l'en-tête du fil a été cherché : il n'est PAS dans
+   * `review-thread` non plus. La boîte environnante reste donc le seul endroit où lire l'état.
+   *
+   * Reste NON mesuré, et donc non traité ici : aucun conteneur de cette vue ne porte
+   * d'attribut `id`, si bien que `threadId`/`commentId` y sont vides et que `getThreads()`
+   * retombe sur ses identifiants synthétiques. Le permalien, lui, PORTE cet identifiant dans
+   * son fragment (`#r3932637709`) — le jour où ces champs devront être renseignés, c'est là
+   * qu'ils se lisent, et non dans un attribut du DOM. */
 
   /** Fils rendus sur la page — pour les ancres du bandeau (§5.5). */
   renderedThreads: {
@@ -239,6 +243,14 @@ export const selectors = {
       '[data-testid="permalink"]',
       'a[href*="#discussion_r"]',
       'a[href*="#issuecomment"]',
+      // MESURÉ sur la vue `…/changes` : le permalien d'un commentaire est le lien de sa DATE,
+      // et son fragment s'écrit `#r<id>` là où la génération héritée écrit `#discussion_r<id>`
+      // — d'où le zéro du deuxième candidat. Placé AVANT le repli large, faute de quoi il ne
+      // serait jamais atteint. Ce n'est pas une réparation : le repli attrape déjà le bon lien
+      // sur cette vue, les liens d'avatar et d'auteur (`/Reefact`) n'ayant pas de fragment.
+      // C'est une prise accidentelle rendue délibérée — elle cesse de dépendre du fait
+      // qu'aucun autre lien à fragment n'apparaisse plus haut dans le fil.
+      '[class*="ActivityHeader-module__HeaderLink"]',
       'a[href*="#"]',
     ],
   } satisfies SelectorChain,

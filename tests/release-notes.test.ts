@@ -77,6 +77,34 @@ describe("extraction d'une section de notes de version", () => {
     expect(extractSection(notes, '2.0.0')).toBeNull();
   });
 
+  it('ne prend pas une ligne fence-like SUIVIE DE TEXTE pour une clôture (revue Reefact, PR #46)', () => {
+    // Une clôture ne peut être suivie que d'espaces. Dans un bloc ouvert par quatre backticks,
+    // « ````pas-une-clôture » est du contenu ; la traiter en clôture rouvrait le défaut d'un
+    // cran plus bas — le `##` suivant redevenait une frontière et la note repartait tronquée.
+    const notes = [
+      '## 1.1.0 — March 2, 2026',
+      '',
+      '````md',
+      '````pas-une-clôture',
+      '## un titre DANS le bloc',
+      '````',
+      '',
+      '- après le bloc',
+      '',
+      '## 1.0.0 — January 5, 2026',
+      '',
+      '- ailleurs',
+    ].join('\n');
+    const section = extractSection(notes, '1.1.0');
+    expect(section).toContain('- après le bloc'); // la section va jusqu'au bout
+    expect(section).toContain('## un titre DANS le bloc'); // gardé comme contenu, pas lu comme frontière
+    expect(section).not.toContain('ailleurs'); // la vraie voisine arrête toujours
+    // Compter les délimiteurs ne dirait rien ici : la ligne de CONTENU en porte elle-même. Ce
+    // qui prouve que le bloc s'est refermé au bon endroit, c'est que la section se poursuit
+    // au-delà de lui et s'arrête sur la vraie section suivante — les deux assertions ci-dessus.
+    expect(section!.trimEnd().endsWith('- après le bloc')).toBe(true);
+  });
+
   it('refuse une section réduite à son seul titre — publier sans un mot est ce qu’on empêche', () => {
     const notes = ['## 1.1.0 — March 2, 2026', '', '   ', '', '## 1.0.0 — January 5, 2026', '', '- du contenu'].join('\n');
     expect(extractSection(notes, '1.1.0')).toBeNull();
@@ -122,16 +150,26 @@ describe('les notes réellement livrées', () => {
     }
   });
 
-  it('portent une section pour chaque version, extractible par le garde', () => {
+  it('portent une section NON VIDE pour chaque version, dans les DEUX langues', () => {
+    // Sur les deux fichiers, pas seulement l'anglais que lit le garde (revue Reefact, PR #46) :
+    // une section française réduite à son titre garde exactement la même LISTE de versions, donc
+    // le test d'égalité ci-dessus reste vert — et le corps de Release renverrait vers une note
+    // française vide. Cette PR promet des notes bilingues et vient d'ajouter le refus des
+    // sections vides ; l'appliquer à une langue sur deux ne tiendrait ni l'une ni l'autre.
     for (const major of deliveredMajors()) {
-      const path = `docs/release-notes-${major}.x-en.md`;
-      const notes = readFileSync(path, 'utf8');
-      const versions = versionsIn(path);
-      expect(versions.length, `${path} sans aucune version`).toBeGreaterThan(0);
+      const english = `docs/release-notes-${major}.x-en.md`;
+      const versions = versionsIn(english);
+      expect(versions.length, `${english} sans aucune version`).toBeGreaterThan(0);
+      for (const lang of ['en', 'fr']) {
+        const path = `docs/release-notes-${major}.x-${lang}.md`;
+        const notes = readFileSync(path, 'utf8');
+        for (const version of versions) {
+          // Une section réduite à son titre rend null : le garde refuserait, ce test aussi.
+          expect(extractSection(notes, version), `section ${version} vide ou inextractible (${lang})`).not.toBeNull();
+        }
+      }
       for (const version of versions) {
-        // Une section réduite à son titre rend null : le garde refuserait, ce test aussi.
-        expect(extractSection(notes, version), `section ${version} inextractible`).not.toBeNull();
-        expect(notesPathOf(version), `${version} lue dans le mauvais fichier`).toBe(path);
+        expect(notesPathOf(version), `${version} lue dans le mauvais fichier`).toBe(english);
       }
     }
   });

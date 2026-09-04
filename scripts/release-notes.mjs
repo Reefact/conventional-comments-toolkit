@@ -28,13 +28,25 @@ export function notesPathOf(version) {
   return `docs/release-notes-${major}.x-en.md`;
 }
 
-/** Délimiteur de bloc de code ouvert ou fermé par cette ligne, ou null. Approximation assumée
- * de CommonMark : trois caractères ou plus, `` ` `` ou `~`, indentés d'au plus trois espaces.
- * Ce qui compte ici n'est pas de rendre le Markdown, c'est de ne pas prendre une ligne de
- * CONTENU pour une frontière de section. */
-function fenceDelimiter(line) {
+/** OUVERTURE de bloc de code, ou null : trois caractères ou plus, `` ` `` ou `~`, indentés d'au
+ * plus trois espaces. Ce qui suit sur la ligne est une info string (```` ```sh ````), sans
+ * effet ici. */
+function fenceOpener(line) {
   const match = /^ {0,3}(`{3,}|~{3,})/.exec(line);
   return match === null ? null : match[1];
+}
+
+/** Cette ligne CLÔT-elle le bloc ouvert par `open` ? Trois conditions, et la troisième est
+ * celle qui manquait (revue Reefact, PR #46) : le même caractère, une longueur au moins égale,
+ * et RIEN d'autre que des espaces après le délimiteur.
+ *
+ * Sans elle, une ligne comme ```` ````pas-une-clôture ```` à l'intérieur d'un bloc ouvert par
+ * quatre backticks — du CONTENU Markdown parfaitement valide — refermait le bloc. Le `## ` qui
+ * suivait redevenait une frontière de section, et la note repartait tronquée, fence ouverte :
+ * exactement le défaut que la conscience des fences venait corriger, une couche plus bas. */
+function closesFence(line, open) {
+  const match = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+  return match !== null && match[1][0] === open[0] && match[1].length >= open.length;
 }
 
 /** Section d'UNE version : de son titre `## <version>` jusqu'au prochain `## ` de PREMIER
@@ -61,15 +73,14 @@ export function extractSection(markdown, version) {
   let title = null;
   const body = [];
   for (const line of String(markdown).split('\n')) {
-    const fence = fenceDelimiter(line);
     if (open !== null) {
-      // Seule une clôture du MÊME caractère et au moins aussi longue referme le bloc.
-      if (fence !== null && fence[0] === open[0] && fence.length >= open.length) open = null;
+      if (closesFence(line, open)) open = null;
       if (title !== null) body.push(line);
       continue;
     }
-    if (fence !== null) {
-      open = fence;
+    const opener = fenceOpener(line);
+    if (opener !== null) {
+      open = opener;
       if (title !== null) body.push(line);
       continue;
     }

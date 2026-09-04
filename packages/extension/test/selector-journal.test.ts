@@ -12,9 +12,14 @@
 // Constaté sur une page réelle (PR #45 du dépôt, fusionnée) : deux rafales de plus de
 // quarante entrées `merge-button` en neuf secondes, puis à nouveau au rechargement suivant.
 //
-// La question à laquelle ce journal répond est « QUELS sélecteurs ont échoué, et quand pour la
-// dernière fois » — jamais « combien de fois » : un compte dicté par le rythme des mutations
-// de la page ne mesure rien. Deux bornes, à deux portées différentes, et il faut les deux :
+// La question à laquelle ce journal répond est « QUELS sélecteurs ont échoué, et à quel
+// chargement de page pour la dernière fois » — jamais « combien de fois » : un compte dicté par
+// le rythme des mutations de la page ne mesure rien. L'horodatage est celui de la première
+// dégradation de la chaîne DANS SON ONGLET : un onglet ouvert des heures le garde, le chargement
+// suivant le remplace (revue Reefact, PR #48). Le rafraîchir en continu rendrait une écriture de
+// stockage par mutation du DOM — la churn même que ces bornes existent pour supprimer.
+//
+// Deux bornes, à deux portées différentes, et il faut les deux :
 // `SelectorLog` borne UN onglet (et avec lui la remontée télémétrique), `appendToJournal`
 // borne le journal PARTAGÉ, qu'alimentent plusieurs onglets et plusieurs rechargements.
 
@@ -47,7 +52,7 @@ describe('§9.4 — un onglet ne journalise qu’une fois par chaîne', () => {
   });
 });
 
-describe('§9.4 — le journal partagé garde une ligne par chaîne, la plus récente', () => {
+describe('§9.4 — le journal partagé garde une ligne par chaîne, celle écrite en dernier', () => {
   /** Aire de stockage minimale : `get`/`set` sur un objet, comme `chrome.storage.local`. */
   function fakeArea(initial: Record<string, unknown> = {}) {
     const store: Record<string, unknown> = { ...initial };
@@ -87,7 +92,7 @@ describe('§9.4 — le journal partagé garde une ligne par chaîne, la plus ré
 
     expect(store['selectorFailures']).toEqual([
       { chain: 'repository-public-meta', at: '2026-09-04T08:58:24.000Z' },
-      { chain: 'merge-button', at: '2026-09-04T09:10:33.983Z' }, // la dernière occurrence
+      { chain: 'merge-button', at: '2026-09-04T09:10:33.983Z' }, // l'écriture la plus récente
     ]);
   });
 

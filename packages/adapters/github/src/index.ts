@@ -168,9 +168,11 @@ export class GithubClientAdapter implements PlatformAdapter {
         // inférieurs en AFFIRMANT avoir lu la configuration du dépôt (revue Codex, round 2).
         // Le cas est devenu rare ; il n'a pas disparu.
         //
-        // DEUX conditions, et la première est celle qui manquait. Le masque de GitHub n'existe
-        // que pour une requête ANONYME : si une session est ouverte, le premier saut part
-        // authentifié et le 404 dit ce qu'il dit — quelle que soit la visibilité du dépôt.
+        // DEUX conditions POSITIVES, et la première est celle qui manquait. Le masque de GitHub
+        // n'existe que pour une requête ANONYME : si une session est ouverte, le premier saut
+        // part authentifié et le 404 dit ce qu'il dit — quelle que soit la visibilité du dépôt.
+        // `=== false` des deux côtés, jamais une négation : un capteur qui ne sait pas répondre
+        // laisse le 404 nominal, il ne vote pas pour le reclassement (revue Reefact, PR #48).
         // Conditionner le reclassement à la seule visibilité a produit exactement le défaut
         // que le paragraphe précédent croyait impossible : sur un dépôt PUBLIC, `#repoIsPublic()`
         // a répondu `false` dans un vrai navigateur (page de PR connectée, mesurée par
@@ -183,8 +185,14 @@ export class GithubClientAdapter implements PlatformAdapter {
         // La visibilité reste lue dans la page, qui la porte, et la conclusion ne se tire que
         // sur une preuve POSITIVE de dépôt privé : visibilité inconnue — sélecteur pourri, page
         // qui ne le dit plus — vaut `absent`, c'est-à-dire exactement le comportement d'avant.
-        const masked =
-          credentials !== 'include' && !this.#hasSession() && this.#repoIsPublic() === false;
+        // Les deux sondes sont évaluées, jamais court-circuitées : `#repoIsPublic()` JOURNALISE
+        // sa propre dégradation (§9.4, CA-11), et un `&&` qui l'évite selon l'état de la session
+        // ferait dépendre le journal d'un capteur voisin. C'est déjà ainsi que le code lisait la
+        // visibilité à chaque 404 avant l'ajout de la session : la condition change, la
+        // couverture du journal ne change pas.
+        const hasSession = this.#hasSession();
+        const isPublic = this.#repoIsPublic();
+        const masked = credentials !== 'include' && hasSession === false && isPublic === false;
         return masked
           ? { status: 'unreachable', reason: 'HTTP 404 (dépôt privé : absence indiscernable)' }
           : { status: 'absent' };
@@ -198,15 +206,23 @@ export class GithubClientAdapter implements PlatformAdapter {
 
   /** Une session est-elle ouverte dans la page ? MESURÉ, pas rappelé : `meta[name="user-login"]`
    * porte le login connecté, et existe avec `content=""` pour un visiteur déconnecté (relevé
-   * sur une page de PR réelle) — l'absence du méta comme le contenu vide valent donc « pas de
-   * session ». C'est le MÊME sélecteur que `getCurrentUser()` : une seule définition de « qui
-   * est connecté », qui ne peut pas diverger d'elle-même.
+   * sur une page de PR réelle). C'est le MÊME sélecteur que `getCurrentUser()` : une seule
+   * définition de « qui est connecté », qui ne peut pas diverger d'elle-même.
+   *
+   * TROIS états, et le troisième est le point : `null` quand la page ne dit rien — méta disparu,
+   * attribut absent. Une première rédaction traitait cet inconnu comme « pas de session » (`??
+   * ''`), ce qui rouvrait le défaut que ce capteur venait fermer : un sélecteur pourri suffisait
+   * à simuler une déconnexion, et si le capteur de visibilité répondait `false` — celui-là même
+   * qu'on vient de mesurer faillible — un 404 nominal redevenait `unreachable` et le bandeau
+   * revenait (revue Reefact, PR #48). Les deux signaux doivent être POSITIFS, sans quoi il n'y en
+   * a jamais eu qu'un.
    *
    * Pas de `log.degraded()` ici : ce capteur ne sert qu'à REFUSER un reclassement, jamais à en
-   * déclencher un, et son silence rend simplement la décision au capteur de visibilité. */
-  #hasSession(): boolean {
-    const { element } = queryChain(this.#doc, selectors.currentUser);
-    return (element?.getAttribute('content') ?? '').trim() !== '';
+   * déclencher un, et son silence rend la décision au défaut sûr, pas au capteur de visibilité. */
+  #hasSession(): boolean | null {
+    const meta = queryChain(this.#doc, selectors.currentUser).element;
+    const login = meta?.getAttribute('content');
+    return login === undefined || login === null ? null : login.trim() !== '';
   }
 
   /** Le dépôt affiché est-il public ? `null` quand la page ne le dit pas — et ce troisième

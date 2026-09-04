@@ -129,7 +129,18 @@ Corrigé : la lecture part en `credentials: 'same-origin'` — la session
 accompagne le premier saut, pas la redirection. Le bandeau disparaît sur
 un dépôt **public**, et aussi sur un dépôt **privé** tant qu'une session
 est ouverte. Il ne reste que pour un visiteur déconnecté, et il dit alors
-la vérité : l'extension n'a pas pu lire. (GitHub masquant volontiers le
-privé en « inexistant », un 404 y est reclassé en lecture impossible dès
-que la page indique un dépôt privé ; sans quoi l'extension conclurait
-« pas de configuration ».)
+la vérité : l'extension n'a pas pu lire.
+
+Cette dernière phrase cachait un second défaut, et il vaut la peine d'en
+garder la trace. GitHub masquant volontiers le privé en « inexistant », un
+404 était reclassé en lecture impossible **dès que la page indiquait un
+dépôt privé** — un signal lu dans la page, donc faillible. Il a
+effectivement menti : sur une page de pull request connectée d'un dépôt
+**public**, le capteur de visibilité a répondu « privé », le 404 nominal
+est devenu `unreachable`, et le bandeau s'affichait sur un dépôt qui
+n'avait tout simplement pas de configuration — le cas le plus ordinaire
+qui soit. Le reclassement exige désormais l'accord de **deux** signaux
+indépendants : aucune session dans la page (`meta[name="user-login"]` vide
+ou absent) **et** un dépôt annoncé privé. Le masque n'existant que pour
+une requête anonyme, une session ouverte suffit à rendre au 404 son sens
+ordinaire, quoi que dise le capteur de visibilité.

@@ -124,7 +124,18 @@ Fixed: the read is sent with `credentials: 'same-origin'` — the session
 travels with the first hop, not with the redirect. The banner disappears
 on a **public** repository, and on a **private** one too as long as a
 session is open. It remains only for a signed-out visitor, and then says
-something true: the extension could not read. (GitHub readily masks
-private resources as missing, so a 404 there is reclassified as an
-unreadable configuration as soon as the page says the repository is
-private; otherwise the extension would conclude "no configuration".)
+something true: the extension could not read.
+
+That last sentence hid a second defect, and it is worth keeping the
+record. GitHub readily masks private resources as missing, so a 404 was
+reclassified as an unreadable configuration **as soon as the page said
+the repository was private** — a page-scraped signal, and therefore a
+fallible one. It did fail: on a signed-in pull request page of a
+**public** repository, the visibility probe answered "private", the
+nominal 404 became `unreachable`, and the banner appeared on a
+repository that simply had no configuration — the most ordinary case
+there is. The reclassification now needs **two** independent signals to
+agree: no session in the page (`meta[name="user-login"]` empty or
+absent) **and** a repository reported private. The mask only exists for
+an anonymous request, so an open session is enough to give the 404 back
+its ordinary meaning, whatever the visibility probe says.

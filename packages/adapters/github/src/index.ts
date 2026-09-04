@@ -149,9 +149,10 @@ export class GithubClientAdapter implements PlatformAdapter {
    * avec QUEL code, nous ne l'avons pas mesuré (le proxy de l'environnement de développement
    * intercepte tout dépôt hors périmètre et répond lui-même, y compris pour un dépôt
    * inexistant). Les deux réponses sont donc traitées : 403 rend `unreachable` directement, et
-   * un 404 — GitHub masquant volontiers le privé en « inexistant » — est reclassé plus bas dès
-   * que la page dit le dépôt privé. Dans les deux cas l'extension DIT qu'elle n'a pas pu lire,
-   * au lieu de prétendre qu'il n'y a pas de fichier. */
+   * un 404 — GitHub masquant volontiers le privé en « inexistant » — n'est reclassé plus bas
+   * que sur la conjonction de DEUX signaux : aucune session dans la page, ET un dépôt dit
+   * privé. Dans ces cas l'extension DIT qu'elle n'a pas pu lire, au lieu de prétendre qu'il
+   * n'y a pas de fichier. */
   async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
     const url = `https://${pr.host}/${pr.scope.join('/')}/raw/HEAD/.conventional-comments.json`;
     const credentials = configCredentials(url);
@@ -166,12 +167,23 @@ export class GithubClientAdapter implements PlatformAdapter {
         // inférieurs en AFFIRMANT avoir lu la configuration du dépôt (revue Codex, round 2).
         // Le cas est devenu rare ; il n'a pas disparu.
         //
-        // La visibilité est donc lue dans la page, qui la porte. Et la conclusion ne se tire
-        // que sur une preuve POSITIVE de dépôt privé : visibilité inconnue — sélecteur pourri,
-        // page qui ne le dit plus — vaut `absent`, c'est-à-dire exactement le comportement
-        // d'avant. Une dégradation de sélecteur ne peut pas faire apparaître un bandeau sur
-        // les dépôts publics, qui sont le cas courant.
-        const masked = credentials !== 'include' && this.#repoIsPublic() === false;
+        // DEUX conditions, et la première est celle qui manquait. Le masque de GitHub n'existe
+        // que pour une requête ANONYME : si une session est ouverte, le premier saut part
+        // authentifié et le 404 dit ce qu'il dit — quelle que soit la visibilité du dépôt.
+        // Conditionner le reclassement à la seule visibilité a produit exactement le défaut
+        // que le paragraphe précédent croyait impossible : sur un dépôt PUBLIC, `#repoIsPublic()`
+        // a répondu `false` dans un vrai navigateur (page de PR connectée, mesurée par
+        // l'utilisateur), le 404 nominal est devenu `unreachable`, et le bandeau du §5.4
+        // s'affichait sur un dépôt sans configuration — le cas le plus courant qui soit.
+        // La visibilité est un capteur de PAGE, donc faillible ; la session en est un second,
+        // indépendant, et il porte la question réellement posée (« ce 404 peut-il être un
+        // masque ? »). Il faut désormais que les deux disent oui.
+        //
+        // La visibilité reste lue dans la page, qui la porte, et la conclusion ne se tire que
+        // sur une preuve POSITIVE de dépôt privé : visibilité inconnue — sélecteur pourri, page
+        // qui ne le dit plus — vaut `absent`, c'est-à-dire exactement le comportement d'avant.
+        const masked =
+          credentials !== 'include' && !this.#hasSession() && this.#repoIsPublic() === false;
         return masked
           ? { status: 'unreachable', reason: 'HTTP 404 (dépôt privé : absence indiscernable)' }
           : { status: 'absent' };
@@ -181,6 +193,19 @@ export class GithubClientAdapter implements PlatformAdapter {
     } catch (e) {
       return { status: 'unreachable', reason: String(e) };
     }
+  }
+
+  /** Une session est-elle ouverte dans la page ? MESURÉ, pas rappelé : `meta[name="user-login"]`
+   * porte le login connecté, et existe avec `content=""` pour un visiteur déconnecté (relevé
+   * sur une page de PR réelle) — l'absence du méta comme le contenu vide valent donc « pas de
+   * session ». C'est le MÊME sélecteur que `getCurrentUser()` : une seule définition de « qui
+   * est connecté », qui ne peut pas diverger d'elle-même.
+   *
+   * Pas de `log.degraded()` ici : ce capteur ne sert qu'à REFUSER un reclassement, jamais à en
+   * déclencher un, et son silence rend simplement la décision au capteur de visibilité. */
+  #hasSession(): boolean {
+    const { element } = queryChain(this.#doc, selectors.currentUser);
+    return (element?.getAttribute('content') ?? '').trim() !== '';
   }
 
   /** Le dépôt affiché est-il public ? `null` quand la page ne le dit pas — et ce troisième

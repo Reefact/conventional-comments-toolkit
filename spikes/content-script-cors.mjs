@@ -69,6 +69,15 @@ writeFileSync(
     try { const r = await fetch(url, init); out[name] = 'HTTP ' + r.status; }
     catch { out[name] = 'THREW'; }
   }
+  // LE RECEVEUR DE \`fetch\`, mesure separee : le monde isole ne repond pas comme la page.
+  // Un adaptateur qui range \`fetch\` dans un champ et l'appelle comme methode (\`this.#f(u)\`)
+  // passe l'instance en receveur. Dans le monde PRINCIPAL, Chromium l'accepte ; ici, non.
+  class Holder { #f = fetch; call(u) { return this.#f(u, { credentials: 'same-origin' }); } }
+  try { await new Holder().call(location.origin + '/present.json'); out['receiver-field'] = 'OK'; }
+  catch (e) { out['receiver-field'] = 'THREW ' + e.message; }
+  class Bound { #f = fetch.bind(globalThis); call(u) { return this.#f(u, { credentials: 'same-origin' }); } }
+  try { await new Bound().call(location.origin + '/present.json'); out['receiver-bound'] = 'OK'; }
+  catch (e) { out['receiver-bound'] = 'THREW ' + e.message; }
   document.title = 'DONE ' + JSON.stringify(out);
 })();`
 );
@@ -114,6 +123,15 @@ try {
   // CE QUE FAIT getRepoConfig() : authentifié au premier saut, anonyme après la redirection.
   assert('`same-origin` traverse la redirection — ce que fait getRepoConfig()', seen['redirect-cors-sameorigin'] === 'HTTP 200', seen['redirect-cors-sameorigin']);
   assert('… en AYANT authentifié le premier saut — un dépôt privé reste lisible', cookiesSeen['/redirect-cors.json'] === 'session=secret', String(cookiesSeen['/redirect-cors.json']));
+  // LE DÉFAUT LIVRÉ, et pourquoi aucun test unitaire ne pouvait le voir : un faux `fetch` est
+  // une fonction ordinaire, qui accepte n'importe quel receveur. Le vrai, dans le monde isolé
+  // d'un script de contenu, exige le sien — l'adaptateur rangeait `fetch` dans un champ privé
+  // et l'appelait comme méthode, donc avec l'instance en receveur : TOUTE lecture de
+  // configuration levait, et le bandeau du §5.4 s'affichait sur chaque dépôt, avec ou sans
+  // fichier. Sondé d'abord dans le monde PRINCIPAL, où Chromium l'accepte, le défaut s'était
+  // déclaré introuvable : la mesure était bonne, le monde ne l'était pas.
+  assert('`fetch` rangé dans un champ et appelé comme méthode LÈVE dans le monde isolé', String(seen['receiver-field']).startsWith('THREW'), String(seen['receiver-field']));
+  assert('… et lié à son global, il passe — ce que fait l’adaptateur', seen['receiver-bound'] === 'OK', String(seen['receiver-bound']));
   assert('… et SANS envoyer le cookie après la redirection — le joker l’exige', corsSeen['/ok.json'] === null, String(corsSeen['/ok.json']));
 } finally {
   await ctx.close();

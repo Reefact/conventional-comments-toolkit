@@ -81,6 +81,33 @@ export function hostMatchesPattern(host: string, pattern: string): boolean {
 }
 
 /** L'hôte est-il couvert par au moins une des entrées (noms exacts et jokers mêlés) ? */
+/** Le `fetch` à employer par un adaptateur : la substitution reçue, sinon le global **LIÉ à
+ * son global**. Le `.bind()` n'est pas une précaution de style, c'est la correction d'un défaut
+ * livré.
+ *
+ * Un adaptateur range son `fetch` dans un champ privé et l'appelle comme méthode
+ * (`this.#fetch(url, init)`) : l'appel passe donc l'INSTANCE en receveur. Dans le monde isolé
+ * d'un script de contenu, Chromium refuse ce receveur —
+ * « Failed to execute 'fetch' on 'Window': Illegal invocation » — et TOUTE lecture de
+ * configuration levait. L'extension rendait `unreachable` sur chaque dépôt, avec ou sans
+ * fichier, et affichait le bandeau du §5.4 en permanence.
+ *
+ * Deux raisons pour lesquelles ce défaut a vécu longtemps, et elles se valent d'être écrites :
+ *  - aucun test unitaire ne peut le voir. Un faux `fetch` est une fonction ordinaire, qui
+ *    accepte n'importe quel receveur ; le vrai exige le sien.
+ *  - sondé dans le monde PRINCIPAL d'une page, Chromium ACCEPTE ce même receveur. La mesure
+ *    qui déclarait l'hypothèse fausse était juste — dans le mauvais monde.
+ *
+ * `npm run check:content-script-cors` mesure les deux formes, dans un script de contenu réel.
+ *
+ * Le repli sans `bind` couvre le contexte qui n'a pas de `fetch` global : l'échec y reste au
+ * moment de la lecture, comme avant, plutôt qu'à la construction de l'adaptateur. */
+export function adapterFetch(impl?: typeof fetch): typeof fetch {
+  if (impl) return impl;
+  const global = globalThis.fetch;
+  return typeof global === 'function' ? global.bind(globalThis) : global;
+}
+
 export function hostMatchesAny(host: string, patterns: readonly string[]): boolean {
   return patterns.some((p) => hostMatchesPattern(host, p));
 }

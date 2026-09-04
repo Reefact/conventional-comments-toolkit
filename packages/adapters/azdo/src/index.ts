@@ -19,6 +19,7 @@ import {
   type UserInfo,
 } from '@cct/core';
 import {
+  adapterFetch,
   closestChain,
   commentBodyText,
   hostMatchesAny,
@@ -68,7 +69,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
 
   constructor(opts: AzdoClientOptions = {}) {
     this.#hosts = ['dev.azure.com', ...(opts.extraHosts ?? [])];
-    this.#fetch = opts.fetchImpl ?? fetch;
+    this.#fetch = adapterFetch(opts.fetchImpl);
     this.#doc = opts.documentRef ?? document;
     this.#readOrgConfig = opts.readOrgConfig;
     this.log = opts.log ?? new SelectorLog();

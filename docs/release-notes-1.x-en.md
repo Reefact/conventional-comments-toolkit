@@ -64,6 +64,7 @@ _Decorations get badges of their own, and the whole display follows a configurat
 ### 🐛 Bug fixes
 
 - Changing the configuration now refreshes what is already on screen — including on a tab you left open on a pull request. A label disabled mid-review loses its badge instead of keeping one for a state that no longer exists.
+- **A comment box you already had open follows that change too, including whether it blocks your submission.** It went on applying the configuration captured when it opened, so an organisation switching from `enforce` to `off` left you blocked until you closed and reopened the box.
 
 ## 1.0.0-beta.5 — September 2, 2026
 
@@ -95,6 +96,11 @@ _Two permissions dropped from the manifest, telemetry that only exists if you as
 
 - Optional telemetry, off unless you turn it on, bound to the endpoint you consented to and configured by your organisation's policy rather than by a repository file.
 - The version shown in `chrome://extensions` now distinguishes pre-releases: `1.0.0-beta.1` and `1.0.0-beta.2` no longer both read `1.0.0`.
+
+### 🐛 Bug fixes
+
+- **On GitHub Enterprise Server and self-hosted Azure DevOps Server, granting the host permission now actually gives you the extension.** The grant succeeded and nothing appeared: no adapter was ever built for that host. Which platform a host serves is now recorded with it, so a GHES domain and an Azure DevOps Server one are told apart.
+- **An organisation configuration hosted outside your platform is readable again.** It never was: the page's own CORS policy blocked it whatever permission you had granted, leaving the extension permanently degraded and judging on two configuration levels where the server uses three.
 
 ## 1.0.0-beta.2 — August 24, 2026
 

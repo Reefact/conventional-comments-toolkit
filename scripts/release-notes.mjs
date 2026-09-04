@@ -28,7 +28,27 @@ export function notesPathOf(version) {
   return `docs/release-notes-${major}.x-en.md`;
 }
 
-/** Section d'UNE version : de son titre `## <version>` jusqu'au prochain `## `, ou la fin.
+/** Délimiteur de bloc de code ouvert ou fermé par cette ligne, ou null. Approximation assumée
+ * de CommonMark : trois caractères ou plus, `` ` `` ou `~`, indentés d'au plus trois espaces.
+ * Ce qui compte ici n'est pas de rendre le Markdown, c'est de ne pas prendre une ligne de
+ * CONTENU pour une frontière de section. */
+function fenceDelimiter(line) {
+  const match = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+  return match === null ? null : match[1];
+}
+
+/** Section d'UNE version : de son titre `## <version>` jusqu'au prochain `## ` de PREMIER
+ * niveau, ou la fin du fichier.
+ *
+ * Les titres à l'intérieur d'un bloc de code délimité ne comptent pas — ni pour ouvrir la
+ * section, ni pour la fermer (revue Reefact, PR #46). Une note qui montre une commande
+ * contenant `## install` dans un bloc ```sh` était sinon tronquée à cette ligne, et la Release
+ * publiait un bloc de code laissé OUVERT — alors même que ce script annonce lire la section
+ * « telle quelle ».
+ *
+ * Rend null pour une section VIDE autant que pour une section absente : un titre seul passait
+ * le garde et laissait publier une release sans un mot sur ce qui avait changé, ce que ce
+ * fichier existe précisément pour empêcher.
  *
  * La frontière de mot après la version n'est pas un détail : sans elle, `## 1.0.0-beta.1`
  * répondrait à une demande pour `1.0.0`, et la release stable publierait la note d'une bêta.
@@ -36,13 +56,33 @@ export function notesPathOf(version) {
  * d'entrer dans l'expression régulière, où `.` et `-` ont tous deux un sens. */
 export function extractSection(markdown, version) {
   const escaped = String(version).replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
-  const lines = String(markdown).split('\n');
   const heading = new RegExp(`^## ${escaped}(?:\\s|$)`);
-  const start = lines.findIndex((line) => heading.test(line));
-  if (start === -1) return null;
-  const rest = lines.slice(start + 1);
-  const end = rest.findIndex((line) => line.startsWith('## '));
-  return [lines[start], ...(end === -1 ? rest : rest.slice(0, end))].join('\n').trimEnd();
+  let open = null; // délimiteur du bloc de code en cours, ou null
+  let title = null;
+  const body = [];
+  for (const line of String(markdown).split('\n')) {
+    const fence = fenceDelimiter(line);
+    if (open !== null) {
+      // Seule une clôture du MÊME caractère et au moins aussi longue referme le bloc.
+      if (fence !== null && fence[0] === open[0] && fence.length >= open.length) open = null;
+      if (title !== null) body.push(line);
+      continue;
+    }
+    if (fence !== null) {
+      open = fence;
+      if (title !== null) body.push(line);
+      continue;
+    }
+    if (title === null) {
+      if (heading.test(line)) title = line;
+      continue;
+    }
+    if (line.startsWith('## ')) break;
+    body.push(line);
+  }
+  if (title === null) return null;
+  const text = body.join('\n').trim();
+  return text === '' ? null : `${title}\n${text}`;
 }
 
 if (process.argv[1] !== undefined && process.argv[1].endsWith('release-notes.mjs')) {
@@ -62,7 +102,10 @@ if (process.argv[1] !== undefined && process.argv[1].endsWith('release-notes.mjs
   }
   const section = extractSection(markdown, version);
   if (section === null) {
-    fail(`${path} ne porte aucune section « ## ${version} » — écrivez-la avant de poser le tag.`);
+    fail(
+      `${path} ne porte aucune section « ## ${version} » qui dise quelque chose — absente, ` +
+        `ou réduite à son seul titre. Écrivez-la avant de poser le tag.`
+    );
   }
   console.log(section);
 }

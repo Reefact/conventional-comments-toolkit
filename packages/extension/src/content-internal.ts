@@ -910,11 +910,25 @@ export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
  * Ne porte QUE de l'état appartenant à la plateforme — jamais ce que notre propre rendu
  * écrit : c'est `ownOutputSignatureOf`, capturée après le rendu, qui couvre ce versant. */
 function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boolean): string {
-  const published = publishedSignatureOf(adapter) ?? '';
   const completion = probeCompletionControl ? (adapter.getCompletionControl() !== null ? '1' : '0') : '?';
-  const rendered = renderedThreadsOf(adapter);
-  const threadIds = rendered.map((t) => t.id).join(',');
-  return `${published}|${completion}|${threadIds}|${renderedCommentCountOf(adapter)}`;
+  return `${completion}|${contentSignatureOf(adapter)}`;
+}
+
+/** Le CONTENU que la plateforme rend — résumé publié, fils, nombre de corps de commentaire —
+ * sans le bouton de complétion, et c'est toute la raison d'être de cette séparation : ce
+ * bouton n'est pas du contenu, et sa sonde change de valeur (`'?'`) au franchissement de la
+ * fenêtre d'hydratation, sans que la page ait bougé d'un pixel. Une comparaison faite au
+ * travers de cette bascule verrait un changement qui n'existe pas.
+ *
+ * C'est ce que compare `run()` pour décider si une page qui n'a encore RIEN montré mérite un
+ * nouveau rendu passé la fenêtre (voir là-bas). Sans effet de bord : aucune de ces trois
+ * lectures ne journalise de dégradation de sélecteur, contrairement à `getCompletionControl()`. */
+function contentSignatureOf(adapter: PlatformAdapter): string {
+  const published = publishedSignatureOf(adapter) ?? '';
+  const threadIds = renderedThreadsOf(adapter)
+    .map((t) => t.id)
+    .join(',');
+  return `${published}|${threadIds}|${renderedCommentCountOf(adapter)}`;
 }
 
 /** Nombre de corps de commentaire que la PLATEFORME rend — **jamais** le nombre de ceux que
@@ -1145,6 +1159,9 @@ export function observePrChromeNavigation(
 ): (() => void) {
   let lastPrKey: string | null = null;
   let lastChromeSig: string | null = null;
+  // Pendant de `lastChromeSig` pour la branche « rien montré » de `run()` — voir là-bas
+  // pourquoi les deux ne se confondent pas.
+  let lastContentSig: string | null = null;
   // État de ce que NOTRE dernier rendu a laissé dans la page (`ownOutputSignatureOf`) —
   // écrit à la FIN du rendu, jamais au début, pour que nos propres écritures ne se
   // re-déclenchent pas elles-mêmes.
@@ -1279,6 +1296,10 @@ export function observePrChromeNavigation(
     // d'hydratation de CETTE PR — jamais indéfiniment (§9.4, cf. chromeSignatureOf).
     const probeCompletionControl = navigated || nowMs <= retryUntil;
     const chromeSig = key === null ? null : chromeSignatureOf(adapter, probeCompletionControl);
+    // Lu à CHAQUE tour, y compris quand `showedSomething` est vrai : c'est la référence que
+    // la branche « rien montré » compare, et la laisser se figer sur un tour sauté ferait
+    // dépendre le réveil de l'ordre des tours.
+    const contentSig = key === null ? null : contentSignatureOf(adapter);
     if (!navigated && !forceRender) {
       if (showedSomething) {
         // Deux versants, et il faut les deux : l'état de la PLATEFORME a-t-il changé, et ce
@@ -1289,8 +1310,23 @@ export function observePrChromeNavigation(
         // des écritures qui ne sont pas les siennes.
         const ownSig = key === null ? null : ownOutputSignatureOf(adapter, doc);
         if (chromeSig === lastChromeSig && ownSig === lastOwnSig) return; // rien de neuf à montrer
-      } else if (nowMs > retryUntil) {
-        return; // fenêtre d'hydratation écoulée, rien à montrer et toujours pas plus de contenu
+      } else if (nowMs > retryUntil && contentSig === lastContentSig) {
+        // Fenêtre d'hydratation écoulée, rien montré — et la page n'a TOUJOURS pas bougé.
+        // La seconde moitié de cette condition est le correctif (revue Reefact, PR #49) :
+        // sans elle, la fenêtre était une date de PÉREMPTION et non une borne au martèlement.
+        // Le cas se voit sur `Files changed`, qui ne rend AUCUNE description de PR (§4.1) :
+        // tant qu'aucun fil n'existe, cette vue n'a rien à montrer, l'observateur se taisait
+        // cinq secondes plus tard, et le premier commentaire inline publié ensuite ne
+        // recevait ni badge ni bandeau avant un rechargement complet. Le compte des corps
+        // rendus le réveille désormais — et une page qui ne bouge pas ressort toujours ici,
+        // sans rendre, ce que garde le test « une PR réellement vide n'est pas retentée
+        // indéfiniment ».
+        //
+        // `contentSig`, jamais `chromeSig` : ce dernier porte la sonde du bouton de
+        // complétion, qui bascule à `'?'` au franchissement de cette même fenêtre (voir
+        // `chromeSignatureOf`) — la comparaison y verrait un changement à chaque fois, pour
+        // une page identique, et rendrait la borne inopérante.
+        return;
       }
     }
     // Consommé ici, que le rendu ait été déclenché par `forceRender` ou non : un
@@ -1299,6 +1335,7 @@ export function observePrChromeNavigation(
     // jamais perdu, jamais consommé deux fois pour un seul écart constaté.
     forceRender = false;
     lastChromeSig = chromeSig;
+    lastContentSig = contentSig;
     inFlight = true;
     // Une navigation peut survenir pendant les lectures asynchrones : le rendu vérifie
     // alors qu'il porte toujours sur la PR affichée avant d'écrire quoi que ce soit.

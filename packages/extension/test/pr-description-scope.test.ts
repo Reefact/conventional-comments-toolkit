@@ -165,6 +165,16 @@ describe('§5.5 — la description ne reçoit pas de badge', () => {
 
 describe('§5.5 — écarter la description ne rend pas l’extension sourde', () => {
   const disposers: (() => void)[] = [];
+  // Reposée à CHAQUE test, et pas seulement une fois : l'`afterEach` ci-dessous repointe
+  // `location` hors PR, si bien qu'un second test de ce bloc démarrerait sur une page dont
+  // `currentPr()` rend `null` — l'observateur n'y rendrait rien, pour une raison qui n'est
+  // pas celle qu'il teste.
+  beforeEach(() => {
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/Reefact/conventional-comments-toolkit/pull/39'),
+      configurable: true,
+    });
+  });
   afterEach(() => {
     for (const dispose of disposers.splice(0)) dispose();
     document.body.innerHTML = '';
@@ -201,17 +211,57 @@ describe('§5.5 — écarter la description ne rend pas l’extension sourde', (
     document.body.insertAdjacentHTML('beforeend', COMMENT_BODY('issue: le build casse'));
     await settle();
 
-    const badged = document.querySelector('#issuecomment-5513165152 .cct-badge');
-    expect(badged).not.toBeNull();
+    await waitFor(() => document.querySelector('#issuecomment-5513165152 .cct-badge') !== null);
+    expect(document.querySelector('#issuecomment-5513165152 .cct-badge')).not.toBeNull();
     // Et la description, elle, n'a toujours reçu aucun badge.
     expect(document.querySelectorAll('.js-command-palette-pull-body .cct-badge')).toHaveLength(0);
+  });
+
+  // Le MÊME réveil, sur la vue où AUCUNE description n'est rendue — `Files changed` (revue
+  // Reefact, PR #49). Le test ci-dessus ne pouvait pas le voir : sa description servait de
+  // sentinelle non nulle. Ici la page est vide au premier rendu, donc `showed` est faux quoi
+  // qu'on décide du décompte — c'est la borne de `run()` elle-même qui doit céder devant un
+  // changement de contenu, sans quoi la fenêtre d'hydratation est une date de péremption.
+  it('sur Files changed, sans description ni commentaire initial, le premier commentaire inline réveille l’observateur', async () => {
+    document.body.innerHTML = '<div class="js-diff-progressive-container"></div>';
+    const adapter = new GithubClientAdapter({
+      documentRef: document,
+      fetchImpl: async () => new Response('', { status: 404 }),
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+    let t = 0;
+    disposers.push(observePrChromeNavigation(adapter, resolver, document, () => t));
+    await settle();
+
+    t += RENDER_RETRY_WINDOW_MS + 1; // la fenêtre d'hydratation est écoulée, page toujours vide
+    document.querySelector('.js-diff-progressive-container')!.insertAdjacentHTML(
+      'beforeend',
+      '<div data-testid="review-thread" id="discussion_r42"><div class="comment-body js-comment-body">issue: le build casse</div></div>'
+    );
+    await waitFor(() => document.querySelector('#discussion_r42 .cct-badge') !== null);
+    expect(document.querySelector('#discussion_r42 .cct-badge')).not.toBeNull();
   });
 });
 
 /** Attente RÉELLE, et non un simple vidage de microtâches : une mutation qui arrive pendant
  * qu'un rendu est encore en vol est relancée par un `setTimeout(RENDER_RETRY_THROTTLE_MS)`
  * (content-internal.ts, `missedMutation`). Un `await Promise.resolve()` répété n'atteint
- * jamais ce réveil-là, et le test échouerait pour une raison qui n'est pas la sienne. */
+ * jamais ce réveil-là, et le test échouerait pour une raison qui n'est pas la sienne.
+ *
+ * Réservée aux assertions d'ABSENCE, seules à exiger un délai fixe. */
 function settle(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, RENDER_RETRY_THROTTLE_MS * 2 + 50));
+}
+
+/** Attente d'une PRÉSENCE, par sondage plutôt que par délai fixe : le nombre de tours de
+ * rendu qui séparent la mutation du badge dépend de ce qui était en vol à cet instant, et un
+ * délai calibré sur cette machine-ci deviendrait un test instable sur un agent de CI plus
+ * lent. Sort dès que la condition est vraie, et laisse l'assertion qui suit rendre le verdict
+ * si le délai s'épuise. */
+async function waitFor(predicate: () => boolean, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
 }

@@ -10,6 +10,22 @@ GitHub qui les porte.
 
 ## Poser une release
 
+0. **Écrire la note de version**, dans les deux langues : une section `## <version> — <date>` en
+   tête de [`docs/release-notes-1.x-en.md`](release-notes-1.x-en.md) et de son jumeau
+   [`-fr.md`](release-notes-1.x-fr.md), rédigée à partir de la section correspondante du
+   [`CHANGELOG.md`](../CHANGELOG.md). C'est ce texte, lu **tel quel** dans le fichier anglais,
+   que porte le corps de la Release GitHub.
+
+   Rien n'est dérivé de `git log`, et c'est délibéré : un sujet de commit explique un diff à un
+   relecteur, une note de version explique une version à quelqu'un qui décide s'il met à jour.
+   Le workflow **refuse de publier** si le fichier, ou la section de cette version, n'existe pas
+   — plutôt que de se rabattre sur un pis-aller qui ressemblerait à une note sans en être une.
+   Pour l'avoir tout de suite plutôt qu'au tag :
+
+   ```
+   node scripts/release-notes.mjs 1.1.0
+   ```
+
 1. Mettre à jour `version` dans `packages/extension/src/manifest.json` — c'est cette
    valeur que le navigateur affichera une fois l'extension chargée. **Uniquement des
    chiffres** : un à quatre entiers de 0 à 65535 séparés par des points, pas tous nuls
@@ -79,6 +95,8 @@ stores, ni l'installation forcée par politique d'entreprise (`ExtensionInstallF
 Le tag se pose parfois sur un commit que la CI n'a jamais vu ; le workflow rejoue donc
 lui-même les gardes qui comptent, et n'importe laquelle qui échoue empêche la Release :
 
+- la note de version de ce tag existe — contrôlée **avant** toute construction, pour qu'un tag
+  posé sans elle échoue en quelques secondes plutôt qu'après compilation et empaquetage ;
 - build TypeScript de tous les paquets et suite de tests complète ;
 - aucun import distant dans le bundle (§10 — la CSP MV3 l'interdit) ;
 - manifestes Chromium et Firefox chargeables, version du bundle conforme au tag ;
@@ -97,6 +115,11 @@ alors franchement, plutôt que d'écraser ce que des gens ont peut-être déjà 
 ## Répétition à blanc
 
 `workflow_dispatch` sur `release.yml` exécute tout sauf la publication : les archives
-sortent en artefacts du run, avec le même contenu et les mêmes vérifications. C'est la
-manière d'essayer une modification du workflow, ou de dépanner quelqu'un sans poser de
+sortent en artefacts du run, avec le même contenu et les mêmes vérifications. Une exception :
+l'absence de note de version n'y est qu'un **avertissement**. Hors d'un tag, la version vient du
+manifeste — numérique, `1.0.0` — et une pré-version `1.0.0-beta.8` n'y a par construction aucune
+section ; exiger la note en répétition ferait donc échouer toute répétition tant qu'une version
+stable n'est pas publiée.
+
+C'est la manière d'essayer une modification du workflow, ou de dépanner quelqu'un sans poser de
 tag.

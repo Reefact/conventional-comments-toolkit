@@ -49,6 +49,37 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = 'tag' ]; then tag="$GITHUB_REF_NAME"; fi
           node scripts/release-version.mjs "$tag" | tee -a "$GITHUB_OUTPUT"
 
+      # Ce qui a CHANGÉ, lu tel quel dans un fichier rédigé à la main avant le tag. Le corps de
+      # Release ne disait jusqu'ici que comment installer, jamais ce que la version apporte. Rien
+      # n'est dérivé de `git log` : un sujet de commit explique un diff à un relecteur, pas une
+      # version à quelqu'un qui décide s'il met à jour. Absente → la publication échoue, sans
+      # repli : une note manquante est un trou à combler avant de poser un tag, pas une chose à
+      # rattraper en silence par un pis-aller qui ressemble à une note sans en être une.
+      #
+      # ICI, juste après la résolution de version et AVANT toute construction : un tag posé sans
+      # note doit échouer en quelques secondes, pas après avoir compilé, testé et empaqueté.
+      - name: Note de version (refuse si elle n'est pas écrite)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PUBLISHING: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+        run: |
+          set -euo pipefail
+          if node scripts/release-notes.mjs "$VERSION" > "$RUNNER_TEMP/release-notes.md"; then
+            echo "Note de version trouvée pour $VERSION :"
+            cat "$RUNNER_TEMP/release-notes.md"
+            exit 0
+          fi
+          # Répétition à blanc : la version vient du MANIFESTE (numérique, `1.0.0`), jamais d'un
+          # tag — une pré-version `1.0.0-beta.N` n'y a donc aucune section, et exiger la note ici
+          # ferait échouer TOUTE répétition tant qu'une stable n'est pas publiée. On dit ce qui
+          # manquerait, et on laisse la répétition aller au bout de ce qu'elle sait vérifier.
+          if [ "$PUBLISHING" != 'true' ]; then
+            echo "::warning::Répétition à blanc : aucune note pour $VERSION (attendu hors d'un tag) — une publication, elle, refuserait."
+            : > "$RUNNER_TEMP/release-notes.md"
+            exit 0
+          fi
+          exit 1
+
       - name: Compiler les paquets
         run: npm run build
 
@@ -251,6 +282,13 @@ jobs:
           set -euo pipefail
           notes="$RUNNER_TEMP/notes.md"
           {
+            # Ce qui a changé d'abord : c'est la question que se pose un lecteur qui arrive ici.
+            cat "$RUNNER_TEMP/release-notes.md"
+            echo
+            echo "Relevé complet, contraintes et cas limites compris : [\`CHANGELOG.md\`](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/CHANGELOG.md). Notes de version en français : [\`docs/release-notes-1.x-fr.md\`](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/release-notes-1.x-fr.md)."
+            echo
+            echo "---"
+            echo
             echo "## Installation sans chaîne de build"
             echo
             echo "Aucun Node, npm ni Git requis : télécharger l'archive, la décompresser, charger le dossier."

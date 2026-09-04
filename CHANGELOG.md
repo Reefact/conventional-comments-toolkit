@@ -32,6 +32,20 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **Review threads are read again on the rewritten "Files changed" view.** Four chains that
+  read the page came back empty there, and the consequences were spread across the product: no
+  badge on any published comment (§5.5) — the raw `issue (non-blocking):` prefix stayed visible
+  where the extension normally hides it behind a badge; every thread reported as unresolved-state
+  unknown; empty authors and bodies in what the banner reads; and, most costly, **editing the
+  root comment of a thread was classified as a reply**, which §4.1 exempts from validation by
+  default — an `issue:` root could be edited into anything without the extension looking. Two
+  facts had to be measured rather than assumed: the resolution marker sits *beside*
+  `[data-testid="review-thread"]` rather than inside it, so a resolved thread read as unknown;
+  and this view has no named edit form, the editor's position inside the comment being what
+  distinguishes an edit from a new reply. The neighbouring box is only consulted when it holds a
+  single thread, so no thread can ever adopt its neighbour's resolved state. As with the
+  composer, each failure now leaves a journal entry (§9.4) instead of failing in silence.
+
 - **The comment tooling is back on the rewritten "Files changed" view** (§4.1, whose first row
   calls an inline diff comment the core of review — the one zone, with a thread root, that
   carries a blocking state). GitHub now serves that page at `/pull/N/changes`, where the

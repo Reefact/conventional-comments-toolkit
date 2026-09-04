@@ -366,11 +366,16 @@ export class GithubClientAdapter implements PlatformAdapter {
     const containers = queryChainAll(this.#doc, selectors.renderedThreads);
     return containers.map((el, i) => {
       const id = el.id || el.getAttribute('data-thread-id') || `dom-thread-${i}`;
-      const resolvedOutcome = queryChain(el, selectors.resolvedMarker);
+      const resolvedElement = queryChain(el, selectors.resolvedMarker).element ?? this.#resolvedMarkerBeside(el);
       const bodyEl = queryChain(el, selectors.commentBody).element;
-      const author = queryChain(el, selectors.commentAuthor).element?.textContent?.trim() ?? '';
+      const authorEl = queryChain(el, selectors.commentAuthor).element;
+      const author = authorEl?.textContent?.trim() ?? '';
       const anchorOutcome = queryChain(el, selectors.threadAnchor);
-      if (!anchorOutcome.element) this.log.degraded(selectors.threadAnchor); // §9.4
+      // §9.4 — un fil rendu dont on ne sait lire ni le corps ni l'auteur est une chaîne
+      // pourrie, pas un fil vide : sur la vue `…/changes`, les deux étaient muettes.
+      if (!bodyEl) this.log.degraded(selectors.commentBody);
+      if (!authorEl) this.log.degraded(selectors.commentAuthor);
+      if (!anchorOutcome.element) this.log.degraded(selectors.threadAnchor);
       const anchor = anchorOutcome.element?.getAttribute('href') ?? `#${id}`;
       return {
         id,
@@ -385,10 +390,26 @@ export class GithubClientAdapter implements PlatformAdapter {
           canCarryBlockingState: true,
         },
         replies: [],
-        resolution: resolvedOutcome.element ? ('resolved' as const) : ('unknown' as const),
+        resolution: resolvedElement ? ('resolved' as const) : ('unknown' as const),
         canCarryBlockingState: true,
       };
     });
+  }
+
+  /** Le marqueur de résolution cherché dans la BOÎTE qui entoure le fil, quand il n'est pas
+   * dedans. MESURÉ sur la vue `…/changes` (cf. `selectors.ts`) : `[data-testid="review-thread"]`
+   * et le bouton de dé-résolution y sont SŒURS sous `div.rounded-2.bgColor-default`, si bien
+   * qu'un fil manifestement résolu se lisait `unknown`.
+   *
+   * Le voisinage n'est consulté que s'il ne porte qu'UN seul fil. Deux fils dans la même
+   * boîte — configuration non observée, mais que rien n'interdit — feraient sinon lire à l'un
+   * l'état de l'autre, et un fil bloquant serait déclaré résolu par son voisin. L'inconnu est
+   * le côté sûr : `resolution: 'unknown'` ne résout rien de force. */
+  #resolvedMarkerBeside(thread: Element): Element | null {
+    const box = thread.parentElement;
+    if (!box) return null;
+    if (queryChainAll(box, selectors.renderedThreads).length > 1) return null;
+    return queryChain(box, selectors.resolvedMarker).element;
   }
 
   getCompletionControl(): SubmitControl | null {
@@ -540,10 +561,11 @@ export class GithubClientAdapter implements PlatformAdapter {
             break;
           }
         }
-        if (comments.length > 0 && editedComment === null) {
-          // Le fil rend des commentaires mais l'éditeur n'est dans aucun : dégradation de
-          // sélecteur, journalisée (§9.4) — le repli 'reply' désactive la validation
-          // localement, jamais silencieusement.
+        if (comments.length === 0 || editedComment === null) {
+          // Deux façons de ne pas situer le commentaire édité, une seule conséquence : le
+          // repli 'reply', qui désactive la validation localement — jamais silencieusement
+          // (§9.4). Le fil ne rend AUCUN commentaire reconnu (chaîne périmée, ce qu'était le
+          // cas sur la vue `…/changes`), ou il en rend et l'éditeur n'est dans aucun.
           this.log.degraded(selectors.renderedComment);
         }
         const isRootEdit = comments.length > 0 && editedComment === comments[0];

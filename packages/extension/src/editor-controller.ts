@@ -17,6 +17,7 @@ import {
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { computePrefixInsertion, shiftSelection } from '@cct/adapter-shared';
 import { decideGuard, feedbackState, type GuardDecision } from './guard.js';
+import { stackingMountFor } from './ui/stacking.js';
 import { buildToolbar, type PosedPrefix, type Toolbar } from './ui/toolbar.js';
 import { attachQuickInput } from './ui/quickinput.js';
 import { FeedbackView } from './ui/feedback.js';
@@ -265,6 +266,11 @@ export class EditorController {
       this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-editor'));
     }
 
+    // §5.1 — barre d'outils au-dessus de la zone de saisie, §5.3 pastille en dessous : les
+    // deux visent un conteneur qui EMPILE, que le parent direct du champ n'est pas toujours
+    // (cf. ui/stacking.ts). Le repli est le parent direct, c'est-à-dire le comportement d'avant.
+    const mount = stackingMountFor(this.deps.editor.element) ?? { container: host, anchor: this.deps.editor.element };
+
     // §5.1 — barre d'outils au-dessus de la zone de saisie.
     const toolbar = buildToolbar({
       config: this.config,
@@ -278,14 +284,14 @@ export class EditorController {
       currentPrefix: () => prefixPosedIn(this.deps.adapter.readValue(this.deps.editor), this.config),
     });
     this.#toolbar = toolbar;
-    host.insertBefore(toolbar.element, this.deps.editor.element);
+    mount.container.insertBefore(toolbar.element, mount.anchor);
     this.#disposers.push(() => {
       toolbar.element.remove();
       this.#toolbar = null;
     });
 
     // §5.3 — pastille permanente sous la zone de saisie, zone aria-live.
-    this.#feedback = new FeedbackView(this.deps.editor.element, this.deps.lang);
+    this.#feedback = new FeedbackView(this.deps.editor.element, this.deps.lang, mount.anchor);
     this.#disposers.push(() => this.#feedback?.dispose());
 
     // §5.2 — complétion `/` ou `:`, abréviations Tab, navigation clavier.

@@ -408,19 +408,36 @@ export class GithubClientAdapter implements PlatformAdapter {
   }
 
   /** Commentaires rendus sur la page, pour les badges du §5.5 — surface d'affichage,
-   * hors du contrat normatif §9.2.3. */
+   * hors du contrat normatif §9.2.3.
+   *
+   * **La description de la PR en est exclue** (§4.1, hors périmètre) : `commentBody` la
+   * matche — MESURÉ, un `.comment-body` sur la page de `pull/39` s'y trouve —, et un
+   * `note: …` écrit en tête d'une description y recevait donc un badge, sur un texte dont
+   * la convention ne dit rien. C'est le même hors-périmètre que celui d'`observeEditors`,
+   * et la même chaîne le décide.
+   *
+   * Les DEUX sondes ci-dessous, elles, continuent de la compter, et ce n'est pas une
+   * inattention : elles ne servent pas à décorer mais à savoir si la PAGE a bougé —
+   * `chromeSignatureOf` pour la reprise du bandeau, `ownOutputSignatureOf` pour vérifier
+   * que la plateforme n'a pas emporté ce que nous avions écrit. Une description modifiée
+   * est un changement de page comme un autre, et le fait qu'elle ne porte jamais de badge
+   * ne la rend pas moins visible. */
   getRenderedComments(): { element: Element; bodyText: string }[] {
-    return queryChainAll(this.#doc, selectors.commentBody).map((element) => ({
-      element,
-      bodyText: commentBodyText(element),
-    }));
+    return queryChainAll(this.#doc, selectors.commentBody)
+      .filter((element) => closestChain(element, selectors.prDescription).element === null)
+      .map((element) => ({
+        element,
+        bodyText: commentBodyText(element),
+      }));
   }
 
   /** Sonde bon marché du nombre de commentaires rendus, pour la signature de reprise du
    * bandeau (content-internal.ts, chromeSignatureOf) — jamais `getRenderedComments()` pour
    * ça : cette dernière calcule `commentBodyText` (clone du sous-arbre dès qu'un badge est
    * posé) pour CHAQUE commentaire, alors que seul le compte importe à un observateur qui
-   * tourne à chaque mutation, pour toute la durée de vie de l'onglet. */
+   * tourne à chaque mutation, pour toute la durée de vie de l'onglet. Compte la description
+   * de la PR, que `getRenderedComments()` écarte — voir là-haut pourquoi les deux
+   * divergent. */
   getRenderedCommentCount(): number {
     return queryChainAll(this.#doc, selectors.commentBody).length;
   }

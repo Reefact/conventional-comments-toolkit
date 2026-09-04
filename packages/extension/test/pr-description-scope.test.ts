@@ -22,8 +22,14 @@
 // et le premier test ci-dessous en fait la contre-épreuve : le MÊME champ, hors de cette
 // ancestralité, reste observé. Sans lui, l'absence de la description ne prouverait rien, elle
 // pourrait tenir à un fixture que la chaîne `editors` ne voit pas du tout.
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
+import { ClientConfigResolver } from '../src/config-resolver.js';
+import {
+  observePrChromeNavigation,
+  RENDER_RETRY_THROTTLE_MS,
+  RENDER_RETRY_WINDOW_MS,
+} from '../src/content-internal.js';
 
 /** Le champ d'édition, à l'identique partout : ce qui change d'un test à l'autre est ce qui
  * l'entoure, jamais lui. */
@@ -113,3 +119,99 @@ describe('§4.1 — la description de la PR est hors périmètre', () => {
     expect(adapter.log.failures.some((f) => f.chain === 'pr-description')).toBe(false);
   });
 });
+
+// Le second versant du même hors-périmètre : la description porte un `.comment-body`
+// (MESURÉ : un, sur la page de `pull/39`), donc `decorateComment` y posait un badge dès
+// qu'elle commençait par `note: …` ou `issue: …` — sur un texte dont la convention ne dit
+// rien.
+const DESCRIPTION_BODY = (text: string) => `
+  <div class="TimelineItem js-comment-container js-command-palette-pull-body">
+    <div id="pullrequest-4420243102" class="js-comment">
+      <div class="comment-body markdown-body js-comment-body">${text}</div>
+    </div>
+  </div>`;
+
+const COMMENT_BODY = (text: string) => `
+  <div class="TimelineItem js-comment-container">
+    <div id="issuecomment-5513165152" class="timeline-comment js-comment">
+      <div class="comment-body markdown-body js-comment-body">${text}</div>
+    </div>
+  </div>`;
+
+describe('§5.5 — la description ne reçoit pas de badge', () => {
+  beforeEach(() => {
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/Reefact/conventional-comments-toolkit/pull/39'),
+      configurable: true,
+    });
+  });
+
+  it('getRenderedComments écarte la description et garde les commentaires', () => {
+    document.body.innerHTML = DESCRIPTION_BODY('note: description') + COMMENT_BODY('issue: un vrai commentaire');
+    const bodies = new GithubClientAdapter({ documentRef: document }).getRenderedComments();
+    expect(bodies.map((b) => b.bodyText)).toEqual(['issue: un vrai commentaire']);
+  });
+
+  // Les deux SONDES, elles, continuent de la compter — et ce n'est pas un oubli : elles ne
+  // servent pas à décorer mais à savoir si la page a bougé. Le test suivant dit pourquoi
+  // cette divergence est nécessaire, et pas seulement tolérable.
+  it('les sondes de signature comptent toujours la description', () => {
+    document.body.innerHTML = DESCRIPTION_BODY('note: description') + COMMENT_BODY('issue: un vrai commentaire');
+    const adapter = new GithubClientAdapter({ documentRef: document });
+    expect(adapter.getRenderedCommentCount()).toBe(2);
+    expect(adapter.getRenderedCommentElements()).toHaveLength(2);
+  });
+});
+
+describe('§5.5 — écarter la description ne rend pas l’extension sourde', () => {
+  const disposers: (() => void)[] = [];
+  afterEach(() => {
+    for (const dispose of disposers.splice(0)) dispose();
+    document.body.innerHTML = '';
+    // Même précaution que `pr-chrome-navigation.test.ts` : un `GithubClientAdapter` relit
+    // `document.location` à chaque appel, et le laisser sur une PR ferait revivre
+    // l'observateur d'un test suivant dans le document partagé par le fichier.
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/Reefact/conventional-comments-toolkit/pulls'),
+      configurable: true,
+    });
+  });
+
+  // Le piège que l'exclusion des badges ouvrait, et qui n'est visible qu'ici : `showed`
+  // décide si l'observateur continue de rendre passé `RENDER_RETRY_WINDOW_MS`. Sur une PR
+  // SANS AUCUN COMMENTAIRE, sans fil et sans résumé publié (composant B non déployé), la
+  // description était le seul corps rendu — la retirer du décompte faisait tomber `showed`
+  // à `false`, et l'observateur devenait muet cinq secondes plus tard : le PREMIER
+  // commentaire posté n'aurait plus jamais reçu ses badges avant un rechargement complet.
+  it('le premier commentaire posté après la fenêtre d’hydratation reçoit ses badges', async () => {
+    document.body.innerHTML = DESCRIPTION_BODY('## Summary');
+    // `fetchImpl` substitué : sans lui, la lecture de configuration du §8.1.2 partirait pour
+    // de vrai vers github.com depuis la suite de tests.
+    const adapter = new GithubClientAdapter({
+      documentRef: document,
+      fetchImpl: async () => new Response('', { status: 404 }),
+    });
+    const resolver = new ClientConfigResolver(async () => null);
+    let t = 0;
+    disposers.push(observePrChromeNavigation(adapter, resolver, document, () => t));
+    await settle();
+    expect(document.querySelectorAll('.cct-badge')).toHaveLength(0); // rien à décorer encore
+
+    t += RENDER_RETRY_WINDOW_MS + 1; // la fenêtre d'hydratation est écoulée
+    document.body.insertAdjacentHTML('beforeend', COMMENT_BODY('issue: le build casse'));
+    await settle();
+
+    const badged = document.querySelector('#issuecomment-5513165152 .cct-badge');
+    expect(badged).not.toBeNull();
+    // Et la description, elle, n'a toujours reçu aucun badge.
+    expect(document.querySelectorAll('.js-command-palette-pull-body .cct-badge')).toHaveLength(0);
+  });
+});
+
+/** Attente RÉELLE, et non un simple vidage de microtâches : une mutation qui arrive pendant
+ * qu'un rendu est encore en vol est relancée par un `setTimeout(RENDER_RETRY_THROTTLE_MS)`
+ * (content-internal.ts, `missedMutation`). Un `await Promise.resolve()` répété n'atteint
+ * jamais ce réveil-là, et le test échouerait pour une raison qui n'est pas la sienne. */
+function settle(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, RENDER_RETRY_THROTTLE_MS * 2 + 50));
+}

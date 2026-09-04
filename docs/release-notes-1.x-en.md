@@ -7,6 +7,22 @@ every section of the specification an entry rests on — see
 The extension starts in `assist` mode: it helps and it flags, it never blocks a submission. The
 source of truth for conformance stays the server companion (component B).
 
+## 1.0.0-beta.9 — September 4, 2026
+
+_The extension no longer gets in the way of a pull request's own description, no longer goes quiet on a page that starts out empty, and finally says why when it cannot read your configuration._
+
+### ✨ Features
+
+- When the configuration cannot be read, the options page now shows **why** — `HTTP 429`, a `TypeError`, a 404 that cannot be told from a refusal — together with the level it came from, instead of the bare word `unreachable`. The reason stays on your machine: it goes to `chrome.storage.local` and nowhere else.
+
+### 🐛 Bug fixes
+
+- **A pull request's own description is no longer treated as a review comment.** The convention says nothing about it, yet the label toolbar was drawn on it — and under `enforce` the submit guard applied to its Update button, so a description without a `label:` prefix could not be saved at all. Badges are gone from it too. Where a future GitHub rendering names things differently, the description simply behaves as it did before, never worse.
+- **The "Configuration unread" banner no longer appears on every repository.** Every configuration read was failing before it left the browser, on public and private repositories alike, with a configuration file and without — so the extension always fell back to its degraded state. Repository-level configuration is readable again.
+- **A page that had nothing to show no longer stops watching after five seconds.** On the *Files changed* view of a pull request with no thread yet, the first comment posted afterwards got neither badge nor banner until a full reload — and so did coming back to *Conversation* from another tab of the same pull request. A page that has not moved is still left alone; one that gains a comment, a thread or a published result is rendered again.
+- **A missing page is no longer read as a hidden one while you are signed in.** GitHub masks a private resource as missing, and the extension trusted a page-scraped "private" signal that could be wrong on a public repository. Two independent signals must now agree before a 404 means an unreadable configuration.
+- **The selector degradation journal is usable again.** Visiting a single closed pull request filled all fifty lines with one entry and evicted every real degradation, because the merge button it looks for is legitimately absent there. One line per selector now — and the opt-in telemetry, which inflated for the same reason, with it.
+
 ## 1.0.0-beta.8 — September 4, 2026
 
 _Published comments read like titles — badges, then the subject in bold on the same line — and three ways a comment could silently lose its badges are closed._

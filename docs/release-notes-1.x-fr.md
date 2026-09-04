@@ -7,6 +7,22 @@ cas limite, chaque section de la spécification sur laquelle une entrée s'appui
 L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. La
 source de vérité sur la conformité reste le compagnon serveur (composant B).
 
+## 1.0.0-beta.9 — 4 septembre 2026
+
+_L'extension ne s'impose plus sur la description d'une pull request, ne s'endort plus sur une page vide au départ, et dit enfin pourquoi quand elle n'arrive pas à lire votre configuration._
+
+### ✨ Nouveautés
+
+- Quand la configuration ne peut pas être lue, la page d'options affiche désormais **pourquoi** — `HTTP 429`, une `TypeError`, un 404 qu'on ne distingue pas d'un refus — avec le niveau d'où vient l'échec, au lieu du seul mot `unreachable`. La raison reste sur votre machine : elle va dans `chrome.storage.local` et nulle part ailleurs.
+
+### 🐛 Corrections
+
+- **La description d'une pull request n'est plus traitée comme un commentaire de revue.** La convention n'en dit rien, et pourtant la barre d'outils des labels s'y affichait — et sous `enforce`, le garde à l'envoi s'appliquait à son bouton Update : une description sans préfixe `label:` ne pouvait tout simplement plus être enregistrée. Les badges en ont disparu aussi. Si un futur rendu de GitHub nomme les choses autrement, la description se comportera comme avant, jamais moins bien.
+- **Le bandeau « Configuration non lue » ne s'affiche plus sur tous les dépôts.** Toute lecture de configuration échouait avant même de quitter le navigateur, sur les dépôts publics comme privés, avec fichier de configuration comme sans — l'extension retombait donc toujours dans son état dégradé. La configuration au niveau du dépôt est de nouveau lisible.
+- **Une page qui n'avait rien à montrer ne cesse plus de surveiller au bout de cinq secondes.** Sur l'onglet *Files changed* d'une pull request sans encore aucun fil, le premier commentaire publié ensuite ne recevait ni badge ni bandeau avant un rechargement complet — et revenir sur *Conversation* depuis un autre onglet de la même pull request non plus. Une page qui n'a pas bougé est toujours laissée tranquille ; une page qui gagne un commentaire, un fil ou un résultat publié est rendue de nouveau.
+- **Une page absente n'est plus lue comme une page cachée pendant que vous êtes connecté.** GitHub masque une ressource privée en la disant absente, et l'extension se fiait à un signal « privé » relevé sur la page, qui pouvait se tromper sur un dépôt public. Deux signaux indépendants doivent maintenant concorder pour qu'un 404 signifie une configuration illisible.
+- **Le journal de dégradation des sélecteurs est de nouveau utilisable.** Visiter une seule pull request fermée remplissait ses cinquante lignes d'une même entrée et évinçait toute dégradation réelle, parce que le bouton de fusion qu'il cherche y est légitimement absent. Une ligne par sélecteur désormais — et la télémétrie facultative, qui gonflait pour la même raison, avec lui.
+
 ## 1.0.0-beta.8 — 4 septembre 2026
 
 _Un commentaire publié se lit comme un titre — les badges, puis le sujet en gras sur la même ligne — et trois façons de perdre silencieusement ses badges sont refermées._

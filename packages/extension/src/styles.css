@@ -333,6 +333,37 @@
   border-style: dashed;
 }
 
+/* Sujet du commentaire publié (§5.5), mis en avant sur la ligne des badges — badges.ts pose ce
+   wrapper juste après le préfixe masqué, et les badges DANS le même élément que lui, si bien que
+   les trois se lisent d'une traite : badges, puis de quoi il s'agit. Même graisse que le badge de
+   label (600), qui ouvre la ligne : deux poids différents sur une même ligne donneraient à croire
+   à deux niveaux d'information là où il n'y en a qu'un.
+
+   Aucune couleur, aucune taille propre : le sujet est le texte de l'auteur, pas un ornement de
+   l'extension — il doit rester exactement ce que la plateforme rend, en plus marqué. */
+.cct-subject {
+  font-weight: 600;
+  /* Écart DOUBLÉ avec le badge qui précède (demande Reefact) : les 6 px de `margin-right` du
+     badge plus ceux-ci. Deux marges horizontales adjacentes ne fusionnent jamais — seules les
+     verticales le font —, l'addition est donc réelle, et mesurée par spikes/subject-line.mjs.
+     Ce qui reste à 6 px entre badges, à 12 px devant le sujet : les badges forment un groupe,
+     le sujet commence autre chose. */
+  margin-left: 6px;
+}
+
+/* Respiration entre la ligne du sujet et la suite du commentaire, posée par badges.ts SEULEMENT
+   quand le corps reprend sur la ligne suivante du même paragraphe (`markSubjectBreak`) — un
+   corps qui reprend au paragraphe suivant est déjà espacé par la plateforme.
+
+   Un bloc de hauteur pleine, pas une marge : MESURÉ dans Chromium, une marge sur le `<br>` qui
+   clôt la ligne ne déplace rien du tout, avec ou sans `display: block`. Hauteur en `em` et non
+   en pixels — c'est le corps de commentaire de la plateforme qui fixe sa taille de police, pas
+   cette feuille de style. */
+.cct-subject-break {
+  display: block;
+  height: 1em;
+}
+
 /* Préfixe structuré masqué à l'affichage (§5.5) : son information est déjà portée, de façon
    accessible (icône + texte, jamais la seule couleur, §10), par les badges posés juste avant
    lui. `display: none`, pas `visibility: hidden` : aucune trace dans l'arbre d'accessibilité

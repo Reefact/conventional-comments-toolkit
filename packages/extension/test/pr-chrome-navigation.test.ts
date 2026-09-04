@@ -1075,11 +1075,21 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
   });
 
   it('un .cct-badge imbriqué (pas enfant direct) n’est pas exclu à tort', () => {
-    // decorateComment() ne pose jamais un badge autrement qu'en `afterbegin` — un
-    // `.cct-badge` plus profond (citation, bloc de code d'un autre commentaire cité) est un
-    // texte normal, pas notre propre badge.
+    // decorateComment() ne pose jamais un badge ailleurs qu'en tête du corps ou en tête du
+    // paragraphe qui porte le sujet — un `.cct-badge` plus profond (citation, bloc de code d'un
+    // autre commentaire cité) est un texte normal, pas notre propre badge.
     const el = document.createElement('div');
     el.innerHTML = '<blockquote><span class="cct-badge">🐛 issue</span></blockquote>issue: x';
+    expect(commentBodyText(el)).toBe(el.textContent);
+  });
+
+  it('un .cct-badge dans le <p> d’une CITATION n’est pas exclu non plus — l’exclusion s’arrête au premier niveau', () => {
+    // Frontière exacte du sélecteur élargi (OWN_BADGES) le jour où les badges ont pu descendre
+    // dans le paragraphe du sujet : « enfant direct du corps, ou enfant direct de son `<p>` », et
+    // rien de plus profond. Un `<blockquote><p>` est un niveau au-delà — le confondre amputerait
+    // le corps relu du texte cité, et analyze() jugerait un commentaire tronqué.
+    const el = document.createElement('div');
+    el.innerHTML = '<blockquote><p><span class="cct-badge">🐛 issue</span></p></blockquote><p>issue: x</p>';
     expect(commentBodyText(el)).toBe(el.textContent);
   });
 
@@ -1314,11 +1324,15 @@ describe('Codex round 2 #7 — les badges posés pendant que le mode était acti
     const doc = document;
     const current = pr(26);
     let configText = '{}'; // défauts : mode assist
+    const body = 'issue: quelque chose ne va pas';
     const commentEl = doc.createElement('div');
-    doc.body.appendChild(commentEl); // clearBadges() interroge le document entier, pas un élément détaché
+    // Le texte RÉEL, pas un élément vide : c'est lui que `decorateComment` masque en partie
+    // (le préfixe structuré, §5.5) et que le passage à off doit rendre entièrement.
+    commentEl.textContent = body;
+    doc.body.appendChild(commentEl); // le nettoyage interroge le document entier, pas un élément détaché
     let currentPublished: PublishedSummary | null = publishedSummary({ state: 'failure', unresolvedBlockingCount: 1 });
     const adapter = makeAdapter(() => current, () => currentPublished, {
-      getRenderedComments: () => [{ element: commentEl, bodyText: 'issue: quelque chose ne va pas' }],
+      getRenderedComments: () => [{ element: commentEl, bodyText: body }],
     });
     adapter.getRepoConfig = async () => ({ status: 'found', text: configText });
     let resolverNow = 0;
@@ -1327,6 +1341,8 @@ describe('Codex round 2 #7 — les badges posés pendant que le mode était acti
     observe(adapter, resolver, doc);
     await flushAll();
     expect(commentEl.querySelector('.cct-badge')).not.toBeNull();
+    expect(commentEl.querySelector('.cct-hidden-prefix')).not.toBeNull(); // préfixe masqué, sujet mis en avant
+    expect(commentEl.querySelector('.cct-subject')).not.toBeNull();
 
     configText = JSON.stringify({ mode: 'off' });
     currentPublished = publishedSummary({ state: 'success', unresolvedBlockingCount: 0 });
@@ -1335,6 +1351,13 @@ describe('Codex round 2 #7 — les badges posés pendant que le mode était acti
     await flushAll();
 
     expect(commentEl.querySelector('.cct-badge')).toBeNull();
+    // …et RIEN d'autre non plus : ne retirer que les badges laissait le préfixe structuré
+    // masqué — une partie du texte de l'auteur rendue invisible par une extension qui se
+    // déclare inactive, jusqu'au rechargement de la page.
+    expect(commentEl.querySelector('.cct-hidden-prefix')).toBeNull();
+    expect(commentEl.querySelector('.cct-subject')).toBeNull();
+    expect(commentEl.textContent).toBe(body);
+    expect(commentEl.childNodes).toHaveLength(1); // un seul nœud de texte recollé, pas des morceaux
   });
 });
 
@@ -2263,10 +2286,19 @@ describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut sign
 
     // Réhydratation qui reconstruit le SEUL sous-arbre de texte natif, sans toucher aux
     // badges : le `<p>` retrouve son texte brut, donc plus de `.cct-hidden-prefix`, et les
-    // badges restent en enfants directs du corps, à côté. C'est le cas que `decorateComment`
-    // sait déjà réparer (entretien inconditionnel du masquage, revue Reefact PR #40) mais
-    // que rien ne lui donnait l'occasion de voir.
-    body.querySelector('p')!.innerHTML = 'nitpick (test): un sujet de test';
+    // badges restent en place à côté de lui. C'est le cas que `decorateComment` sait déjà
+    // réparer (entretien inconditionnel du masquage, revue Reefact PR #40) mais que rien ne
+    // lui donnait l'occasion de voir.
+    //
+    // Les nœuds de texte sont remplacés UN À UN plutôt que par un `innerHTML` du paragraphe :
+    // depuis que les badges partagent la ligne du sujet (§5.5), ils vivent DANS ce paragraphe,
+    // et l'écraser en entier les emporterait — le texte des badges quitterait `textContent`,
+    // le digest le verrait, et ce test ne testerait plus l'angle mort qu'il vise.
+    const paragraph = body.querySelector('p')!;
+    for (const node of [...paragraph.childNodes]) {
+      if (!(node.nodeType === 1 && (node as Element).classList.contains('cct-badge'))) node.remove();
+    }
+    paragraph.append(document.createTextNode('nitpick (test): un sujet de test'));
     // Les deux prémisses de ce test, vérifiées et non supposées — sans elles il ne testerait
     // plus ce qu'il annonce : `display: none` est une propriété de RENDU, `textContent`
     // rapporte le texte masqué comme n'importe quel autre, et le digest de texte est donc
@@ -2278,6 +2310,40 @@ describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut sign
 
     expect(body.querySelector('.cct-hidden-prefix')?.textContent).toBe('nitpick (test): ');
     expect(body.querySelector('.cct-badge')).not.toBeNull(); // les badges n'ont pas été perdus au passage
+  });
+
+  it('la mise en avant du SUJET seule défaite — préfixe, texte et badges intacts — est reposée (§5.5)', async () => {
+    // Même angle mort, un nœud plus loin : `.cct-subject` n'AJOUTE aucun texte, il enveloppe
+    // celui de l'auteur. Le défaire laisse `textContent` rigoureusement identique, et laisse
+    // aussi `.cct-hidden-prefix` en place — donc la carte du seul préfixe, telle qu'elle
+    // existait, n'y voyait rien. Le sujet perdait son gras jusqu'au rechargement de la page.
+    onPullRequest();
+    const body = conversationComment('un sujet de test');
+    const check = document.createElement('div');
+    check.setAttribute('data-testid', 'check-run-item');
+    check.textContent = summaryLine(0);
+    document.body.appendChild(check);
+    const adapter = new GithubClientAdapter({ documentRef: document, fetchImpl });
+
+    observe(adapter, new ClientConfigResolver(async () => null), document);
+    await flushAll();
+    const subject = body.querySelector('.cct-subject');
+    expect(subject).not.toBeNull();
+    const textBefore = body.textContent;
+
+    // Le wrapper SEUL est défait, ses enfants rendus au paragraphe à leur place exacte.
+    const parent = subject!.parentNode!;
+    while (subject!.firstChild) parent.insertBefore(subject!.firstChild, subject!);
+    subject!.remove();
+
+    // Les trois prémisses de ce test, vérifiées et non supposées.
+    expect(body.textContent).toBe(textBefore);
+    expect(body.querySelector('.cct-hidden-prefix')).not.toBeNull();
+    expect(body.querySelector('.cct-badge')).not.toBeNull();
+
+    await flushAll();
+
+    expect(body.querySelector('.cct-subject')?.textContent).toBe('un sujet de test');
   });
 
   // Invariant dont dépend tout ce qui précède, dans LES DEUX adaptateurs : la sonde bon

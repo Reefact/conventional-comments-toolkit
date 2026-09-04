@@ -47,4 +47,36 @@ describe('taille des badges (§5.5) — le label reste plus marquant que ses dé
     expect(labelWeight).toBeGreaterThan(decoWeight);
     expect(decoWeight).toBeLessThanOrEqual(400); // jamais en gras, cf. commentaire au-dessus de .cct-badge-deco
   });
+
+  it('le sujet posé sur la ligne des badges est effectivement en gras (demande Reefact)', () => {
+    // Même défaut que celui décrit en tête de ce fichier, sur un autre nom de classe : badges.ts
+    // pose `.cct-subject` autour du sujet, mais c'est CETTE règle — et elle seule — qui le met en
+    // gras. Sans elle, le wrapper existe, les tests du DOM passent, et l'utilisateur ne voit
+    // aucune différence avec ce qu'il a demandé de changer.
+    const subjectWeight = declaredNumber(ruleBody('.cct-subject'), 'font-weight');
+    expect(subjectWeight).toBeGreaterThan(400);
+    // Même graisse que le badge de label qui ouvre la ligne : deux poids sur une même ligne
+    // donneraient à croire à deux niveaux d'information là où il n'y en a qu'un.
+    expect(subjectWeight).toBe(declaredNumber(ruleBody('.cct-badge-label'), 'font-weight'));
+  });
+
+  it('l’écart entre le dernier badge et le sujet vaut le DOUBLE de l’écart entre badges (demande Reefact)', () => {
+    // Les deux marges s’additionnent — horizontales, elles ne fusionnent jamais —, si bien que
+    // le sujet est à 2 × l’écart qui sépare deux badges. Écrire la même valeur des deux côtés
+    // est ce qui rend le doublement EXACT plutôt qu’approché : un badge dont l’écart changerait
+    // sans que celui-ci suive romprait la relation que cette règle exprime.
+    const betweenBadges = declaredNumber(ruleBody('.cct-badge'), 'margin-right');
+    const beforeSubject = declaredNumber(ruleBody('.cct-subject'), 'margin-left');
+    expect(beforeSubject).toBe(betweenBadges);
+  });
+
+  it('la respiration sous la ligne du sujet est un BLOC de hauteur non nulle', () => {
+    // Mesuré dans Chromium (spikes/subject-line.mjs) : une marge posée sur le `<br>` qui clôt la
+    // ligne ne déplace rien, avec ou sans `display: block`. Seul un bloc à part, de hauteur
+    // propre, écarte réellement le corps de la ligne du sujet — d’où ces deux déclarations,
+    // dont aucune n’est décorative.
+    const body = ruleBody('.cct-subject-break');
+    expect(body).toMatch(/display\s*:\s*block/);
+    expect(declaredNumber(body, 'height')).toBeGreaterThan(0);
+  });
 });

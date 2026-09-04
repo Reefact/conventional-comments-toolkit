@@ -1,6 +1,13 @@
 // Badges des commentaires publiés (§5.5) : rendu visuel du label puis, à sa droite, un badge
 // par décoration résolue (§3.3) — sans jamais modifier le contenu stocké côté serveur.
 //
+// Les badges partagent la LIGNE DU SUJET, à sa gauche, quand le préfixe structuré a pu être
+// masqué : ils sont alors posés dans l'élément qui porte ce sujet, et le sujet lui-même passe en
+// gras (`.cct-subject`). Cette ligne se lit alors comme un titre — « badges, puis de quoi il
+// s'agit » — au lieu d'un bandeau de badges suivi d'un texte qui recommence à la ligne (demande
+// Reefact). Quand le masquage est refusé (§9.4, projection avec perte ou premier niveau qui
+// n'est pas un `<p>`), rien ne bouge : badges en tête du corps, texte intact en dessous.
+//
 // Rafraîchi sur changement de config, sans churn DOM sur un rendu inchangé : content-
 // internal.ts appelle decorateComment() sur CHAQUE commentaire à CHAQUE passage de rendu
 // (mutation observée), donc à chaque frappe ailleurs sur la page. Un signal comparable —
@@ -22,6 +29,7 @@ import {
   type PlatformProfile,
   type ResolvedDecoration,
 } from '@cct/core';
+import { OWN_BADGES } from '@cct/adapter-shared';
 import { ui } from './strings.js';
 
 function labelBadge(label: { icon?: string; id: string; color?: string }, config: EffectiveConfig): HTMLElement {
@@ -321,6 +329,167 @@ function isLosslessBadgeProjection(prefixLine: string, shown: ResolvedDecoration
   return true;
 }
 
+/** Sujet mis en avant (§5.5) : ce qui suit le préfixe sur la PREMIÈRE ligne est enveloppé ici,
+ * pour être rendu en gras SUR la ligne des badges, à leur droite — demande Reefact, qui trouvait
+ * le sujet relégué sous un bandeau de badges alors qu'il en est la suite de lecture immédiate.
+ * Deux gestes indissociables, dont c'est le premier : ce wrapper porte le gras, et
+ * `decorateComment` pose ensuite les badges DANS le même élément que lui, ce qui les met en flux
+ * inline avec le sujet plutôt qu'au-dessus.
+ *
+ * `<span>`, jamais `<strong>` : la mise en avant est COSMÉTIQUE — rien au §3.1 ne donne au sujet
+ * l'« importance forte » que `<strong>` annonce, et l'ajouter mettrait dans l'arbre
+ * d'accessibilité une emphase que l'auteur n'a pas écrite (§10). Le poids visuel se lit à l'œil,
+ * l'information, elle, est déjà portée par les badges. */
+const SUBJECT_CLASS = 'cct-subject';
+
+/** Nœuds du sujet, dans l'ordre : depuis le frère qui suit le préfixe masqué jusqu'à la fin de
+ * la PREMIÈRE ligne. Deux frontières, parce que le corps rendu en connaît deux : un `<br>` —
+ * ce que devient une simple fin de ligne dans un commentaire GitHub — et une fin de ligne
+ * littérale à l'intérieur d'un nœud de texte, quand le corps tient d'un seul tenant (le cas des
+ * DOM de test, et de toute plateforme qui ne réécrit pas les sauts de ligne). Sans la seconde,
+ * un corps « issue: sujet\ndiscussion » d'un seul nœud verrait « discussion » passer en gras
+ * avec le sujet.
+ *
+ * La mise en forme inline du sujet (`code`, lien, gras, mention) est gardée telle quelle, en
+ * frères successifs : le sujet la traverse, c'est le cas courant, pas un cas limite.
+ *
+ * Mais un saut de ligne peut vivre DANS cette mise en forme, et non à côté : `**sujet  \ncorps**`
+ * rend `<strong>sujet<br>corps</strong>`, un seul frère dont le `<br>` est interne (revue
+ * Reefact, PR #45). Prendre ce frère en entier passerait « corps » en gras avec le sujet, et
+ * `markSubjectBreak()` ne verrait ensuite aucun `<br>` après le wrapper : ni la borne ni la
+ * respiration. On RENONCE alors entièrement — tableau vide, donc aucun wrapper, aucun
+ * déplacement de badge, le commentaire rendu comme avant ce rendu.
+ *
+ * Renoncer plutôt que scinder le frère fautif : le scinder demanderait de cloner un élément de
+ * l'AUTEUR pour en répartir le contenu de part et d'autre du saut — un `<a>` dupliqué devient
+ * deux liens, et le §9.4 dit ce que vaut un affinage cosmétique face à ce risque. Renoncer
+ * plutôt que s'arrêter AVANT ce frère, aussi : le début de la ligne passerait en gras et sa fin
+ * non, sur une même ligne — une mise en avant qui désignerait un fragment au lieu du sujet. */
+function subjectNodes(hidden: Element): ChildNode[] {
+  const nodes: ChildNode[] = [];
+  for (let node = hidden.nextSibling; node !== null; node = node.nextSibling) {
+    if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
+      const element = node as Element;
+      if (element.tagName === 'BR') break;
+      if (element.querySelector('br') !== null) return []; // borne interne : on ne sait pas border proprement
+    }
+    if (node.nodeType === 3 /* Node.TEXT_NODE */) {
+      const newline = (node as Text).data.indexOf('\n');
+      if (newline === 0) break; // la ligne s'arrête avant ce nœud : rien à en prendre
+      if (newline > 0) {
+        (node as Text).splitText(newline); // la suite devient un frère, hors du sujet
+        nodes.push(node);
+        break;
+      }
+    }
+    nodes.push(node);
+  }
+  return nodes;
+}
+
+/** Respiration entre la ligne du sujet et la suite du commentaire (demande Reefact : « un saut
+ * de ligne entre la ligne des badges + sujet et le body »), posée UNIQUEMENT quand le corps
+ * reprend sur la ligne suivante du MÊME paragraphe — c'est-à-dire quand un `<br>` clôt le sujet.
+ * Un corps qui reprend au paragraphe SUIVANT est déjà séparé par la marge de bloc de la
+ * plateforme : y ajouter quoi que ce soit doublerait un écart qui existe (« s'il y en a déjà un,
+ * pas besoin d'en rajouter un autre »).
+ *
+ * Un NŒUD, et non une règle CSS sur le `<br>` ni sur le sujet — les deux idées naturelles ont
+ * été essayées dans un vrai Chromium avant d'écrire cette ligne, et toutes deux échouent :
+ *   - une marge sur le `<br>`, avec ou sans `display: block`, ne déplace RIEN (mesuré : 21 px
+ *     entre les deux lignes, avec comme sans la règle) ;
+ *   - `display: inline-block` + `margin-bottom` sur `.cct-subject` fonctionne sur un sujet
+ *     court, mais fait basculer un sujet LONG tout entier SOUS les badges — la boîte
+ *     rétrécie-à-la-demande prend la largeur du bloc conteneur, ne tient plus sur la ligne
+ *     entamée, et passe à la suivante. C'est exactement la mise en page que ce rendu existe
+ *     pour éviter.
+ * `spikes/subject-line.mjs` rejoue ces mesures pour que le jour où l'une des deux deviendrait
+ * vraie, ce soit constaté et non deviné. */
+const SUBJECT_BREAK_CLASS = 'cct-subject-break';
+
+/** Pose ou retire l'espaceur selon ce que le DOM porte VRAIMENT après le sujet, à chaque
+ * passage : un `<br>` peut apparaître ou disparaître d'une édition à l'autre, et l'espaceur ne
+ * doit jamais survivre au saut de ligne qui le justifiait. Purement décoratif, sans texte :
+ * `commentBodyText()` relit le même corps avec ou sans lui. */
+function markSubjectBreak(wrapper: Element): void {
+  const next = wrapper.nextSibling;
+  const lineBreak = next !== null && next.nodeType === 1 && (next as Element).tagName === 'BR' ? (next as Element) : null;
+  const existing = wrapper.parentElement?.querySelector(`:scope > .${SUBJECT_BREAK_CLASS}`) ?? null;
+  if (lineBreak === null) {
+    existing?.remove(); // le corps enchaîne sur un autre bloc : la plateforme espace déjà
+    return;
+  }
+  if (existing !== null && existing.previousSibling === lineBreak) return; // déjà en place
+  existing?.remove();
+  const spacer = globalThis.document.createElement('span');
+  spacer.className = SUBJECT_BREAK_CLASS;
+  lineBreak.after(spacer);
+}
+
+/** Enveloppe le sujet, si ce n'est pas déjà fait. Idempotent, et réentretenu à chaque passage
+ * comme le masquage lui-même : une réhydratation de plateforme peut emporter ce wrapper sans
+ * toucher aux badges. Un sujet VIDE (`issue:` seul, §3.5 E-EMPTY-SUBJECT) ne reçoit rien —
+ * un span vide n'a rien à mettre en gras. */
+function wrapSubject(hidden: Element): void {
+  const next = hidden.nextSibling;
+  if (next !== null && next.nodeType === 1 && (next as Element).classList.contains(SUBJECT_CLASS)) {
+    markSubjectBreak(next as Element); // wrapper déjà là : seul l'espaceur reste à réentretenir
+    return;
+  }
+  const nodes = subjectNodes(hidden);
+  if (nodes.length === 0) return;
+  const wrapper = globalThis.document.createElement('span');
+  wrapper.className = SUBJECT_CLASS;
+  hidden.after(wrapper);
+  for (const node of nodes) wrapper.appendChild(node);
+  markSubjectBreak(wrapper);
+}
+
+/** Rend les enfants d'un wrapper à son parent, à leur place exacte, et referme la coupure —
+ * jamais deux nœuds de texte adjacents, que `hiddenPrefixSpan()` ne saurait plus border. */
+function unwrapInPlace(wrapper: Element): void {
+  const parent = wrapper.parentNode;
+  if (!parent) return;
+  while (wrapper.firstChild) parent.insertBefore(wrapper.firstChild, wrapper);
+  wrapper.remove();
+  parent.normalize();
+}
+
+/** Rend visible un préfixe masqué, et referme la coupure derrière lui. */
+function revealPrefix(hidden: Element): void {
+  const parent = hidden.parentNode;
+  hidden.replaceWith(globalThis.document.createTextNode(hidden.textContent ?? ''));
+  parent?.normalize();
+}
+
+/** Défait l'enveloppe du sujet et l'espaceur qui l'accompagne. Les wrappers vont par paire et ne
+ * se voient jamais l'un sans l'autre : un `.cct-subject` resté seul — préfixe démasqué par une
+ * réhydratation, sujet non — serait avalé par le wrapper que le passage suivant construit (il
+ * n'est ni un `<br>` ni une fin de ligne, donc il APPARTIENT au sujet au sens de
+ * `subjectNodes()`), et le sujet se retrouverait emballé deux fois. */
+function unwrapSubject(commentBodyElement: Element): void {
+  for (const spacer of [...commentBodyElement.querySelectorAll(`.${SUBJECT_BREAK_CLASS}`)]) spacer.remove();
+  const wrapper = commentBodyElement.querySelector(`.${SUBJECT_CLASS}`);
+  if (wrapper) unwrapInPlace(wrapper);
+}
+
+/** Défait TOUT ce que `decorateComment()` a posé sur une page — badges, espaceur, sujet mis en
+ * avant, préfixe masqué — quand l'extension quitte le contexte qui les justifiait : plus de PR,
+ * ou `mode: off` (§7 : « extension entièrement inactive »).
+ *
+ * Ne retirer que les badges, comme le faisait `clearBadges()`, laissait le préfixe structuré
+ * INVISIBLE sans plus rien pour en porter l'information : une extension qui se déclare inactive
+ * continuait de masquer une partie du texte de l'auteur, jusqu'au rechargement de la page. Le
+ * défaisage doit couvrir tout ce que le rendu pose, pas seulement ce qui se voit. */
+export function clearCommentDecorations(root: ParentNode): void {
+  for (const badge of [...root.querySelectorAll('.cct-badge')]) badge.remove();
+  for (const spacer of [...root.querySelectorAll(`.${SUBJECT_BREAK_CLASS}`)]) spacer.remove();
+  // Le sujet AVANT le préfixe : les deux vivent dans le même parent, et défaire le sujet
+  // d'abord laisse `revealPrefix()` recoller la ligne entière d'un seul `normalize()`.
+  for (const wrapper of [...root.querySelectorAll(`.${SUBJECT_CLASS}`)]) unwrapInPlace(wrapper);
+  for (const hidden of [...root.querySelectorAll('.cct-hidden-prefix')]) revealPrefix(hidden);
+}
+
 /** Masque le préfixe structuré du corps AFFICHÉ (§5.5) — jamais le corps STOCKÉ côté serveur,
  * qu'aucune de ces écritures n'atteint : ce nœud est purement client, ajouté au rendu, jamais
  * renvoyé à la plateforme. Le formulaire d'édition d'un commentaire existant est un sous-arbre
@@ -345,12 +514,21 @@ function applyPrefixVisibility(commentBodyElement: Element, prefixLine: string |
   const existing = commentBodyElement.querySelector('.cct-hidden-prefix');
   if (prefixLine === null) {
     if (existing) {
-      existing.replaceWith(globalThis.document.createTextNode(existing.textContent ?? ''));
-      commentBodyElement.normalize();
+      // Le sujet part avec le préfixe : sa mise en avant ne se lit qu'avec les badges, qui
+      // disparaissent au même instant. Avant `replaceWith`, pour que le `normalize()` final
+      // referme les DEUX coupures d'un coup.
+      unwrapSubject(commentBodyElement);
+      revealPrefix(existing);
     }
     return;
   }
-  if (existing) return;
+  if (existing) {
+    wrapSubject(existing); // réentretien, comme le masquage lui-même : gratuit si rien n'a bougé
+    return;
+  }
+  // Un `.cct-subject` sans son préfixe masqué, avant de reconstruire : `wrapSubject()`
+  // l'emballerait tel quel dans le nouveau wrapper, une couche de plus à chaque passage.
+  unwrapSubject(commentBodyElement);
   const first = firstTextNode(commentBodyElement);
   if (!first || first === ABORT) return;
   const span = hiddenPrefixSpan(first.data, prefixLine);
@@ -376,6 +554,7 @@ function applyPrefixVisibility(commentBodyElement: Element, prefixLine: string |
   hidden.className = 'cct-hidden-prefix';
   target.replaceWith(hidden);
   hidden.appendChild(target);
+  wrapSubject(hidden);
 }
 
 export function decorateComment(
@@ -395,7 +574,6 @@ export function decorateComment(
     },
     config
   );
-  const stale = [...commentBodyElement.querySelectorAll(':scope > .cct-badge')] as HTMLElement[];
   // Calculé AVANT le retour anticipé sur `!a.resolved` : `isLosslessBadgeProjection()` (ci-
   // dessous) a besoin de `shown` pour savoir ce qui sera VISIBLE PAR SON NOM, que le label soit
   // résolu ou non ne change rien à cette question — un tableau vide quand il ne l'est pas.
@@ -416,6 +594,27 @@ export function decorateComment(
   // réapparu tel quel. Idempotent (firstTextNode ignore les `.cct-badge` déjà posés, encore
   // présents ici), donc gratuit quand rien n'a bougé.
   applyPrefixVisibility(commentBodyElement, canHidePrefix ? a.prefixLine : null, bodyText);
+  // Où poser les badges — LU dans le DOM que la ligne ci-dessus vient d'établir, jamais déduit
+  // de `canHidePrefix` seul, qui dit ce qu'on VOULAIT faire, pas ce qui a été fait (les replis
+  // de `applyPrefixVisibility` renoncent sans le dire à l'appelant). Préfixe masqué → l'élément
+  // qui le porte : le `<p>` de la première ligne, ou le corps lui-même quand son texte y vit
+  // sans paragraphe. Les badges y sont alors en flux INLINE avec le sujet mis en gras, donc sur
+  // SA ligne, à sa gauche. Masquage refusé (§9.4) → en tête du corps, au-dessus du texte, comme
+  // avant : sans frontière de préfixe fiable, il n'y a pas non plus de sujet à border.
+  // Les badges suivent le SUJET, pas le préfixe masqué : c'est sa ligne qu'ils rejoignent. Les
+  // deux coïncident presque toujours — le wrapper naît juste après le masquage, dans le même
+  // parent —, sauf quand `subjectNodes()` renonce (borne de ligne interne à un frère, sujet
+  // vide). Se régler sur le préfixe y poserait les badges en flux inline devant un sujet qui
+  // n'a pas été mis en avant : la moitié d'un agencement, jamais demandée.
+  const subject = commentBodyElement.querySelector(`.${SUBJECT_CLASS}`);
+  const host = subject?.parentElement ?? commentBodyElement;
+  // Les DEUX emplacements, jamais le seul emplacement courant : quand le masquage vient de
+  // disparaître, les badges du rendu précédent sont restés dans le `<p>` que `host` ne désigne
+  // plus, et un balayage limité à `host` les y laisserait orphelins — un badge décrivant un état
+  // qui n'existe plus, survivant au changement même qui l'a aboli. `OWN_BADGES` est celui-là
+  // même que `commentBodyText()` exclut de la relecture (adapter-shared) : les deux fonctions
+  // doivent parler du MÊME ensemble de nœuds, sous peine qu'un badge compte comme du corps.
+  const stale = [...commentBodyElement.querySelectorAll(OWN_BADGES)] as HTMLElement[];
   if (!a.resolved) {
     // Un changement de configuration a pu rendre ce commentaire non résolu (label
     // désactivé, par exemple) : un badge qui décrivait un état qui n'existe plus ne doit
@@ -435,7 +634,15 @@ export function decorateComment(
   // label laisserait stale[0] intact et ce court-circuit renoncerait à réparer le manquant
   // (revue Codex, PR #38). Le compte de badges effectivement présents doit donc correspondre
   // à ce que CE rendu produirait, pas seulement la signature du premier.
-  if (stale.length === 1 + expectedCount && stale[0]?.dataset['cctSig'] === signature) {
+  // `parentElement === host` en plus de la signature et du compte : le masquage du préfixe a pu
+  // apparaître ou disparaître sous des badges par ailleurs identiques (label et décorations
+  // inchangés, seule une décoration REJETÉE ou un W-CASE ayant basculé, §5.5) — les badges sont
+  // alors au bon nombre, à la bonne signature, et au MAUVAIS endroit.
+  if (
+    stale.length === 1 + expectedCount &&
+    stale[0]?.parentElement === host &&
+    stale[0]?.dataset['cctSig'] === signature
+  ) {
     return; // inchangé — aucune écriture DOM de badge ; le préfixe a déjà été réentretenu plus haut
   }
 
@@ -446,5 +653,5 @@ export function decorateComment(
   // prepend() insère tous les badges en une fois, dans l'ordre donné (label, puis les
   // décorations dans l'ordre d'écriture) — contrairement à insertAdjacentElement('afterbegin'),
   // répété, qui les aurait posés en ordre inverse.
-  commentBodyElement.prepend(badge, ...decorationBadges(shown, hiddenDescriptive, config, lang));
+  host.prepend(badge, ...decorationBadges(shown, hiddenDescriptive, config, lang));
 }

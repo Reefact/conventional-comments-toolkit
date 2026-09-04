@@ -23,6 +23,22 @@ export interface ResolvedClientConfig {
   /** État dégradé au sens du §5.4, condition 4 : une lecture a rendu `unreachable`.
    * Un fichier simplement absent n'est PAS une dégradation. */
   degraded: boolean;
+  /** POURQUOI, et à quel niveau — `null` hors état dégradé. L'adaptateur construit un motif
+   * (`HTTP 429`, `TypeError: Failed to fetch`) à chaque `unreachable` ; il était jusqu'ici
+   * jeté sur place, et le booléen ci-dessus était tout ce qui survivait. Diagnostiquer un
+   * bandeau « Configuration non lue » demandait alors d'instrumenter le navigateur de la
+   * personne qui le voyait — trois allers-retours pour une information que le code tenait
+   * déjà. Le motif suit donc la dégradation jusqu'à la page d'options (§9.2.3).
+   *
+   * Local, jamais émis : cette chaîne va dans `chrome.storage.local` et nulle part ailleurs
+   * (la télémétrie ne transporte que des compteurs de dégradation de sélecteurs, §10). */
+  degradedReason: string | null;
+}
+
+/** Motif d'une lecture impossible, préfixé par son NIVEAU (§8.2) : « repo » et « org » ne se
+ * corrigent pas au même endroit, et le motif seul ne dit pas lequel des deux a échoué. */
+function unreadableReason(level: 'repo' | 'org', read: ConfigRead): string {
+  return `${level}: ${read.status === 'unreachable' ? read.reason : 'motif absent'}`;
 }
 
 interface CacheEntry {
@@ -74,7 +90,14 @@ export class ClientConfigResolver {
     // §5.4, condition 4 : une lecture qui a rendu `unreachable` met en état dégradé —
     // jamais masqué par une entrée de cache expirée.
     const degraded = repo.degraded || org.degraded;
-    return { config, notices, fingerprint: fingerprint(config), degraded };
+    // Les DEUX niveaux quand les deux ont échoué : n'en montrer qu'un ferait corriger la
+    // moitié du problème, puis revoir le bandeau.
+    const reasons = [
+      ...(repo.degraded ? [unreadableReason('repo', repo.read)] : []),
+      ...(org.degraded ? [unreadableReason('org', org.read)] : []),
+    ];
+    const degradedReason = reasons.length > 0 ? reasons.join(' | ') : null;
+    return { config, notices, fingerprint: fingerprint(config), degraded, degradedReason };
   }
 
   async #cached(

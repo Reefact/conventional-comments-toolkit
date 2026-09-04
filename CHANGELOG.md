@@ -32,6 +32,13 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **The compliance outline around the field is visible again on the rewritten "Files changed"
+  view** (§5.3). It was drawn all along — measured green on the text area — and then clipped:
+  the state ring is an `outline` so that it never pushes the page around, but an outline paints
+  *outside* the element's box, and on that view the field sits in a Primer wrapper with
+  `overflow: hidden` and exactly the same box. A negative `outline-offset` brings the ring
+  inside the box, where nothing clips it, at the cost of one pixel of inset everywhere else.
+
 - **The toolbar sits above the field again on the rewritten "Files changed" view** (§5.1, and
   §5.3 for the feedback pill below it). Both were inserted as immediate siblings of the text
   area, which puts them above and below only if the field's own parent stacks its children —

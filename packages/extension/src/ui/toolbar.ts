@@ -144,6 +144,34 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   // Le SEUL état de la barre. Il ne s'écrit qu'en un endroit : `selectorFor()`.
   let decoration: DecorationState = { origin: 'pending', ids: [] };
 
+  /** DEUX rangées, et jamais une seule : les labels au-dessus, les commandes de décoration
+   * en dessous. La barre était un unique conteneur `flex-wrap`, donc une seule suite de
+   * commandes que la largeur disponible coupait où elle voulait — un label pouvait se
+   * retrouver à côté du sélecteur de décoration, deux gestes de natures différentes rendus
+   * comme s'ils appartenaient à la même famille (retour utilisateur).
+   *
+   * La séparation est STRUCTURELLE, pas seulement affaire de largeur : retirer les icônes
+   * des boutons (ci-dessous) recule le seuil de casse sans le supprimer, et une fenêtre
+   * étroite ou une configuration à treize labels le rencontre toujours. Chaque rangée garde
+   * son propre `flex-wrap` : ce qui déborde d'une rangée passe à la ligne DANS cette rangée,
+   * jamais dans l'autre.
+   *
+   * `role="none"` : ces deux boîtes n'existent que pour la mise en page. Sans lui, la
+   * restructuration insérerait deux conteneurs génériques entre le `role="toolbar"` et ses
+   * commandes ; avec lui, l'arbre d'accessibilité est exactement celui d'avant — un toolbar
+   * dont les enfants sont les boutons, le radiogroup et le champ libre. Un rôle
+   * présentationnel n'efface que la sémantique de l'élément qui le porte, jamais celle de ses
+   * enfants : un `div` n'a aucun enfant requis, donc rien à leur transmettre. */
+  const newRow = (): HTMLElement => {
+    const row = doc.createElement('div');
+    row.className = 'cct-toolbar-row';
+    row.setAttribute('role', 'none');
+    root.appendChild(row);
+    return row;
+  };
+  const labelRow = newRow();
+  const decorationRow = newRow();
+
   // Un bouton par label, avec libellé et couleur distincts (§5.1) — mais SANS son icône,
   // délibérément, là où le badge d'un commentaire publié la garde (badges.ts, `labelBadge()`).
   //
@@ -214,7 +242,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       }
     });
     button.setAttribute('aria-pressed', 'false');
-    root.appendChild(button);
+    labelRow.appendChild(button);
   }
 
   // Sélecteur de décoration segmenté : « aucune », puis un segment par décoration
@@ -254,7 +282,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       s.setAttribute('aria-checked', s === target ? 'true' : 'false');
     }
   }
-  root.appendChild(group);
+  decorationRow.appendChild(group);
 
   /** La décoration valide en attente dans le champ libre, RETIRÉE du champ. Rendue à
    * l'appelant qui la pose lui-même — un clic de label, notamment. */
@@ -328,7 +356,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       if (next instanceof HTMLElement && next.classList.contains('cct-label-button')) return;
       commitFree();
     });
-    root.appendChild(free);
+    decorationRow.appendChild(free);
   }
 
   /** Ce que la barre montre doit être ce que le commentaire porte. Sans cette

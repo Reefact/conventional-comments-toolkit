@@ -43,13 +43,35 @@
   padding-right: 0;
 }
 
+/* La barre EMPILE ses rangées, elle ne les fait pas couler : les boutons de label d'abord,
+   les commandes de décoration ensuite, et jamais les deux mêlées sur une même ligne.
+
+   Un unique conteneur `flex-wrap` ne pouvait pas le garantir : il coupe la suite des
+   commandes là où la largeur l'oblige, sans savoir qu'un bouton de label et un segment de
+   décoration sont deux gestes de natures différentes. Retirer les icônes des boutons
+   (toolbar.ts) recule ce seuil sans le supprimer — une fenêtre étroite, un panneau latéral
+   ou une configuration à treize labels le rencontrent encore.
+
+   `flex-direction: column` est la moitié CSS d'une règle dont l'autre moitié est le DOM
+   (deux `.cct-toolbar-row`, toolbar.ts) : l'une sans l'autre ne sépare rien — les deux
+   rangées redeviennent alors deux éléments en ligne que la largeur réunit dès qu'elle le
+   peut. C'est pourquoi le test lit les deux. */
 .cct-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  row-gap: 8px;
+  padding: 4px 0;
+  margin-bottom: 8px;
+}
+
+/* Chaque rangée garde son propre retour à la ligne : ce qui déborde d'une rangée passe à la
+   ligne DANS cette rangée, jamais dans l'autre. Mêmes gouttières qu'avant la séparation. */
+.cct-toolbar-row {
   display: flex;
   flex-wrap: wrap;
   column-gap: 6px;
   row-gap: 8px;
-  padding: 4px 0;
-  margin-bottom: 8px;
   align-items: center;
 }
 

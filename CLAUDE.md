@@ -38,8 +38,11 @@
 - `specifications-fr.md` est la référence fonctionnelle **normative**. Ne jamais
   la modifier pour la faire correspondre à l'implémentation. L'état du
   repository est la source de vérité sur l'avancement.
-- Branche de travail : `claude/implement-specification-fr-2a14q6` — développer
-  et pousser dessus, jamais ailleurs.
+- Branche de travail : **celle que la session en cours désigne** — développer et
+  pousser dessus, jamais sur `main`, jamais sur une autre. Ce point a nommé une
+  branche ; elle n'existe plus sur `origin`, et la consigne est restée là, fausse,
+  sans que rien ne le signale. Un nom de branche est une liste d'un seul élément :
+  il vieillit comme les autres.
 - Les choix purement techniques appartiennent à l'agent ; l'absence d'une
   décision technique dans la spec est un espace de conception, pas une
   ambiguïté à remonter.
@@ -82,7 +85,8 @@ retrait soit visible, sinon la vérification est verte pour rien ; et un test pe
 passer avec ET sans le correctif (faux trop pauvre pour exprimer le défaut) — il
 ne prouve alors rien du tout.
 
-Deux gardes mécanisent la part mécanisable :
+Des gardes mécanisent la part mécanisable. Ceux qui suivent sont ici parce que chacun
+porte une LEÇON, pas pour faire l'inventaire — `package.json` fait foi sur ce qui existe :
 
 - `npm run check:context-apis` — le bundle livré ne référence aucune API absente
   de son contexte d'exécution. C'est ce garde qui aurait attrapé
@@ -121,7 +125,7 @@ Deux gardes mécanisent la part mécanisable :
 npm install                     # une fois
 npm test                        # suite complète (vitest)
 npm run build                   # tsc -b sur tous les paquets
-npm run checks                  # gardes du repo (matrice CA, invisibles, CSS, API/contexte)
+npm run checks                  # les gardes sans navigateur, build compris — package.json fait foi
 npm run spike                   # spike P1' dans Chromium (§9.3)
 npm run smoke:mv3               # extension empaquetée dans un vrai Chromium (prémisses MV3)
 npm run check:github-theme-vars # variables Primer de styles.css toujours présentes sur github.com
@@ -131,19 +135,19 @@ npm run check:relay-cors        # la même question pour le service worker du re
 npm run check:subject-line      # badges et sujet sur UNE seule ligne, mesuré (§5.5)
 ```
 
-`spike`, `smoke:mv3`, `check:beacon`, les deux `check:*-cors`, `check:subject-line` et
-`check:github-theme-vars` pilotent un vrai Chromium via
-`playwright-core`, qui ne le télécharge pas à l'install : une fois par machine, `npx
-playwright-core install chromium` (comme le fait la CI avant ces commandes). `smoke:mv3`
-charge `packages/extension/dist-ext/` : lancer `npm run build:extension` d'abord.
+Toute commande qui interroge le NAVIGATEUR plutôt que le code pilote un vrai Chromium via
+`playwright-core` — c'est ce qui distingue une mesure d'une affirmation, et c'est pourquoi
+ces commandes existent séparément de `npm test`. `playwright-core` ne télécharge pas le
+navigateur à l'installation : une fois par machine, `npx playwright-core install chromium`
+(comme le fait la CI avant ces commandes). `smoke:mv3` charge
+`packages/extension/dist-ext/` : lancer `npm run build:extension` d'abord.
 
-La CI rejoue ces commandes (`.github/workflows/`) : `ci.yml` (build + tests, Node 20 et
-22), `conformance.yml` (les gardes ci-dessus + spécification non modifiée par une PR de
-code), `extension-package.yml` (bundle MV3, aucun code distant), `browser-smoke.yml`
-(spike + fumée MV3 + transport de la télémétrie + ligne du sujet dans Chromium, quotidiennement et sur
-toute PR touchant `packages/extension/` ou `packages/adapters/`), `theme-vars-canary.yml` (variables de
-thème GitHub hebdomadaire, ouvre une issue en cas d'échec). Les faire passer en local
-avant de pousser.
+La CI rejoue ces commandes : `.github/workflows/` fait foi sur qui lance quoi, quand, et
+sur quels chemins. Trois propriétés valent d'être sues parce qu'aucune ne se lit dans une
+commande : la suite tourne sur DEUX versions de Node, une PR qui modifie
+`specifications-fr.md` en même temps que du code est refusée, et ce qui exige un vrai
+navigateur tourne aussi la nuit — un canari, pour que la pourriture d'un sélecteur se
+découvre sans PR. Les faire passer en local avant de pousser.
 
 Piège récurrent : les caractères invisibles (BOM, NBSP, U+202F, U+FE0F, ZWJ)
 s'écrivent TOUJOURS en échappements `\uXXXX` dans les sources et les tests.

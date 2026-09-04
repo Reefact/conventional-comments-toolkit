@@ -66,7 +66,12 @@ let journalQueue: Promise<unknown> = Promise.resolve();
  * perdre une entrée. Le journal est un outil de diagnostic (§9.4), pas une comptabilité :
  * perdre une ligne sur une collision est acceptable, perdre tout l'historique à chaque
  * dégradation ne l'était pas. */
-export function appendToJournal<T>(key: string, entries: readonly T[], limit: number): Promise<void> {
+export function appendToJournal<T>(
+  key: string,
+  entries: readonly T[],
+  limit: number,
+  dedupeBy?: (entry: T) => string
+): Promise<void> {
   const next = journalQueue.then(
     () =>
       new Promise<void>((resolve) => {
@@ -76,7 +81,18 @@ export function appendToJournal<T>(key: string, entries: readonly T[], limit: nu
           area.get([key], (items) => {
             const existing = Array.isArray(items?.[key]) ? (items[key] as T[]) : [];
             try {
-              area.set!({ [key]: [...existing, ...entries].slice(-limit) }, () => resolve());
+              // `dedupeBy` : UNE ligne par clé, portant la dernière occurrence. Le journal de
+              // dégradation répond « quels sélecteurs ont échoué, et quand pour la dernière
+              // fois » — jamais « combien de fois », un compte que le rythme des mutations de
+              // la page dicte et qui ne mesure rien. Sans cette clause, une PR fermée, où
+              // l'absence du bouton de fusion est la norme, remplissait les 50 lignes de
+              // `merge-button` à chaque rechargement et ÉVINÇAIT toute vraie dégradation.
+              // La déduplication de `SelectorLog` borne un onglet ; celle-ci borne le journal
+              // PARTAGÉ, que plusieurs onglets et plusieurs rechargements alimentent.
+              const kept = dedupeBy
+                ? existing.filter((e) => !entries.some((n) => dedupeBy(n) === dedupeBy(e)))
+                : existing;
+              area.set!({ [key]: [...kept, ...entries].slice(-limit) }, () => resolve());
             } catch {
               resolve(); // contexte invalidé entre la lecture et l'écriture
             }

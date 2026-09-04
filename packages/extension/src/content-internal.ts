@@ -910,21 +910,29 @@ export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
  * Ne porte QUE de l'état appartenant à la plateforme — jamais ce que notre propre rendu
  * écrit : c'est `ownOutputSignatureOf`, capturée après le rendu, qui couvre ce versant. */
 function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boolean): string {
-  const withRendered = adapter as PlatformAdapter & {
-    getRenderedCommentCount?: () => number;
-    getRenderedComments?: () => unknown[];
-  };
   const published = publishedSignatureOf(adapter) ?? '';
   const completion = probeCompletionControl ? (adapter.getCompletionControl() !== null ? '1' : '0') : '?';
   const rendered = renderedThreadsOf(adapter);
   const threadIds = rendered.map((t) => t.id).join(',');
-  // Sonde le COMPTE, jamais getRenderedComments() : cette dernière calcule bodyText (clone
-  // du sous-arbre dès qu'un badge est posé) pour chaque commentaire, un coût proportionnel
-  // à tout le DOM des commentaires rendus, à chaque mutation, pour la durée de vie de
-  // l'onglet. Repli sur getRenderedComments().length pour les adaptateurs (de test) qui
-  // n'exposent pas la sonde dédiée.
-  const commentCount = withRendered.getRenderedCommentCount?.() ?? withRendered.getRenderedComments?.().length ?? 0;
-  return `${published}|${completion}|${threadIds}|${commentCount}`;
+  return `${published}|${completion}|${threadIds}|${renderedCommentCountOf(adapter)}`;
+}
+
+/** Nombre de corps de commentaire que la PLATEFORME rend — **jamais** le nombre de ceux que
+ * nous décorons, et les deux ont cessé de coïncider le jour où la description de la PR est
+ * sortie du périmètre (§4.1) : l'adaptateur GitHub la compte ici et l'écarte de
+ * `getRenderedComments()`.
+ *
+ * Sonde le COMPTE, jamais getRenderedComments() : cette dernière calcule bodyText (clone
+ * du sous-arbre dès qu'un badge est posé) pour chaque commentaire, un coût proportionnel
+ * à tout le DOM des commentaires rendus, à chaque mutation, pour la durée de vie de
+ * l'onglet. Repli sur getRenderedComments().length pour les adaptateurs (de test) qui
+ * n'exposent pas la sonde dédiée. */
+function renderedCommentCountOf(adapter: PlatformAdapter): number {
+  const withRendered = adapter as PlatformAdapter & {
+    getRenderedCommentCount?: () => number;
+    getRenderedComments?: () => unknown[];
+  };
+  return withRendered.getRenderedCommentCount?.() ?? withRendered.getRenderedComments?.().length ?? 0;
 }
 
 /** Corps de commentaire rendus — les éléments SEULS, jamais `getRenderedComments()` : cette
@@ -1596,11 +1604,9 @@ async function renderPrChrome(
   const withRendered = adapter as PlatformAdapter & {
     getRenderedComments?: () => { element: Element; bodyText: string }[];
   };
-  let renderedComments = 0;
   if (withRendered.getRenderedComments) {
     for (const { element, bodyText } of withRendered.getRenderedComments()) {
       decorateComment(element, bodyText, resolved.config, profile, lang);
-      renderedComments++;
     }
   }
 
@@ -1616,7 +1622,16 @@ async function renderPrChrome(
   // seule surface que cette PR affichait. `showed: true` ne fige rien : la reprise passe
   // alors par les signatures (`chromeSignatureOf`/`ownOutputSignatureOf`), qui rendent dès
   // que quoi que ce soit change — strictement plus réactif que l'expiration d'une fenêtre.
-  return { showed: hasSomethingToShow || renderedComments > 0, resolved };
+  //
+  // Le compte vient de la SONDE de plateforme, et non du nombre de commentaires que la
+  // boucle ci-dessus vient de décorer : depuis que la description de la PR est écartée des
+  // badges (§4.1), les deux diffèrent d'exactement un sur une page de conversation — et une
+  // PR encore SANS AUCUN COMMENTAIRE serait retombée à zéro, donc `showed: false`, donc
+  // muette après `RENDER_RETRY_WINDOW_MS` : le premier commentaire posté n'aurait plus reçu
+  // ses badges avant un rechargement. Ce que ce booléen a toujours voulu dire est « la page
+  // portait des corps de commentaire », pas « nous avons peint quelque chose » — un
+  // commentaire sans préfixe était déjà compté sans recevoir le moindre badge.
+  return { showed: hasSomethingToShow || renderedCommentCountOf(adapter) > 0, resolved };
 }
 
 /** Porte le `title`/`aria-disabled` NATIFS du bouton (branche protégée, revue requise…)

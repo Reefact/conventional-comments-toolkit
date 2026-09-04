@@ -17,7 +17,7 @@ import {
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { computePrefixInsertion, shiftSelection } from '@cct/adapter-shared';
 import { decideGuard, feedbackState, type GuardDecision } from './guard.js';
-import { stackingMountFor } from './ui/stacking.js';
+import { ringIsClipped, stackingMountFor } from './ui/stacking.js';
 import { buildToolbar, type PosedPrefix, type Toolbar } from './ui/toolbar.js';
 import { attachQuickInput } from './ui/quickinput.js';
 import { FeedbackView } from './ui/feedback.js';
@@ -264,6 +264,13 @@ export class EditorController {
       // direct, pour couvrir aussi ce wrapper intermédiaire.
       this.deps.editor.element.classList.add('cct-editor');
       this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-editor'));
+    }
+
+    // §5.3 — le trait d'état rentre dans la boîte quand un conteneur le rognerait, et
+    // seulement là : ailleurs il mordrait sur le texte d'un champ sans padding (ui/stacking.ts).
+    if (ringIsClipped(this.deps.editor.element)) {
+      this.deps.editor.element.classList.add('cct-ring-inset');
+      this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-ring-inset'));
     }
 
     // §5.1 — barre d'outils au-dessus de la zone de saisie, §5.3 pastille en dessous : les

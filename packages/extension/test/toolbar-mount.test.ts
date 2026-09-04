@@ -23,7 +23,7 @@ import { defaultConfig, type PrRef } from '@cct/core';
 import { writeToTextField } from '@cct/adapter-shared';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { EditorController } from '../src/editor-controller.js';
-import { stackingMountFor } from '../src/ui/stacking.js';
+import { ringIsClipped, stackingMountFor } from '../src/ui/stacking.js';
 
 const pr: PrRef = {
   platform: 'github',
@@ -143,5 +143,55 @@ describe('§5.1 / §5.3 — barre et pastille dans le composeur de la nouvelle v
     const { toolbar, feedback, champ } = attachOn('<div id="hote" style="display:block"><textarea id="champ"></textarea></div>');
     expect(toolbar.nextElementSibling).toBe(champ);
     expect(feedback.previousElementSibling).toBe(champ);
+  });
+});
+
+// §5.3 — le trait d'état est un `outline`, donc peint À L'EXTÉRIEUR de la boîte du champ, donc
+// rognable par un ancêtre qui coupe ce qui dépasse. happy-dom n'a pas de moteur de rendu : les
+// rectangles y sont tous nuls. Les tests ci-dessous les POSENT donc explicitement, aux valeurs
+// relevées sur les deux pages — c'est l'arithmétique de `ringIsClipped` qu'ils vérifient, pas
+// la peinture, et le fixture le dit plutôt que de le laisser croire.
+function withRect(el: Element, left: number, right: number): void {
+  el.getBoundingClientRect = () =>
+    ({ left, right, top: 0, bottom: 20, width: right - left, height: 20, x: left, y: 0, toJSON: () => ({}) }) as DOMRect;
+}
+
+describe('ringIsClipped — le trait d’état sera-t-il rogné', () => {
+  // MESURÉ sur `…/changes` : le champ va de 463 à 1026, son enveloppe Primer aussi, et elle
+  // porte `overflow: hidden`. Le trait tombe sur son bord et disparaît.
+  it('un conteneur qui coupe et qui gaine le champ rogne le trait', () => {
+    document.body.innerHTML = '<div id="gaine" style="overflow:hidden"><textarea id="champ"></textarea></div>';
+    const champ = document.getElementById('champ')!;
+    withRect(champ, 463, 1026);
+    withRect(document.getElementById('gaine')!, 463, 1026);
+    expect(ringIsClipped(champ)).toBe(true);
+  });
+
+  // Le cas du DOM hérité : un conteneur coupe peut-être, mais il a de la marge autour du champ.
+  // Y rentrer le trait le ferait mordre sur le texte, `cct-editor` ayant mis le padding à zéro.
+  it('un conteneur qui coupe mais garde de la marge ne rogne rien', () => {
+    document.body.innerHTML = '<div id="large" style="overflow:hidden"><textarea id="champ"></textarea></div>';
+    const champ = document.getElementById('champ')!;
+    withRect(champ, 471, 1018);
+    withRect(document.getElementById('large')!, 463, 1026);
+    expect(ringIsClipped(champ)).toBe(false);
+  });
+
+  it('un conteneur qui ne coupe pas ne rogne rien, même collé', () => {
+    document.body.innerHTML = '<div id="visible" style="overflow:visible"><textarea id="champ"></textarea></div>';
+    const champ = document.getElementById('champ')!;
+    withRect(champ, 463, 1026);
+    withRect(document.getElementById('visible')!, 463, 1026);
+    expect(ringIsClipped(champ)).toBe(false);
+  });
+
+  // Un seul bord commun arrive par accident dans n'importe quelle mise en page ; il ne suffit
+  // pas à conclure, sinon le DOM hérité se ferait rentrer le trait pour rien.
+  it('un seul bord collé ne suffit pas', () => {
+    document.body.innerHTML = '<div id="demi" style="overflow:hidden"><textarea id="champ"></textarea></div>';
+    const champ = document.getElementById('champ')!;
+    withRect(champ, 463, 900);
+    withRect(document.getElementById('demi')!, 463, 1026);
+    expect(ringIsClipped(champ)).toBe(false);
   });
 });

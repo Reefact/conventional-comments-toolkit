@@ -58,7 +58,9 @@ _<une ligne : ce dont cette version parle, comme on le résumerait à quelqu'un 
 ```
 
 Ne garder que les rubriques qui ont du contenu ; ne jamais imprimer un titre vide. Versions les
-plus récentes en premier. Seules les versions PUBLIÉES ont une section — jamais `[Unreleased]`.
+plus récentes en premier. Toute section porte un NUMÉRO DE VERSION — jamais `[Unreleased]`, jamais
+un titre d'attente. Celle de la version qu'on prépare s'écrit à l'étape 4, donc AVANT le tag :
+c'est précisément elle que `release.yml` ira lire, et son absence est ce qui fait refuser.
 
 ## Les règles qui ne se devinent pas
 

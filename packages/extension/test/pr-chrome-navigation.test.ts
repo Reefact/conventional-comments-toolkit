@@ -2247,6 +2247,39 @@ describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut sign
     expect(body.querySelector('p')?.textContent).toContain('un sujet corrigé deux fois');
   });
 
+  it('le masquage du préfixe SEUL défait — texte et badges intacts — est reposé (revue Reefact, PR #42)', async () => {
+    onPullRequest();
+    const body = conversationComment('un sujet de test');
+    const check = document.createElement('div');
+    check.setAttribute('data-testid', 'check-run-item');
+    check.textContent = summaryLine(0);
+    document.body.appendChild(check);
+    const adapter = new GithubClientAdapter({ documentRef: document, fetchImpl });
+
+    observe(adapter, new ClientConfigResolver(async () => null), document);
+    await flushAll();
+    expect(body.querySelector('.cct-hidden-prefix')).not.toBeNull();
+    const textBefore = body.textContent;
+
+    // Réhydratation qui reconstruit le SEUL sous-arbre de texte natif, sans toucher aux
+    // badges : le `<p>` retrouve son texte brut, donc plus de `.cct-hidden-prefix`, et les
+    // badges restent en enfants directs du corps, à côté. C'est le cas que `decorateComment`
+    // sait déjà réparer (entretien inconditionnel du masquage, revue Reefact PR #40) mais
+    // que rien ne lui donnait l'occasion de voir.
+    body.querySelector('p')!.innerHTML = 'nitpick (test): un sujet de test';
+    // Les deux prémisses de ce test, vérifiées et non supposées — sans elles il ne testerait
+    // plus ce qu'il annonce : `display: none` est une propriété de RENDU, `textContent`
+    // rapporte le texte masqué comme n'importe quel autre, et le digest de texte est donc
+    // rigoureusement aveugle à ce défaut.
+    expect(body.textContent).toBe(textBefore);
+    expect(body.querySelector('.cct-badge')).not.toBeNull();
+
+    await flushAll();
+
+    expect(body.querySelector('.cct-hidden-prefix')?.textContent).toBe('nitpick (test): ');
+    expect(body.querySelector('.cct-badge')).not.toBeNull(); // les badges n'ont pas été perdus au passage
+  });
+
   // Invariant dont dépend tout ce qui précède, dans LES DEUX adaptateurs : la sonde bon
   // marché employée par `ownOutputSignatureOf` doit désigner EXACTEMENT les corps que le
   // rendu décore (`getRenderedComments`). Deux listes qui divergeraient feraient surveiller

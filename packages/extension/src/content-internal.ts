@@ -935,8 +935,8 @@ function renderedCommentElementsOf(adapter: PlatformAdapter): Element[] {
 
 /** Ce que NOTRE rendu écrit dans la page, et que la plateforme peut défaire : le texte des
  * fils et des corps de commentaire — nos badges et notre masquage de préfixe y entrent — et
- * la présence de nos deux surfaces (§5.5). Trois angles morts que le décompte seul laissait
- * ouverts (revue Codex, PR #26 ; puis le défaut d'édition ci-dessous) :
+ * la présence de nos deux surfaces (§5.5). Quatre angles morts que le décompte seul laissait
+ * ouverts (revue Codex, PR #26 ; puis les deux défauts d'édition ci-dessous) :
  *
  * - une racine éditée SUR PLACE (`issue: a` corrigé en `issue: b`) ne change ni le nombre de
  *   fils, ni leurs identifiants, ni le nombre de commentaires — la signature de plateforme
@@ -952,13 +952,17 @@ function renderedCommentElementsOf(adapter: PlatformAdapter): Element[] {
  *   les fils de revue (`[data-testid="review-thread"]`,
  *   `.js-resolvable-timeline-thread-container`), jamais un commentaire de premier niveau.
  *   Rien ne bougeait donc dans aucune des deux signatures, `run()` sortait, et le
- *   commentaire restait DÉFINITIVEMENT sans badge, préfixe structuré réapparu en clair.
+ *   commentaire restait DÉFINITIVEMENT sans badge, préfixe structuré réapparu en clair ;
+ * - le masquage du préfixe SEUL défait, texte et badges intacts — voir `hiddenPrefixMapOf`,
+ *   qui dit pourquoi le digest de texte est aveugle à ce cas-là par construction.
  *
  * Le texte, et pas seulement la PRÉSENCE de nos nœuds (un simple compte de `.cct-badge`
  * suffirait à rattraper un corps réécrit) : nous n'avons pas MESURÉ comment chaque
  * plateforme applique une édition — remplacement du sous-arbre rendu, ou correctif ciblé sur
  * les seuls nœuds de texte. Le second laisserait nos badges en place et PÉRIMÉS, un défaut
  * qu'aucun compte ne verrait ; le digest de texte couvre les deux sans avoir à trancher.
+ * Il ne couvre en revanche PAS ce que `display: none` soustrait au rendu sans le soustraire
+ * à `textContent` : c'est exactement l'objet du quatrième point ci-dessus.
  *
  * **Capturée APRÈS le rendu, jamais avant.** C'est tout l'intérêt de la séparer de
  * `chromeSignatureOf` : nos badges et nos insertions modifient précisément ce qu'elle
@@ -967,8 +971,34 @@ function renderedCommentElementsOf(adapter: PlatformAdapter): Element[] {
  * coalescence des mutations et retarde d'autant le retrait d'un bandeau périmé. Comparée à
  * l'état laissé par le rendu précédent, seule une main EXTÉRIEURE la fait bouger. */
 function ownOutputSignatureOf(adapter: PlatformAdapter, doc: Document): string {
-  const surfaces = [...renderedThreadsOf(adapter).map((t) => t.element), ...renderedCommentElementsOf(adapter)];
-  return `${textDigestOf(surfaces)}|${injectedSurfacesOf(doc)}`;
+  const comments = renderedCommentElementsOf(adapter);
+  const surfaces = [...renderedThreadsOf(adapter).map((t) => t.element), ...comments];
+  return `${textDigestOf(surfaces)}|${hiddenPrefixMapOf(comments)}|${injectedSurfacesOf(doc)}`;
+}
+
+/** Où le masquage du préfixe (§5.5) est POSÉ, commentaire par commentaire — la seule de nos
+ * écritures qu'un digest de texte ne peut pas voir disparaître, et il faut dire pourquoi.
+ * `.cct-hidden-prefix` masque son contenu par `display: none`, une propriété de RENDU :
+ * `textContent` continue de le rapporter mot pour mot. Remplacer le wrapper par son propre
+ * texte — ce que fait une réhydratation qui reconstruit le sous-arbre de texte natif sans
+ * toucher à nos badges, restés à côté en enfants directs — laisse donc `textContent`
+ * RIGOUREUSEMENT identique. Le préfixe structuré redevient visible et rien ne bougeait dans
+ * aucune des deux signatures : `run()` sortait avant `decorateComment()`, dont l'entretien
+ * inconditionnel du masquage (ui/badges.ts, revue Reefact PR #40) n'était alors jamais
+ * atteint — la réparation existait, la porte pour y arriver, non (revue Reefact, PR #42).
+ *
+ * Par COMMENTAIRE, pas un compte global : un compte suffirait à voir une perte sèche, mais
+ * pas un échange — un corps qui perd son wrapper pendant qu'un autre le gagne dans la même
+ * salve. Une chaîne positionnelle distingue les deux pour le prix d'un `querySelector` par
+ * corps, très en deçà du digest de texte déjà payé sur les mêmes éléments.
+ *
+ * Un `0` n'est PAS une anomalie à rattraper indéfiniment : un commentaire sans préfixe, ou
+ * dont la projection en badges serait à perte (§5.5), n'a jamais de wrapper, et son `0` est
+ * le même d'un rendu au suivant — stable, donc sans boucle. */
+function hiddenPrefixMapOf(commentElements: Element[]): string {
+  let map = '';
+  for (const element of commentElements) map += element.querySelector('.cct-hidden-prefix') === null ? '0' : '1';
+  return map;
 }
 
 /** Empreinte 32 bits (FNV-1a) du texte des éléments où notre rendu écrit. Le coût est assumé

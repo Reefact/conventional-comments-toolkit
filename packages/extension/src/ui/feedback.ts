@@ -29,7 +29,11 @@ export class FeedbackView {
   #editor: Element;
   #lang: string;
 
-  constructor(editor: Element, lang: string) {
+  /** `mountAnchor` : l'élément DERRIÈRE lequel poser la pastille — le champ lui-même quand son
+   * parent empile, sinon l'ancêtre qui le contient dans le premier parent qui empile
+   * (ui/stacking.ts). Sans lui, la pastille se posait dans un `<span>` en `inline-flex` sur la
+   * vue `…/changes` de GitHub, et s'affichait en colonne à droite du champ. */
+  constructor(editor: Element, lang: string, mountAnchor: Element = editor) {
     this.#editor = editor;
     this.#lang = lang;
     const doc = globalThis.document;
@@ -44,7 +48,7 @@ export class FeedbackView {
     this.#list = doc.createElement('ul');
     this.#list.className = 'cct-diagnostics';
     this.#root.append(this.#pastille, this.#list, this.#live);
-    editor.insertAdjacentElement('afterend', this.#root);
+    mountAnchor.insertAdjacentElement('afterend', this.#root);
     const id = `cct-fb-${Math.floor(performance.now())}-${Math.floor(Math.random() * 1e6)}`;
     this.#root.id = id;
     // Messages d'erreur associés au champ (§10, accessibilité).

@@ -32,6 +32,15 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **The toolbar sits above the field again on the rewritten "Files changed" view** (§5.1, and
+  §5.3 for the feedback pill below it). Both were inserted as immediate siblings of the text
+  area, which puts them above and below only if the field's own parent stacks its children —
+  true of the legacy DOM, false here, where that parent is a Primer `<span>` laid out as a row.
+  The ten label buttons were folded into a narrow column beside the field, and the pill into a
+  second one. They now go into the nearest ancestor that actually stacks, found by asking the
+  style engine rather than by naming a platform container — one more name that would age. Where
+  the immediate parent already stacks it is kept, so the legacy geometry is untouched.
+
 - **Review threads are read again on the rewritten "Files changed" view.** Four chains that
   read the page came back empty there, and the consequences were spread across the product: no
   badge on any published comment (§5.5) — the raw `issue (non-blocking):` prefix stayed visible

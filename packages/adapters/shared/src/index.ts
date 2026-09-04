@@ -81,6 +81,10 @@ export function hostMatchesPattern(host: string, pattern: string): boolean {
 }
 
 /** L'hôte est-il couvert par au moins une des entrées (noms exacts et jokers mêlés) ? */
+export function hostMatchesAny(host: string, patterns: readonly string[]): boolean {
+  return patterns.some((p) => hostMatchesPattern(host, p));
+}
+
 /** Le `fetch` à employer par un adaptateur : la substitution reçue, sinon le global **LIÉ à
  * son global**. Le `.bind()` n'est pas une précaution de style, c'est la correction d'un défaut
  * livré.
@@ -106,10 +110,6 @@ export function adapterFetch(impl?: typeof fetch): typeof fetch {
   if (impl) return impl;
   const global = globalThis.fetch;
   return typeof global === 'function' ? global.bind(globalThis) : global;
-}
-
-export function hostMatchesAny(host: string, patterns: readonly string[]): boolean {
-  return patterns.some((p) => hostMatchesPattern(host, p));
 }
 
 // ————— Stratégie d'écriture programmatique (§9.3) —————
@@ -235,12 +235,27 @@ export function closestChain(el: Element, chain: SelectorChain): SelectorOutcome
 export class SelectorLog {
   readonly failures: { chain: string; at: string }[] = [];
   #telemetry: ((event: { kind: 'selector-degradation'; chain: string }) => void) | null;
+  // UNE entrée par chaîne, pas une par appel — et c'est un défaut constaté, pas une
+  // optimisation. `getCompletionControl()` journalise dès qu'il ne trouve pas le bouton de
+  // fusion, et il est appelé à chaque mutation du DOM : sur une PR fermée, où l'absence du
+  // bouton est la NORME, une seule visite écrivait des dizaines d'entrées identiques. Le
+  // journal étant plafonné (50 entrées côté extension), une PR fusionnée le remplissait
+  // intégralement de `merge-button` et ÉVINÇAIT toute vraie dégradation : le diagnostic censé
+  // révéler qu'un sélecteur a pourri était aveuglé par un non-événement.
+  //
+  // La question à laquelle ce journal répond est « QUELS sélecteurs ont échoué », jamais
+  // « combien de fois » — un compte piloté par le rythme des mutations de la page ne mesure
+  // rien. La déduplication vaut donc aussi pour la remontée télémétrique, qu'elle cesse
+  // d'enfler pour la même raison.
+  #seen = new Set<string>();
 
   constructor(telemetry: ((event: { kind: 'selector-degradation'; chain: string }) => void) | null = null) {
     this.#telemetry = telemetry;
   }
 
   degraded(chain: SelectorChain): void {
+    if (this.#seen.has(chain.name)) return;
+    this.#seen.add(chain.name);
     this.failures.push({ chain: chain.name, at: new Date().toISOString() });
     // Remontée télémétrique agrégée uniquement si la télémétrie est activée (§10, CA-11).
     this.#telemetry?.({ kind: 'selector-degradation', chain: chain.name });

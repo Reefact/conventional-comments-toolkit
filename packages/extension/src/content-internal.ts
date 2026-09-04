@@ -284,7 +284,7 @@ export const TELEMETRY_FLUSH_MS = 5 * 60_000;
  * dernières du dernier onglet à avoir écrit (revue Codex, PR #31). D'où le passage par
  * `appendToJournal`, qui relit avant d'écrire, et l'ajout de la SEULE entrée nouvelle. */
 function persistSelectorFailure(entry: { chain: string; at: string }): void {
-  void appendToJournal('selectorFailures', [entry], SELECTOR_LOG_LIMIT);
+  void appendToJournal('selectorFailures', [entry], SELECTOR_LOG_LIMIT, (e) => e.chain);
 }
 
 async function readUserLanguage(): Promise<string | null> {

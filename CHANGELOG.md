@@ -16,6 +16,28 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **The pull request's own description is no longer treated as a review comment** (§4.1, which
+  places it outside the convention's scope). The editor that "Edit" opens on it matched the
+  comment-editor chain, and the zone fallback — no thread, no review body, no conversation form,
+  therefore a diff-line comment — classified it as a thread root, the one zone that carries a
+  blocking state. The visible symptom was the label toolbar drawn on a text the convention says
+  nothing about; the costly one was invisible: under `enforce`, the submit guard applied to the
+  description's own Update button, so a description without a `label:` prefix could not be saved
+  at all. Badges are gone from it too (§5.5). The exclusion matches on the containers around the
+  field rather than the field itself, because GitHub serves that textarea from a fragment it
+  refuses without a session: only the containers could be measured. Where a future rendering
+  names them differently, nothing matches and the description behaves as it did before — never
+  worse.
+- **A page that had nothing to show no longer stops watching after five seconds.** The hydration
+  window was meant to bound retries on a page still filling in; it also stopped the observer for
+  good on a page that never had anything, and only then. That is the ordinary state of the
+  *Files changed* view of a pull request with no thread yet: the first inline comment posted
+  afterwards received neither badge nor banner until a full reload, and so did returning to
+  *Conversation* from another tab of the same pull request, which is not a navigation and does
+  not restart the window. The window now bounds repetition, not lifetime: a page that has not
+  moved is still left alone, a page that gains a comment, a thread or a published result is
+  rendered again.
+
 - **The "Configuration unread" banner no longer appears on every repository.** Both client
   adapters held the global `fetch` in a private field and called it as a method, which passes the
   adapter instance as the receiver. In the isolated world of a content script Chromium refuses

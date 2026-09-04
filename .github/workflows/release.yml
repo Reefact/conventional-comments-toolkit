@@ -280,12 +280,16 @@ jobs:
           WORK: ${{ steps.zips.outputs.dir }}
         run: |
           set -euo pipefail
+          # Majeure DÉRIVÉE de la version, jamais écrite en dur : les notes vivent par majeure
+          # (`notesPathOf`), et une 2.x lierait sinon le français du train 1.x — la bonne note
+          # anglaise au-dessus d'un lien vers l'ancienne (revue Reefact, PR #46).
+          major="${VERSION%%.*}"
           notes="$RUNNER_TEMP/notes.md"
           {
             # Ce qui a changé d'abord : c'est la question que se pose un lecteur qui arrive ici.
             cat "$RUNNER_TEMP/release-notes.md"
             echo
-            echo "Relevé complet, contraintes et cas limites compris : [\`CHANGELOG.md\`](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/CHANGELOG.md). Notes de version en français : [\`docs/release-notes-1.x-fr.md\`](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/release-notes-1.x-fr.md)."
+            echo "Relevé complet, contraintes et cas limites compris : [\`CHANGELOG.md\`](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/CHANGELOG.md). Notes de version en français : [\`docs/release-notes-$major.x-fr.md\`](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/release-notes-$major.x-fr.md)."
             echo
             echo "---"
             echo

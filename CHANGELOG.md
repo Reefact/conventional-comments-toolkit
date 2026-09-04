@@ -98,6 +98,12 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - **Badges follow a configuration change while the page is open (§8.1.2)** — including on an idle
   tab, where nothing else would have noticed. A label disabled mid-review loses its badge; a
   decoration that becomes a carrier gains its colour.
+- **An editor already open follows that change too, submission guard included.** It kept
+  validating against the effective configuration captured when it was attached, so a switch from
+  `enforce` to `off` — or the reverse — never reached it until the box was closed and reopened:
+  a reviewer could stay blocked by a rule the organisation had just lifted. Open editors are now
+  updated in place whenever a render applies a new configuration, and reconciliation is
+  serialized so two changes landing together cannot leave half the surfaces on the old one.
 - A render whose pull request was navigated away from mid-flight is rejected instead of writing
   into the page that replaced it.
 - A decoration rejected by the configuration is never exposed for display (§3.3, §5.5).
@@ -147,6 +153,18 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **A granted GitHub Enterprise Server or self-hosted Azure DevOps Server host is actually
+  usable.** Granting the permission injected the content script, but no adapter was ever
+  constructed with that host — so nothing appeared on the page, despite the grant succeeding.
+  The platform each host serves is now recorded alongside it: the options page takes any domain
+  in one free-text field, and forwarding the same list to both adapters would have made the
+  GitHub one claim every host, silently breaking Azure DevOps Server recognition.
+- **An organisation `configUrl` hosted outside the displayed platform is readable again.** The
+  content script issues requests on behalf of the page's own origin and stays subject to its
+  CORS policy, whatever host permission was granted — so that document was never readable: the
+  extension resolved two configuration levels where the server resolves three, sat permanently
+  degraded, and its fingerprint could never match the server's (§8.1.3, rule 2). The read now
+  goes through the service worker's relay, which already existed and had no caller.
 - Every key of an enterprise floor document is vetted, not four of thirteen, and every level-2
   read is routed through the vetted floor rather than the raw one.
 

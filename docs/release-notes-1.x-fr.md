@@ -65,6 +65,7 @@ _Les décorations ont leurs propres badges, et l'affichage suit un changement de
 ### 🐛 Corrections
 
 - Changer la configuration rafraîchit désormais ce qui est déjà à l'écran — y compris sur un onglet resté ouvert sur une pull request. Un label désactivé en cours de revue perd son badge au lieu d'en garder un pour un état qui n'existe plus.
+- **Une boîte de commentaire déjà ouverte suit ce changement elle aussi, y compris sur le fait de bloquer votre envoi.** Elle continuait d'appliquer la configuration capturée à son ouverture : une organisation passant d'`enforce` à `off` vous laissait bloqué tant que vous n'aviez pas fermé puis rouvert la boîte.
 
 ## 1.0.0-beta.5 — 2 septembre 2026
 
@@ -96,6 +97,11 @@ _Deux permissions retirées du manifeste, une télémétrie qui n'existe que si 
 
 - Télémétrie facultative, éteinte tant que vous ne l'activez pas, liée à l'adresse pour laquelle vous avez consenti et configurée par la politique de votre organisation plutôt que par un fichier de dépôt.
 - La version affichée dans `chrome://extensions` distingue les pré-versions : `1.0.0-beta.1` et `1.0.0-beta.2` ne s'affichent plus toutes deux comme `1.0.0`.
+
+### 🐛 Corrections
+
+- **Sur GitHub Enterprise Server et Azure DevOps Server auto-hébergé, accorder la permission d'hôte vous donne enfin l'extension.** L'autorisation était accordée et rien n'apparaissait : aucun adaptateur n'était construit pour cet hôte. La plateforme que sert chaque hôte est désormais enregistrée avec lui, ce qui distingue un domaine GHES d'un domaine Azure DevOps Server.
+- **Une configuration d'organisation hébergée hors de votre plateforme redevient lisible.** Elle ne l'avait jamais été : la politique CORS de la page la bloquait quelle que soit la permission accordée, laissant l'extension en état dégradé permanent et jugeant sur deux niveaux de configuration là où le serveur en utilise trois.
 
 ## 1.0.0-beta.2 — 24 août 2026
 

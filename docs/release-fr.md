@@ -11,10 +11,15 @@ GitHub qui les porte.
 ## Poser une release
 
 0. **Écrire la note de version**, dans les deux langues : une section `## <version> — <date>` en
-   tête de [`docs/release-notes-1.x-en.md`](release-notes-1.x-en.md) et de son jumeau
-   [`-fr.md`](release-notes-1.x-fr.md), rédigée à partir de la section correspondante du
-   [`CHANGELOG.md`](../CHANGELOG.md). C'est ce texte, lu **tel quel** dans le fichier anglais,
-   que porte le corps de la Release GitHub.
+   tête de `docs/release-notes-<majeure>.x-en.md` et de son jumeau `-fr.md`, rédigée à partir de
+   la section correspondante du [`CHANGELOG.md`](../CHANGELOG.md). C'est ce texte, lu **tel
+   quel** dans le fichier anglais, que porte le corps de la Release GitHub.
+
+   Les notes vivent **par version majeure** : une 2.0.0 ouvre `docs/release-notes-2.x-en.md` et
+   son jumeau plutôt que de faire grossir le premier fichier indéfiniment. Le workflow dérive
+   cette majeure de la version — il ne la connaît pas d'avance. Aujourd'hui :
+   [`docs/release-notes-1.x-en.md`](release-notes-1.x-en.md) et
+   [`-fr.md`](release-notes-1.x-fr.md).
 
    Rien n'est dérivé de `git log`, et c'est délibéré : un sujet de commit explique un diff à un
    relecteur, une note de version explique une version à quelqu'un qui décide s'il met à jour.

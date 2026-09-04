@@ -19,19 +19,44 @@ export interface StackingMount {
   anchor: Element;
 }
 
-/** Remonte au plus `limit` niveaux. Rend `null` si aucun ancêtre n'empile — l'appelant
+/** Remonte au plus `limit` niveaux. Rend `null` si aucun ancêtre ne convient — l'appelant
  * retombe alors sur le parent direct, c'est-à-dire sur le comportement d'avant : ne rien
- * savoir ne doit jamais faire pire que ce qui existait. */
+ * savoir ne doit jamais faire pire que ce qui existait.
+ *
+ * DEUX conditions, et la seconde a été ajoutée en regardant le résultat de la première dans
+ * le navigateur : un ancêtre qui empile ses enfants mais qui est lui-même ENFERMÉ DANS UNE
+ * RANGÉE ne fait pas un bon hôte. Sur la vue `…/changes`, le premier ancêtre à empiler est
+ * `InlineAutocomplete-module__container` (`display: block`), mais son parent
+ * `MarkdownInput-module__inputWrapper` est une rangée : la barre y tombait bien au-dessus du
+ * champ, à la largeur de la seule colonne du champ. Un cran plus haut,
+ * `AddCommentEditor-module__ConversationCommentBox` empile ET vit dans une colonne : la barre
+ * y prend la largeur du composeur, ce que le §5.1 décrit.
+ *
+ * Conséquence assumée : sur un DOM où le parent direct empile mais tient dans une rangée, le
+ * point d'ancrage remonte lui aussi d'un cran. C'est voulu — c'est exactement le cas où la
+ * barre serait comprimée. Là où le parent direct empile DANS une colonne ou un bloc, rien ne
+ * bouge, et c'est le cas du DOM hérité. */
 export function stackingMountFor(editor: Element, limit = 6): StackingMount | null {
   const view = editor.ownerDocument?.defaultView ?? null;
   let anchor: Element = editor;
   let container = editor.parentElement;
   for (let i = 0; container && i < limit; i++) {
-    if (stacks(container, view)) return { container, anchor };
+    if (stacks(container, view) && !squeezed(container, view)) return { container, anchor };
     anchor = container;
     container = container.parentElement;
   }
   return null;
+}
+
+/** « Cet élément est-il posé dans une rangée ? » — la question se pose à son parent de MISE EN
+ * PAGE, donc en traversant les `display: contents`, qui n'en sont pas un. Sans parent, rien ne
+ * le comprime. */
+function squeezed(el: Element, view: (Window & typeof globalThis) | null): boolean {
+  let parent = el.parentElement;
+  while (parent && (view?.getComputedStyle(parent).display || 'block') === 'contents') {
+    parent = parent.parentElement;
+  }
+  return parent !== null && !stacks(parent, view);
 }
 
 /** « Cet élément met-il ses enfants les uns SOUS les autres ? » — question de mise en page,

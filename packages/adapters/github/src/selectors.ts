@@ -9,11 +9,50 @@
 import type { SelectorChain } from '@cct/adapter-shared';
 
 export const selectors = {
-  /** Zone de saisie d'un commentaire — les deux générations encapsulent un <textarea> (§A.2). */
+  /** Zone de saisie d'un commentaire — les deux générations encapsulent un <textarea> (§A.2).
+   *
+   * MESURÉ sur `https://github.com/Reefact/conventional-comments-toolkit/pull/45/changes`
+   * (session ouverte, composeur de ligne ouvert, 2026-09-04). La page `…/changes` est la
+   * nouvelle vue des fichiers modifiés, et le composeur y est le SEUL <textarea> du
+   * document :
+   *
+   *   <textarea aria-label="Markdown value" placeholder="Leave a comment"
+   *             class="prc-Textarea-TextArea-snlco" id="_r_qm_">
+   *
+   * Aucun des six candidats d'avant n'y matchait — ni les quatre hérités, ni les deux
+   * candidats React, écrits de mémoire et jamais observés nulle part. L'extension ne posait
+   * donc aucune barre d'outils sur la zone que le §4.1 appelle « cœur de la revue », et le
+   * silence était complet : `observeEditors` ne journalisait pas cet échec (§9.4).
+   *
+   * Deux attributs du champ sont inutilisables : `-snlco` est un hachage de build de Primer,
+   * `_r_qm_` un identifiant `useId` de React. Restent trois prises, de la plus spécifique à
+   * la plus large, chacune suffisante à elle seule :
+   *
+   *   - `aria-label="Markdown value"` — nom accessible que Primer donne au champ de son
+   *     éditeur Markdown. Il ne contient pas « comment », ce sur quoi tombait l'ancien
+   *     premier candidat ;
+   *   - `placeholder="Leave a comment"` — texte visible, donc localisable, mais sans
+   *     ambiguïté sur la nature du champ ;
+   *   - `class*="prc-Textarea-TextArea"` — le composant Primer, hachage retiré : le filet le
+   *     plus large, et le seul qui survive à une réécriture des deux précédents.
+   *
+   * CES TROIS PRISES SONT EN DERNIER, et l'ordre est le point délicat : `queryChainAll`
+   * s'arrête au premier candidat qui ramène un élément, et ne rend QUE les siens — un
+   * candidat placé trop haut masque donc tous les suivants. Or `placeholder` et la classe
+   * Primer sont larges : en tête de chaîne, sur une page servie par la génération héritée —
+   * celle où l'extension fonctionne aujourd'hui —, ils pourraient n'attraper qu'une partie
+   * des éditeurs (le composeur principal sans les réponses de fil) et faire DISPARAÎTRE le
+   * reste. Placé en fin de chaîne, l'ajout est strictement additif : il ne peut que changer
+   * « aucun éditeur » en « des éditeurs », jamais défaire une détection qui marche. Le prix
+   * est connu et assumé : sur une page hypothétique qui mélangerait les deux générations,
+   * la nouvelle resterait invisible — un cas non mesuré, et le journal le dira désormais.
+   *
+   * Les deux candidats React d'origine ne sont pas retirés pour autant : ils ne matchent
+   * rien de mesuré, mais rien ne prouve qu'ils ne décrivent aucune vue. */
   editors: {
     name: 'editors',
     candidates: [
-      // Génération React (Files changed réécrite).
+      // Génération React — jamais observée, laissée telle quelle.
       'textarea[aria-label*="omment"][class*="CommentBox"]',
       'div[data-testid*="comment-composer"] textarea',
       // Génération héritée.
@@ -21,7 +60,24 @@ export const selectors = {
       'textarea[name="pull_request_review_comment[body]"]',
       'textarea[name="pull_request_review[body]"]',
       'textarea.js-comment-field',
+      // Nouvelle vue des fichiers modifiés (`/pull/N/changes`) — MESURÉ, voir ci-dessus.
+      'textarea[aria-label="Markdown value"]',
+      'textarea[placeholder="Leave a comment"]',
+      'textarea[class*="prc-Textarea-TextArea"]',
     ],
+  } satisfies SelectorChain,
+
+  /** Sonde générique « cette page porte-t-elle une surface de saisie ? » — elle ne sert qu'à
+   * DÉCIDER si l'absence de match de `editors` est une dégradation (§9.4) ou le cas nominal.
+   * Ce qu'elle attrape n'est jamais décoré : aucun `EditorHandle` n'en sort.
+   *
+   * Sans cette distinction, journaliser l'échec de `editors` serait pire que le silence :
+   * sur une PR dont aucun composeur n'est ouvert, ne rien trouver est la NORME, et une entrée
+   * par page noierait le journal comme `merge-button` le faisait sur une PR fermée (cf.
+   * `SelectorLog`, adapters/shared). */
+  editingSurfaces: {
+    name: 'editing-surfaces',
+    candidates: ['textarea', '[contenteditable="true"]'],
   } satisfies SelectorChain,
 
   /** **Description de la PR — hors périmètre** (§4.1, dernière ligne du tableau : format non

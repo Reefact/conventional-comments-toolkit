@@ -32,6 +32,21 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **The comment tooling is back on the rewritten "Files changed" view** (§4.1, whose first row
+  calls an inline diff comment the core of review — the one zone, with a thread root, that
+  carries a blocking state). GitHub now serves that page at `/pull/N/changes`, where the
+  composer is a Primer `<textarea>` that none of the chain's six candidates matched: no toolbar,
+  no quick input, no validation, precisely where a blocking `issue:` counts. The visible oddity
+  was the mirror image of the useful behaviour — the toolbar still appeared in the general
+  conversation box, only to warn through `W-NOT-BLOCKABLE` that a blocking label does nothing
+  there. Three measured handles now catch the field, ordered from the most specific to the
+  widest and each sufficient on its own; neither Primer's build hash nor React's generated id is
+  one of them, because both change on every deployment. The miss no longer goes unrecorded
+  either: `observeEditors` was the one probe in the GitHub adapter that journaled nothing when
+  its chain came back empty, so the extension was inert and silent at once. It now writes a
+  degradation entry (§9.4) when a page carries an editing surface no candidate recognises —
+  never when no composer is simply open, which is the norm.
+
 - **The pull request's own description is no longer treated as a review comment** (§4.1, which
   places it outside the convention's scope). The editor that "Edit" opens on it matched the
   comment-editor chain, and the zone fallback — no thread, no review body, no conversation form,

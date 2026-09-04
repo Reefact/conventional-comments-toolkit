@@ -167,9 +167,14 @@ export function relayOrgConfigRead(url: string): Promise<ConfigRead> {
 
 /** §9.2.3 — l'état dégradé se signale « dans les options ET dans son indicateur » : la
  * page d'options lit `degradedState` dans chrome.storage.local ; c'est ici qu'il s'écrit,
- * à chaque résolution de configuration. */
-export function writeDegradedState(degraded: boolean): void {
-  writeCurrentState({ degradedState: degraded ? 'unreachable' : false });
+ * à chaque résolution de configuration.
+ *
+ * La clé porte le MOTIF quand il est connu (`repo: HTTP 429`), et non plus le seul mot
+ * `unreachable`. La page d'options affiche déjà cette valeur telle quelle : c'est la
+ * différence entre « l'extension n'a pas pu lire » et « voici quoi corriger ». `unreachable`
+ * reste le repli, pour qu'une dégradation sans motif se signale quand même. */
+export function writeDegradedState(degraded: boolean, reason: string | null = null): void {
+  writeCurrentState({ degradedState: degraded ? (reason?.trim() || 'unreachable') : false });
 }
 
 /** Plancher côté A : politique d'entreprise poussée par le navigateur —
@@ -616,7 +621,7 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     if (disposed) return;
     // Résolution hors chemin critique : la NFR d'injection porte sur l'appel du cb (§10).
     const resolved = await resolver.resolve(adapter, editor.context.pr);
-    writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
+    writeDegradedState(resolved.degraded, resolved.degradedReason); // §9.2.3 — visible dans les options
     if (disposed) return;
     const entry: EditorEntry = { editor, element: editor.element, controller: null, builtSignature: null, generation: 0 };
     releaseDetached();
@@ -1466,7 +1471,7 @@ async function renderPrChrome(
     return { showed: true, resolved: null }; // pas de PR : rien à retenter tant que la navigation ne change pas
   }
   const resolved = await resolver.resolve(adapter, pr);
-  writeDegradedState(resolved.degraded); // §9.2.3 — visible dans les options
+  writeDegradedState(resolved.degraded, resolved.degradedReason); // §9.2.3 — visible dans les options
   if (resolved.config.mode === 'off') {
     if (isCurrent()) {
       clearStaleBanner();

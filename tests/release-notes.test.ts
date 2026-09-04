@@ -117,9 +117,41 @@ describe("extraction d'une section de notes de version", () => {
   });
 });
 
-/** Versions annoncées par un fichier de notes, dans l'ordre du document. */
+/** Les lignes du document, celles d'un bloc de code délimité remplacées par `null` — ouverture,
+ * contenu et clôture comprises. Le tableau reste ALIGNÉ sur le fichier, pour qu'un message
+ * d'erreur puisse nommer un vrai numéro de ligne.
+ *
+ * Deux tests de ce fichier ont besoin de la même distinction, et chacun s'était trompé tout
+ * seul (revue Reefact, PR #47) : `versionsIn` prenait un `## install` écrit dans un bloc ```sh`
+ * pour une version nommée « install » — un format qu'`extractSection` accepte explicitement,
+ * plus bas dans ce fichier — et le garde de repli suivait les blocs avec un basculement trop
+ * permissif. Une seule réponse, bâtie sur les fonctions du script, plutôt que deux qui dérivent.
+ */
+function outsideFences(markdown: string): (string | null)[] {
+  let open: string | null = null;
+  return markdown.split('\n').map((line) => {
+    if (open !== null) {
+      if (closesFence(line, open)) open = null;
+      return null;
+    }
+    const opener = fenceOpener(line);
+    if (opener !== null) {
+      open = opener;
+      return null;
+    }
+    return line;
+  });
+}
+
+/** Versions annoncées par un fichier de notes, dans l'ordre du document — jamais un titre
+ * écrit à l'intérieur d'un bloc de code. */
 function versionsIn(path: string): string[] {
-  return [...readFileSync(path, 'utf8').matchAll(/^## (\S+)/gm)].map((m) => m[1]!);
+  const versions: string[] = [];
+  for (const line of outsideFences(readFileSync(path, 'utf8'))) {
+    const match = line === null ? null : /^## (\S+)/.exec(line);
+    if (match !== null) versions.push(match[1]!);
+  }
+  return versions;
 }
 
 /** Toutes les majeures livrées, DÉCOUVERTES sur le disque — jamais une liste écrite ici. Le
@@ -178,23 +210,15 @@ describe('les notes réellement livrées', () => {
     for (const major of deliveredMajors()) {
       for (const lang of ['en', 'fr']) {
         const path = `docs/release-notes-${major}.x-${lang}.md`;
-        const lines = readFileSync(path, 'utf8').split('\n');
-        const première = lines.findIndex((line) => line.startsWith('## '));
+        // Dans un bloc de code, le retour à la ligne est le CONTENU : il ne se déplie pas, et
+        // une ligne collée juste après la clôture ouvre un paragraphe plutôt qu'elle n'en
+        // continue un. `outsideFences` rend les deux d'un coup — le bloc vaut frontière.
+        const lignes = outsideFences(readFileSync(path, 'utf8'));
+        const première = lignes.findIndex((line) => line?.startsWith('## ') === true);
         expect(première, `${path} sans aucune section`).toBeGreaterThanOrEqual(0);
-        let ouvert: string | null = null; // délimiteur du bloc en cours, ou null
-        lines.forEach((line, index) => {
-          if (index < première) return;
-          // Dans un bloc de code, le retour à la ligne est le contenu : il ne se déplie pas.
-          if (ouvert !== null) {
-            if (closesFence(line, ouvert)) ouvert = null;
-            return;
-          }
-          const ouverture = fenceOpener(line);
-          if (ouverture !== null) {
-            ouvert = ouverture;
-            return;
-          }
-          const previous = lines[index - 1] ?? '';
+        lignes.forEach((line, index) => {
+          if (index < première || line === null) return;
+          const previous = lignes[index - 1] ?? '';
           const isContinuation =
             previous.trim() !== '' && line.trim() !== '' && !OUVRE_UN_BLOC.test(line);
           expect(isContinuation, `${path}:${index + 1} replie la ligne précédente`).toBe(false);

@@ -13,6 +13,12 @@
 //   4. la barre d'outils n'a AUCUN retrait horizontal — elle a été déplacée une fois par erreur
 //      pour aligner le texte, et il a fallu la remettre.
 //
+// CE QUE CE GARDE NE TIENT PAS, et qui doit rester écrit ici : il REJOUE les gestes de
+// `attach()` (chercher le cadre, poser le retrait, rentrer le trait) au lieu d'appeler le
+// contrôleur, qu'un bundle de navigateur ne monterait pas sans sa configuration ni son
+// adaptateur. Le câblage — « attach() pose bien ces classes » — est tenu côté vitest, dans
+// extension/test/toolbar-mount.test.ts. Ici on mesure la GÉOMÉTRIE qui en découle.
+//
 // Le DOM des deux fixtures est celui MESURÉ sur github.com (2026-09-04) : sur `…/changes`, le
 // champ est gainé d'un conteneur Primer en `overflow: hidden` qui épouse sa boîte ; sur la vue
 // héritée, rien ne le gaine.
@@ -42,8 +48,8 @@ function assert(name, condition, detail) {
 const bundled = await build({
   stdin: {
     contents: `
-      import { ringIsClipped } from './packages/extension/src/ui/stacking.ts';
-      globalThis.cct = { ringIsClipped };
+      import { framedAncestor, ringIsClipped } from './packages/extension/src/ui/stacking.ts';
+      globalThis.cct = { framedAncestor, ringIsClipped };
     `,
     resolveDir: root,
     loader: 'ts',
@@ -69,55 +75,72 @@ await page.setContent(`
     ${css}
   </style>
 
-  <!-- Vue héritée : l'extension pose son propre retrait, rien ne gaine le champ. -->
-  <div class="cct-host" id="herite">
+  <!-- Vue héritée : le cadre est le parent direct du champ (MESURÉ : .CommentBox-container). -->
+  <div id="herite" style="border: 1px solid #3d444d; border-radius: 6px">
     ${BARRE}
-    <textarea class="cct-editor cct-border-ok" id="champ-herite">m</textarea>
+    <textarea class="cct-border-ok" id="champ-herite">m</textarea>
     ${PASTILLE}
   </div>
 
-  <!-- Vue des fichiers modifiés : pas de cct-host, et une gaine qui coupe. -->
-  <div id="changes">
-    ${BARRE}
-    <span class="gaine"><textarea class="cct-border-ok" id="champ-changes">m</textarea></span>
-    ${PASTILLE}
+  <!-- Vue des fichiers modifiés : le cadre est deux niveaux au-dessus (inputWrapper), et une
+       gaine arrondie en overflow hidden épouse le champ entre les deux. -->
+  <div id="changes" style="border: 1px solid #3d444d; border-radius: 6px">
+    <div class="auto">
+      ${BARRE}
+      <span class="gaine"><textarea class="cct-border-ok" id="champ-changes">m</textarea></span>
+      ${PASTILLE}
+    </div>
   </div>
 `);
 await page.addScriptTag({ content: bundled.outputFiles[0].text });
 
 const m = await page.evaluate(() => {
   const q = (s) => document.querySelector(s);
-  // Ce que fait editor-controller.ts à l'attache, et rien d'autre.
-  const rogne = {
-    herite: globalThis.cct.ringIsClipped(q('#champ-herite')),
-    changes: globalThis.cct.ringIsClipped(q('#champ-changes')),
-  };
-  if (rogne.changes) q('#champ-changes').classList.add('cct-ring-inset');
-  if (rogne.herite) q('#champ-herite').classList.add('cct-ring-inset');
-
   const rect = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
   const offset = (e) => parseFloat(getComputedStyle(e).outlineOffset);
-  const champC = q('#champ-changes');
-  const gaine = q('.gaine');
 
+  // Ce que fait editor-controller.ts à l'attache, dans le même ordre, avec le code livré.
+  const attache = (champ) => {
+    const cadre = globalThis.cct.framedAncestor(champ);
+    if (cadre) {
+      cadre.classList.add('cct-host');
+      champ.classList.add('cct-editor');
+    }
+    if (globalThis.cct.ringIsClipped(champ)) champ.classList.add('cct-ring-inset');
+    return cadre;
+  };
+  const cadreH = attache(q('#champ-herite'));
+  const cadreC = attache(q('#champ-changes'));
+
+  const champC = q('#champ-changes');
   return {
-    rogne,
+    rogne: { herite: q('#champ-herite').classList.contains('cct-ring-inset'), changes: champC.classList.contains('cct-ring-inset') },
+    cadreH: cadreH?.id ?? null,
+    cadreC: cadreC?.id ?? null,
     offsetHerite: offset(q('#champ-herite')),
     offsetChanges: offset(champC),
-    // Rectangle réellement peint par le trait : la boîte, gonflée du décalage (négatif ici).
     traitChanges: (() => { const r = rect(champC), o = offset(champC);
       return { l: r.l - o, r: r.r + o, t: r.t - o, b: r.b + o }; })(),
-    gaineRect: rect(gaine),
+    gaineRect: rect(q('.gaine')),
     rayonChanges: getComputedStyle(champC).borderTopLeftRadius,
-    rayonGaine: getComputedStyle(gaine).borderTopLeftRadius,
+    rayonGaine: getComputedStyle(q('.gaine')).borderTopLeftRadius,
     gouttiereHerite: parseFloat(getComputedStyle(q('#champ-herite')).paddingLeft),
     barreRetrait: parseFloat(getComputedStyle(q('#herite .cct-toolbar')).paddingLeft),
     ecartPastille: rect(q('#herite .cct-feedback')).t - rect(q('#champ-herite')).b,
+    // Le retrait entre le CADRE et notre barre — les 8 px qui manquaient sur la nouvelle vue.
+    respireH: rect(q('#herite .cct-toolbar')).l - rect(cadreH).l,
+    respireC: rect(q('#changes .cct-toolbar')).l - rect(cadreC).l,
   };
 });
 
 console.log('Mise en page du composeur — mesurée dans Chromium\n');
 
+assert('le cadre est trouvé de chaque côté', m.cadreH === 'herite' && m.cadreC === 'changes', `${m.cadreH} / ${m.cadreC}`);
+assert(
+  'notre barre respire autant à l’intérieur des deux cadres',
+  m.respireH === m.respireC && m.respireH >= 8,
+  `hérité ${m.respireH}px, changes ${m.respireC}px`
+);
 assert('la gaine de `…/changes` est reconnue comme rognante', m.rogne.changes === true);
 assert('la vue héritée ne l’est pas', m.rogne.herite === false);
 assert('le trait y reste donc dehors', m.offsetHerite === 0, `outline-offset ${m.offsetHerite}px`);

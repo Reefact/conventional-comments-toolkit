@@ -33,25 +33,19 @@
   padding: var(--base-size-8, 8px);
 }
 
-/* Le retrait du conteneur remplace celui que la zone de saisie se donnait : les deux
-   cumulés porteraient son texte deux fois plus loin que la barre d'outils. Combinateur
-   descendant, et non enfant direct : sur le composeur React reconnu par data-testid
-   (editor-controller.ts), la zone de saisie peut être nichée sous un wrapper intermédiaire
-   entre elle et le conteneur qui porte `cct-host`. */
-.cct-host .cct-editor {
-  padding-left: var(--cct-inner-gutter, 5px);
-  padding-right: var(--cct-inner-gutter, 5px);
-}
+/* Le retrait du conteneur remplace celui que la zone de saisie se donnait : cumulés, ils
+   porteraient son texte deux fois plus loin. Combinateur descendant, et non enfant direct :
+   sur le composeur React reconnu par data-testid (editor-controller.ts), la zone de saisie
+   peut être nichée sous un wrapper intermédiaire entre elle et le conteneur `cct-host`.
 
-/* Le même retrait pour la barre et la pastille, et c'est ce qui rend le précédent possible :
-   à zéro, le texte du champ tombait sur la même verticale que la barre — alignement voulu —
-   mais collé au trait d'état, qui passe au bord de la boîte. Un espace donné au seul champ
-   aurait acheté la lisibilité au prix de l'alignement. Les trois bougent ensemble, la
-   verticale est conservée, et la gouttière est nommée pour qu'on la règle en un seul endroit. */
-.cct-host .cct-toolbar,
-.cct-host .cct-feedback {
-  padding-left: var(--cct-inner-gutter, 5px);
-  padding-right: var(--cct-inner-gutter, 5px);
+   La valeur n'est PAS zéro, et ce n'est pas un oubli. À zéro, le texte tombait exactement sur
+   la verticale de la barre — mais collé au trait d'état, qui passe au bord de la boîte : la
+   première lettre frôlait le filet. La gouttière écarte le seul TEXTE ; la barre et la
+   pastille gardent leur place, jugée bonne sur le rendu. C'est un arbitrage tranché à l'œil
+   sur la page réelle, pas une règle déduite — d'où la variable, pour le régler d'un endroit. */
+.cct-host .cct-editor {
+  padding-left: var(--cct-inner-gutter, 8px);
+  padding-right: var(--cct-inner-gutter, 8px);
 }
 
 /* La barre EMPILE ses rangées, elle ne les fait pas couler : les boutons de label d'abord,

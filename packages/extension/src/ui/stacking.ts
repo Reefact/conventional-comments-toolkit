@@ -81,3 +81,33 @@ export function ringIsClipped(editor: Element, tolerance = 2, limit = 4): boolea
   }
   return false;
 }
+
+/** Le conteneur qui ENCADRE le champ : le plus proche ancêtre dont la bordure est visible.
+ *
+ * MESURÉ au focus réel sur les deux générations (2026-09-04), et c'est la mesure qui a fini
+ * par expliquer l'écart visible entre elles :
+ *
+ *   /pull/48          .CommentBox-container   border 1px, et outline bleu 2px au focus
+ *   /pull/48/changes  MarkdownInput-module__inputWrapper  idem
+ *
+ * Des deux côtés, ce cadre englobe la barre, le champ et la pastille. Sur la page héritée,
+ * l'extension lui pose 8 px de retrait (`cct-host`), si bien que son contenu respire à
+ * l'intérieur du cadre ; sur la nouvelle vue, faute d'être reconnu, il n'en avait aucun et le
+ * cadre serrait tout. La différence de rendu tenait à ces 8 px, pas au point d'insertion —
+ * lequel a été soupçonné trois fois et disculpé trois fois.
+ *
+ * Chercher « qui dessine le cadre » plutôt que « comment s'appelle ce conteneur » unifie les
+ * deux générations sans nommer aucune des deux : sur le DOM hérité, la réponse est l'élément
+ * que l'extension choisissait déjà. */
+export function framedAncestor(editor: Element, limit = 4): Element | null {
+  const view = editor.ownerDocument?.defaultView ?? null;
+  if (!view) return null;
+  let el = editor.parentElement;
+  for (let i = 0; el && i < limit; i++) {
+    const style = view.getComputedStyle(el);
+    const widths = [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth];
+    if (widths.some((w) => parseFloat(w) > 0)) return el;
+    el = el.parentElement;
+  }
+  return null;
+}

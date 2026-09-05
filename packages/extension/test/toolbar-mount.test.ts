@@ -23,7 +23,7 @@ import { defaultConfig, type PrRef } from '@cct/core';
 import { writeToTextField } from '@cct/adapter-shared';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { EditorController } from '../src/editor-controller.js';
-import { ringIsClipped, stackingMountFor } from '../src/ui/stacking.js';
+import { framedAncestor, ringIsClipped, stackingMountFor } from '../src/ui/stacking.js';
 
 const pr: PrRef = {
   platform: 'github',
@@ -193,5 +193,32 @@ describe('ringIsClipped — le trait d’état sera-t-il rogné', () => {
     withRect(champ, 463, 900);
     withRect(document.getElementById('demi')!, 463, 1026);
     expect(ringIsClipped(champ)).toBe(false);
+  });
+});
+
+// Le conteneur qui ENCADRE le champ reçoit le retrait de l'extension (`cct-host`) : c'est lui
+// qui porte, sur les deux générations, le cadre bleu du focus. MESURÉ : `.CommentBox-container`
+// sur la vue héritée, `MarkdownInput-module__inputWrapper` sur `…/changes` — le premier étant
+// déjà celui que l'extension choisissait, la règle ne peut pas changer cette page-là.
+describe('framedAncestor — qui dessine le cadre du champ', () => {
+  it('sur le DOM hérité, c’est le conteneur que l’extension choisissait déjà', () => {
+    document.body.innerHTML =
+      '<div id="box" class="CommentBox-container" style="border:1px solid #3d444d"><textarea id="champ" style="border:0"></textarea></div>';
+    expect((framedAncestor(document.getElementById('champ')!) as HTMLElement).id).toBe('box');
+  });
+
+  it('sur la nouvelle vue, il traverse les conteneurs sans bordure', () => {
+    document.body.innerHTML = `
+      <div id="wrapper" style="border:1px solid #3d444d">
+        <div class="InlineAutocomplete-module__container" style="border:0">
+          <span style="border:0"><textarea id="champ" style="border:0"></textarea></span>
+        </div>
+      </div>`;
+    expect((framedAncestor(document.getElementById('champ')!) as HTMLElement).id).toBe('wrapper');
+  });
+
+  it('sans aucun cadre, rien n’est proposé — l’appelant ne pose alors aucun retrait', () => {
+    document.body.innerHTML = '<div style="border:0"><textarea id="champ" style="border:0"></textarea></div>';
+    expect(framedAncestor(document.getElementById('champ')!)).toBeNull();
   });
 });

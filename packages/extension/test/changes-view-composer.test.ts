@@ -18,7 +18,10 @@
 // build de Primer (`-snlco`) et l'identifiant `useId` de React (`_r_qm_`). Le troisième test
 // est leur contre-épreuve — un hachage différent ne doit rien changer.
 import { beforeEach, describe, expect, it } from 'vitest';
+import { defaultConfig } from '@cct/core';
 import { GithubClientAdapter } from '@cct/adapter-github';
+import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controller.js';
+import { writeToTextField } from '@cct/adapter-shared';
 import type { EditorHandle } from '@cct/adapter-shared';
 
 /** Le composeur mesuré. Chaque prise peut être retirée séparément : c'est ce qui permet de
@@ -205,5 +208,80 @@ describe('§4.1 — le corps d’une revue en lot ne porte pas d’état bloquan
     const { editors } = observe();
     expect(editors[0]!.context.zone).toBe('thread-root');
     expect(editors[0]!.context.canCarryBlockingState).toBe(true);
+  });
+});
+
+// §4.3 — la garde d'envoi. MESURÉ sur la vue `…/changes`, boîte de réponse ouverte : le
+// composeur n'a aucun `form`, ses boutons sont `type="button"`, et le pied en porte trois.
+// *Cancel* est un `<button>` nu et premier enfant du groupe ; *Reply* et *Start a review* sont
+// chacun enveloppés d'un `<div>`. Aucun attribut ne les sépare — `data-variant` vaut `default`
+// pour *Reply* COMME pour *Cancel*.
+const PIED = `
+  <div class="Footer-module__footer__asFN1">
+    <div class="Footer-module__childrenStyling__XjmP5">
+      <button id="annuler" type="button" data-variant="default" class="prc-Button-ButtonBase-9n-Xk py-1 px-2">Cancel</button>
+      <div><button id="repondre" type="button" data-variant="default" class="prc-Button-ButtonBase-9n-Xk py-1 px-2">Reply</button></div>
+      <div><button id="revue" type="button" data-variant="primary" class="prc-Button-ButtonBase-9n-Xk py-1 px-2">Start a review</button></div>
+    </div>
+  </div>`;
+
+// La date de création de la PR conditionne le périmètre d'activation (§6.2.3) : sans elle, la
+// garde reste désarmée et le test passerait sans rien prouver.
+const COMPOSEUR_COMPLET = `
+  <relative-time datetime="2026-10-01T00:00:00Z"></relative-time>
+  <div class="MarkdownEditor-module__container__H4O8J">${COMPOSER()}${PIED}</div>`;
+
+describe('§4.3 — la garde d’envoi sur le composeur de la nouvelle vue', () => {
+  beforeEach(() => {
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes'),
+      configurable: true,
+    });
+  });
+
+  it('les deux boutons qui publient sont des contrôles d’envoi, jamais celui qui annule', () => {
+    document.body.innerHTML = COMPOSEUR_COMPLET;
+    const { adapter: a, editors } = observe();
+    const ids = a.getSubmitControls(editors[0]!).map((c) => (c.element as HTMLElement).id);
+    expect(ids).toEqual(['repondre', 'revue']);
+    expect(ids).not.toContain('annuler');
+  });
+
+  // Le clic bloqué, bout en bout : mode `enforce`, commentaire sans label, clic intercepté en
+  // capture sur le bouton qui publie — et laissé passer sur celui qui annule, sans quoi
+  // l'auteur d'un commentaire non conforme ne pourrait plus en sortir.
+  it('en `enforce`, le clic qui publie est intercepté et celui qui annule passe', async () => {
+    document.body.innerHTML = COMPOSEUR_COMPLET;
+    const { adapter: a, editors } = observe();
+    const config = defaultConfig();
+    config.mode = 'enforce';
+    config.activation.activatedAt = '2026-09-01T00:00:00Z';
+    const controller = new EditorController({
+      adapter: a,
+      editor: editors[0]!,
+      resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
+      published: null,
+      lang: 'fr',
+      currentUserLogin: 'alice',
+    });
+    controller.attach();
+    // Le blocage suit la validation, débattue : sans texte non conforme ET sans l'attente,
+    // rien n'est encore armé et le test passerait pour une mauvaise raison.
+    writeToTextField(editors[0]!.element as HTMLTextAreaElement, 'pas de label ici');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect((document.getElementById('repondre') as HTMLElement).getAttribute('aria-disabled')).toBe('true');
+    expect((document.getElementById('annuler') as HTMLElement).hasAttribute('aria-disabled')).toBe(false);
+
+    const clic = (id: string): boolean => {
+      const bouton = document.getElementById(id)!;
+      let recu = false;
+      bouton.addEventListener('click', () => (recu = true));
+      bouton.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+      return recu;
+    };
+    expect(clic('repondre')).toBe(false);
+    expect(clic('revue')).toBe(false);
+    expect(clic('annuler')).toBe(true);
+    controller.dispose();
   });
 });

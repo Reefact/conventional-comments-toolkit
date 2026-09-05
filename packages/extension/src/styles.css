@@ -39,8 +39,19 @@
    (editor-controller.ts), la zone de saisie peut être nichée sous un wrapper intermédiaire
    entre elle et le conteneur qui porte `cct-host`. */
 .cct-host .cct-editor {
-  padding-left: 0;
-  padding-right: 0;
+  padding-left: var(--cct-inner-gutter, 5px);
+  padding-right: var(--cct-inner-gutter, 5px);
+}
+
+/* Le même retrait pour la barre et la pastille, et c'est ce qui rend le précédent possible :
+   à zéro, le texte du champ tombait sur la même verticale que la barre — alignement voulu —
+   mais collé au trait d'état, qui passe au bord de la boîte. Un espace donné au seul champ
+   aurait acheté la lisibilité au prix de l'alignement. Les trois bougent ensemble, la
+   verticale est conservée, et la gouttière est nommée pour qu'on la règle en un seul endroit. */
+.cct-host .cct-toolbar,
+.cct-host .cct-feedback {
+  padding-left: var(--cct-inner-gutter, 5px);
+  padding-right: var(--cct-inner-gutter, 5px);
 }
 
 /* La barre EMPILE ses rangées, elle ne les fait pas couler : les boutons de label d'abord,

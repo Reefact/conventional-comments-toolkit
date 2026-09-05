@@ -16,6 +16,14 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **The review panel's own submit button is guarded too** (§4.3). The click guard reached the
+  inline composer but not "Finish your comments": its two buttons are not inside the container
+  that holds the field — measured, they live in the overlay carrying the panel, ten levels up —
+  so the lookup, which stopped at the first ancestor that *matched*, returned nothing and a
+  non-compliant review stayed publishable under `enforce`. It now keeps the first container that
+  actually carries buttons. Telling that panel's buttons apart needed no guesswork: the one that
+  publishes wears its own component's class, which *Cancel* does not.
+
 - **Diagnostic messages now follow the language picked in the options page** (§5.3, which wants
   them "in the language resolved per §8.1.2"). Everything the extension writes itself already
   did — the validation pill, the *Fix* button, the banner — but the one text that comes from

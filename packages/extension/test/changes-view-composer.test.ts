@@ -285,3 +285,67 @@ describe('§4.3 — la garde d’envoi sur le composeur de la nouvelle vue', () 
     controller.dispose();
   });
 });
+
+// Le second point de sortie (§4.3, revue de la PR #52) : le panneau « Finish your comments ».
+// MESURÉ, panneau ouvert : ses deux boutons ne sont PAS dans le conteneur du champ mais dans
+// l'overlay qui porte le panneau, dix niveaux au-dessus — et celui qui publie porte la classe
+// de son composant, `ReviewMenuFooter-module__Submit…`, que *Cancel* n'a pas.
+const PANNEAU_AVEC_BOUTONS = `
+  <relative-time datetime="2026-10-01T00:00:00Z"></relative-time>
+  <div class="prc-Overlay-Overlay-jfs-T">
+    ${PANNEAU_REVUE}
+    <div class="ReviewMenuFooter-module__Footer__abc">
+      <div class="d-flex flex-row gap-2">
+        <span></span>
+        <button id="annuler-revue" type="button" data-variant="default" class="prc-Button-ButtonBase-9n-Xk">Cancel</button>
+      </div>
+      <div><button id="soumettre" type="button" data-variant="primary" class="prc-Button-ButtonBase-9n-Xk ReviewMenuFooter-module__SubmitReview__x1">Submit comments</button></div>
+    </div>
+  </div>`;
+
+describe('§4.3 — la garde d’envoi sur le panneau de revue', () => {
+  beforeEach(() => {
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes'),
+      configurable: true,
+    });
+  });
+
+  it('le bouton qui publie la revue est un contrôle d’envoi, jamais celui qui annule', () => {
+    document.body.innerHTML = PANNEAU_AVEC_BOUTONS;
+    const { adapter: a, editors } = observe();
+    expect(editors[0]!.context.zone).toBe('review-body'); // on est bien dans le panneau
+    const ids = a.getSubmitControls(editors[0]!).map((c) => (c.element as HTMLElement).id);
+    expect(ids).toEqual(['soumettre']);
+  });
+
+  it('en `enforce`, le clic qui publie la revue est intercepté et l’annulation passe', async () => {
+    document.body.innerHTML = PANNEAU_AVEC_BOUTONS;
+    const { adapter: a, editors } = observe();
+    const config = defaultConfig();
+    config.mode = 'enforce';
+    config.activation.activatedAt = '2026-09-01T00:00:00Z';
+    const controller = new EditorController({
+      adapter: a,
+      editor: editors[0]!,
+      resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
+      published: null,
+      lang: 'fr',
+      currentUserLogin: 'alice',
+    });
+    controller.attach();
+    writeToTextField(editors[0]!.element as HTMLTextAreaElement, 'pas de label ici');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+
+    const clic = (id: string): boolean => {
+      const bouton = document.getElementById(id)!;
+      let recu = false;
+      bouton.addEventListener('click', () => (recu = true));
+      bouton.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+      return recu;
+    };
+    expect(clic('soumettre')).toBe(false);
+    expect(clic('annuler-revue')).toBe(true);
+    controller.dispose();
+  });
+});

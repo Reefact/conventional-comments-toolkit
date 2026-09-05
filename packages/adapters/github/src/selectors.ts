@@ -202,6 +202,14 @@ export const selectors = {
       // qu'il ne soit pas le premier enfant, il faudrait que la plateforme l'enveloppe ET le
       // déplace. Le libellé, lui, n'est pas une prise : il se traduit.
       '[class*="Footer-module__childrenStyling"] > div:not(:first-child) button',
+      // Le panneau de revue, MESURÉ : deux boutons seulement, et celui qui publie porte la
+      // classe de son propre composant — `ReviewMenuFooter-module__Submit…` — quand *Cancel*
+      // n'a que la base Primer. Prise sémantique, et qui échoue du bon côté : si GitHub la
+      // renomme, on cesse d'intercepter au lieu de se mettre à bloquer l'annulation.
+      // `data-variant="primary"` aurait marché ici aussi, mais pas dans le composeur inline,
+      // où *Reply* est `default` comme *Cancel* — une prise par vue vaut mieux qu'une prise
+      // qui ne tient qu'à moitié.
+      '[class*="ReviewMenuFooter-module__Submit"]',
     ],
   } satisfies SelectorChain,
 
@@ -300,6 +308,12 @@ export const selectors = {
       // commentaire non conforme restait publiable au clic (revue, PR #52). Ce conteneur-ci
       // porte à la fois le champ et le pied qui tient les boutons.
       '[class*="MarkdownEditor-module__container"]',
+      // Le panneau « Finish your comments » range ses boutons DEHORS : MESURÉ, ils vivent dans
+      // l'overlay qui porte le panneau, dix niveaux au-dessus du champ, quand le candidat
+      // ci-dessus matche bien plus tôt sans les contenir. C'est ce qui a imposé à
+      // `getSubmitControls()` de retenir le premier conteneur qui porte des BOUTONS, et non le
+      // premier qui matche.
+      '[class*="prc-Overlay-Overlay"]',
     ],
   } satisfies SelectorChain,
 

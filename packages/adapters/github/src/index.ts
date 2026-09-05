@@ -344,14 +344,26 @@ export class GithubClientAdapter implements PlatformAdapter {
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {
-    const form = closestChain(editor.element, selectors.submitContainer).element ?? editor.element.parentElement;
-    if (!form) return [];
-    // Jamais de contrôle `complete-pr` ici : seul getCompletionControl() l'expose, et il
-    // n'est jamais intercepté (§9.2.3).
-    return queryChainAll(form, selectors.submitButtons).map((element) => ({
-      element,
-      kind: 'submit' as const,
-    }));
+    // On retient le premier conteneur qui porte réellement des boutons, et NON le premier qui
+    // matche. La nuance vient d'une mesure : dans le panneau « Finish your comments », le champ
+    // est bien dans un `MarkdownEditor-module__container` — candidat qui matche — mais les
+    // boutons de ce panneau vivent dans l'overlay, deux crans plus haut. S'arrêter au premier
+    // ancêtre qui matche rendait donc une liste vide, et sous `enforce` une revue non conforme
+    // restait publiable au clic (revue, PR #52).
+    const containers: Element[] = [];
+    for (const candidate of selectors.submitContainer.candidates) {
+      const found = editor.element.closest(candidate);
+      if (found) containers.push(found);
+    }
+    // Le repli d'avant, conservé tel quel : le parent direct, quand aucun candidat ne matche.
+    if (editor.element.parentElement) containers.push(editor.element.parentElement);
+    for (const container of containers) {
+      // Jamais de contrôle `complete-pr` ici : seul getCompletionControl() l'expose, et il
+      // n'est jamais intercepté (§9.2.3).
+      const controls = queryChainAll(container, selectors.submitButtons);
+      if (controls.length > 0) return controls.map((element) => ({ element, kind: 'submit' as const }));
+    }
+    return [];
   }
 
   readValue(editor: EditorHandle): string {

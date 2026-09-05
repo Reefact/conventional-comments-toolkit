@@ -26,7 +26,7 @@ const COMMENT = (opts: { body?: string; author?: string; editor?: string; reply?
         <a class="Avatar-module__avatarLink__LpV3I prc-Link-Link-9ZwDx" href="/Reefact"><img data-testid="github-avatar"></a>
         <a data-testid="avatar-link" class="ActivityHeader-module__AuthorName__VJr9h" href="/Reefact">${opts.author ?? 'Reefact'}</a>
         <span class="ActivityHeader-module__HeaderMutedText__D3G5r"><a class="ActivityHeader-module__HeaderLink__WnxQu prc-Link-Link-9ZwDx" href="${
-          opts.permalien ?? 'https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes#r3932637709'
+          opts.permalien ?? PERMALIEN_RACINE
         }">on Sep 4, 2026</a></span>
       </div>
     </div>
@@ -50,7 +50,7 @@ const THREAD = (
       <div data-testid="review-thread">
         <div class="ReviewThread-module__ReviewThreadContainer__TvwhT">
           ${COMMENT({ body: 'issue (non-blocking): la date reste celle de la première occurrence.', editor: opts.editeRacine, corpsReconnu: opts.corpsReconnu })}
-          ${COMMENT({ body: 'note: le contrat corrigé est cohérent avec le journal.', reply: true, editor: opts.editeReponse, corpsReconnu: opts.corpsReconnu })}
+          ${COMMENT({ body: 'note: le contrat corrigé est cohérent avec le journal.', reply: true, editor: opts.editeReponse, corpsReconnu: opts.corpsReconnu, permalien: PERMALIEN_REPONSE })}
           <div class="rounded-bottom-2 p-2 bgColor-inset">
             <div class="AddCommentEditor-module__AddCommentEditor__SOA0y">
               <div class="AddCommentEditor-module__ConversationCommentBox__qxXdE AddCommentEditor-module__isReplying__jv7w0">
@@ -67,6 +67,11 @@ const THREAD = (
       }
     </div>
   </div>`;
+
+/** Les deux permaliens mesurés du fil : le §9.2.3 exige des identifiants que cette vue ne
+ * met sur aucun conteneur, et c'est le fragment de ces liens qui les porte. */
+const PERMALIEN_RACINE = 'https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes#r3932637709';
+const PERMALIEN_REPONSE = 'https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes#r3932676203';
 
 function adapter(): GithubClientAdapter {
   return new GithubClientAdapter({ documentRef: document });
@@ -152,6 +157,22 @@ describe('§4.1 — la zone d’un champ, dans un fil de la nouvelle vue', () =>
     expect(editors[0]!.context.zone).toBe('thread-root');
     expect(editors[0]!.context.canCarryBlockingState).toBe(true);
     expect(editors[0]!.context.action).toBe('edit');
+  });
+
+  // §9.2.3 : `threadId` pour toute zone `reply` et toute édition, `commentId` pour toute
+  // édition. Aucun conteneur de cette vue ne porte d'`id` — les deux se lisent donc dans le
+  // fragment du permalien, et le test le vérifie sur les TROIS cas que le contrat couvre.
+  it('les identifiants sont lus dans le permalien, faute d’`id` sur la page', () => {
+    document.body.innerHTML = THREAD({ editeRacine: 'edition-racine' });
+    expect(observe().editors[0]!.context).toMatchObject({ threadId: 'r3932637709', commentId: 'r3932637709' });
+
+    document.body.innerHTML = THREAD({ editeReponse: 'edition-reponse' });
+    expect(observe().editors[0]!.context).toMatchObject({ threadId: 'r3932637709', commentId: 'r3932676203' });
+
+    document.body.innerHTML = THREAD({ reponse: 'reponse' });
+    const composition = observe().editors[0]!.context;
+    expect(composition.threadId).toBe('r3932637709');
+    expect(composition.commentId).toBeUndefined(); // rien n'est édité : le §9.2.3 ne l'exige pas
   });
 
   it('l’édition d’une RÉPONSE reste une réponse', () => {

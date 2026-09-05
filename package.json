@@ -31,7 +31,8 @@
     "check:managed-keys": "node scripts/check-managed-keys.mjs",
     "check:content-script-cors": "node spikes/content-script-cors.mjs",
     "check:relay-cors": "node spikes/relay-cors.mjs",
-    "check:subject-line": "node spikes/subject-line.mjs"
+    "check:subject-line": "node spikes/subject-line.mjs",
+    "check:composer-layout": "node spikes/composer-layout.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

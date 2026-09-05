@@ -120,6 +120,17 @@ describe('CA-11 — une chaîne `editors` qui ne reconnaît plus rien laisse une
     expect(adapter.log.failures.map((f) => f.chain)).toContain('editors');
   });
 
+  // Le défaut trouvé en revue : la condition ne peut pas porter sur l'échec TOTAL de la
+  // chaîne. `queryChainAll` s'arrête au premier candidat qui ramène un élément, donc une page
+  // où deux générations coexistent — ce que `selectors.editors` envisage explicitement —
+  // laissait la seconde invisible ET sans trace.
+  it('un éditeur reconnu n’excuse pas une surface que rien ne reconnaît', () => {
+    document.body.innerHTML = `${COMPOSER()}<div><textarea id="inconnu"></textarea></div>`;
+    const { adapter: a, editors } = observe();
+    expect(editors.map((e) => (e.element as HTMLTextAreaElement).id)).toEqual(['_r_qm_']); // l'un est vu…
+    expect(a.log.failures.map((f) => f.chain)).toContain('editors'); // …l'autre est journalisé
+  });
+
   // Le cas NOMINAL, et la raison pour laquelle la condition ne porte pas sur le seul échec de
   // la chaîne : sur une PR dont aucun composeur n'est ouvert, ne rien trouver est la norme.
   // Journaliser ici remplirait le journal de non-événements et évincerait les vraies

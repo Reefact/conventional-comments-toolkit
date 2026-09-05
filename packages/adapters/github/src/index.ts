@@ -285,16 +285,22 @@ export class GithubClientAdapter implements PlatformAdapter {
     const seen = new WeakSet<Element>();
     const scan = () => {
       const found = queryChainAll(this.#doc, selectors.editors);
-      // Aucun éditeur reconnu ALORS QUE la page porte une surface de saisie : la chaîne a
-      // pourri. C'est exactement ce qu'a fait la nouvelle vue des fichiers modifiés
-      // (`/pull/N/changes`, cf. `selectors.editors`) — et sans cette ligne, l'extension y
-      // était inerte ET muette : ni barre d'outils, ni trace au journal (§9.4).
+      const inconnues = queryChainAll(this.#doc, selectors.editingSurfaces).filter((s) => !found.includes(s));
+      // Une surface de saisie que la chaîne n'a PAS ramenée : elle a pourri, en tout ou en
+      // partie. C'est ce qu'a fait la nouvelle vue des fichiers modifiés (`/pull/N/changes`,
+      // cf. `selectors.editors`) — et sans cette ligne, l'extension y était inerte ET muette :
+      // ni barre d'outils, ni trace au journal (§9.4).
       //
-      // La condition porte sur la PRÉSENCE d'une surface de saisie, jamais sur le seul échec
-      // de la chaîne : sur une PR dont aucun composeur n'est ouvert, ne rien trouver est le
-      // cas nominal, et le journaliser noierait CA-11 sous des non-événements. Le second
-      // membre n'est donc évalué que dans le cas d'échec — le chemin nominal ne paie rien.
-      if (found.length === 0 && queryChain(this.#doc, selectors.editingSurfaces).element) {
+      // La condition ne porte PAS sur l'échec total de la chaîne, et c'est un défaut corrigé
+      // en revue : `queryChainAll` s'arrêtant au premier candidat qui ramène un élément, une
+      // page où deux générations coexistent — cas que `selectors.editors` envisage
+      // explicitement — aurait laissé la seconde invisible ET sans entrée de journal. On
+      // compare donc les surfaces trouvées à celles qui existent.
+      //
+      // Ce que ça coûte, et c'est assumé : un `<textarea>` étranger au composeur (formulaire
+      // voisin, champ masqué) vaut une entrée de journal à tort. Une seule, le journal
+      // dédupliquant par chaîne — contre une extension muette dans le cas inverse.
+      if (inconnues.length > 0) {
         this.log.degraded(selectors.editors);
       }
       for (const el of found) {

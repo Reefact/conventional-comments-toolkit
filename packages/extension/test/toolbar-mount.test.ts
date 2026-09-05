@@ -221,4 +221,19 @@ describe('framedAncestor — qui dessine le cadre du champ', () => {
     document.body.innerHTML = '<div style="border:0"><textarea id="champ" style="border:0"></textarea></div>';
     expect(framedAncestor(document.getElementById('champ')!)).toBeNull();
   });
+
+  // Le CÂBLAGE, que la mesure navigateur ne peut pas tenir : elle rejoue ce que fait
+  // `attach()` plutôt que de l'appeler. Ici on appelle le vrai contrôleur, et on vérifie que
+  // le retrait atterrit sur le cadre — y compris quand aucune des deux reconnaissances
+  // historiques (testid `comment-composer`, classe `CommentBox`) ne matche.
+  it('attach() pose le retrait sur le cadre, même sans nom reconnu', () => {
+    const { champ } = attachOn(`
+      <div id="cadre" style="border:1px solid #3d444d">
+        <div style="display:block">
+          <span style="display:inline-flex;overflow:hidden"><textarea id="champ"></textarea></span>
+        </div>
+      </div>`);
+    expect(document.getElementById('cadre')!.classList.contains('cct-host')).toBe(true);
+    expect(champ.classList.contains('cct-editor')).toBe(true);
+  });
 });

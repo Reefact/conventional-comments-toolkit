@@ -531,6 +531,26 @@ export class GithubClientAdapter implements PlatformAdapter {
     };
   }
 
+  /** L'identifiant que la page ne met pas sur ses conteneurs, lu dans le PERMALIEN.
+   *
+   * MESURÉ sur la vue `…/changes` : ni `[data-testid="review-thread"]` ni le conteneur d'un
+   * commentaire ne portent d'attribut `id`, alors que le §9.2.3 exige `threadId` pour toute
+   * zone `reply` et toute édition, et `commentId` pour toute édition. Le lien de la DATE d'un
+   * commentaire, lui, porte l'identifiant dans son fragment :
+   * `…/pull/48/changes#r3932637709` — la génération héritée écrivant `#discussion_r…`, on
+   * garde le fragment tel quel plutôt que d'en normaliser la forme : c'est un identifiant
+   * opaque, pas une valeur à interpréter.
+   *
+   * Le premier lien à fragment d'un conteneur est ce permalien (mesuré : les liens d'avatar et
+   * d'auteur pointent vers `/Reefact`, sans fragment) — c'est aussi ce que suppose déjà
+   * `getThreads()` pour ses ancres de bandeau. */
+  #anchorIdOf(container: Element | null | undefined): string | undefined {
+    if (!container) return undefined;
+    const href = queryChain(container, selectors.threadAnchor).element?.getAttribute('href');
+    const fragment = href?.split('#')[1];
+    return fragment || undefined;
+  }
+
   #toHandle(el: Element): EditorHandle | null {
     const pr = this.currentPr();
     if (!pr) return null;
@@ -546,8 +566,8 @@ export class GithubClientAdapter implements PlatformAdapter {
   #contextOf(el: Element, pr: PrRef): EditorContext {
     const action: 'compose' | 'edit' = closestChain(el, selectors.editForm).element ? 'edit' : 'compose';
     // Identifiant du commentaire édité, lu dans le DOM (#issuecomment-…, #discussion_r…).
-    const editedId =
-      action === 'edit' ? closestChain(el, selectors.renderedComment).element?.id || undefined : undefined;
+    const editedComment_ = action === 'edit' ? closestChain(el, selectors.renderedComment).element : null;
+    const editedId = action === 'edit' ? editedComment_?.id || this.#anchorIdOf(editedComment_) : undefined;
     const thread = closestChain(el, selectors.threadContainer).element;
     if (thread) {
       // L'ÉDITION du commentaire RACINE d'un fil reste zone 'thread-root' (§4.1, §4.3) :
@@ -580,7 +600,7 @@ export class GithubClientAdapter implements PlatformAdapter {
             zone: 'thread-root',
             action,
             pr,
-            threadId: thread.id || editedId,
+            threadId: thread.id || this.#anchorIdOf(thread) || editedId,
             commentId: editedId,
             canCarryBlockingState: true,
             inScope: true,
@@ -590,7 +610,7 @@ export class GithubClientAdapter implements PlatformAdapter {
           zone: 'reply',
           action,
           pr,
-          threadId: thread.id || editedId,
+          threadId: thread.id || this.#anchorIdOf(thread) || editedId,
           commentId: editedId,
           canCarryBlockingState: false,
           inScope: true,
@@ -600,7 +620,7 @@ export class GithubClientAdapter implements PlatformAdapter {
         zone: 'reply',
         action,
         pr,
-        threadId: thread.id || undefined,
+        threadId: thread.id || this.#anchorIdOf(thread) || undefined,
         canCarryBlockingState: false,
         inScope: true, // recalculé par l'extension avec activatedAt (§6.2.3)
       };

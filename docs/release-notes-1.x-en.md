@@ -7,6 +7,20 @@ every section of the specification an entry rests on — see
 The extension starts in `assist` mode: it helps and it flags, it never blocks a submission. The
 source of truth for conformance stays the server companion (component B).
 
+## 1.0.0-beta.10 — September 5, 2026
+
+_GitHub rewrote its "Files changed" view, and the extension had gone quiet on it: this release brings the whole toolkit back there, and makes diagnostics speak the language you picked._
+
+### 🐛 Bug fixes
+
+- **The comment tooling works again on GitHub's rewritten "Files changed" view.** GitHub now serves that page at `/pull/N/changes`, where the extension recognised nothing: no label toolbar, no quick entry, no live validation, no badges on published comments — precisely where a blocking `issue:` counts most. All of it is back. A page carrying an editing surface the extension does not recognise now leaves a diagnostic entry too, instead of being inert and silent at once.
+- **Under `enforce`, a non-compliant comment can no longer be published from that view.** Neither by clicking *Reply* under a diff line, nor from the "Finish your comments" panel of a batch review, whose buttons sit in the overlay rather than beside the field. Only the keyboard path was guarded before, so a comment the extension had flagged could still be sent with a mouse.
+- **Editing the root comment of a thread is validated again there.** It was taken for a reply, which the default configuration exempts from validation — an `issue:` root could be edited into anything without the extension looking. Published comments get their badges back too, resolved threads read as resolved instead of unknown, and the pull request banner shows the authors and bodies it was missing.
+- **A blocking label in a review summary is warned about again.** In the "Finish your comments" body, `issue:` reported everything except the one warning that matters there: nobody can resolve a review summary, so it carries no blocking state. The same text in the conversation box has always said so.
+- **The Preview tab shows badges on that view too.** Writing `issue: …` in a composer on `…/changes` and switching to *Preview* rendered the prefix in plain text, where the same switch on the conversation page showed the badge.
+- **The composer looks like itself again on that view.** The toolbar sits above the field instead of being folded into a narrow column beside it, the compliance outline around the field is visible instead of clipped by the container that wraps it, and the toolbar, the field and the verdict pill are no longer squeezed against the frame that surrounds them. That spacing survives a trip through the *Preview* tab as well, which used to strip it until the composer was closed.
+- **Diagnostic messages now follow the language you picked in the options page.** A French interface could show *Conforme, avec avertissements* above *This comment is blocking but has no discussion*: that one line took its language from the repository's configuration rather than from your own preference. Label names (`issue`, `praise`…) and diagnostic codes (`E-NO-LABEL`, `W-NO-DISCUSSION`…) stay untranslated in both languages — they are identifiers, and the check output names them the same way.
+
 ## 1.0.0-beta.9 — September 4, 2026
 
 _The extension no longer gets in the way of a pull request's own description, no longer goes quiet on a page that starts out empty, and finally says why when it cannot read your configuration._

@@ -12,7 +12,7 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
-## [Unreleased]
+## [1.0.0-beta.10] - 2026-09-05
 
 ### Fixed
 
@@ -51,7 +51,6 @@ and what a reader needs from them is the behaviour, not the thirteen.
   codes (`E-NO-LABEL`, `W-NO-DISCUSSION`…) stay untranslated in both languages: they are
   identifiers, and the check output (§6.3.1) names them the same way.
 
-
 - **Under `enforce`, a non-compliant comment can no longer be published by clicking on the
   rewritten "Files changed" view** (§4.3). That composer has no `form`, so the submit-control
   lookup fell back to the field's direct parent — a `<span>` holding nothing but the field —
@@ -80,12 +79,32 @@ and what a reader needs from them is the behaviour, not the thirteen.
   conversation box reports all three. The panel is recognised by two measured containers of its
   own component, appended to the chain so the generations that already matched cannot move.
 
+- **The composer is no longer squeezed against its frame on the rewritten "Files changed" view**
+  (§5.1, §5.3). Two screenshots of the same composer looked nothing alike, and eight pixels
+  explained the gap: the extension pads the container that frames the toolbar, the field and the
+  pill, and it recognised that container on the legacy DOM only, so here the frame squeezed all
+  three. Measured at real focus on both generations — `.CommentBox-container` on one, Primer's
+  `MarkdownInput` wrapper on the other, each drawing a 1px border and a 2px outline — the
+  container to pad is the one that *draws the frame*, whatever it is called. Asking that question
+  returns the very element the legacy DOM already used, so nothing can move there. Two more
+  spacings come with it, settled by eye on the rendered page and each a named variable: eight
+  pixels between the field's text and the state ring, which the zeroed padding had left it flush
+  against, and four between the field and the verdict pill, which read as part of the box rather
+  than as a verdict about it. That margin is constant across every state, so it displaces the
+  space `min-height` reserves instead of making it vary — the no-layout-shift property of §5.3 is
+  untouched.
+
 - **The compliance outline around the field is visible again on the rewritten "Files changed"
   view** (§5.3). It was drawn all along — measured green on the text area — and then clipped:
   the state ring is an `outline` so that it never pushes the page around, but an outline paints
   *outside* the element's box, and on that view the field sits in a Primer wrapper with
-  `overflow: hidden` and exactly the same box. A negative `outline-offset` brings the ring
-  inside the box, where nothing clips it, at the cost of one pixel of inset everywhere else.
+  `overflow: hidden` and exactly the same box. A negative `outline-offset` brings the ring inside
+  the box, where nothing clips it — but only where a clipping ancestor hugs *both* horizontal
+  edges of the field, one shared edge being an accident any layout produces. Insetting it
+  everywhere was the first answer, and it bit the text: on the legacy DOM `cct-editor` zeroes the
+  field's horizontal padding, so a ring drawn inside cut into the first letter. The ring inherits
+  the sleeve's corner radius too, rather than a written value — the textarea has none, so an
+  inset ring was a square rectangle in a rounded box and had its four corners cut in turn.
 
 - **The toolbar sits above the field again on the rewritten "Files changed" view** (§5.1, and
   §5.3 for the feedback pill below it). Both were inserted as immediate siblings of the text
@@ -107,8 +126,13 @@ and what a reader needs from them is the behaviour, not the thirteen.
   `[data-testid="review-thread"]` rather than inside it, so a resolved thread read as unknown;
   and this view has no named edit form, the editor's position inside the comment being what
   distinguishes an edit from a new reply. The neighbouring box is only consulted when it holds a
-  single thread, so no thread can ever adopt its neighbour's resolved state. As with the
-  composer, each failure now leaves a journal entry (§9.4) instead of failing in silence.
+  single thread, so no thread can ever adopt its neighbour's resolved state. The identifiers the
+  contract asks for — `threadId` for every reply zone and every edit, `commentId` for every edit
+  (§9.2.3) — came out undefined here, since neither the comment container nor
+  `[data-testid="review-thread"]` carries an `id`; they are read from the permalink the view
+  already exposes (`…/pull/48/changes#r3932637709`), whose fragment is kept verbatim because it
+  is an opaque identifier and not a value to interpret. As with the composer, each failure now
+  leaves a journal entry (§9.4) instead of failing in silence.
 
 - **The comment tooling is back on the rewritten "Files changed" view** (§4.1, whose first row
   calls an inline diff comment the core of review — the one zone, with a thread root, that
@@ -371,7 +395,8 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
-[Unreleased]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.8...HEAD
+[1.0.0-beta.10]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.9...v1.0.0-beta.10
+[1.0.0-beta.9]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.8...v1.0.0-beta.9
 [1.0.0-beta.8]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.7...v1.0.0-beta.8
 [1.0.0-beta.7]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.6...v1.0.0-beta.7
 [1.0.0-beta.6]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.5...v1.0.0-beta.6

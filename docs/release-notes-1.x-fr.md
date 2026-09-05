@@ -7,6 +7,20 @@ cas limite, chaque section de la spécification sur laquelle une entrée s'appui
 L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. La
 source de vérité sur la conformité reste le compagnon serveur (composant B).
 
+## 1.0.0-beta.10 — 5 septembre 2026
+
+_GitHub a réécrit sa vue « Files changed », et l'extension s'y était tue : cette version y ramène tout l'outillage, et fait parler les diagnostics dans la langue que vous avez choisie._
+
+### 🐛 Corrections
+
+- **L'outillage des commentaires fonctionne de nouveau sur la vue « Files changed » réécrite de GitHub.** GitHub sert désormais cette page sous `/pull/N/changes`, où l'extension ne reconnaissait rien : pas de barre de labels, pas de saisie rapide, pas de validation en direct, pas de badges sur les commentaires publiés — précisément là où un `issue:` bloquant compte le plus. Tout est de retour. Et une page qui porte une zone de saisie que l'extension ne reconnaît pas laisse maintenant une entrée de diagnostic, au lieu d'être inerte et muette à la fois.
+- **Sous `enforce`, un commentaire non conforme ne peut plus être publié depuis cette vue.** Ni en cliquant sur *Reply* sous une ligne de diff, ni depuis le panneau « Finish your comments » d'une revue groupée, dont les boutons vivent dans la surcouche et non à côté du champ. Seul le chemin clavier était gardé jusqu'ici : un commentaire signalé par l'extension partait quand même à la souris.
+- **Modifier le commentaire racine d'un fil y est de nouveau validé.** C'était pris pour une réponse, que la configuration par défaut dispense de validation — une racine `issue:` pouvait donc être réécrite en n'importe quoi sans que l'extension y regarde. Les commentaires publiés retrouvent aussi leurs badges, les fils résolus se lisent comme résolus plutôt qu'en état inconnu, et le bandeau de la pull request affiche les auteurs et les textes qui lui manquaient.
+- **Un label bloquant dans le résumé d'une revue est de nouveau signalé.** Dans le corps de « Finish your comments », `issue:` remontait tout sauf le seul avertissement qui compte là : personne ne peut résoudre un résumé de revue, qui ne porte donc aucun état bloquant. Le même texte dans la boîte de conversation l'a toujours dit.
+- **L'onglet Preview affiche les badges sur cette vue aussi.** Écrire `issue: …` dans un composeur sur `…/changes` puis basculer sur *Preview* rendait le préfixe en texte brut, là où la même bascule sur la page de conversation affichait le badge.
+- **Le composeur ressemble de nouveau à lui-même sur cette vue.** La barre d'outils est au-dessus du champ au lieu d'être repliée en colonne étroite à côté de lui, le trait de conformité autour du champ est visible au lieu d'être rogné par le conteneur qui l'enveloppe, et la barre, le champ et la pastille de verdict ne sont plus serrés contre le cadre qui les entoure. Cet espacement survit aussi à un aller-retour par l'onglet *Preview*, qui le faisait disparaître jusqu'à la fermeture du composeur.
+- **Les messages de diagnostic suivent maintenant la langue choisie dans la page d'options.** Une interface en français pouvait afficher *Conforme, avec avertissements* au-dessus de *This comment is blocking but has no discussion* : cette ligne-là prenait sa langue dans la configuration du dépôt plutôt que dans votre propre préférence. Les noms de labels (`issue`, `praise`…) et les codes de diagnostic (`E-NO-LABEL`, `W-NO-DISCUSSION`…) restent non traduits dans les deux langues — ce sont des identifiants, et la sortie du check les nomme de la même façon.
+
 ## 1.0.0-beta.9 — 4 septembre 2026
 
 _L'extension ne s'impose plus sur la description d'une pull request, ne s'endort plus sur une page vide au départ, et dit enfin pourquoi quand elle n'arrive pas à lire votre configuration._

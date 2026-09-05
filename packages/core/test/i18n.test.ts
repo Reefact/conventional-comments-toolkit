@@ -15,9 +15,17 @@ describe('§10 — catalogues de messages', () => {
     expect(Object.keys(fr).sort()).toEqual(Object.keys(en).sort());
   });
 
-  it('aucune valeur vide : une clé traduite par la chaîne vide efface le message', () => {
-    for (const [key, value] of Object.entries({ ...en, ...fr })) {
-      expect(value.trim(), key).not.toBe('');
+  it('aucune valeur vide, dans CHACUN des deux catalogues', () => {
+    // Chacun parcouru pour son compte, jamais fusionné (revue Reefact, PR #53) : le test
+    // précédent impose des jeux de clés identiques, donc `{ ...en, ...fr }` écrase TOUTES les
+    // valeurs anglaises par les françaises — ce garde ne relisait alors que le français.
+    // Mesuré : `'and': ''` posé dans en.ts laissait passer les quatre tests de ce fichier.
+    // C'est le catalogue anglais qui est le plus exposé, en plus : `t()` s'y rabat en
+    // dernier ressort, donc une valeur vide y est celle qu'aucun repli ne peut rattraper.
+    for (const [lang, catalog] of Object.entries({ en, fr })) {
+      for (const [key, value] of Object.entries(catalog)) {
+        expect(value.trim(), `${lang}/${key}`).not.toBe('');
+      }
     }
   });
 

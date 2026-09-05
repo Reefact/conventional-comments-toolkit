@@ -20,7 +20,7 @@ import { decideGuard, feedbackState, type GuardDecision } from './guard.js';
 import { buildToolbar, type PosedPrefix, type Toolbar } from './ui/toolbar.js';
 import { attachQuickInput } from './ui/quickinput.js';
 import { FeedbackView } from './ui/feedback.js';
-import type { ResolvedClientConfig } from './config-resolver.js';
+import { localizedConfig, type ResolvedClientConfig } from './config-resolver.js';
 import type { TelemetryEvent } from './telemetry.js';
 
 /** Le label que le commentaire porte DÉJÀ, au sens du §3.4.1 — `null` s'il n'en porte
@@ -160,9 +160,12 @@ export class EditorController {
    * compteur de frappes, ce qui n'est plus un agrégat et en dit bien plus long. Seule
    * l'APPARITION d'un code est comptée ; sa disparition puis son retour en recomptent un. */
   #countedCodes: Set<string>;
+  /** `deps.resolved.config` vue par `core/`, langue résolue substituée — voir le getter. */
+  #config: EffectiveConfig;
 
   constructor(deps: ControllerDeps) {
     this.deps = deps;
+    this.#config = localizedConfig(deps.resolved.config, deps.lang);
     this.#countedCodes = new Set(deps.initialCountedCodes ?? []);
   }
 
@@ -173,8 +176,20 @@ export class EditorController {
     return this.#countedCodes;
   }
 
+  /** La configuration que ce contrôleur applique — celle du dépôt, `language` mise à la
+   * langue RÉSOLUE (§8.1.2) par `localizedConfig()`. Tout ce qui interroge `core/` d'ici
+   * passe par ce getter, `analyze()` compris : c'est ce qui met le `message` d'un
+   * `Diagnostic` dans la langue de l'interface qui l'affiche, comme le §5.3 l'exige.
+   *
+   * `deps.lang` est la langue résolue à la CONSTRUCTION, et le reste : un document de
+   * configuration qui change de `language` change aussi la signature de rendu
+   * (`renderConfigSignatureOf`, content-internal.ts), donc reconstruit le contrôleur avec
+   * une langue fraîchement résolue. `updateResolved()` ne voit ce changement que dans la
+   * fenêtre où l'ANCIEN contrôleur tient encore la garde en attendant son remplaçant : il y
+   * applique les nouvelles règles dans l'ancienne langue, exactement comme il y garde
+   * l'ancienne barre d'outils. */
   get config(): EffectiveConfig {
-    return this.deps.resolved.config;
+    return this.#config;
   }
 
   /** Remplace la configuration résolue — ET le résumé publié — d'un éditeur DÉJÀ attaché
@@ -204,6 +219,7 @@ export class EditorController {
    * (`this.config` fait foi) — un décalage cosmétique, jamais un contournement du blocage. */
   updateResolved(resolved: ResolvedClientConfig, published: PublishedSummary | null): void {
     this.deps.resolved = resolved;
+    this.#config = localizedConfig(resolved.config, this.deps.lang);
     this.deps.published = published;
     this.refresh();
   }

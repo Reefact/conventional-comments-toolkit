@@ -16,7 +16,15 @@ const pr: PrRef = {
 
 function setup(
   mode: 'enforce' | 'warn' = 'enforce',
-  opts: { telemetry?: (event: TelemetryEvent) => boolean; initialCountedCodes?: ReadonlySet<string> } = {}
+  opts: {
+    telemetry?: (event: TelemetryEvent) => boolean;
+    initialCountedCodes?: ReadonlySet<string>;
+    /** Langue RÉSOLUE au §8.1.2 — celle que `resolveUiLanguage()` rend au contrôleur. */
+    lang?: string;
+    /** Clé `language` du document de configuration (§8.2) — `null` par défaut, comme
+     * `defaultConfig()` : c'est le cas ordinaire, celui où seule la préférence locale parle. */
+    configLanguage?: string | null;
+  } = {}
 ) {
   const host = document.createElement('div');
   const textarea = document.createElement('textarea');
@@ -45,13 +53,14 @@ function setup(
   const config = defaultConfig();
   config.mode = mode;
   config.activation.activatedAt = '2026-09-01T00:00:00Z';
+  config.language = opts.configLanguage ?? null;
 
   const controller = new EditorController({
     adapter: adapter as PlatformAdapter,
     editor,
     resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
     published: null,
-    lang: 'fr',
+    lang: opts.lang ?? 'fr',
     currentUserLogin: 'alice',
     telemetry: opts.telemetry,
     initialCountedCodes: opts.initialCountedCodes,
@@ -333,6 +342,77 @@ describe('§5 — contrôleur d’éditeur', () => {
     expect(fix).not.toBeNull();
     fix.click();
     expect(textarea.value).toBe('issue: le nom est ambigu');
+    controller.dispose();
+  });
+});
+
+describe('§5.3 + §8.1.2 — le message d’un diagnostic suit la langue RÉSOLUE', () => {
+  beforeEach(() => {
+    document.body.textContent = '';
+  });
+
+  /** Le texte du diagnostic affiché, code et bouton de correction retirés. */
+  function messageIn(host: HTMLElement, code: string): string {
+    const li = host.querySelector(`.cct-diagnostics li[data-code="${code}"] span`);
+    return li?.textContent ?? '';
+  }
+
+  it('sans clé `language` au dépôt, la préférence locale décide — pastille ET message', async () => {
+    // Le cas ordinaire, et celui qui était faux : `defaultConfig()` laisse `language` à
+    // `null`, la personne choisit « français » dans la page d'options, et TOUT ce que
+    // l'extension écrit elle-même passait bien en français — la pastille, le bouton
+    // « Corriger » — pendant que le seul texte venu de `core/`, le message du diagnostic,
+    // restait en anglais. `analyze()` le choisit sur `config.language`, et c'est la clé du
+    // dépôt qui y arrivait, jamais la langue résolue au §8.1.2.
+    const { controller, textarea, host } = setup('warn', { lang: 'fr', configLanguage: null });
+    controller.attach();
+    writeToTextField(textarea, 'issue (blocking): le nom de cette variable est ambigu');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(host.querySelector('.cct-pastille')?.textContent).toContain('Conforme, avec avertissements');
+    expect(messageIn(host, 'W-NO-DISCUSSION')).toBe(
+      'W-NO-DISCUSSION — Ce commentaire est bloquant mais ne comporte aucune discussion : expliquez pourquoi le point doit être traité.'
+    );
+    controller.dispose();
+  });
+
+  it('la préférence locale PRIME sur la clé `language` du dépôt, dans les deux sens (§8.1.2)', async () => {
+    // Substituer la langue résolue ne doit pas revenir à imposer une langue : le §8.1.2 est
+    // un ORDRE de priorité, et un dépôt en `"language": "fr"` doit rendre l'anglais à qui a
+    // choisi « english » dans ses options — sans quoi le correctif troquerait un défaut
+    // contre son symétrique.
+    const en = setup('warn', { lang: 'en', configLanguage: 'fr' });
+    en.controller.attach();
+    writeToTextField(en.textarea, 'issue (blocking): le nom de cette variable est ambigu');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(messageIn(en.host, 'W-NO-DISCUSSION')).toContain('This comment is blocking but has no discussion');
+    en.controller.dispose();
+
+    // Et le dépôt reste la source quand personne n'a de préférence locale : `resolveUiLanguage()`
+    // rend alors la clé elle-même, donc `localizedConfig()` ne substitue rien.
+    const fr = setup('warn', { lang: 'fr', configLanguage: 'fr' });
+    fr.controller.attach();
+    writeToTextField(fr.textarea, 'issue (blocking): le nom de cette variable est ambigu');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(messageIn(fr.host, 'W-NO-DISCUSSION')).toContain('Ce commentaire est bloquant');
+    fr.controller.dispose();
+  });
+
+  it('ce qui n’est PAS traduit : le code du diagnostic, et les identifiants de labels qu’il cite', async () => {
+    // §10 : « les identifiants de labels restent en anglais ». Un message français cite donc
+    // `issue`, `praise`, `nitpick`… tels quels, et le code du §3.5.1 reste `E-UNKNOWN-LABEL` —
+    // ce sont des identifiants, pas de la prose. Traduire l'un ou l'autre rendrait le retour de
+    // l'extension incomparable à celui du check (§6.3.1), qui les écrit dans la langue du dépôt.
+    const { controller, textarea, host } = setup('warn', { lang: 'fr', configLanguage: null });
+    controller.attach();
+    writeToTextField(textarea, 'probleme: le nom de cette variable est ambigu');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    const li = host.querySelector('.cct-diagnostics li');
+    expect(li?.getAttribute('data-code')).toBe('E-UNKNOWN-LABEL'); // le code, jamais traduit
+    const message = messageIn(host, 'E-UNKNOWN-LABEL');
+    expect(message).toContain('Label inconnu'); // la prose, elle, l'est
+    for (const id of ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question']) {
+      expect(message).toContain(id);
+    }
     controller.dispose();
   });
 });

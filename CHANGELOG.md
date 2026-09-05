@@ -12,6 +12,22 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Fixed
+
+- **Diagnostic messages now follow the language picked in the options page** (§5.3, which wants
+  them "in the language resolved per §8.1.2"). Everything the extension writes itself already
+  did — the validation pill, the *Fix* button, the banner — but the one text that comes from
+  `core/` did not: it picks its language from the configuration's `language` key, and that key
+  is what reached it, never the language resolved for the browser. On a repository that does not
+  set it — the default — a French interface therefore showed *Conforme, avec avertissements*
+  above *This comment is blocking but has no discussion*. The local preference now wins, as
+  §8.1.2 orders it, and a repository that does set `language` still decides for anyone who has
+  expressed no preference of their own. Label identifiers (`issue`, `praise`…) and diagnostic
+  codes (`E-NO-LABEL`, `W-NO-DISCUSSION`…) stay untranslated in both languages: they are
+  identifiers, and the check output (§6.3.1) names them the same way.
+
 ## [1.0.0-beta.9] - 2026-09-04
 
 ### Fixed

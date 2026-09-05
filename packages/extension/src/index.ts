@@ -1,7 +1,12 @@
 // @cct/extension — composant A. Les modules exportés ici sont la surface testable ;
 // content.ts et background.ts sont les points d'entrée MV3.
 
-export { ClientConfigResolver, resolveUiLanguage, type ResolvedClientConfig } from './config-resolver.js';
+export {
+  ClientConfigResolver,
+  resolveUiLanguage,
+  localizedConfig,
+  type ResolvedClientConfig,
+} from './config-resolver.js';
 export {
   decideGuard,
   resolveInScope,

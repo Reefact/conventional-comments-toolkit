@@ -475,12 +475,36 @@ export class GithubClientAdapter implements PlatformAdapter {
    * est un changement de page comme un autre, et le fait qu'elle ne porte jamais de badge
    * ne la rend pas moins visible. */
   getRenderedComments(): { element: Element; bodyText: string }[] {
-    return queryChainAll(this.#doc, selectors.commentBody)
-      .filter((element) => closestChain(element, selectors.prDescription).element === null)
-      .map((element) => ({
-        element,
-        bodyText: commentBodyText(element),
-      }));
+    const published = queryChainAll(this.#doc, selectors.commentBody).filter(
+      (element) => closestChain(element, selectors.prDescription).element === null
+    );
+    // `Set` : sur les générations mesurées, les deux chaînes désignent des éléments
+    // disjoints (voir `previewBody`) — mais un corps décoré deux fois n'est une évidence
+    // pour personne, et le dédoublonnage coûte moins qu'une note expliquant qu'il n'a pas
+    // lieu d'être.
+    return [...new Set([...published, ...this.#previewBodies()])].map((element) => ({
+      element,
+      bodyText: commentBodyText(element),
+    }));
+  }
+
+  /** Aperçus rendus par l'onglet « Preview » d'un champ en cours de rédaction — mêmes badges
+   * que les commentaires publiés (§5.5), sur un texte qui ne l'est pas encore. Réunis aux
+   * corps publiés par les trois méthodes de cette section, et par elles seules : `getThreads()`
+   * ne les lit JAMAIS, un brouillon n'étant le corps d'aucun fil — c'est aussi pourquoi ils
+   * n'entrent pas dans la chaîne `comment-body`, que cette lecture-là emploie.
+   *
+   * Rend un tableau vide sur la génération héritée, où la chaîne `comment-body` attrape déjà
+   * l'aperçu (voir `previewBody`, selectors.ts) : c'est ce qui fait que les badges s'y
+   * affichent depuis toujours, et qu'il n'y a rien à y changer.
+   *
+   * LIMITE connue, écrite parce qu'elle n'est pas mesurée : sur une vue de conversation
+   * réécrite en React — que nous n'avons pas observée —, l'aperçu de la DESCRIPTION d'une PR
+   * recevrait des badges, alors que le §4.1 la met hors périmètre. L'exclusion employée par
+   * `getRenderedComments()` (`prDescription`) n'y matcherait rien non plus, ses candidats
+   * étant tous hérités : le jour où cette vue sera mesurée, les deux se traitent ensemble. */
+  #previewBodies(): Element[] {
+    return queryChainAll(this.#doc, selectors.previewBody);
   }
 
   /** Sonde bon marché du nombre de commentaires rendus, pour la signature de reprise du
@@ -491,7 +515,13 @@ export class GithubClientAdapter implements PlatformAdapter {
    * de la PR, que `getRenderedComments()` écarte — voir là-haut pourquoi les deux
    * divergent. */
   getRenderedCommentCount(): number {
-    return queryChainAll(this.#doc, selectors.commentBody).length;
+    // L'aperçu y entre, et c'est CE compte qui réveille le rendu quand on passe sur l'onglet
+    // « Preview » : un aperçu qui apparaît ne change ni le résumé publié, ni les identifiants
+    // de fils, ni le nombre de corps publiés. Sans lui ici, la signature de reprise
+    // (content-internal.ts, chromeSignatureOf) resterait identique, `run()` ressortirait
+    // avant de rendre, et l'aperçu n'aurait jamais ses badges — le correctif de la chaîne
+    // `preview-body` serait resté sans effet.
+    return queryChainAll(this.#doc, selectors.commentBody).length + this.#previewBodies().length;
   }
 
   /** Les mêmes éléments, sans leur `bodyText` — pour la signature de NOTRE propre sortie
@@ -502,7 +532,11 @@ export class GithubClientAdapter implements PlatformAdapter {
    * PAS un sous-ensemble de `getRenderedThreadElements()` : un commentaire de la
    * conversation n'appartient à aucun fil de revue. */
   getRenderedCommentElements(): Element[] {
-    return queryChainAll(this.#doc, selectors.commentBody);
+    // L'aperçu y entre pour la même raison que les corps publiés : il est re-rendu par React
+    // à chaque aller-retour Write/Preview, et une seconde rédaction suivie d'un second aperçu
+    // ne change AUCUN compte — seul le digest de texte voit que le corps n'est plus celui que
+    // nos badges décrivaient.
+    return [...queryChainAll(this.#doc, selectors.commentBody), ...this.#previewBodies()];
   }
 
   /** Élément après lequel insérer le bandeau (§5.5) — surface d'affichage, hors du contrat

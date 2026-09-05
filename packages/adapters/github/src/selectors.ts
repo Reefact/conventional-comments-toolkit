@@ -364,6 +364,63 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
+  /** Corps rendu par l'onglet « Preview » d'un champ en cours de rédaction — le §5.5 le
+   * décore comme n'importe quel corps de commentaire, alors qu'il n'est pas publié. C'est un
+   * comportement HÉRITÉ, pas une exigence : sur la génération ancienne, l'aperçu porte
+   * `comment-body` et la chaîne ci-dessus l'attrape depuis toujours. Sur la vue `…/changes`,
+   * elle ne l'attrapait pas, et l'écart entre les deux vues est le défaut signalé.
+   *
+   * POURQUOI UNE CHAÎNE À PART, et non un candidat de plus dans `comment-body` :
+   * `queryChainAll` ne rend que les éléments du PREMIER candidat qui matche. Sur `…/changes`
+   * ce premier candidat est celui des fils (`ReviewThreadComment-module__SafeHTMLBox`) ;
+   * un candidat d'aperçu ajouté APRÈS lui n'y serait jamais atteint, et placé AVANT il
+   * évincerait les corps de fil dès qu'un aperçu est ouvert. Les deux ensembles sont
+   * disjoints : il leur faut deux lectures, que l'appelant réunit (`getRenderedComments`).
+   *
+   * MESURÉ, mais PAS sur le DOM de la page, et la nuance doit être écrite :
+   * `…/changes` répond **302 vers `/files` sans session** (vérifié le 2026-09-05), cette vue
+   * n'était donc pas ouvrable depuis l'environnement de développement. La mesure porte sur le
+   * CODE LIVRÉ par `github.githubassets.com` — ce qui dit ce que le composant rend dans tous
+   * les cas, et ne dit pas qu'il est bien celui que la page monte. Deux relevés du
+   * 2026-09-05, chunks trouvés par la table de `wp-runtime-6ce19d92daee010e.js` :
+   *
+   *   - `pz-6fb14692eb5a8512.js` — l'éditeur, en mode aperçu, rend
+   *
+   *       <div aria-live="polite" tabindex="-1"
+   *            class="MarkdownEditor-module__previewViewerWrapper__M5C8O …">
+   *         <h2 class="MarkdownEditor-module__previewHeader__CZcUw">Rendered Markdown Preview</h2>
+   *         <MarkdownViewer verifiedHTML=… />
+   *
+   *   - `wp-0857cd7042392755.js` — ce `MarkdownViewer` (`displayName`) rend son HTML dans un
+   *     élément dont la classe vaut
+   *     `cx("markdown-body", !fournie && "MarkdownViewer-module__markdownBody__yGuuU", fournie)` :
+   *     `markdown-body` est INCONDITIONNELLE, la classe de module n'apparaît qu'à défaut de
+   *     classe fournie par l'appelant. C'est la même fonction qui explique le corps de fil
+   *     relevé le 2026-09-04 (`div.markdown-body.ReviewThreadComment-module__SafeHTMLBox__…`,
+   *     où le fil FOURNIT sa classe) — un seul composant, deux habillages.
+   *
+   * D'où la prise en deux morceaux — l'enveloppe de l'aperçu, PUIS le corps — plutôt que la
+   * seule classe `MarkdownViewer-module__markdownBody`, qui désignerait tout aperçu rendu
+   * ailleurs sur la page. L'enveloppe seule ne conviendrait pas non plus : elle contient le
+   * `<h2>` de titre, dont le texte entrerait dans le corps relu et casserait la
+   * reconnaissance du préfixe.
+   *
+   * Le second candidat est le repli du premier : les deux classes sont sur le MÊME élément
+   * aujourd'hui, et `markdown-body` — globale, ancienne, portée par tout markdown rendu de
+   * GitHub — passe en tête parce qu'elle survivra plus longtemps qu'un nom de module CSS.
+   *
+   * Aucun candidat pour la génération héritée, et c'est délibéré : son aperçu porte
+   * `comment-body` (`.previewable-comment-form .comment-body`, mesuré le même jour dans la
+   * feuille de style livrée), la chaîne ci-dessus l'attrape déjà, et un candidat ici le ferait
+   * décorer deux fois. */
+  previewBody: {
+    name: 'preview-body',
+    candidates: [
+      '[class*="MarkdownEditor-module__previewViewerWrapper"] .markdown-body',
+      '[class*="MarkdownEditor-module__previewViewerWrapper"] [class*="MarkdownViewer-module__markdownBody"]',
+    ],
+  } satisfies SelectorChain,
+
   /** Auteur d'un commentaire rendu. */
   commentAuthor: {
     name: 'comment-author',

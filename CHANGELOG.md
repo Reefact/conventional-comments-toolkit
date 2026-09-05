@@ -16,6 +16,21 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **The Preview tab shows badges on the rewritten "Files changed" view too** (§5.5). Writing
+  `issue: …` in a composer on `…/changes` and switching to *Preview* rendered the prefix in
+  plain text, while the same switch on the conversation page showed the badge. Nothing was
+  written for that view in the first place: the legacy preview happens to carry `comment-body`,
+  the class the extension already reads, and the rewritten one carries neither that nor the
+  class its review threads use. It took a second selector chain rather than one more candidate
+  in the existing one — a chain returns the matches of the *first* candidate that matches
+  anything, so an appended candidate would never have been reached while a thread is on the
+  page (the reported case), and a prepended one would have hidden the thread bodies as soon as
+  a preview opened. The preview now also counts among the rendered bodies, which is what wakes
+  the render up when the tab is switched: opening it changes no published summary, no thread
+  id, and no comment count. Measured on GitHub's shipped bundles rather than on the page —
+  `…/changes` answers 302 to `/files` without a session — and the selector file says which
+  chunks, what they render, and what that kind of measurement cannot promise.
+
 - **The review panel's own submit button is guarded too** (§4.3). The click guard reached the
   inline composer but not "Finish your comments": its two buttons are not inside the container
   that holds the field — measured, they live in the overlay carrying the panel, ten levels up —

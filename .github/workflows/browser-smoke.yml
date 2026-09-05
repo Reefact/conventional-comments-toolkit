@@ -98,5 +98,12 @@ jobs:
       - name: Ligne du sujet — badges et sujet sur une seule ligne (§5.5)
         run: npm run check:subject-line
 
+      # Même famille : où un trait est PEINT et ce qui le rogne ne se déduit pas d'un arbre
+      # DOM. Ce garde tient les réglages du composeur trouvés à l'œil sur github.com — trait
+      # d'état rentré seulement là où il serait coupé, gouttière du texte, barre laissée en
+      # place — et il est différentiel : la contre-épreuve rejoue le débordement d'origine.
+      - name: Mise en page du composeur — trait d'état, gouttière, pastille (§5.1, §5.3)
+        run: npm run check:composer-layout
+
       - name: Smoke test de sélecteurs (§9.4)
         run: node spikes/p1-prime/smoke.mjs

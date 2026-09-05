@@ -133,6 +133,7 @@ npm run check:beacon            # un POST no-cors cross-origin part et arrive, s
 npm run check:content-script-cors # ce qu'un script de contenu a le droit de LIRE (redirections, cookies)
 npm run check:relay-cors        # la même question pour le service worker du relais
 npm run check:subject-line      # badges et sujet sur UNE seule ligne, mesuré (§5.5)
+npm run check:composer-layout   # trait d'état, gouttière du texte, pastille — mesurés (§5.1, §5.3)
 ```
 
 Toute commande qui interroge le NAVIGATEUR plutôt que le code pilote un vrai Chromium via

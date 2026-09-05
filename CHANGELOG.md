@@ -28,9 +28,6 @@ and what a reader needs from them is the behaviour, not the thirteen.
   codes (`E-NO-LABEL`, `W-NO-DISCUSSION`…) stay untranslated in both languages: they are
   identifiers, and the check output (§6.3.1) names them the same way.
 
-## [1.0.0-beta.9] - 2026-09-04
-
-### Fixed
 
 - **The composer keeps its spacing after a trip through the Preview tab.** Switching to
   Preview and back remounts the editor on the rewritten Files changed view, and React rewrites
@@ -93,6 +90,10 @@ and what a reader needs from them is the behaviour, not the thirteen.
   its chain came back empty, so the extension was inert and silent at once. It now writes a
   degradation entry (§9.4) when a page carries an editing surface no candidate recognises —
   never when no composer is simply open, which is the norm.
+
+## [1.0.0-beta.9] - 2026-09-04
+
+### Fixed
 
 - **The pull request's own description is no longer treated as a review comment** (§4.1, which
   places it outside the convention's scope). The editor that "Edit" opens on it matched the

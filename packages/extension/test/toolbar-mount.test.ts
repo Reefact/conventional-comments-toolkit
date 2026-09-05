@@ -226,6 +226,24 @@ describe('framedAncestor — qui dessine le cadre du champ', () => {
   // `attach()` plutôt que de l'appeler. Ici on appelle le vrai contrôleur, et on vérifie que
   // le retrait atterrit sur le cadre — y compris quand aucune des deux reconnaissances
   // historiques (testid `comment-composer`, classe `CommentBox`) ne matche.
+  // MESURÉ sur `…/changes` : passer par l'onglet « Preview » et revenir fait remonter le
+  // composeur par React, qui réécrit le `className` de l'enveloppe. Le champ est CONSERVÉ
+  // (`memeNoeud: true`, nos classes y survivent), mais `cct-host` disparaît de l'ancêtre et le
+  // retrait avec elle — et rien ne la reposait, `observeEditors` ne remontant un champ qu'une
+  // fois. Le test reproduit l'effacement, pas le changement d'onglet : c'est l'effacement qui
+  // est le fait mesuré, le geste qui le provoque appartient à GitHub.
+  it('une classe emportée par la plateforme est reposée', async () => {
+    attachOn(`
+      <div id="cadre" style="border:1px solid #3d444d">
+        <div style="display:block"><textarea id="champ"></textarea></div>
+      </div>`);
+    const cadre = document.getElementById('cadre')!;
+    expect(cadre.classList.contains('cct-host')).toBe(true);
+    cadre.className = 'reecrit-par-la-plateforme'; // ce que fait React au remontage
+    await new Promise((r) => setTimeout(r, 0));
+    expect(cadre.classList.contains('cct-host')).toBe(true);
+  });
+
   it('attach() pose le retrait sur le cadre, même sans nom reconnu', () => {
     const { champ } = attachOn(`
       <div id="cadre" style="border:1px solid #3d444d">

@@ -32,6 +32,14 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **The composer keeps its spacing after a trip through the Preview tab.** Switching to
+  Preview and back remounts the editor on the rewritten Files changed view, and React rewrites
+  the class list of the field's wrapper — taking with it the class that carries the extension's
+  own 8px inset. The field itself survives, classes and all, so nothing re-attached and the
+  spacing stayed lost until the composer was closed. The classes the extension puts on the page
+  are now watched and put back when the platform takes them, the same way its badges already
+  are.
+
 - **A blocking label in a batch review's body is warned about again** (§4.1, which validates
   that body but denies it any blocking state — nobody can resolve a review summary). On the
   rewritten Files changed view the "Finish your comments" panel matched none of the chain's

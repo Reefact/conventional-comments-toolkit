@@ -9,7 +9,7 @@ source de vérité sur la conformité reste le compagnon serveur (composant B).
 
 ## 1.0.0-beta.10 — 5 septembre 2026
 
-_GitHub a réécrit sa vue « Files changed », et l'extension s'y était tue : cette version y ramène tout l'outillage, et fait parler les diagnostics dans la langue que vous avez choisie._
+_GitHub a réécrit sa vue « Files changed », et l'extension s'y était tue : cette version y ramène tout l'outillage — et, partout, met les messages de diagnostic dans la même langue que le reste de l'interface._
 
 ### 🐛 Corrections
 
@@ -19,7 +19,7 @@ _GitHub a réécrit sa vue « Files changed », et l'extension s'y était tue : 
 - **Un label bloquant dans le résumé d'une revue est de nouveau signalé.** Dans le corps de « Finish your comments », `issue:` remontait tout sauf le seul avertissement qui compte là : personne ne peut résoudre un résumé de revue, qui ne porte donc aucun état bloquant. Le même texte dans la boîte de conversation l'a toujours dit.
 - **L'onglet Preview affiche les badges sur cette vue aussi.** Écrire `issue: …` dans un composeur sur `…/changes` puis basculer sur *Preview* rendait le préfixe en texte brut, là où la même bascule sur la page de conversation affichait le badge.
 - **Le composeur ressemble de nouveau à lui-même sur cette vue.** La barre d'outils est au-dessus du champ au lieu d'être repliée en colonne étroite à côté de lui, le trait de conformité autour du champ est visible au lieu d'être rogné par le conteneur qui l'enveloppe, et la barre, le champ et la pastille de verdict ne sont plus serrés contre le cadre qui les entoure. Cet espacement survit aussi à un aller-retour par l'onglet *Preview*, qui le faisait disparaître jusqu'à la fermeture du composeur.
-- **Les messages de diagnostic suivent maintenant la langue choisie dans la page d'options.** Une interface en français pouvait afficher *Conforme, avec avertissements* au-dessus de *This comment is blocking but has no discussion* : cette ligne-là prenait sa langue dans la configuration du dépôt plutôt que dans votre propre préférence. Les noms de labels (`issue`, `praise`…) et les codes de diagnostic (`E-NO-LABEL`, `W-NO-DISCUSSION`…) restent non traduits dans les deux langues — ce sont des identifiants, et la sortie du check les nomme de la même façon.
+- **Les messages de diagnostic sont maintenant dans la même langue que le reste de l'interface.** Une interface en français pouvait afficher *Conforme, avec avertissements* au-dessus de *This comment is blocking but has no discussion* : tout ce que l'extension écrit elle-même suivait déjà la langue résolue pour vous — votre propre préférence d'abord, la clé `language` du dépôt ensuite, la langue de l'interface de la plateforme à défaut des deux —, mais cette ligne-là, qui vient de la bibliothèque de validation partagée, ne lisait que la clé du dépôt. Les noms de labels (`issue`, `praise`…) et les codes de diagnostic (`E-NO-LABEL`, `W-NO-DISCUSSION`…) restent non traduits dans les deux langues — ce sont des identifiants, et la sortie du check les nomme de la même façon.
 
 ## 1.0.0-beta.9 — 4 septembre 2026
 

@@ -39,8 +39,9 @@ and what a reader needs from them is the behaviour, not the thirteen.
   actually carries buttons. Telling that panel's buttons apart needed no guesswork: the one that
   publishes wears its own component's class, which *Cancel* does not.
 
-- **Diagnostic messages now follow the language picked in the options page** (§5.3, which wants
-  them "in the language resolved per §8.1.2"). Everything the extension writes itself already
+- **Diagnostic messages now follow the resolved language, not the repository's key** (§5.3, which
+  wants them "in the language resolved per §8.1.2" — the local preference, then that key, then the
+  platform's interface language). Everything the extension writes itself already
   did — the validation pill, the *Fix* button, the banner — but the one text that comes from
   `core/` did not: it picks its language from the configuration's `language` key, and that key
   is what reached it, never the language resolved for the browser. On a repository that does not

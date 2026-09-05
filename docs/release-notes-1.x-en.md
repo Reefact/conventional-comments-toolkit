@@ -9,7 +9,7 @@ source of truth for conformance stays the server companion (component B).
 
 ## 1.0.0-beta.10 — September 5, 2026
 
-_GitHub rewrote its "Files changed" view, and the extension had gone quiet on it: this release brings the whole toolkit back there, and makes diagnostics speak the language you picked._
+_GitHub rewrote its "Files changed" view, and the extension had gone quiet on it: this release brings the whole toolkit back there — and, everywhere, puts diagnostic messages in the same language as the rest of the interface._
 
 ### 🐛 Bug fixes
 
@@ -19,7 +19,7 @@ _GitHub rewrote its "Files changed" view, and the extension had gone quiet on it
 - **A blocking label in a review summary is warned about again.** In the "Finish your comments" body, `issue:` reported everything except the one warning that matters there: nobody can resolve a review summary, so it carries no blocking state. The same text in the conversation box has always said so.
 - **The Preview tab shows badges on that view too.** Writing `issue: …` in a composer on `…/changes` and switching to *Preview* rendered the prefix in plain text, where the same switch on the conversation page showed the badge.
 - **The composer looks like itself again on that view.** The toolbar sits above the field instead of being folded into a narrow column beside it, the compliance outline around the field is visible instead of clipped by the container that wraps it, and the toolbar, the field and the verdict pill are no longer squeezed against the frame that surrounds them. That spacing survives a trip through the *Preview* tab as well, which used to strip it until the composer was closed.
-- **Diagnostic messages now follow the language you picked in the options page.** A French interface could show *Conforme, avec avertissements* above *This comment is blocking but has no discussion*: that one line took its language from the repository's configuration rather than from your own preference. Label names (`issue`, `praise`…) and diagnostic codes (`E-NO-LABEL`, `W-NO-DISCUSSION`…) stay untranslated in both languages — they are identifiers, and the check output names them the same way.
+- **Diagnostic messages are now in the same language as the rest of the interface.** A French interface could show *Conforme, avec avertissements* above *This comment is blocking but has no discussion*: everything the extension writes itself already followed the language resolved for you — your own preference first, the repository's `language` key next, the platform's interface language failing both — but that one line, which comes from the shared validation library, read the repository's key alone. Label names (`issue`, `praise`…) and diagnostic codes (`E-NO-LABEL`, `W-NO-DISCUSSION`…) stay untranslated in both languages — they are identifiers, and the check output names them the same way.
 
 ## 1.0.0-beta.9 — September 4, 2026
 

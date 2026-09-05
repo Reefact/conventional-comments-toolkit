@@ -148,3 +148,23 @@ export function resolveUiLanguage(
 ): string {
   return userPreference ?? config.language ?? platformLanguage ?? 'en';
 }
+
+/** La configuration effective telle que `core/` doit la voir DANS LE NAVIGATEUR : identique
+ * en tout point, sauf `language`, qui y porte la langue RÉSOLUE au sens ci-dessus et non la
+ * seule clé `language` du document de configuration.
+ *
+ * `core/` produit UN texte que l'extension affiche tel quel — le `message` d'un `Diagnostic`
+ * —, et il se choisit sur `config.language`. Sans cette substitution, ce message restait
+ * donc dans la langue du dépôt (`null` par défaut, donc l'anglais) pendant que tout le reste
+ * de l'interface suivait la préférence locale : la pastille disait « Conforme, avec
+ * avertissements » au-dessus d'un « This comment is blocking but has no discussion ». Le
+ * §5.3 veut ce message « dans la langue résolue au §8.1.2 », préférence locale comprise.
+ *
+ * Ne peut pas faire diverger un verdict : `language` n'en gouverne aucun et reste hors du
+ * domaine de `fingerprint()` (§9.2.2), donc hors de la règle 2 du §8.1.3. La substitution
+ * n'AJOUTE que ce que le §8.1.2 place autour de la clé — la préférence locale devant, la
+ * langue de la plateforme derrière ; sans préférence ni langue de plateforme, elle rend la
+ * clé elle-même. */
+export function localizedConfig(config: EffectiveConfig, lang: string): EffectiveConfig {
+  return config.language === lang ? config : { ...config, language: lang };
+}

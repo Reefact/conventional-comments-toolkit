@@ -113,7 +113,10 @@ const en: Record<string, string> = {
   'badge.decoration.overflow': '{count} more decoration(s), not shown',
 };
 
-const catalogs: Record<string, Record<string, string>> = { fr, en };
+/** Exporté pour le garde de parité (`test/i18n-strings.test.ts`) : une clé présente d'un
+ * côté et absente de l'autre ne casse rien — `ui()` se rabat sur l'anglais —, elle se
+ * contente de rendre une phrase anglaise au milieu de phrases françaises. */
+export const catalogs: Record<string, Record<string, string>> = { fr, en };
 
 export function ui(lang: string, key: string, params?: Record<string, string | number>): string {
   const base = lang.toLowerCase().split(/[-_]/)[0] ?? 'en';

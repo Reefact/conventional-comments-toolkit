@@ -185,6 +185,23 @@ export const selectors = {
       'button[type="submit"][data-testid*="submit"]',
       'button[type="submit"].btn-primary',
       'button[type="submit"]',
+      // MESURÉ sur la vue `…/changes`, boîte de réponse ouverte : les boutons de Primer sont
+      // `type="button"`, donc invisibles aux trois candidats ci-dessus. Le pied en porte
+      // trois — *Cancel*, *Reply*, *Start a review* — et il faut intercepter les deux qui
+      // PUBLIENT sans toucher à celui qui annule : bloquer *Cancel* enfermerait l'auteur d'un
+      // commentaire non conforme, pire que le défaut qu'on corrige.
+      //
+      // Aucun attribut ne les sépare : `data-variant` vaut `primary` pour *Start a review*
+      // mais `default` pour *Reply* COMME pour *Cancel*, et il n'y a ni `data-testid`, ni
+      // `aria-label`, ni indice de raccourci clavier (cherché, absent). Le seul écart mesuré
+      // est structurel : *Cancel* est un `<button>` nu, PREMIER enfant du groupe, quand les
+      // deux autres sont chacun enveloppés d'un `<div>`.
+      //
+      // D'où les deux conditions plutôt qu'une. L'enveloppe seule échouerait du mauvais côté —
+      // le jour où GitHub enveloppe *Cancel*, on se mettrait à l'intercepter. En exigeant AUSSI
+      // qu'il ne soit pas le premier enfant, il faudrait que la plateforme l'enveloppe ET le
+      // déplace. Le libellé, lui, n'est pas une prise : il se traduit.
+      '[class*="Footer-module__childrenStyling"] > div:not(:first-child) button',
     ],
   } satisfies SelectorChain,
 
@@ -275,7 +292,15 @@ export const selectors = {
    * nommé (§9.4). */
   submitContainer: {
     name: 'submit-container',
-    candidates: ['form'],
+    candidates: [
+      'form',
+      // MESURÉ sur la vue `…/changes` : ce composeur n'a AUCUN `form`, si bien que le repli de
+      // `getSubmitControls()` — le parent direct du champ — tombait sur le `<span>` qui ne
+      // contient que lui. Aucun contrôle d'envoi n'était donc branché, et sous `enforce` un
+      // commentaire non conforme restait publiable au clic (revue, PR #52). Ce conteneur-ci
+      // porte à la fois le champ et le pied qui tient les boutons.
+      '[class*="MarkdownEditor-module__container"]',
+    ],
   } satisfies SelectorChain,
 
   /** Marqueur « résolu » d'un fil rendu. */

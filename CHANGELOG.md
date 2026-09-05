@@ -29,6 +29,17 @@ and what a reader needs from them is the behaviour, not the thirteen.
   identifiers, and the check output (§6.3.1) names them the same way.
 
 
+- **Under `enforce`, a non-compliant comment can no longer be published by clicking on the
+  rewritten "Files changed" view** (§4.3). That composer has no `form`, so the submit-control
+  lookup fell back to the field's direct parent — a `<span>` holding nothing but the field —
+  and wired no control at all; only the keyboard path survived. Its footer carries three
+  buttons, and telling apart the two that publish from the one that cancels took measuring:
+  Primer's buttons are `type="button"`, `data-variant` reads `default` for *Reply* as for
+  *Cancel*, and there is no test id, label or shortcut hint to go by. The one measured
+  difference is structural — *Cancel* is a bare button and the group's first child, the other
+  two are each wrapped — so the selector asks for both, since the wrapper alone would fail on
+  the dangerous side the day GitHub wraps *Cancel* too.
+
 - **The composer keeps its spacing after a trip through the Preview tab.** Switching to
   Preview and back remounts the editor on the rewritten Files changed view, and React rewrites
   the class list of the field's wrapper — taking with it the class that carries the extension's

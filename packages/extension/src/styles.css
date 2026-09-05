@@ -212,6 +212,16 @@
 .cct-ring-inset.cct-border-warn { outline-offset: -1px !important; }
 .cct-ring-inset.cct-border-error { outline-offset: -2px !important; }
 
+/* …et il en prend les COINS. Un `outline` épouse le `border-radius` de son propre élément, or
+   le champ n'en a aucun : MESURÉ sur la vue `…/changes`, le `<textarea>` est à `0px` quand la
+   gaine qui le rogne est à `6px` (2026-09-04). Le trait y était donc un rectangle à angles
+   droits dans une boîte arrondie, dont les quatre coins se faisaient couper — la moitié du
+   correctif manquait, et se voyait.
+   `inherit` plutôt qu'une valeur : le rayon est celui de la gaine, quel qu'il soit et quand
+   GitHub le changera. La règle ne touche que les champs marqués `cct-ring-inset`, donc jamais
+   une génération où le trait reste dehors. */
+.cct-ring-inset { border-radius: inherit !important; }
+
 /* Bandeau du §5.5 — un sommaire, pas une alarme. Le verdict de conformité appartient au
    check de la plateforme, déjà rouge et déjà bloquant ; le rejouer ici en « danger »
    dévaluerait les deux. Surface neutre, fanion d'attention, icône ET texte (§10). */

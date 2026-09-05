@@ -225,6 +225,32 @@ export class EditorController {
     this.refresh();
   }
 
+  /** Pose une classe et la REPOSE si la plateforme l'emporte.
+   *
+   * MESURÉ sur la vue `…/changes` : passer sur l'onglet « Preview » puis revenir à « Write »
+   * fait remonter le composeur par React, qui réécrit le `className` de l'enveloppe du champ.
+   * Le champ, lui, est conservé — `memeNoeud: true`, et nos classes `cct-editor` /
+   * `cct-ring-inset` y survivent — mais `cct-host` disparaît de l'ancêtre, et le retrait de
+   * 8 px avec elle. Rien ne le rattrapait : `observeEditors` ne remonte un champ qu'une fois,
+   * donc aucun réattachement n'a lieu et la classe reste perdue jusqu'à la fermeture du
+   * composeur.
+   *
+   * Le dépôt a déjà cet idiome pour ce que la plateforme défait de nos rendus
+   * (`ownOutputSignatureOf`, content-internal.ts) ; ici il suffit d'un observateur d'attribut
+   * par élément. Reposer la classe déclenche une nouvelle mutation, que le rappel voit sans
+   * rien faire : pas de boucle. */
+  #keepClass(el: Element, cls: string): void {
+    el.classList.add(cls);
+    const observer = new MutationObserver(() => {
+      if (!el.classList.contains(cls)) el.classList.add(cls);
+    });
+    observer.observe(el, { attributes: true, attributeFilter: ['class'] });
+    this.#disposers.push(() => {
+      observer.disconnect();
+      el.classList.remove(cls);
+    });
+  }
+
   attach(): void {
     const decision = this.evaluateNow();
     if (decision.inactive) return; // mode off : l'extension reste inactive (§7)
@@ -263,22 +289,19 @@ export class EditorController {
       (this.deps.editor.element.className.includes('CommentBox') ? host : null) ??
       framedAncestor(this.deps.editor.element);
     if (paddedContainer) {
-      paddedContainer.classList.add('cct-host');
-      this.#disposers.push(() => paddedContainer.classList.remove('cct-host'));
+      this.#keepClass(paddedContainer, 'cct-host');
       // La zone de saisie se donne souvent son propre retrait horizontal (sur GitHub,
       // `.CommentBox-input` porte `padding: var(--base-size-8)`), qui ferait double emploi
       // avec celui du conteneur et désalignerait son texte du reste. Neutralisé en CSS ; la
       // règle correspondante (styles.css) cible un descendant, pas seulement un enfant
       // direct, pour couvrir aussi ce wrapper intermédiaire.
-      this.deps.editor.element.classList.add('cct-editor');
-      this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-editor'));
+      this.#keepClass(this.deps.editor.element, 'cct-editor');
     }
 
     // §5.3 — le trait d'état rentre dans la boîte quand un conteneur le rognerait, et
     // seulement là : ailleurs il mordrait sur le texte d'un champ sans padding (ui/stacking.ts).
     if (ringIsClipped(this.deps.editor.element)) {
-      this.deps.editor.element.classList.add('cct-ring-inset');
-      this.#disposers.push(() => this.deps.editor.element.classList.remove('cct-ring-inset'));
+      this.#keepClass(this.deps.editor.element, 'cct-ring-inset');
     }
 
     // §5.1 — barre d'outils au-dessus de la zone de saisie, §5.3 pastille en dessous : les

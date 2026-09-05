@@ -164,8 +164,14 @@
   color: var(--fgColor-default, var(--color-fg-default, currentColor));
 }
 
+/* La pastille est décollée du champ : posée juste sous lui, elle se lisait comme une partie
+   de la boîte plutôt que comme un verdict à son sujet. La marge est CONSTANTE, quel que soit
+   l'état affiché, donc elle ne rouvre pas le décalage de mise en page que `min-height` ferme
+   (§5.3) : elle déplace la réserve, elle ne la fait pas varier. Réglée à l'œil sur la page,
+   comme la gouttière plus haut, et nommée pour la même raison. */
 .cct-feedback {
   min-height: 1.6em; /* pas de layout shift (§5.3) */
+  margin-top: var(--cct-pastille-gap, 4px);
   font-size: 12px;
 }
 

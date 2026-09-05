@@ -64,7 +64,7 @@ await page.setContent(`
   <style>
     body { font: 14px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; margin: 0; width: 700px; }
     /* La gaine mesurée sur la vue des fichiers modifiés : elle épouse le champ et coupe. */
-    .gaine { display: inline-flex; overflow: hidden; width: 100%; }
+    .gaine { display: inline-flex; overflow: hidden; width: 100%; border-radius: 6px; }
     .gaine textarea { width: 100%; border: 0; padding: 8px; box-sizing: border-box; }
     ${css}
   </style>
@@ -108,6 +108,8 @@ const m = await page.evaluate(() => {
     traitChanges: (() => { const r = rect(champC), o = offset(champC);
       return { l: r.l - o, r: r.r + o, t: r.t - o, b: r.b + o }; })(),
     gaineRect: rect(gaine),
+    rayonChanges: getComputedStyle(champC).borderTopLeftRadius,
+    rayonGaine: getComputedStyle(gaine).borderTopLeftRadius,
     gouttiereHerite: parseFloat(getComputedStyle(q('#champ-herite')).paddingLeft),
     barreRetrait: parseFloat(getComputedStyle(q('#herite .cct-toolbar')).paddingLeft),
     ecartPastille: rect(q('#herite .cct-feedback')).t - rect(q('#champ-herite')).b,
@@ -131,6 +133,13 @@ assert(
   'contre-épreuve : dehors, il déborderait — c’est le défaut observé',
   sorti.l < m.gaineRect.l || sorti.r > m.gaineRect.r,
   `il irait à [${sorti.l.toFixed(1)}, ${sorti.r.toFixed(1)}]`
+);
+// Un trait rentré dans une boîte arrondie doit s'arrondir avec elle, sinon ses quatre coins
+// se font rogner — ce qui s'est vu avant que le rayon ne soit hérité.
+assert(
+  'rentré, le trait prend le rayon de la gaine',
+  m.rayonChanges === m.rayonGaine && parseFloat(m.rayonGaine) > 0,
+  `champ ${m.rayonChanges}, gaine ${m.rayonGaine}`
 );
 assert('le texte garde sa gouttière (≥ 5px)', m.gouttiereHerite >= 5, `${m.gouttiereHerite}px`);
 assert('la barre n’a aucun retrait horizontal', m.barreRetrait === 0, `${m.barreRetrait}px`);

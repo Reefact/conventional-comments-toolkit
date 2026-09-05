@@ -32,6 +32,15 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **A blocking label in a batch review's body is warned about again** (§4.1, which validates
+  that body but denies it any blocking state — nobody can resolve a review summary). On the
+  rewritten Files changed view the "Finish your comments" panel matched none of the chain's
+  three candidates, so the field fell through to the thread-root fallback and was credited with
+  a blocking state it cannot carry. The symptom was one missing line: `issue:` there reported
+  `E-EMPTY-SUBJECT` and `W-NO-DISCUSSION` but not `W-NOT-BLOCKABLE`, where the same text in the
+  conversation box reports all three. The panel is recognised by two measured containers of its
+  own component, appended to the chain so the generations that already matched cannot move.
+
 - **The compliance outline around the field is visible again on the rewritten "Files changed"
   view** (§5.3). It was drawn all along — measured green on the text area — and then clipped:
   the state ring is an `outline` so that it never pushes the page around, but an outline paints

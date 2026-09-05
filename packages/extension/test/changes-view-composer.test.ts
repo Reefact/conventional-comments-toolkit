@@ -138,3 +138,61 @@ describe('CA-11 — une chaîne `editors` qui ne reconnaît plus rien laisse une
     expect(adapter.log.failures.map((f) => f.chain)).not.toContain('editors');
   });
 });
+
+// §4.1 — « Corps d'une revue soumise en lot : format validé, ne porte AUCUN état bloquant ».
+// C'est le panneau « Finish your comments » (Submit comments / Start a review). MESURÉ sur
+// `/pull/48/changes` : ses trois candidats historiques y comptent 0, et le champ y est
+// indiscernable de celui d'un commentaire de ligne — mêmes `aria-label`, `placeholder` et
+// classe. Seuls ses ancêtres le distinguent, et le fixture les reproduit dans leur ordre relevé.
+const PANNEAU_REVUE = `
+  <div class="ReviewMenu-module__AnchoredReviewBody__kV00L">
+    <div class="CommentBox-module__commentBoxContainer__fVeTk">
+      <fieldset class="MarkdownEditor-module__fieldSet__RU0NL">
+        <div class="MarkdownEditor-module__container__H4O8J">
+          <div class="ReviewMenuContent-module__CommentBoxContainer__hDeoQ">
+            <div class="MarkdownInput-module__inputWrapper__vOI3M">
+              <div class="InlineAutocomplete-module__container__NQUmo">
+                <span class="MarkdownInput-module__textArea__BRDa8">
+                  <textarea id="revue" aria-label="Markdown value" class="prc-Textarea-TextArea-snlco"></textarea>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+  </div>`;
+
+describe('§4.1 — le corps d’une revue en lot ne porte pas d’état bloquant', () => {
+  beforeEach(() => {
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes'),
+      configurable: true,
+    });
+  });
+
+  it('le champ du panneau de revue est classé `review-body`', () => {
+    document.body.innerHTML = PANNEAU_REVUE;
+    const { editors } = observe();
+    expect(editors).toHaveLength(1);
+    expect(editors[0]!.context.zone).toBe('review-body');
+    // La conséquence visible : `W-NOT-BLOCKABLE` peut enfin s'afficher (§3.5, CA-21).
+    expect(editors[0]!.context.canCarryBlockingState).toBe(false);
+  });
+
+  // Contre-épreuve : le MÊME champ, hors du panneau, reste une racine de fil — sans quoi le
+  // test ci-dessus passerait avec un fixture que rien ne distingue.
+  it('le même champ hors du panneau reste une racine de fil', () => {
+    document.body.innerHTML = `
+      <div class="MarkdownInput-module__inputWrapper__vOI3M">
+        <div class="InlineAutocomplete-module__container__NQUmo">
+          <span class="MarkdownInput-module__textArea__BRDa8">
+            <textarea id="ligne" aria-label="Markdown value" class="prc-Textarea-TextArea-snlco"></textarea>
+          </span>
+        </div>
+      </div>`;
+    const { editors } = observe();
+    expect(editors[0]!.context.zone).toBe('thread-root');
+    expect(editors[0]!.context.canCarryBlockingState).toBe(true);
+  });
+});

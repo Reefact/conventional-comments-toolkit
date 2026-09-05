@@ -159,7 +159,23 @@ export const selectors = {
   /** Corps d'une revue soumise en lot — zone `review-body` (§4.1, §A.7). */
   reviewSummaryForm: {
     name: 'review-summary-form',
-    candidates: ['[data-testid="review-changes-form"]', 'form.pull-request-review-menu-form', '.js-reviews-container form'],
+    candidates: [
+      '[data-testid="review-changes-form"]',
+      'form.pull-request-review-menu-form',
+      '.js-reviews-container form',
+      // MESURÉ sur `/pull/48/changes`, panneau « Finish your comments » ouvert (2026-09-04) :
+      // aucun des trois candidats ci-dessus n'y matche, et le champ du panneau est
+      // indiscernable de celui d'un commentaire de ligne par ses attributs propres — même
+      // `aria-label`, même `placeholder`, même classe. Ce qui le distingue est au-dessus de
+      // lui : deux conteneurs du composant « ReviewMenu », que rien d'autre ne porte.
+      //
+      // Sans eux, le corps de revue tombait dans le repli de `#contextOf()` et se retrouvait
+      // classé `thread-root`, donc réputé porter un état bloquant. Symptôme unique et vérifié
+      // à l'écran : un `issue:` y affichait `E-EMPTY-SUBJECT` et `W-NO-DISCUSSION`, mais PAS
+      // `W-NOT-BLOCKABLE` — alors que personne ne peut résoudre un corps de revue (§4.1).
+      '[class*="ReviewMenuContent-module__"]',
+      '[class*="ReviewMenu-module__"]',
+    ],
   } satisfies SelectorChain,
 
   /** Boutons d'envoi d'un formulaire de commentaire (§4.3). */

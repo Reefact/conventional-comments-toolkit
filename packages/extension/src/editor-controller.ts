@@ -17,7 +17,7 @@ import {
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { computePrefixInsertion, shiftSelection } from '@cct/adapter-shared';
 import { decideGuard, feedbackState, type GuardDecision } from './guard.js';
-import { ringIsClipped, stackingMountFor } from './ui/stacking.js';
+import { framedAncestor, ringIsClipped, stackingMountFor } from './ui/stacking.js';
 import { buildToolbar, type PosedPrefix, type Toolbar } from './ui/toolbar.js';
 import { attachQuickInput } from './ui/quickinput.js';
 import { FeedbackView } from './ui/feedback.js';
@@ -253,7 +253,15 @@ export class EditorController {
     // trouvé par ce sélecteur — pas `host` — pour que l'en-tête et les onglets natifs, situés
     // au même niveau que ce wrapper, reçoivent eux aussi le retrait.
     const commentBoxContainer = this.deps.editor.element.closest('[data-testid*="comment-composer"]');
-    const paddedContainer = commentBoxContainer ?? (this.deps.editor.element.className.includes('CommentBox') ? host : null);
+    // Troisième voie, et la seule qui ne nomme personne : le conteneur qui ENCADRE le champ
+    // (ui/stacking.ts). Elle rend, sur le DOM hérité, l'élément que les deux premières
+    // désignaient déjà — elle ne peut donc pas y changer le rendu — et elle donne enfin son
+    // retrait à la nouvelle vue des fichiers modifiés, dont le cadre serrait la barre, le
+    // champ et la pastille faute d'être reconnu.
+    const paddedContainer =
+      commentBoxContainer ??
+      (this.deps.editor.element.className.includes('CommentBox') ? host : null) ??
+      framedAncestor(this.deps.editor.element);
     if (paddedContainer) {
       paddedContainer.classList.add('cct-host');
       this.#disposers.push(() => paddedContainer.classList.remove('cct-host'));

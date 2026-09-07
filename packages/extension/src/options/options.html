@@ -246,18 +246,23 @@
       </header>
 
       <section class="group">
-        <h2>Hôtes autorisés</h2>
+        <h2>Domaines autorisés</h2>
         <p class="group-sub">Accès de l'extension aux plateformes de revue de code.</p>
 
         <section class="panel">
-          <div class="panel-head"><h3>Sites cloud</h3></div>
-          <p class="panel-sub">Domaine connu et plateforme prédéfinie : un clic autorise l'accès.</p>
+          <!-- « Connus » plutôt que « cloud » ou « standards » : ce qui sépare cette zone
+               de la suivante n'est pas une façon d'héberger — une organisation historique
+               `visualstudio.com` est du cloud et se saisit pourtant plus bas, un GHE Cloud à
+               résidence de données aussi. C'est que l'extension connaît DÉJÀ l'adresse et la
+               plateforme, ce qui est exactement ce qui permet le clic unique. -->
+          <div class="panel-head"><h3>Domaines connus</h3></div>
+          <p class="panel-sub">Adresse et plateforme déjà connues : un clic autorise l'accès.</p>
           <div class="cloud-grid" id="cloud-list"></div>
-          <p class="empty-note" id="cloud-empty" hidden>Tous les sites cloud reconnus sont déjà autorisés.</p>
+          <p class="empty-note" id="cloud-empty" hidden>Tous les domaines connus sont déjà autorisés.</p>
         </section>
 
         <section class="panel">
-          <div class="panel-head"><h3>Domaine auto-hébergé</h3></div>
+          <div class="panel-head"><h3>Autres domaines</h3></div>
           <p class="panel-sub">
             Pour GitHub Enterprise Server, Azure DevOps Server, une organisation historique
             <code>visualstudio.com</code> ou tout autre hôte propre à votre organisation :
@@ -287,7 +292,8 @@
         </section>
 
         <section class="panel">
-          <div class="panel-head"><h3>Hôtes configurés</h3></div>
+          <div class="panel-head"><h3>Domaines configurés</h3></div>
+          <p class="panel-sub">L'extension est active sur ces domaines, et sur eux seulement.</p>
           <ul class="host-list" id="host-list" aria-live="polite"></ul>
           <p class="empty-note" id="host-empty" hidden>Aucun domaine autorisé pour l'instant.</p>
           <p class="form-state remove-state" aria-live="polite"></p>

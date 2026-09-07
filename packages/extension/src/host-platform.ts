@@ -119,8 +119,11 @@ export interface CloudPlatform {
  * l'accès à toutes les organisations sur URLs historiques quand un poste n'en sert qu'une.
  * Ce catalogue l'a porté, contredisant son propre commentaire, qui reconnaissait déjà le
  * cas comme « inconnu à la compilation, même situation que `*.ghe.com` » (revue Reefact,
- * PR #61). Ces hôtes-là se saisissent dans la zone des domaines auto-hébergés, où
- * `inferPlatform()` pré-remplit déjà Azure DevOps sur ce suffixe.
+ * PR #61). Ces hôtes-là se saisissent dans la zone « Autres domaines », où
+ * `inferPlatform()` pré-remplit déjà Azure DevOps sur ce suffixe. C'est d'ailleurs pourquoi
+ * cette zone ne s'appelle plus « auto-hébergée » : une organisation `visualstudio.com` est
+ * du cloud et y passe quand même. Ce qui la sépare de la précédente est que l'extension ne
+ * connaît PAS son adresse, pas la façon dont elle est hébergée.
  *
  * `dev.azure.com` reste ici : l'organisation y vit dans le CHEMIN, c'est donc un hôte fixe,
  * et l'autoriser est le minimum possible pour ce domaine. */

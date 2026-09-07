@@ -121,7 +121,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('zone 1 — sites cloud : le catalogue moins ce qui est déjà accordé', () => {
+describe('zone 1 — domaines connus : le catalogue moins ce qui est déjà accordé', () => {
   it('propose tout le catalogue quand rien n’est accordé', async () => {
     installPage();
     await loadOptions();
@@ -235,7 +235,7 @@ describe('zone 1 — sites cloud : le catalogue moins ce qui est déjà accordé
   });
 });
 
-describe('zone 3 — hôtes configurés : on y retire, on n’y reclasse plus', () => {
+describe('zone 3 — domaines configurés : on y retire, on n’y reclasse plus', () => {
   it('« Retirer » révoque la permission et purge l’étiquette', async () => {
     const state = installPage({
       granted: ['https://ghes.example.corp/*'],

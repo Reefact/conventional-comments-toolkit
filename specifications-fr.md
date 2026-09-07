@@ -1497,6 +1497,15 @@ interface EditorChrome {
                                        // qui donner le retrait intérieur (§5.1, §5.3)
 }
 
+// La FORME du HTML qu'une plateforme produit en rendant un corps de commentaire Markdown — les deux
+// seuls faits que le masquage de préfixe et la mise en avant du sujet (§5.5) interrogent.
+interface RenderedBodyShape {
+  paragraphTags: readonly string[];    // conteneurs de premier niveau enveloppant une ligne de Markdown
+                                       // ordinaire sans avoir consommé de syntaxe de tête ; tout le reste
+                                       // fait RENONCER le masquage, ce qui est l'issue sûre (§9.4, CA-11)
+  lineBreakTag: string;                // ce qui matérialise une fin de ligne simple dans ce corps rendu
+}
+
 interface PlatformAdapter {
   matches(url: URL): boolean;          // §2 — activation par domaine, `optional_host_permissions` (§A.4, §B.4)
   platformProfile(): PlatformProfile;  // §9.2.2 — marqueurs propres à la plateforme, passés à `validate()`
@@ -1504,6 +1513,8 @@ interface PlatformAdapter {
   getOrgConfig(url: string | null): Promise<ConfigRead>;  // §8.1.2 niveau 2 — URL issue du canal de plancher
   observeEditors(cb: (editor: EditorHandle) => void): Disposable;  // §4.1 — zones ; l'appel du cb est l'instant
                                                                    // mesuré par la NFR d'injection (§10)
+  renderedBodyShape(): RenderedBodyShape;  // §5.5 — la forme du HTML rendu par cette plateforme.
+                                       // Obligatoire pour la même raison que la suivante
   getEditorChrome(editor: EditorHandle): EditorChrome;  // §5.1, §5.3 — où l'extension s'accroche dans CE
                                        // composeur. Obligatoire : une méthode optionnelle laisserait une
                                        // plateforme nouvelle compiler sans jamais répondre
@@ -1543,6 +1554,8 @@ Trois propriétés la rendent sûre, et chacune répond à un échec précis :
 - **Aucune signature de ce contrat ne nomme une plateforme.** Un port qui exposerait `isGitHubChangesView()` aurait échoué : il obligerait le code partagé à savoir de qui il parle, et le `if` que le polymorphisme doit supprimer reviendrait sous un autre nom. Cette propriété est vérifiable mécaniquement, et elle est vérifiée.
 
 Elle est **obligatoire**, et ce choix se paie : toute doublure de test doit y répondre. Une méthode optionnelle ne coûterait rien et laisserait une plateforme nouvelle compiler sans jamais se prononcer — son extension se logerait alors au jugé sur un DOM que personne n'a regardé, silencieusement. Le compilateur doit poser la question ; répondre « rien de spécial » ne coûte qu'un mot.
+
+`renderedBodyShape()` répond à la même nécessité pour le §5.5, et mérite d'être distinguée sur un point : c'est la seule de ces deux méthodes dont l'absence produisait un rendu **faux** plutôt qu'un renoncement. Les faits de forme y étaient écrits en dur — un conteneur de paragraphe, un marqueur de fin de ligne —, mesurés sur une seule plateforme et appliqués à toutes. Sur un corps rendu où la fin de ligne n'est pas ce marqueur, la borne du sujet ne se déclenche jamais et un fragment entier du corps passe dans le sujet mis en avant. Les autres fuites de ce genre renoncent proprement ; celle-là se trompe, et c'est pourquoi la donnée doit venir de la plateforme même lorsque toutes répondent, aujourd'hui, la même chose.
 
 En cas d'échec de reconnaissance, le §9.4 s'applique sans réserve : aucune exception ne remonte, la dégradation est journalisée, et l'absence de retrait intérieur ne dégrade que l'esthétique du composeur — jamais l'usage normal de la plateforme (`CA-11`).
 

@@ -12,16 +12,30 @@ specific to AMO.
 See also [`store-listing-firefox-fr.md`](store-listing-firefox-fr.md)
 for the French version.
 
-## Technical prerequisite — verified while drafting this listing
+## Technical prerequisites — verified while drafting this listing
 
-The Gecko ID declared in `packages/extension/build.mjs`
-(`browser_specific_settings.gecko.id`) carried an example domain
-(`@example.org`) — a placeholder with no place in a real submission,
-even though Mozilla does not require ownership of the domain used in
-the ID. Fixed: it now points to
-`conventional-comments-toolkit@conventionalcomments.io`, the project's
-actual domain. Running `npm run build:extension` regenerates
-`packages/extension/dist-ext/firefox/manifest.json` with this new ID —
+- **Gecko ID.** The one declared in `packages/extension/build.mjs`
+  (`browser_specific_settings.gecko.id`) carried an example domain
+  (`@example.org`) — a placeholder with no place in a real submission,
+  even though Mozilla does not require ownership of the domain used in
+  the ID. Fixed: it now points to
+  `conventional-comments-toolkit@conventionalcomments.io`, the
+  project's actual domain.
+- **Data collection declared in the manifest.** As of November 3, 2025,
+  Mozilla requires every **new** extension submitted to AMO to declare
+  its data collection practices directly in
+  `browser_specific_settings.gecko.data_collection_permissions` — a
+  submission-form checklist is no longer enough (Extension Workshop,
+  "Firefox built-in consent for data collection and transmission").
+  Fixed: `build.mjs` now declares `required: ["none"]` (nothing is
+  transmitted by default) and `optional: ["technicalAndInteraction"]`
+  for the §10 telemetry — `technicalAndInteraction` is the only
+  category Mozilla allows to be declared optional rather than
+  required, which matches telemetry that is off by default and gated
+  on consent exactly.
+
+Running `npm run build:extension` regenerates
+`packages/extension/dist-ext/firefox/manifest.json` with both fixes —
 that file, once zipped, is what gets submitted to AMO.
 
 ## What carries over as-is
@@ -61,13 +75,22 @@ that file, once zipped, is what gets submitted to AMO.
   diff text. Check AMO's corresponding boxes accordingly (likely: none
   of Mozilla's listed personal-data categories apply, since optional
   telemetry is neither on by default nor tied to any identity).
-- **Manual source review.** Unlike Chrome Web Store, AMO may request
-  access to the unminified source when the submitted bundle is built by
-  a tool (here, `esbuild` — see `packages/extension/build.mjs`). Since
-  the repository is public under Apache-2.0, pointing AMO at the
-  repository URL (https://github.com/reefact/conventional-comments-toolkit)
-  in the field provided is enough — no need to upload a separate source
-  archive.
+- **Source code must be uploaded, not just linked.** Unlike Chrome Web
+  Store, AMO **requires** the source code whenever the submitted bundle
+  is produced by a tool that makes it hard to read — minification, or a
+  bundler such as `esbuild` (the one used here — see
+  `packages/extension/build.mjs`) or webpack (Extension Workshop,
+  "Source code submission"). A public repository URL is **not
+  sufficient**: a source archive matching the submitted version must be
+  uploaded with **every version**, together with a `README` that gives
+  the exact steps to reproduce the bundle — environment (OS, tool
+  versions), dependency install commands, the build command, and the
+  lockfile (`package-lock.json`, already at the repository root) to pin
+  exact versions. Since the repository is public under Apache-2.0,
+  preparing this archive is just zipping the repository at the
+  relevant tag rather than writing anything new — but the archive
+  itself has to be attached to the submission; the repository URL alone
+  does not stand in for that upload.
 - **Contact fields.** AMO asks for a **support email address** and,
   optionally, a **homepage**. Neither has been decided yet in this
   repository (same gap as for Chrome Web Store and Edge) — needs

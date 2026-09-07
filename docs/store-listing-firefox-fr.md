@@ -12,17 +12,31 @@ qui est spécifique à AMO.
 Voir aussi [`store-listing-firefox-en.md`](store-listing-firefox-en.md)
 pour la version anglaise.
 
-## Prérequis technique — vérifié avant la rédaction de cette fiche
+## Prérequis techniques — vérifiés avant la rédaction de cette fiche
 
-L'identifiant Gecko déclaré dans `packages/extension/build.mjs`
-(`browser_specific_settings.gecko.id`) portait un domaine d'exemple
-(`@example.org`) — un placeholder qui n'a pas sa place dans une
-soumission réelle, même si Mozilla n'exige pas la possession du domaine
-utilisé dans l'identifiant. Corrigé : il pointe désormais vers
-`conventional-comments-toolkit@conventionalcomments.io`, le domaine
-réel du projet. Un `npm run build:extension` régénère
-`packages/extension/dist-ext/firefox/manifest.json` avec ce nouvel
-identifiant — c'est ce fichier, une fois zippé, qui se soumet à AMO.
+- **Identifiant Gecko.** Celui déclaré dans `packages/extension/build.mjs`
+  (`browser_specific_settings.gecko.id`) portait un domaine d'exemple
+  (`@example.org`) — un placeholder qui n'a pas sa place dans une
+  soumission réelle, même si Mozilla n'exige pas la possession du domaine
+  utilisé dans l'identifiant. Corrigé : il pointe désormais vers
+  `conventional-comments-toolkit@conventionalcomments.io`, le domaine
+  réel du projet.
+- **Déclaration de collecte de données dans le manifeste.** Depuis le 3
+  novembre 2025, Mozilla exige que toute **nouvelle** extension soumise à
+  AMO déclare ses pratiques de collecte directement dans
+  `browser_specific_settings.gecko.data_collection_permissions` — un
+  formulaire de soumission ne suffit plus (Extension Workshop, « Firefox
+  built-in consent for data collection and transmission »). Corrigé :
+  `build.mjs` déclare désormais `required: ["none"]` (rien n'est transmis
+  par défaut) et `optional: ["technicalAndInteraction"]` pour la
+  télémétrie du §10 — `technicalAndInteraction` est la seule catégorie
+  que Mozilla autorise à déclarer en optionnelle plutôt qu'obligatoire,
+  ce qui correspond exactement à une télémétrie désactivée par défaut et
+  soumise à consentement.
+
+Un `npm run build:extension` régénère
+`packages/extension/dist-ext/firefox/manifest.json` avec ces deux
+correctifs — c'est ce fichier, une fois zippé, qui se soumet à AMO.
 
 ## Ce qui est repris tel quel
 
@@ -66,13 +80,22 @@ identifiant — c'est ce fichier, une fois zippé, qui se soumet à AMO.
   conséquence (probablement : aucune case à cocher pour les catégories
   de données personnelles listées par Mozilla, la télémétrie optionnelle
   n'étant ni activée par défaut ni liée à une identité).
-- **Revue manuelle du code source.** Contrairement à Chrome Web Store,
-  AMO peut demander l'accès au code source non minifié si le bundle
-  soumis est construit par un outil (ici `esbuild`, voir
-  `packages/extension/build.mjs`). Le dépôt étant public sous
-  Apache-2.0, il suffit de renseigner l'URL du dépôt
-  (https://github.com/reefact/conventional-comments-toolkit) dans le
-  champ prévu à cet effet plutôt que de téléverser une archive séparée.
+- **Code source à téléverser, pas seulement à référencer.** Contrairement
+  à Chrome Web Store, AMO **exige** le code source quand le bundle
+  soumis est produit par un outil qui le rend difficile à relire —
+  minification, ou bundler comme `esbuild` (celui utilisé ici, voir
+  `packages/extension/build.mjs`) ou webpack (Extension Workshop,
+  « Source code submission »). Une URL de dépôt public **ne suffit
+  pas** : il faut téléverser, à **chaque version**, une archive du code
+  source correspondant accompagnée d'un `README` qui donne la marche à
+  suivre pour reproduire le bundle à l'identique — environnement
+  (OS, version des outils), commandes d'installation des dépendances,
+  commande de build, et le lockfile (`package-lock.json`, déjà présent
+  à la racine du dépôt) pour figer les versions exactes. Le dépôt étant
+  public sous Apache-2.0, préparer cette archive revient à zipper le
+  dépôt à l'état du tag concerné plutôt qu'à écrire quoi que ce soit de
+  nouveau — mais l'archive doit être jointe à la soumission, l'URL du
+  dépôt seule ne remplace pas ce téléversement.
 - **Champs de contact.** AMO demande une **adresse de support** et,
   optionnellement, une **page d'accueil** (« Homepage »). Ni l'une ni
   l'autre ne sont encore décidées dans ce dépôt (même lacune que pour

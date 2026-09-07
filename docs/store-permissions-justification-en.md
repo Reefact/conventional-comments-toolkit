@@ -35,13 +35,16 @@ for the French original.
 - `chrome.storage.managed`: reads the enterprise policy floor (§8.1.1),
   never written to by the extension.
 
-**Correction (Codex review, second pass):** `selectorFailures` is only
-**read** from `chrome.storage.local` by the options page
-(`options.ts:85`) — nothing in the production code **writes** to it.
-`SelectorLog` keeps its failures in memory only (an internal array). The
-log shown in settings is therefore always empty as things stand; don't
-describe it as data that is actually persisted until that write path
-exists.
+**Correction (Codex review on this document, this round):** the
+previous claim — "nothing in the production code writes to it" — was
+wrong. `persistSelectorFailure()` (`content-internal.ts:286`) does
+write to `chrome.storage.local` under the `selectorFailures` key, via
+`appendToJournal()` (`storage.ts:69`); it is wired into `SelectorLog`'s
+callback (`content-internal.ts:436-437`), which calls it on every new
+selector degradation. The log shown in settings (`options.ts:85`,
+read-only from the options page) is therefore fed by a real write, not
+data that stays empty forever — describe it as such in the submission
+form.
 
 There is **no** persisted "allowed repositories" list, and the read
 cache for `.conventional-comments.json` (`ClientConfigResolver`) is an
@@ -296,11 +299,22 @@ messaging mechanics are verified in a real Chromium instance by
   however, issue network requests**, and that should be said plainly:
   reading the displayed repository's `.conventional-comments.json` via
   the `raw` route, and, when an enterprise policy floor names a
-  `configUrl`, reading that organization document. These requests carry
-  the user's session cookies (`credentials: 'include'`) — the same
-  authorization the user would have opening those URLs in a tab
-  themselves — and never carry any content outward: they are reads,
-  not writes.
+  `configUrl`, reading that organization document. **Correction (Codex
+  review on this document, this round):** claiming all of these
+  requests carry the full session cookie set (`credentials: 'include'`)
+  contradicted the `host_permissions` section earlier in this same
+  document, and was wrong for the most common route. Three cases, not
+  one: reading the displayed repository goes out with
+  **`same-origin`**, on `github.com` plus the `/raw/` path
+  (`configCredentials()`), for the reason already detailed above — the
+  first hop, same-origin as the page, carries the session, while the
+  cross-origin redirect no longer does; an organization `configUrl`
+  that names a domain **distinct** from the platform goes through the
+  service-worker relay, whose `chrome-extension://` origin carries
+  **no** github.com cookie at all; and it is only elsewhere — a
+  `configUrl` that is same-origin with the page, outside that specific
+  `raw` route — that `include` stays the default rule. In every case
+  these are reads: no content ever travels outward.
 - No remote code: `content_security_policy` forbids any script that
   isn't bundled inside the extension, and there is no CDN dependency.
 - Public, auditable source code (Apache-2.0 repository).

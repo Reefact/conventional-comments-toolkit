@@ -30,8 +30,31 @@ import { dirname, resolve } from 'node:path';
 import { Window } from 'happy-dom';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const cssPath = resolve(root, 'packages/extension/src/styles.css');
-const css = readFileSync(cssPath, 'utf8');
+// TOUTES les feuilles livrées, pas seulement la partagée. La scission par plateforme
+// (packages/adapters/<plateforme>/src/platform.css) a déplacé les noms Primer hors de la
+// feuille partagée — donc exactement le motif du défaut d'origine : le commentaire d'en-tête
+// citait « --color-fg- » suivi d'une étoile puis d'une barre oblique, se fermait là, et le
+// parseur emportait la règle suivante. Vérifier la seule feuille partagée laisserait ce garde
+// AU VERT tout en ne regardant plus l'endroit où le risque a déménagé.
+//
+// La liste est celle du build (packages/extension/build.mjs), et elle est relue ici plutôt que
+// recopiée : une feuille de plateforme ajoutée au build sans l'être ici serait livrée sans
+// être vérifiée, et rien ne le dirait.
+const buildScript = readFileSync(resolve(root, 'packages/extension/build.mjs'), 'utf8');
+const sheetPaths = [
+  resolve(root, 'packages/extension/src/styles.css'),
+  ...[...buildScript.matchAll(/'(\.\.\/adapters\/[^']+\.css)'/g)].map((m) =>
+    resolve(root, 'packages/extension', m[1])
+  ),
+];
+if (sheetPaths.length < 2) {
+  console.error(
+    "Aucune feuille de plateforme trouvée dans packages/extension/build.mjs.\n" +
+      "Ce garde en déduit sa liste : si le build a changé de forme, il ne vérifie plus que la\n" +
+      'feuille partagée sans le dire. Corrigez l\'extraction plutôt que de la contourner.'
+  );
+  process.exit(1);
+}
 
 /** Comparaison insensible aux espaces et au style de guillemets : le parseur normalise
  * `[aria-pressed='true']` en `[aria-pressed="true"]`, ce qui n'est pas un écart. */
@@ -108,19 +131,30 @@ const tally = (values) => {
   return counts;
 };
 
+let total = 0;
+for (const cssPath of sheetPaths) {
+const label = cssPath.slice(root.length + 1);
+const css = readFileSync(cssPath, 'utf8');
+
 const window = new Window();
 const style = window.document.createElement('style');
 style.textContent = css;
 window.document.head.appendChild(style);
 
 const { preludes, braceInString } = extractPreludes(stripComments(css));
+if (preludes.length === 0) {
+  // Une feuille sans aucune règle est légitime — adapters/azdo/src/platform.css n'en porte
+  // aucune, et son commentaire dit pourquoi. Rien à comparer, rien à conclure.
+  console.log(`${label} : aucune règle écrite (feuille de plateforme non renseignée).`);
+  continue;
+}
 if (braceInString) {
   console.error(
-    'styles.css contient une accolade à l\'intérieur d\'une chaîne (par exemple\n' +
+    `${label} contient une accolade à l\'intérieur d\'une chaîne (par exemple\n' +
       'content: "{"). Le parseur de happy-dom, sur lequel repose ce garde, jette toutes les\n' +
       'règles qui suivent une telle chaîne — un vrai navigateur, non. Le contrôle ne peut\n' +
       'donc rien affirmer ici : retirez cette construction du fichier, ou déplacez ce garde\n' +
-      'vers un Chromium réel. Échouer est le seul verdict honnête.'
+      'vers un Chromium réel. Échouer est le seul verdict honnête.`
   );
   process.exit(1);
 }
@@ -137,7 +171,7 @@ for (const [selector, count] of declared) {
 
 if (lost.length > 0) {
   console.error(
-    `styles.css : ${lost.length} règle(s) écrite(s) mais PERDUE(S) par le parseur CSS.\n` +
+    `${label} : ${lost.length} règle(s) écrite(s) mais PERDUE(S) par le parseur CSS.\n` +
       lost
         .map((l) => `  - ${l.selector}` + (l.count > 1 ? `  (${l.kept} retenue(s) sur ${l.count})` : ''))
         .join('\n') +
@@ -148,5 +182,8 @@ if (lost.length > 0) {
   process.exit(1);
 }
 
-const total = [...declared.values()].reduce((a, b) => a + b, 0);
-console.log(`styles.css : ${total} règles écrites, toutes retenues par le parseur.`);
+const sheetTotal = [...declared.values()].reduce((a, b) => a + b, 0);
+console.log(`${label} : ${sheetTotal} règles écrites, toutes retenues par le parseur.`);
+total += sheetTotal;
+}
+console.log(`${total} règles vérifiées sur ${sheetPaths.length} feuilles.`);

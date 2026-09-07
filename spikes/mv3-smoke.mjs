@@ -241,6 +241,40 @@ try {
       (relay.withPromise.answered && relay.withPromise.status === 'unreachable'),
     JSON.stringify(relay)
   );
+
+  // 7. CE QUI SÉPARE VRAIMENT une permission REQUISE d'une permission OPTIONNELLE, mesuré
+  //    plutôt que plaidé. Deux justifications successives de la règle « aucun hôte n'est
+  //    pré-déclaré » ont été écrites de mémoire et se sont révélées fausses (revues Reefact,
+  //    PR #61) : d'abord « un hôte du manifeste est révocable par rien » — le navigateur
+  //    garde ses propres contrôles d'accès aux sites —, puis « il n'apparaît pas dans
+  //    `chrome.permissions` », qui ne résiste pas non plus. Cette assertion établit la
+  //    frontière exacte, et elle vient EN DERNIER parce qu'elle tente une révocation.
+  //
+  //    `getAll()` doit rendre les permissions DÉCLARÉES au manifeste (`storage`,
+  //    `scripting`) : elles y sont donc visibles. Et `remove()` doit ÉCHOUER sur l'une
+  //    d'elles, là où il réussit sur un octroi optionnel. C'est cette asymétrie-là, et elle
+  //    seule, qui fonde la règle : l'extension ne peut pas reprendre ce que le manifeste
+  //    exige, donc ne peut pas construire un consentement autour.
+  const requiredVsOptional = await worker.evaluate(async () => {
+    const all = await new Promise((res) => chrome.permissions.getAll(res));
+    const removal = await new Promise((res) => {
+      try {
+        chrome.permissions.remove({ permissions: ['storage'] }, (removed) =>
+          res({ removed, lastError: chrome.runtime.lastError?.message ?? null })
+        );
+      } catch (e) {
+        res({ removed: false, threw: String(e) });
+      }
+    });
+    return { declared: all?.permissions ?? [], removal };
+  });
+  assert(
+    'une permission du manifeste est VISIBLE dans getAll() mais NON retirable par remove()',
+    requiredVsOptional.declared.includes('storage') &&
+      requiredVsOptional.declared.includes('scripting') &&
+      requiredVsOptional.removal.removed !== true,
+    JSON.stringify(requiredVsOptional)
+  );
 } finally {
   await context.close();
   rmSync(profile, { recursive: true, force: true });

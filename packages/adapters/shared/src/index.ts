@@ -36,6 +36,51 @@ export interface SubmitControl {
   kind: 'submit' | 'submit-and-resolve' | 'complete-pr';
 }
 
+/** Ce que seule la PLATEFORME sait du châssis qui entoure une zone de saisie — la boîte de
+ * commentaire, ses onglets, son en-tête — et dont l'extension a besoin pour s'y loger sans
+ * décaler quoi que ce soit (§5.1, §5.3).
+ *
+ * Cette méthode existe parce que son absence était un DÉFAUT DE CONFORMITÉ, pas parce qu'une
+ * abstraction manquait à l'élégance. Le §9.4 exige que « les sélecteurs DOM soient centralisés
+ * dans un fichier unique PAR ADAPTATEUR » ; or le contrôleur partagé cherchait ce conteneur
+ * avec deux littéraux GitHub (`[data-testid*="comment-composer"]`, puis la classe `CommentBox`),
+ * ce que le §9.4 interdit. Il n'avait pourtant aucun moyen d'obéir : aucune méthode du contrat
+ * ne lui permettait de DEMANDER ce conteneur à l'adaptateur. Élargir le port, c'est rendre
+ * l'obéissance possible.
+ *
+ * **Chaque champ vaut `null` pour dire « je ne me prononce pas »**, et le code partagé applique
+ * alors sa règle géométrique — celle qui n'interroge que le moteur de style et ne nomme personne
+ * (`framedAncestor`, `stackingMountFor`, `ringIsClipped` d'ui/stacking.ts). Un adaptateur qui
+ * rend `NEUTRAL_EDITOR_CHROME` obtient donc EXACTEMENT le comportement d'avant. C'est ce qui
+ * rend cet élargissement sans risque pour une plateforme qu'on n'a pas mesurée : ne rien
+ * affirmer, plutôt qu'affirmer sur elle les chiffres d'une autre.
+ *
+ * Ce châssis porte des ÉLÉMENTS, jamais des longueurs ni des couleurs. La frontière n'est pas
+ * cosmétique : le TypeScript dit quel élément joue quel rôle, la feuille de style de la
+ * plateforme dit combien il mesure (`--cct-frame-padding`, `--cct-text-gutter`). Sans cette
+ * règle, une mesure faite sur une plateforme redeviendrait une constante partagée par toutes,
+ * ce qui est exactement le défaut qu'on corrige : le retrait de 8 px du conteneur était la
+ * marge propre de `.CommentBox-container` sur GitHub, appliquée telle quelle à Azure DevOps.
+ *
+ * Ce type ne nomme AUCUNE plateforme, et c'est une règle : un port dont une signature mentionne
+ * GitHub ou Azure DevOps a échoué, puisqu'il obligerait le code partagé à savoir de qui il parle.
+ * `scripts/check-platform-isolation.mjs` le vérifie. */
+export interface EditorChrome {
+  /** Le conteneur qui encadre ENSEMBLE l'en-tête natif de la boîte, ses onglets, le champ et
+   * ce que l'extension injecte — celui à qui donner le retrait intérieur, pour que rien ne
+   * touche la bordure. `null` : le code partagé le cherche par la géométrie, en remontant au
+   * premier ancêtre qui DESSINE le cadre. */
+  framedContainer: Element | null;
+}
+
+/** « Je ne me prononce sur rien » — la réponse juste pour une plateforme dont la boîte de
+ * commentaire n'a pas été mesurée, et le comportement exact du code partagé avant que le port
+ * ne s'élargisse. Gelé : c'est une valeur partagée par tous les appelants, et un consommateur
+ * distrait qui y écrirait contaminerait les autres. */
+export const NEUTRAL_EDITOR_CHROME: EditorChrome = Object.freeze({
+  framedContainer: null,
+});
+
 export interface PlatformAdapter {
   matches(url: URL): boolean;
   platformProfile(): PlatformProfile;
@@ -43,6 +88,12 @@ export interface PlatformAdapter {
   getOrgConfig(url: string | null): Promise<ConfigRead>;
   observeEditors(cb: (editor: EditorHandle) => void): Disposable;
   getSubmitControls(editor: EditorHandle): SubmitControl[];
+  /** §5.1, §5.3, §9.4 — le châssis de CET éditeur. Obligatoire, et c'est délibéré : une
+   * méthode optionnelle laisserait une plateforme nouvelle compiler sans jamais répondre, et
+   * son extension se logerait alors au jugé sur un DOM que personne n'a regardé. Le compilateur
+   * doit poser la question ; `NEUTRAL_EDITOR_CHROME` permet d'y répondre « rien de spécial »
+   * en un mot. */
+  getEditorChrome(editor: EditorHandle): EditorChrome;
   readValue(editor: EditorHandle): string;
   writeValue(editor: EditorHandle, text: string, caret?: number): void;
   getThreads(): Promise<ThreadInfo[]>;
@@ -226,6 +277,18 @@ export function closestChain(el: Element, chain: SelectorChain): SelectorOutcome
   for (const candidate of chain.candidates) {
     const element = el.closest(candidate);
     if (element) return { element, matched: candidate };
+  }
+  return { element: null, matched: null };
+}
+
+/** L'élément LUI-MÊME répond-il à l'un des candidats ? Distinct de `closestChain`, et la
+ * distinction n'est pas un détail : `Element.closest()` commence par l'élément puis REMONTE,
+ * si bien qu'il répondrait aussi pour un ancêtre portant le motif — réponse fausse quand la
+ * question posée est « ce champ-ci porte-t-il cette marque, auquel cas son cadre est son
+ * parent direct ? ». */
+export function matchesChain(el: Element, chain: SelectorChain): SelectorOutcome {
+  for (const candidate of chain.candidates) {
+    if (el.matches(candidate)) return { element: el, matched: candidate };
   }
   return { element: null, matched: null };
 }

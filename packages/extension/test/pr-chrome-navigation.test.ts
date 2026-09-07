@@ -44,7 +44,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
-import { commentBodyText, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
+import { commentBodyText, type PlatformAdapter, type SubmitControl, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { defaultConfig, fingerprint, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver, type ResolvedClientConfig } from '../src/config-resolver.js';
 import { decorateComment } from '../src/ui/badges.js';
@@ -116,6 +116,7 @@ function makeAdapter(
     getRepoConfig: async () => ({ status: 'absent' }),
     getOrgConfig: async () => ({ status: 'absent' }),
     observeEditors: () => ({ dispose: () => {} }),
+    getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
     getSubmitControls: () => [],
     readValue: () => '',
     writeValue: () => {},
@@ -578,6 +579,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
       }),
       getOrgConfig: async () => ({ status: 'absent' }),
       observeEditors: () => ({ dispose: () => {} }),
+      getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
       getSubmitControls: () => [],
       readValue: () => '',
       writeValue: () => {},

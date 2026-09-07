@@ -26,7 +26,9 @@ import {
   queryChain,
   queryChainAll,
   writeToTextField,
+  NEUTRAL_EDITOR_CHROME,
   SelectorLog,
+  type EditorChrome,
   type EditorContext,
   type EditorHandle,
   type PlatformAdapter,
@@ -159,6 +161,20 @@ export class AzdoClientAdapter implements PlatformAdapter {
     const observer = new MutationObserver(() => scan());
     observer.observe(this.#doc.documentElement, { childList: true, subtree: true });
     return { dispose: () => observer.disconnect() };
+  }
+
+  /** Le châssis de cet éditeur (§5.1, §5.3). **On ne se prononce pas, et c'est une réponse,
+   * pas un trou** : la boîte de commentaire d'Azure DevOps n'a jamais été mesurée dans ce
+   * dépôt, et le seul cadre dont on connaisse la forme est celui de GitHub. Nommer ici un
+   * conteneur, ou reprendre les chiffres relevés sur github.com, serait affirmer sur cette
+   * plateforme ce qu'on n'a pas regardé — exactement le défaut que l'élargissement du contrat
+   * corrige.
+   *
+   * Le code partagé applique donc sa règle géométrique, qui n'interroge que le moteur de style
+   * et vaut partout. Le jour où quelqu'un mesure un vrai tenant (A-FAIRE-fr.md, point 9), c'est
+   * ICI que le résultat se pose, et nulle part ailleurs. */
+  getEditorChrome(_editor: EditorHandle): EditorChrome {
+    return NEUTRAL_EDITOR_CHROME;
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {

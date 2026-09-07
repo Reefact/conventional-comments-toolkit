@@ -105,5 +105,13 @@ jobs:
       - name: Mise en page du composeur — trait d'état, gouttière, pastille (§5.1, §5.3)
         run: npm run check:composer-layout
 
+      # « Un enregistrement dynamique n'atteint pas un document déjà chargé » : le genre
+      # d'affirmation sur le navigateur qui décide d'une architecture, et qu'aucun faux ne
+      # peut trancher — un `chrome.scripting` de test dira toujours que l'enregistrement a
+      # réussi. La contre-épreuve est dans la mesure : un onglet ouvert ENSUITE, lui, reçoit
+      # bien le script.
+      - name: Injection — ce qu'un enregistrement dynamique atteint (§A.4)
+        run: npm run check:open-tab-injection
+
       - name: Smoke test de sélecteurs (§9.4)
         run: node spikes/p1-prime/smoke.mjs

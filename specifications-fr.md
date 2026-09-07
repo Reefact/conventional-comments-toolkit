@@ -1759,7 +1759,7 @@ Couvre github.com, GitHub Enterprise Cloud (y compris EMU) et GitHub Enterprise 
 | | Cloud | Auto-hébergé |
 |---|---|---|
 | **Offre** | github.com, GitHub Enterprise Cloud (EMU) | GitHub Enterprise Server |
-| **Domaine** | `github.com`, seul domaine pré-déclarable ; sous-domaine dédié de `ghe.com` pour la résidence de données, qui relève du même mécanisme runtime que l'auto-hébergé (voir A.4) | Domaine interne, variable par instance |
+| **Domaine** | `github.com` ; sous-domaine dédié de `ghe.com` pour la résidence de données. Aucun des deux n'est pré-déclaré : tous relèvent du mécanisme runtime décrit en A.4, au même titre que l'auto-hébergé | Domaine interne, variable par instance |
 | **Rythme de mise à jour du produit** | Continu | Par release, plusieurs versions supportées en parallèle |
 | **Version minimale supportée** | — | *à définir avant P2 (génération de DOM à cibler) et avant P5 (webhooks disponibles, notamment `pull_request_review_thread`, nécessaire au §6)* |
 
@@ -1778,7 +1778,12 @@ SPA (Turbo) — l'adaptateur écoute les événements de navigation Turbo pour r
 
 **Lecture du fichier de configuration par l'extension** (`getRepoConfig()`, §9.2.3, §10) : la route web `https://{hôte}/{owner}/{repo}/raw/{branche-par-défaut}/.conventional-comments.json`, servie sur la session de l'utilisateur, sans jeton. Elle fonctionne sur les dépôts privés auxquels la personne a accès, ce que `raw.githubusercontent.com` ne permettrait pas.
 
-Seul `github.com` est pré-déclarable. GitHub Enterprise Server (domaine interne) **et** GitHub Enterprise Cloud with data residency — qui attribue à chaque client un sous-domaine dédié de `ghe.com`, inconnu à la compilation, avec ses propres points d'accès d'API — relèvent tous deux du même mécanisme : `optional_host_permissions` avec saisie du domaine dans les options d'installation, ou pré-autorisation par politique d'entreprise.
+**Aucun domaine n'est pré-déclaré, `github.com` compris.** Tous relèvent du même mécanisme : `optional_host_permissions`, accordé à l'exécution depuis les options d'installation ou pré-autorisé par politique d'entreprise. Un domaine pré-déclaré serait actif sans permission, et par conséquent révocable par rien — c'est la raison de fond, et elle ne connaît pas d'exception, ici pas plus qu'en B.4.
+
+Ce qui distingue les domaines n'est donc pas le droit d'être actif, mais la façon de le demander :
+
+- **Domaine connu à la compilation** (`github.com`) : proposé dans un catalogue de la page d'options, où un seul geste l'autorise et désigne sa plateforme — celle-ci n'ayant pas à être choisie, elle est déjà connue.
+- **Domaine inconnu à la compilation** : GitHub Enterprise Server (domaine interne) **et** GitHub Enterprise Cloud with data residency — qui attribue à chaque client un sous-domaine dédié de `ghe.com`, avec ses propres points d'accès d'API. Le domaine se saisit, et sa plateforme se choisit **avant** l'octroi : un hôte autorisé sans plateforme associée n'active aucun adaptateur (§2).
 
 ### A.5 Gestion du DOM multi-générations
 
@@ -1875,7 +1880,7 @@ SPA — pas d'équivalent de Turbo : l'adaptateur observe le conteneur racine vi
 
 ### B.4 Domaines et lecture de la configuration
 
-`dev.azure.com`, `*.visualstudio.com`, ou domaine on-premise pour Azure DevOps Server → `optional_host_permissions` avec saisie du domaine dans les options pour la variante auto-hébergée.
+`dev.azure.com`, `*.visualstudio.com`, ou domaine on-premise pour Azure DevOps Server → `optional_host_permissions` dans **tous** les cas, selon la règle unique du §A.4. Les deux domaines cloud sont connus à la compilation, donc proposés au catalogue de la page d'options ; le domaine on-premise se saisit, plateforme choisie avant l'octroi.
 
 **Lecture du fichier de configuration par l'extension** (`getRepoConfig()`, §9.2.3, §10) : Azure DevOps n'expose pas de route de fichier brut équivalente à celle de GitHub ; l'accès au contenu d'un fichier passe par un point d'API. Qu'il soit atteignable depuis la page sur la seule session de l'utilisateur est **à établir par le spike `P1'`** (§14), au même titre que le type de l'éditeur (§B.2). S'il ne l'est pas, `getRepoConfig()` y renvoie `{ status: 'unreachable' }` et l'extension y est en **état dégradé** au sens du §5.4 — elle assiste sans bloquer (§10) — le composant B restant, comme partout, la source de vérité.
 

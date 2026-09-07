@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
-// §2, §A.4, §B.4 : sur un hôte accordé via `optional_host_permissions` autre que
-// github.com (statiquement couvert par `content_scripts`), le script de contenu doit
-// être enregistré dynamiquement — sinon l'adaptateur AzDO/GHES existe et est testé, mais
-// reste mort sur toute plateforme réelle. Ces tests reproduisent la mécanique
-// chrome.scripting sans navigateur réel.
+// §2, §A.4, §B.4 : le manifeste ne déclare AUCUN `content_scripts`, donc tout hôte accordé
+// via `optional_host_permissions` — github.com compris — doit être enregistré
+// dynamiquement, sinon l'adaptateur existe et est testé mais reste mort sur toute
+// plateforme réelle. Ces tests reproduisent la mécanique chrome.scripting sans navigateur
+// réel.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -48,15 +48,24 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe('résidu — §2/§A.4/§B.4 : le script de contenu s’enregistre dynamiquement hors github.com', () => {
-  it('au démarrage, chaque permission déjà accordée (hors github.com) est enregistrée', async () => {
+describe('résidu — §2/§A.4/§B.4 : le script de contenu s’enregistre dynamiquement, sans exception', () => {
+  it('au démarrage, CHAQUE permission déjà accordée est enregistrée', async () => {
     const fake = installFakeChrome(['https://github.com/*', 'https://dev.azure.com/*']);
     await import('../src/background.js');
     await new Promise((r) => setTimeout(r, 0)); // laisse la synchronisation asynchrone se dérouler
 
-    expect(fake.scripting.registerContentScripts).toHaveBeenCalledTimes(1);
-    const [scripts] = fake.scripting.registerContentScripts.mock.calls[0]!;
-    expect(scripts).toEqual([
+    expect(fake.scripting.registerContentScripts).toHaveBeenCalledTimes(2);
+    const registered = fake.scripting.registerContentScripts.mock.calls.map(
+      ([scripts]) => (scripts as { id: string; matches: string[] }[])[0]
+    );
+    expect(registered).toEqual([
+      {
+        id: 'cct-https-github-com',
+        matches: ['https://github.com/*'],
+        js: ['content.js'],
+        css: ['styles.css'],
+        runAt: 'document_idle',
+      },
       {
         id: 'cct-https-dev-azure-com',
         matches: ['https://dev.azure.com/*'],
@@ -67,11 +76,27 @@ describe('résidu — §2/§A.4/§B.4 : le script de contenu s’enregistre dyna
     ]);
   });
 
-  it('github.com n’est jamais enregistré dynamiquement — déjà couvert par content_scripts', async () => {
+  // Ce test disait l'inverse : « github.com n'est jamais enregistré dynamiquement — déjà
+  // couvert par content_scripts ». Le manifeste ne déclare plus aucun `content_scripts`, si
+  // bien que l'exception d'hier serait aujourd'hui un hôte mort. Et c'est le SEUL chemin
+  // par lequel sa révocation devient effective : un script encore enregistré continuerait
+  // de s'injecter après le retrait de la permission.
+  it('github.com s’enregistre comme les autres, et se désenregistre à la révocation', async () => {
     const fake = installFakeChrome(['https://github.com/*']);
     await import('../src/background.js');
     await new Promise((r) => setTimeout(r, 0));
-    expect(fake.scripting.registerContentScripts).not.toHaveBeenCalled();
+    expect(fake.scripting.registerContentScripts).toHaveBeenCalledTimes(1);
+
+    const onRemoved = fake.permissions.onRemoved.addListener.mock.calls[0]![0] as (p: {
+      origins: string[];
+    }) => void;
+    onRemoved({ origins: ['https://github.com/*'] });
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(fake.scripting.unregisterContentScripts).toHaveBeenCalledWith(
+      { ids: ['cct-https-github-com'] },
+      expect.any(Function)
+    );
   });
 
   it('un octroi ultérieur (page d’options) déclenche l’enregistrement immédiat', async () => {

@@ -136,6 +136,20 @@ describe('B1 — hostnameOf canonicalise des deux côtés de la comparaison', ()
     expect(hostnameOf('not a host')).toBeNull();
     expect(hostnameOf('')).toBeNull();
     expect(hostnameOf('   ')).toBeNull();
+    expect(hostnameOf('*.')).toBeNull(); // un joker sans domaine ne désigne rien
+  });
+
+  // CE TEST NE SUFFIT PAS À LUI SEUL, et c'est le fait le plus important à son sujet : sous
+  // Node, `new URL('https://*.ghe.com').hostname` rend déjà `*.ghe.com`, si bien qu'il
+  // passait AVANT comme APRÈS le contournement. Chromium, lui, rend `%2A.ghe.com` — mesuré
+  // par `npm run smoke:mv3`, seul endroit où cette affirmation peut être vérifiée. Ce qui
+  // est vérifié ici, c'est que le joker survit à `hostnameOf()` QUEL QUE SOIT ce que le
+  // parseur en fait ; le fait navigateur qui rend le contournement nécessaire vit là-bas.
+  it('conserve un joker de tête, sans le confier au parseur d’URL', () => {
+    expect(hostnameOf('https://*.ghe.com/*')).toBe('*.ghe.com');
+    expect(hostnameOf('https://*.visualstudio.com/*')).toBe('*.visualstudio.com');
+    // Et la canonicalisation continue de s'appliquer à ce qui suit le joker.
+    expect(hostnameOf('https://*.GHE.Example.Corp/*')).toBe('*.ghe.example.corp');
   });
 });
 
@@ -916,11 +930,20 @@ describe('F3 — un hôte classé APRÈS l’ouverture de l’onglet finit par s
 
 describe('G1 — l’activation se décide sur la répartition publiée, pas sur matchesHost()', () => {
   // `dev.azure.com` et `*.visualstudio.com` sont des défauts EN DUR des adaptateurs, mais
-  // `content_scripts` du manifeste ne couvre statiquement que github.com : ces hôtes
-  // dépendent donc bel et bien d'une permission optionnelle. Un commentaire de ce dépôt
-  // affirmait l'inverse, et la révocation était de fait muette sur toute la famille Azure.
-  it('seul github.com est actif sans figurer dans la répartition', () => {
-    expect(selectPlatform('github.com', EMPTY_EXTRA_HOSTS)).toBe('github');
+  // aucun hôte n'est injecté statiquement : tous dépendent d'une permission optionnelle.
+  // Un commentaire de ce dépôt affirmait l'inverse, et la révocation était de fait muette
+  // sur toute la famille Azure.
+  //
+  // Ce test disait « seul github.com est actif sans figurer dans la répartition » : c'était
+  // vrai tant que `content_scripts` l'injectait statiquement et que `selectPlatform()` le
+  // court-circuitait. Le privilège a disparu avec l'entrée du manifeste — et c'est ce qui
+  // rend sa révocation possible, un hôte privilégié n'étant révocable par rien.
+  it('AUCUN hôte n’est actif sans figurer dans la répartition, github.com compris', () => {
+    expect(selectPlatform('github.com', EMPTY_EXTRA_HOSTS)).toBeNull();
+  });
+
+  it('github.com s’active comme les autres, par la répartition', () => {
+    expect(selectPlatform('github.com', { github: ['github.com'], azdo: [] })).toBe('github');
   });
 
   it('dev.azure.com et *.visualstudio.com ne s’activent PAS sur leur seul défaut d’adaptateur', () => {

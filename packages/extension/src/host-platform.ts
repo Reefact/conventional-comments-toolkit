@@ -43,7 +43,16 @@ export const EMPTY_EXTRA_HOSTS: ExtraHostsByPlatform = { github: [], azdo: [] };
  * data residency donne à chaque client un sous-domaine de `ghe.com`, inconnu à la
  * compilation), et `hostMatchesAny()` d'`@cct/adapter-shared` sait le confronter à un
  * hôte concret. Le réduire à `ghe.com` ferait reconnaître le domaine nu et lui seul,
- * c'est-à-dire l'exact inverse de ce que l'octroi couvre. */
+ * c'est-à-dire l'exact inverse de ce que l'octroi couvre.
+ *
+ * **Le joker est retiré AVANT `URL`, et remis après.** Il ne suffisait pas de le laisser
+ * traverser : `new URL('https://*.ghe.com').hostname` rend `*.ghe.com` sous Node — donc
+ * dans toute cette suite de tests — mais `%2A.ghe.com` dans Chromium, MESURÉ (l'assertion
+ * correspondante de `npm run smoke:mv3` le rejoue dans un vrai navigateur). L'étiquette
+ * était donc stockée sous `%2A.ghe.com`, un motif que `matchScore()` ne voit plus comme un
+ * joker faute de `*.` en tête : il le traite comme un hôte exact, que rien n'égale jamais.
+ * La résidence de données n'a ainsi jamais fonctionné hors des tests, et aucun d'eux ne
+ * pouvait le voir — ils tournaient dans le seul environnement où l'affirmation est vraie. */
 export function hostnameOf(input: string): string | null {
   // Le retrait du schéma est INSENSIBLE À LA CASSE : un schéma est valide en majuscules, et
   // une saisie collée depuis une barre d'adresse peut l'être. Sans le drapeau `i`, le
@@ -53,22 +62,60 @@ export function hostnameOf(input: string): string | null {
   // Codex, PR #29).
   const bare = input.trim().replace(/\/\*$/, '').replace(/^https?:\/\//i, '');
   if (bare === '') return null;
+  const wildcard = bare.startsWith('*.');
+  const rest = wildcard ? bare.slice(2) : bare;
+  if (rest === '') return null;
   try {
-    return new URL(`https://${bare}`).hostname || null;
+    const hostname = new URL(`https://${rest}`).hostname;
+    if (!hostname) return null;
+    return wildcard ? `*.${hostname}` : hostname;
   } catch {
     return null;
   }
 }
 
-/** Le SEUL hôte que `content_scripts` du manifeste injecte statiquement, et donc le seul
- * qui ne dépende d'aucune permission optionnelle. `dev.azure.com` et `*.visualstudio.com`
- * sont des défauts codés en dur DANS LES ADAPTATEURS, ce qui est une tout autre chose :
- * ils ne sont injectés que si l'utilisateur a accordé la permission d'hôte, et la
- * révocation doit donc les désactiver comme n'importe quel domaine auto-hébergé. Un
- * commentaire de ce dépôt affirmait le contraire — « les hôtes par défaut […] ne dépendent
- * d'aucune permission optionnelle » — et la révocation était de fait inopérante sur toute
- * la famille Azure (revue Codex, PR #29). */
-export const STATICALLY_INJECTED_HOST = 'github.com';
+/** Un site cloud du catalogue : domaine fixe, connu à la compilation, et plateforme déjà
+ * décidée — de quoi l'autoriser d'un seul clic, sans rien saisir ni choisir.
+ *
+ * `origin` est le motif présenté à `chrome.permissions.request()`, et c'est LUI qui décide
+ * de ce que l'octroi couvre : `hostnameOf()` en tire la clé d'étiquette, joker compris. */
+export interface CloudPlatform {
+  id: string;
+  label: string;
+  origin: string;
+  platform: HostPlatform;
+}
+
+/** Les plateformes cloud que ce produit sait servir. **Aucune n'est pré-déclarée dans le
+ * manifeste** : toutes passent par `optional_host_permissions`, `github.com` comme les
+ * autres.
+ *
+ * C'était faux jusqu'ici — `content_scripts` injectait statiquement `github.com`, seul
+ * hôte actif sans permission et, du même coup, seul hôte que l'utilisateur ne pouvait pas
+ * révoquer. Cette exception se payait en cas particuliers dispersés : un court-circuit
+ * dans `selectPlatform()`, un autre dans `registerContentScriptForOrigin()`, et une ligne
+ * « plateforme non précisée » que la page d'options affichait pour un octroi superflu sur
+ * un domaine où le choix n'était de toute façon jamais lu. Un seul mécanisme pour tout le
+ * monde supprime les trois.
+ *
+ * `*.visualstudio.com` est un joker assumé : chaque organisation historique d'Azure DevOps
+ * a son propre sous-domaine, inconnu à la compilation — même situation que `*.ghe.com`
+ * (§A.4), et `hostnameOf()` conserve le joker exprès pour ce cas. */
+export const CLOUD_PLATFORMS: readonly CloudPlatform[] = [
+  { id: 'github', label: 'GitHub.com', origin: 'https://github.com/*', platform: 'github' },
+  {
+    id: 'azdo',
+    label: 'Azure DevOps Services',
+    origin: 'https://dev.azure.com/*',
+    platform: 'azdo',
+  },
+  {
+    id: 'azdo-legacy',
+    label: 'VisualStudio.com',
+    origin: 'https://*.visualstudio.com/*',
+    platform: 'azdo',
+  },
+];
 
 /** Plateforme évidente pour un domaine de PRODUIT connu — pré-remplissage de la page
  * d'options, jamais une décision prise à la place de la personne : le menu reste
@@ -92,12 +139,14 @@ export function inferPlatform(host: string): HostPlatform | null {
  * choisi, mais qui ne dit rien du DROIT d'y être. Réduire les deux à un booléen
  * « un adaptateur matche » perdait justement les deux informations qui comptent — par quel
  * droit, et lequel — d'où une révocation muette sur les hôtes Azure intégrés, et un
- * reclassement d'hôte qui laissait l'onglet sur l'ancien adaptateur. */
+ * reclassement d'hôte qui laissait l'onglet sur l'ancien adaptateur.
+ *
+ * **Aucun hôte n'est privilégié**, `github.com` compris : il doit figurer dans la
+ * répartition comme n'importe quel autre. C'est ce qui rend sa révocation effective. */
 export function selectPlatform(
   hostname: string,
   extra: ExtraHostsByPlatform
 ): 'github' | 'azdo' | null {
-  if (hostname === STATICALLY_INJECTED_HOST) return 'github';
   const github = matchScore(hostname, extra.github);
   const azdo = matchScore(hostname, extra.azdo);
   if (github === azdo) return null; // aucun des deux, ou égalité : voir ci-dessous

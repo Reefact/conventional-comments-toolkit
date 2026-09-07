@@ -5,12 +5,10 @@
 // de ces hôtes par plateforme à l'usage du script de contenu, et ouvrir la page d'options
 // au clic sur l'icône de la barre d'outils.
 //
-// `content_scripts.matches` du manifeste est statique et ne liste que github.com : sans
-// ce second rôle, accorder la permission sur dev.azure.com ou un GHES depuis la page
-// d'options n'injecterait le script NULLE PART — l'adaptateur AzDO existe et est testé,
-// mais resterait mort sur toute plateforme réelle. Aucun test unitaire ne peut le voir :
-// tous instancient l'adaptateur directement, en court-circuitant ce mécanisme
-// d'activation. Aucun secret, aucun jeton (§10).
+// Le manifeste ne déclare AUCUN `content_scripts` : ce second rôle est donc le seul chemin
+// d'injection qui existe, github.com compris. Sans lui, l'extension serait morte partout —
+// et aucun test unitaire ne peut le voir, tous instanciant l'adaptateur directement, en
+// court-circuitant ce mécanisme d'activation. Aucun secret, aucun jeton (§10).
 //
 // Le TROISIÈME rôle vit ici et pas dans le script de contenu pour une raison de contexte
 // d'exécution, pas de commodité : `chrome.permissions` n'est PAS exposé aux scripts de
@@ -184,18 +182,19 @@ chrome?.action?.onClicked.addListener(() => {
   chrome?.runtime.openOptionsPage?.();
 });
 
-// L'hôte github.com est déjà couvert par l'entrée statique de `content_scripts` — ne
-// jamais l'enregistrer dynamiquement en plus, sous peine d'injecter le script deux fois.
-const STATICALLY_COVERED_ORIGIN = 'https://github.com/*';
-
 /** Identifiant stable pour un origin — chrome.scripting exige un id sans caractère
  * spécial ; il sert aussi de clé pour désenregistrer proprement (§A.4, §B.4). */
 export function scriptIdFor(origin: string): string {
   return `cct-${origin.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
 }
 
+/** Tout hôte accordé s'enregistre ici, sans exception. `github.com` en était une : le
+ * manifeste l'injectait statiquement, il fallait donc l'écarter de l'enregistrement
+ * dynamique pour ne pas injecter le script deux fois. Le manifeste ne déclare plus aucun
+ * `content_scripts` — l'exception n'a plus d'objet, et sa disparition rend la révocation
+ * de github.com effective au même titre que celle de n'importe quel autre domaine. */
 export async function registerContentScriptForOrigin(origin: string): Promise<void> {
-  if (origin === STATICALLY_COVERED_ORIGIN || !chrome?.scripting) return;
+  if (!chrome?.scripting) return;
   const script: RegisteredContentScript = {
     id: scriptIdFor(origin),
     matches: [origin],
@@ -211,7 +210,7 @@ export async function registerContentScriptForOrigin(origin: string): Promise<vo
 }
 
 export async function unregisterContentScriptForOrigin(origin: string): Promise<void> {
-  if (origin === STATICALLY_COVERED_ORIGIN || !chrome?.scripting) return;
+  if (!chrome?.scripting) return;
   await new Promise<void>((resolve) => {
     chrome!.scripting!.unregisterContentScripts({ ids: [scriptIdFor(origin)] }, () => resolve());
   });
@@ -232,11 +231,11 @@ export async function syncContentScriptsWithGrantedPermissions(): Promise<void> 
  * d'entreprise. La politique PRIME : un hôte qu'elle classe ne dépend pas d'un geste
  * interactif dans les réglages pour être reconnu — sans quoi le déploiement pré-autorisé
  * du §10 exigerait que chaque poste visite la page d'options, ce qu'il existe précisément
- * pour éviter (revue Codex, PR #29). `allowedHosts` de la politique reste accepté sous sa
- * forme historique — une liste de noms d'hôtes sans plateforme — et vaut alors, faute de
- * mieux, `github` : c'est la plateforme du domaine pré-déclarable, et le §A.4 est le cas
- * que cette clé sert en premier. Une entreprise qui déploie de l'Azure DevOps Server
- * emploie la forme objet, qui, elle, porte la plateforme. */
+ * pour éviter (revue Codex, PR #29). Seule la forme `{host, platform}` d'`allowedHosts`
+ * classe quoi que ce soit — `parseManagedHostTags()` dit pourquoi une entrée sans
+ * plateforme explicite reste NON classée plutôt que devinée. Ce commentaire affirmait
+ * l'inverse (« vaut alors, faute de mieux, `github` ») bien après que le code eut cessé de
+ * le faire : une description d'un comportement disparu, que rien ne signalait. */
 async function readPlatformTags(): Promise<Record<string, HostPlatform>> {
   const local = await new Promise<Record<string, HostPlatform>>((resolve) => {
     if (!chrome?.storage?.local) return resolve({});

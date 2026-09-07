@@ -41,7 +41,7 @@
 // SANS qu'aucune assertion ne le signale à l'endroit fautif — le symptôme apparaîtrait dans
 // un test ultérieur, sans rapport apparent.
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { commentBodyText, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
@@ -173,8 +173,24 @@ function observe(
   return dispose;
 }
 
+// La répartition publiée est le SEUL titre d'activation d'un hôte, depuis que le manifeste
+// ne déclare plus aucun `content_scripts` : sans elle, `bootstrap()` sort avant d'armer quoi
+// que ce soit. Les tests qui appellent `bootstrap()` ici observaient github.com du temps où
+// `selectPlatform()` le court-circuitait.
+beforeEach(() => {
+  (globalThis as { chrome?: unknown }).chrome = {
+    storage: {
+      local: {
+        get: (_keys: string[], cb: (items: Record<string, unknown>) => void) =>
+          cb({ extraHostsByPlatform: { github: ['github.com'], azdo: [] } }),
+      },
+    },
+  };
+});
+
 afterEach(() => {
   for (const dispose of openObservations.splice(0)) dispose();
+  delete (globalThis as { chrome?: unknown }).chrome;
 });
 
 function bannerTitles(doc: Document): string[] {

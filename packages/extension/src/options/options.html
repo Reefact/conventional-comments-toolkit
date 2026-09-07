@@ -4,94 +4,373 @@
     <meta charset="utf-8" />
     <title>Conventional Comments Toolkit — options</title>
     <style>
-      body { font: 14px system-ui, sans-serif; max-width: 40em; margin: 2em auto; padding: 0 1em; }
-      fieldset { margin-bottom: 1.5em; }
-      .degraded { color: #b3261e; }
-      label { display: block; margin: 0.5em 0; }
+      /* Jetons repris du site du produit (conventionalcomments.io) : c'est le système de
+         design existant, et deux écrans du même produit ne s'inventent pas deux identités.
+         Les polices, elles, ne sont PAS chargées depuis le réseau — aucun code ni aucune
+         ressource distante (§10) : on nomme les familles, et la pile de repli fait foi sur
+         un poste qui ne les a pas. */
+      :root {
+        --accent: #1e44c8;
+        --accent-ink: #16339a;
+        --accent-soft: #e5e9fa;
+        --on-accent: #fff;
+        --bg: #eef1f5;
+        --bg-surface: #fff;
+        --bg-sunken: #e5eaf1;
+        --bg-code: #f5f7fa;
+        --fg: #0b1522;
+        --fg-2: #29384a;
+        --fg-muted: #5a6b80;
+        --fg-faint: #6c7e93;
+        --line: #d3dbe5;
+        --line-soft: #e2e8ef;
+        --line-strong: #b4c0ce;
+        --pass: #1f8a4c;
+        --warn: #b07600;
+        --block: #c93b33;
+        --block-soft: #fae7e5;
+        --radius: 3px;
+        --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --font-display: Archivo, "IBM Plex Sans", system-ui, sans-serif;
+        --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      /* Trois états de thème, pas deux : le réglage « système » ne pose aucun attribut, et
+         seule la requête média l'y distingue. */
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --accent: #7a97ff;
+          --accent-ink: #a9beff;
+          --accent-soft: #16213f;
+          --on-accent: #08101f;
+          --bg: #080e18;
+          --bg-surface: #0f1926;
+          --bg-sunken: #0b131f;
+          --bg-code: #111c2b;
+          --fg: #e8eef6;
+          --fg-2: #c3cedc;
+          --fg-muted: #93a2b5;
+          --fg-faint: #8797aa;
+          --line: #223144;
+          --line-soft: #1a2636;
+          --line-strong: #34465c;
+          --pass: #45c77c;
+          --warn: #d8a02e;
+          --block: #ff8078;
+          --block-soft: #2a1513;
+        }
+      }
+      :root[data-theme="dark"] {
+        --accent: #7a97ff;
+        --accent-ink: #a9beff;
+        --accent-soft: #16213f;
+        --on-accent: #08101f;
+        --bg: #080e18;
+        --bg-surface: #0f1926;
+        --bg-sunken: #0b131f;
+        --bg-code: #111c2b;
+        --fg: #e8eef6;
+        --fg-2: #c3cedc;
+        --fg-muted: #93a2b5;
+        --fg-faint: #8797aa;
+        --line: #223144;
+        --line-soft: #1a2636;
+        --line-strong: #34465c;
+        --pass: #45c77c;
+        --warn: #d8a02e;
+        --block: #ff8078;
+        --block-soft: #2a1513;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        margin: 0;
+      }
+      code { font-family: var(--font-mono); }
+
+      .page { max-width: 44rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+
+      header.top { margin-bottom: 2rem; }
+      header.top h1 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        font-size: 1.5rem;
+        line-height: 1.1;
+        margin: 0 0 0.3rem;
+      }
+      header.top p { margin: 0; color: var(--fg-muted); font-size: 0.88rem; }
+
+      section.group { margin-bottom: 2.5rem; }
+      section.group > h2 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        font-size: 1.15rem;
+        margin: 0 0 0.3rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--line-strong);
+      }
+      section.group > .group-sub { margin: 0.4rem 0 1.1rem; color: var(--fg-muted); font-size: 0.85rem; }
+
+      section.panel {
+        background: var(--bg-surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 1.35rem 1.35rem 1.5rem;
+        margin-bottom: 1.1rem;
+      }
+      section.panel:last-child { margin-bottom: 0; }
+      /* Zone 4 : rouge, parce qu'un domaine qui y figure a l'accès sans rien en faire. */
+      section.panel.anomaly {
+        background: var(--block-soft);
+        border: 2px solid var(--block);
+        margin-top: 1.6rem;
+      }
+      section.panel.anomaly .panel-head h3 { color: var(--block); }
+      section.panel.anomaly .panel-sub { color: var(--fg-2); }
+      section.panel.anomaly code { background: var(--bg-code); padding: 0.05rem 0.3rem; border-radius: var(--radius); }
+      section.panel.anomaly .host-row { background: var(--bg-surface); border-color: var(--block); }
+
+      .panel-head { display: flex; align-items: baseline; gap: 0.55rem; margin-bottom: 0.15rem; }
+      .panel-head h3 { font-family: var(--font-display); font-size: 0.98rem; font-weight: 700; margin: 0; }
+      .panel-sub { color: var(--fg-muted); font-size: 0.82rem; line-height: 1.5; margin: 0 0 1rem; }
+
+      .cloud-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 0.6rem; }
+      .cloud-card {
+        display: flex; align-items: center; gap: 0.65rem;
+        border: 1px solid var(--line); background: var(--bg-sunken);
+        border-radius: var(--radius); padding: 0.6rem 0.7rem;
+      }
+      .cloud-card .glyph {
+        width: 1.75rem; height: 1.75rem; border-radius: var(--radius);
+        display: flex; align-items: center; justify-content: center;
+        background: var(--accent-soft); color: var(--accent-ink);
+        font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; flex: none;
+      }
+      .cloud-card .glyph svg { width: 16px; height: 16px; }
+      .cloud-card .info { flex: 1; min-width: 0; }
+      .cloud-card .info .name { font-weight: 600; font-size: 0.87rem; }
+      .cloud-card .info .domain { font-size: 0.74rem; color: var(--fg-faint); font-family: var(--font-mono); }
+
+      .btn {
+        font-family: var(--font-body); font-size: 0.78rem; font-weight: 600;
+        border-radius: var(--radius); border: 1px solid transparent;
+        padding: 0.38rem 0.7rem; cursor: pointer; white-space: nowrap;
+      }
+      .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      .btn-p { background: var(--accent); color: var(--on-accent); }
+      .btn-quiet { background: transparent; color: var(--block); border-color: transparent; font-weight: 500; padding: 0.38rem 0.5rem; }
+      .btn-quiet:hover { background: var(--block-soft); }
+
+      .selfhost-form { display: flex; flex-direction: column; gap: 0.6rem; }
+      .selfhost-fields { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      .selfhost-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.6rem; }
+      .selfhost-form input[type="text"], .selfhost-form select {
+        font-family: var(--font-body); font-size: 0.85rem;
+        background: var(--bg-sunken); border: 1px solid var(--line); color: var(--fg);
+        border-radius: var(--radius); padding: 0.42rem 0.6rem;
+      }
+      .selfhost-form input[type="text"] { flex: 1 1 13rem; min-width: 11rem; font-family: var(--font-mono); }
+      .selfhost-form input[type="text"]::placeholder { color: var(--fg-faint); }
+      .selfhost-form select { flex: 1 1 14rem; }
+      .selfhost-form input:focus-visible, .selfhost-form select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .form-state { font-size: 0.8rem; color: var(--block); }
+
+      .host-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+      .host-row {
+        display: flex; align-items: center; gap: 0.65rem;
+        border: 1px solid var(--line); border-radius: var(--radius); padding: 0.55rem 0.7rem;
+      }
+      .host-row .kind {
+        width: 1.75rem; height: 1.75rem; border-radius: var(--radius); flex: none;
+        display: flex; align-items: center; justify-content: center;
+        font-family: var(--font-display); font-weight: 700; font-size: 0.95rem;
+      }
+      .host-row .kind svg { width: 15px; height: 15px; }
+      .host-row .kind.cloud { background: var(--accent-soft); color: var(--accent-ink); }
+      .host-row .kind.selfhost { background: var(--bg-sunken); color: var(--fg-muted); border: 1px dashed var(--line-strong); }
+      .host-row .body { flex: 1; min-width: 0; }
+      .host-row .host { font-family: var(--font-mono); font-size: 0.85rem; word-break: break-all; }
+      .host-row .platform { font-size: 0.76rem; color: var(--fg-muted); margin-top: 0.05rem; }
+      .host-row .lock { color: var(--fg-muted); font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+      .catch-up { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem; }
+      .catch-up select {
+        font-family: var(--font-body); font-size: 0.78rem;
+        background: var(--bg-sunken); border: 1px solid var(--line); color: var(--fg);
+        border-radius: var(--radius); padding: 0.32rem 0.45rem;
+      }
+      .empty-note { font-size: 0.82rem; color: var(--fg-faint); margin: 0; }
+
+      .field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.1rem; }
+      .field:last-child { margin-bottom: 0; }
+      .field-label { font-weight: 600; font-size: 0.85rem; }
+      .field select, .field textarea {
+        font-family: var(--font-body); font-size: 0.85rem;
+        background: var(--bg-sunken); border: 1px solid var(--line); color: var(--fg);
+        border-radius: var(--radius); padding: 0.42rem 0.6rem;
+      }
+      .field textarea { font-family: var(--font-mono); resize: vertical; }
+      .field select:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .field-hint { font-size: 0.78rem; color: var(--fg-faint); margin: 0; }
+      .field-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.6rem; }
+      .field-state { font-size: 0.8rem; color: var(--fg-muted); }
+
+      .checkbox-row { display: flex; align-items: center; gap: 0.55rem; font-size: 0.88rem; }
+      .checkbox-row input { accent-color: var(--accent); width: 1rem; height: 1rem; }
+      .endpoint-note { font-size: 0.82rem; color: var(--fg-muted); margin: 0.6rem 0 0; }
+
+      .status-row {
+        display: flex; align-items: baseline; gap: 0.5rem;
+        padding: 0.5rem 0; border-bottom: 1px solid var(--line-soft);
+      }
+      .status-row:last-child { border-bottom: none; }
+      .status-row .dot { width: 0.5rem; height: 0.5rem; border-radius: 999px; flex: none; background: var(--pass); }
+      .status-row.degraded .dot { background: var(--warn); }
+      .status-row .status-body { min-width: 0; }
+      .status-row .status-text { font-size: 0.85rem; }
+      .status-row pre {
+        margin: 0.3rem 0 0; font-family: var(--font-mono); font-size: 0.76rem;
+        color: var(--fg-muted); white-space: pre-wrap; word-break: break-all;
+      }
     </style>
   </head>
   <body>
-    <h1>Conventional Comments Toolkit</h1>
+    <div class="page">
+      <header class="top">
+        <h1>Conventional Comments Toolkit</h1>
+        <p>Réglages de l'extension.</p>
+      </header>
 
-    <fieldset>
-      <legend>Hôtes autorisés</legend>
-      <p>
-        Seul <code>github.com</code> est pré-déclaré — rien à ajouter ici pour l'utiliser, et
-        aucun choix de plateforme ne s'y applique même si un octroi superflu venait à
-        l'accorder par un autre biais. Les domaines GitHub Enterprise Server,
-        <code>*.ghe.com</code> (résidence de données), Azure DevOps Server et l'hôte de la
-        configuration d'organisation passent par <code>optional_host_permissions</code>,
-        activés à la demande (§A.4, §B.4).
-      </p>
-      <label>
-        Ajouter un domaine :
-        <input type="text" id="host-input" placeholder="ghes.example.interne" />
-        <select id="host-platform" required>
-          <!-- Aucune plateforme pré-choisie : `github` en tête était sélectionné par
-               défaut, et autoriser un domaine Azure DevOps sans toucher au menu
-               l'étiquetait silencieusement GitHub — sur dev.azure.com les deux
-               adaptateurs correspondaient alors, et bootstrap() prenait GitHub en
-               premier. Le cas Azure documenté était donc cassé par défaut. -->
-          <option value="" selected>— choisir la plateforme —</option>
-          <option value="github">GitHub Enterprise Server / GHE Cloud (résidence)</option>
-          <option value="azdo">Azure DevOps Server</option>
-          <option value="config">Autre (hôte de configuration d'organisation uniquement)</option>
-        </select>
-        <button id="host-add" type="button">Autoriser</button>
-        <span id="host-add-state" aria-live="polite"></span>
-      </label>
-      <p>
-        La plateforme choisie détermine quel adaptateur reconnaît ce domaine — un domaine
-        autorisé mais non associé n'active aucune interface (§2). Elle est pré-remplie pour
-        les domaines de produit connus (<code>dev.azure.com</code>,
-        <code>*.visualstudio.com</code>, <code>*.ghe.com</code>), à confirmer ou corriger.
-      </p>
-      <ul id="host-list" aria-live="polite"></ul>
-    </fieldset>
+      <section class="group">
+        <h2>Hôtes autorisés</h2>
+        <p class="group-sub">Accès de l'extension aux plateformes de revue de code.</p>
 
-    <fieldset>
-      <legend>Préférences locales (§8.1.2)</legend>
-      <p>Langue, thème, raccourcis, style de badge — jamais le mode ni la liste des labels.</p>
-      <label>
-        Langue de l'interface :
-        <select id="language">
-          <option value="">(suivre la configuration puis la plateforme)</option>
-          <option value="fr">français</option>
-          <option value="en">english</option>
-        </select>
-      </label>
-      <label>
-        Raccourcis directs (§5.2) — une ligne par raccourci, <code>Alt+I=issue</code> ;
-        une ligne <code>Alt+I=</code> (sans label) désactive le raccourci par défaut :
-        <textarea id="direct-shortcuts" rows="4" spellcheck="false"
-          placeholder="Alt+I=issue&#10;Alt+S=suggestion"></textarea>
-        <button id="direct-shortcuts-save" type="button">Enregistrer</button>
-        <span id="direct-shortcuts-state" aria-live="polite"></span>
-      </label>
-    </fieldset>
+        <section class="panel">
+          <div class="panel-head"><h3>Sites cloud</h3></div>
+          <p class="panel-sub">Domaine connu et plateforme prédéfinie : un clic autorise l'accès.</p>
+          <div class="cloud-grid" id="cloud-list"></div>
+          <p class="empty-note" id="cloud-empty" hidden>Tous les sites cloud reconnus sont déjà autorisés.</p>
+        </section>
 
-    <fieldset>
-      <legend>Télémétrie (§10)</legend>
-      <p>
-        Désactivée par défaut. Elle n'émet que des <strong>compteurs agrégés</strong> —
-        label utilisé, code d'erreur, mode, dépôt — jamais le texte d'un commentaire, d'un
-        code ou d'un diff, ni l'adresse de la page. Elle ne s'active que si la
-        <strong>politique d'entreprise</strong> de votre organisation déclare un point de
-        collecte <em>et</em> que vous cochez cette case. Un dépôt ne peut ni l'activer, ni
-        choisir la destination : cela ne se décide que par la politique du navigateur.
-      </p>
-      <label>
-        <input id="telemetry-opt-in" type="checkbox" />
-        Autoriser l'envoi de compteurs agrégés à mon organisation
-      </label>
-      <p id="telemetry-endpoint" aria-live="polite">—</p>
-    </fieldset>
+        <section class="panel">
+          <div class="panel-head"><h3>Domaine auto-hébergé</h3></div>
+          <p class="panel-sub">
+            Pour GitHub Enterprise Server, Azure DevOps Server ou un hôte spécifique à votre
+            organisation, choisissez la plateforme avant d'autoriser l'accès.
+          </p>
+          <div class="selfhost-form">
+            <div class="selfhost-fields">
+              <input type="text" id="host-input" placeholder="ghes.example.interne"
+                aria-label="Domaine à autoriser" />
+              <!-- Aucune plateforme pré-choisie : `github` en tête était sélectionné par
+                   défaut, et autoriser un domaine Azure DevOps sans toucher au menu
+                   l'étiquetait silencieusement GitHub — sur dev.azure.com les deux
+                   adaptateurs correspondaient alors, et bootstrap() prenait GitHub en
+                   premier. Le cas Azure documenté était donc cassé par défaut. -->
+              <select id="host-platform" required aria-label="Plateforme servie par ce domaine">
+                <option value="" selected>— choisir la plateforme —</option>
+                <option value="github">GitHub Enterprise Server / GHE Cloud (résidence)</option>
+                <option value="azdo">Azure DevOps Server</option>
+                <option value="config">Autre (hôte de configuration d'organisation uniquement)</option>
+              </select>
+            </div>
+            <div class="selfhost-actions">
+              <span id="host-add-state" class="form-state" aria-live="polite"></span>
+              <button id="host-add" class="btn btn-p" type="button">Autoriser</button>
+            </div>
+          </div>
+        </section>
 
-    <fieldset>
-      <legend>État</legend>
-      <p id="degraded-state" aria-live="polite">—</p>
-      <p id="selector-log">—</p>
-    </fieldset>
+        <section class="panel">
+          <div class="panel-head"><h3>Hôtes configurés</h3></div>
+          <ul class="host-list" id="host-list" aria-live="polite"></ul>
+          <p class="empty-note" id="host-empty" hidden>Aucun domaine autorisé pour l'instant.</p>
+        </section>
+
+        <!-- Zone 4 : masquée tant qu'elle est vide, titre compris. Un domaine n'y arrive
+             que par un octroi fait hors de cet écran — les zones 1 et 2 classent toujours
+             ce qu'elles autorisent, dans le même geste. -->
+        <section class="panel anomaly" id="unconfigured-panel" hidden>
+          <div class="panel-head"><h3>Domaines non configurés</h3></div>
+          <p class="panel-sub">
+            <strong>L'extension n'est pas active sur ces domaines tant qu'aucune plateforme
+            ne leur est associée.</strong>
+            L'accès a été accordé directement depuis <code>chrome://extensions</code> →
+            « Accès au site ». Choisissez une plateforme pour activer l'extension sur le
+            domaine, ou retirez l'accès.
+          </p>
+          <ul class="host-list" id="unconfigured-list"></ul>
+        </section>
+      </section>
+
+      <section class="group">
+        <h2>Préférences locales</h2>
+        <p class="group-sub">
+          Le mode de validation et la liste des labels suivent toujours la configuration de
+          l'organisation — rien de tout ça ne se règle ici.
+        </p>
+
+        <section class="panel">
+          <div class="field">
+            <label class="field-label" for="language">Langue de l'interface</label>
+            <select id="language">
+              <option value="">Suivre la configuration, puis la plateforme</option>
+              <option value="fr">Français</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="direct-shortcuts">Raccourcis directs</label>
+            <textarea id="direct-shortcuts" rows="4" spellcheck="false"
+              placeholder="Alt+I=issue&#10;Alt+S=suggestion"></textarea>
+            <p class="field-hint">
+              Une ligne par raccourci. Une ligne sans label (<code>Alt+I=</code>) désactive
+              le raccourci par défaut.
+            </p>
+            <div class="field-actions">
+              <span id="direct-shortcuts-state" class="field-state" aria-live="polite"></span>
+              <button id="direct-shortcuts-save" class="btn btn-p" type="button">Enregistrer</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="group">
+        <h2>Télémétrie</h2>
+        <p class="group-sub">
+          Désactivée par défaut. N'émet que des compteurs agrégés — label utilisé, code
+          d'erreur, mode, dépôt — jamais le texte d'un commentaire, d'un code ou d'un diff,
+          ni l'adresse de la page. Elle ne s'active que si la politique d'entreprise de
+          votre organisation déclare un point de collecte <em>et</em> que vous cochez cette
+          case. Un dépôt ne peut ni l'activer, ni choisir la destination.
+        </p>
+        <section class="panel">
+          <label class="checkbox-row">
+            <input id="telemetry-opt-in" type="checkbox" />
+            Autoriser l'envoi de compteurs agrégés à mon organisation
+          </label>
+          <p class="endpoint-note" id="telemetry-endpoint" aria-live="polite">—</p>
+        </section>
+      </section>
+
+      <section class="group">
+        <h2>État</h2>
+        <section class="panel">
+          <div class="status-row" id="degraded-state">
+            <span class="dot"></span>
+            <div class="status-body"><span class="status-text">—</span></div>
+          </div>
+          <div class="status-row" id="selector-log">
+            <span class="dot"></span>
+            <div class="status-body"><span class="status-text">—</span></div>
+          </div>
+        </section>
+      </section>
+    </div>
 
     <script src="options.js" type="module"></script>
   </body>

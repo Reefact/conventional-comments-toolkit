@@ -38,7 +38,7 @@ interface FakeChrome {
   refuseRemoval: boolean;
 }
 
-function installPage(init: Partial<FakeChrome> = {}): FakeChrome {
+function installPage(init: Partial<FakeChrome> = {}, language = 'fr'): FakeChrome {
   // Le corps du vrai document, scripts compris — `innerHTML` ne les exécute pas, et c'est
   // l'import du module, plus bas, qui joue le rôle de `options.js`.
   const body = /<body>([\s\S]*)<\/body>/.exec(OPTIONS_HTML)?.[1] ?? '';
@@ -82,7 +82,10 @@ function installPage(init: Partial<FakeChrome> = {}): FakeChrome {
           cb?.();
         },
       },
-      sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}), set: () => {} },
+      // La page est bilingue (§10) : la langue est un ÉTAT du monde, pas un détail du faux.
+      // Ces tests lisent des libellés français, ils doivent donc le DEMANDER — les laisser
+      // dépendre de `navigator.language` ferait passer ou échouer la suite selon la machine.
+      sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({ language }), set: () => {} },
       managed: { get: (cb: (i: Record<string, unknown>) => void) => cb(state.managed) },
       onChanged: { addListener: () => {} },
     },
@@ -305,7 +308,7 @@ describe('zone 3 — domaines configurés : on y retire, on n’y reclasse plus'
     await loadOptions();
 
     const row = document.querySelector('#host-list .host-row');
-    expect(row?.textContent).toContain("politique d'entreprise");
+    expect(row?.textContent).toContain('politique d\u2019entreprise');
     expect(buttonIn(row, 'Retirer')).toBeNull();
   });
 

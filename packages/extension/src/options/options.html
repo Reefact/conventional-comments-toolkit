@@ -92,7 +92,25 @@
 
       .page { max-width: 44rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
 
-      header.top { margin-bottom: 2rem; }
+      header.top {
+        margin-bottom: 2rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      header.top .titles { min-width: 0; }
+      /* Bouton discret, pas plein : il ne CHANGE rien, il raconte. En bleu, il aurait le
+         poids visuel de « Autoriser », qui accorde une permission d'accès à un domaine. */
+      .btn-tour {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex: none;
+        margin-top: 0.15rem;
+      }
+      .btn-tour svg { width: 13px; height: 13px; }
       header.top h1 {
         font-family: var(--font-display);
         font-weight: 700;
@@ -162,6 +180,10 @@
       }
       .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       .btn-p { background: var(--accent); color: var(--on-accent); }
+      /* Secondaire : contour, pas de fond. La maquette s'en servait déjà, la page livrée ne
+         l'avait jamais eu — le bouton serait sorti sans aucun style. */
+      .btn-s { color: var(--fg-2); border-color: var(--line-strong); background: transparent; font-weight: 500; }
+      .btn-s:hover { background: var(--bg-sunken); }
       .btn-quiet { background: transparent; color: var(--block); border-color: transparent; font-weight: 500; padding: 0.38rem 0.5rem; }
       .btn-quiet:hover { background: var(--block-soft); }
 
@@ -236,66 +258,145 @@
         margin: 0.3rem 0 0; font-family: var(--font-mono); font-size: 0.76rem;
         color: var(--fg-muted); white-space: pre-wrap; word-break: break-all;
       }
+
+      /* ---------- Visite guidée ---------- */
+      /* Le voile couvre le document entier, pas la seule fenêtre : la visite fait défiler,
+         et un voile en `position: fixed` laisserait apparaître le bas de la page. */
+      .tour-veil {
+        position: absolute;
+        inset: 0;
+        background: rgba(6, 12, 22, 0.55);
+        z-index: 40;
+      }
+      /* La lucarne n'est pas un trou : c'est un cadre dont l'ombre portée démesurée FAIT
+         l'assombrissement autour de lui. Un vrai trou demanderait un masque SVG ou quatre
+         rectangles à recalculer, pour le même rendu. */
+      .tour-spot {
+        position: absolute;
+        z-index: 41;
+        border: 2px solid var(--accent);
+        border-radius: var(--radius);
+        box-shadow: 0 0 0 9999px rgba(6, 12, 22, 0.55);
+        pointer-events: none;
+      }
+      .tour-spot[hidden] { display: none; }
+      .tour-popover {
+        position: absolute;
+        z-index: 42;
+        max-width: 26rem;
+        background: var(--bg-surface);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        padding: 1rem 1.1rem 0.9rem;
+        box-shadow: 0 12px 32px rgba(6, 12, 22, 0.28);
+      }
+      .tour-popover-centered {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      .tour-counter {
+        margin: 0 0 0.35rem;
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--fg-faint);
+      }
+      .tour-title {
+        font-family: var(--font-display);
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 0 0 0.4rem;
+      }
+      .tour-body {
+        margin: 0 0 0.9rem;
+        font-size: 0.85rem;
+        line-height: 1.55;
+        color: var(--fg-2);
+      }
+      .tour-actions { display: flex; align-items: center; gap: 0.5rem; }
+      .tour-spacer { flex: 1; }
+      .tour-actions button[hidden] { display: none; }
     </style>
   </head>
   <body>
     <div class="page">
       <header class="top">
-        <h1>Conventional Comments Toolkit</h1>
-        <p>Réglages de l'extension.</p>
+        <div class="titles">
+          <h1 data-i18n="options.title">Conventional Comments Toolkit</h1>
+          <p data-i18n="options.subtitle">Réglages de l'extension.</p>
+        </div>
+        <!-- Toujours présent, y compris avant la première visite : le cacher tant qu'elle
+             n'a pas été vue économiserait un bouton pour créer un cas de plus, et qui a
+             cliqué « Passer » d'entrée doit pouvoir revenir. -->
+        <button id="tour-replay" class="btn btn-s btn-tour" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9.6 9.2a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2.2-2.4 3.6" />
+            <path d="M12 17.2h.01" />
+          </svg>
+          <span data-i18n="options.tour.replay">Revoir la visite guidée</span>
+        </button>
       </header>
 
-      <section class="group">
-        <h2>Domaines autorisés</h2>
-        <p class="group-sub">Accès de l'extension aux plateformes de revue de code.</p>
+      <section class="group" id="group-hosts">
+        <h2 data-i18n="options.hosts.heading">Domaines autorisés</h2>
+        <p class="group-sub" data-i18n="options.hosts.sub">Accès de l'extension aux plateformes de revue de code.</p>
 
-        <section class="panel">
+        <section class="panel" id="panel-known">
           <!-- « Connus » plutôt que « cloud » ou « standards » : ce qui sépare cette zone
                de la suivante n'est pas une façon d'héberger — une organisation historique
                `visualstudio.com` est du cloud et se saisit pourtant plus bas, un GHE Cloud à
                résidence de données aussi. C'est que l'extension connaît DÉJÀ l'adresse et la
                plateforme, ce qui est exactement ce qui permet le clic unique. -->
-          <div class="panel-head"><h3>Domaines connus</h3></div>
-          <p class="panel-sub">Adresse et plateforme déjà connues : un clic autorise l'accès.</p>
+          <div class="panel-head"><h3 data-i18n="options.known.heading">Domaines connus</h3></div>
+          <p class="panel-sub" data-i18n="options.known.sub">Adresse et plateforme déjà connues : un clic autorise l'accès.</p>
           <div class="cloud-grid" id="cloud-list"></div>
-          <p class="empty-note" id="cloud-empty" hidden>Tous les domaines connus sont déjà autorisés.</p>
+          <p class="empty-note" id="cloud-empty" data-i18n="options.known.empty" hidden>Tous les domaines connus sont déjà autorisés.</p>
         </section>
 
-        <section class="panel">
-          <div class="panel-head"><h3>Autres domaines</h3></div>
+        <section class="panel" id="panel-other">
+          <div class="panel-head"><h3 data-i18n="options.other.heading">Autres domaines</h3></div>
+          <!-- Phrase coupée en deux segments de TEXTE autour du `<code>` : le catalogue ne
+               transporte pas de balisage, faute de quoi chaque traduction serait un fragment
+               de document à valider. -->
           <p class="panel-sub">
-            Pour GitHub Enterprise Server, Azure DevOps Server, une organisation historique
-            <code>visualstudio.com</code> ou tout autre hôte propre à votre organisation :
-            choisissez la plateforme avant d'autoriser l'accès.
+            <span data-i18n="options.other.sub.1">Pour GitHub Enterprise Server, Azure DevOps Server, une organisation historique</span>
+            <code>visualstudio.com</code>
+            <span data-i18n="options.other.sub.2">ou tout autre hôte propre à votre organisation : choisissez la plateforme avant d'autoriser l'accès.</span>
           </p>
           <div class="selfhost-form">
             <div class="selfhost-fields">
               <input type="text" id="host-input" placeholder="ghes.example.interne"
-                aria-label="Domaine à autoriser" />
+                data-i18n-aria-label="options.other.host.aria" aria-label="Domaine à autoriser" />
               <!-- Aucune plateforme pré-choisie : `github` en tête était sélectionné par
                    défaut, et autoriser un domaine Azure DevOps sans toucher au menu
                    l'étiquetait silencieusement GitHub — sur dev.azure.com les deux
                    adaptateurs correspondaient alors, et bootstrap() prenait GitHub en
                    premier. Le cas Azure documenté était donc cassé par défaut. -->
-              <select id="host-platform" required aria-label="Plateforme servie par ce domaine">
-                <option value="" selected>— choisir la plateforme —</option>
-                <option value="github">GitHub Enterprise Server / GHE Cloud (résidence)</option>
-                <option value="azdo">Azure DevOps Server ou organisation visualstudio.com</option>
-                <option value="config">Autre (hôte de configuration d'organisation uniquement)</option>
+              <select id="host-platform" required
+                data-i18n-aria-label="options.other.platform.aria"
+                aria-label="Plateforme servie par ce domaine">
+                <option value="" selected data-i18n="options.other.platform.none">— choisir la plateforme —</option>
+                <option value="github" data-i18n="options.platform.github.option">GitHub Enterprise Server / GHE Cloud (résidence)</option>
+                <option value="azdo" data-i18n="options.platform.azdo">Azure DevOps Server ou organisation visualstudio.com</option>
+                <option value="config" data-i18n="options.platform.config.option">Autre (hôte de configuration d'organisation uniquement)</option>
               </select>
             </div>
             <div class="selfhost-actions">
               <span id="host-add-state" class="form-state" aria-live="polite"></span>
-              <button id="host-add" class="btn btn-p" type="button">Autoriser</button>
+              <button id="host-add" class="btn btn-p" type="button" data-i18n="options.other.submit">Autoriser</button>
             </div>
           </div>
         </section>
 
-        <section class="panel">
-          <div class="panel-head"><h3>Domaines configurés</h3></div>
-          <p class="panel-sub">L'extension est active sur ces domaines, et sur eux seulement.</p>
+        <section class="panel" id="panel-configured">
+          <div class="panel-head"><h3 data-i18n="options.configured.heading">Domaines configurés</h3></div>
+          <p class="panel-sub" data-i18n="options.configured.sub">L'extension est active sur ces domaines, et sur eux seulement.</p>
           <ul class="host-list" id="host-list" aria-live="polite"></ul>
-          <p class="empty-note" id="host-empty" hidden>Aucun domaine autorisé pour l'instant.</p>
+          <p class="empty-note" id="host-empty" data-i18n="options.configured.empty" hidden>Aucun domaine autorisé pour l'instant.</p>
           <p class="form-state remove-state" aria-live="polite"></p>
         </section>
 
@@ -303,13 +404,12 @@
              que par un octroi fait hors de cet écran — les zones 1 et 2 classent toujours
              ce qu'elles autorisent, dans le même geste. -->
         <section class="panel anomaly" id="unconfigured-panel" hidden>
-          <div class="panel-head"><h3>Domaines non configurés</h3></div>
+          <div class="panel-head"><h3 data-i18n="options.unconfigured.heading">Domaines non configurés</h3></div>
           <p class="panel-sub">
-            <strong>L'extension n'est pas active sur ces domaines tant qu'aucune plateforme
-            ne leur est associée.</strong>
-            L'accès a été accordé directement depuis <code>chrome://extensions</code> →
-            « Accès au site ». Choisissez une plateforme pour activer l'extension sur le
-            domaine, ou retirez l'accès.
+            <strong data-i18n="options.unconfigured.lead">L'extension n'est pas active sur ces domaines tant qu'aucune plateforme ne leur est associée.</strong>
+            <span data-i18n="options.unconfigured.sub.1">L'accès a été accordé directement depuis</span>
+            <code>chrome://extensions</code>
+            <span data-i18n="options.unconfigured.sub.2">→ « Accès au site ». Choisissez une plateforme pour activer l'extension sur le domaine, ou retirez l'accès.</span>
           </p>
           <ul class="host-list" id="unconfigured-list"></ul>
           <p class="form-state remove-state" aria-live="polite"></p>
@@ -317,58 +417,57 @@
       </section>
 
       <section class="group">
-        <h2>Préférences locales</h2>
-        <p class="group-sub">
+        <h2 data-i18n="options.prefs.heading">Préférences locales</h2>
+        <p class="group-sub" data-i18n="options.prefs.sub">
           Le mode de validation et la liste des labels suivent toujours la configuration de
           l'organisation — rien de tout ça ne se règle ici.
         </p>
 
         <section class="panel">
-          <div class="field">
-            <label class="field-label" for="language">Langue de l'interface</label>
+          <div class="field" id="field-language">
+            <label class="field-label" for="language" data-i18n="options.language.label">Langue de l'interface</label>
             <select id="language">
-              <option value="">Suivre la configuration, puis la plateforme</option>
+              <option value="" data-i18n="options.language.auto">Suivre la configuration, puis la plateforme</option>
               <option value="fr">Français</option>
               <option value="en">English</option>
             </select>
           </div>
 
-          <div class="field">
-            <label class="field-label" for="direct-shortcuts">Raccourcis directs</label>
+          <div class="field" id="field-shortcuts">
+            <label class="field-label" for="direct-shortcuts" data-i18n="options.shortcuts.label">Raccourcis directs</label>
             <textarea id="direct-shortcuts" rows="4" spellcheck="false"
               placeholder="Alt+I=issue&#10;Alt+S=suggestion"></textarea>
             <p class="field-hint">
-              Une ligne par raccourci. Une ligne sans label (<code>Alt+I=</code>) désactive
-              le raccourci par défaut.
+              <span data-i18n="options.shortcuts.hint.1">Une ligne par raccourci. Une ligne sans label (</span><code>Alt+I=</code><span data-i18n="options.shortcuts.hint.2">) désactive le raccourci par défaut.</span>
             </p>
             <div class="field-actions">
               <span id="direct-shortcuts-state" class="field-state" aria-live="polite"></span>
-              <button id="direct-shortcuts-save" class="btn btn-p" type="button">Enregistrer</button>
+              <button id="direct-shortcuts-save" class="btn btn-p" type="button" data-i18n="options.shortcuts.save">Enregistrer</button>
             </div>
           </div>
         </section>
       </section>
 
-      <section class="group">
-        <h2>Télémétrie</h2>
-        <p class="group-sub">
+      <section class="group" id="group-telemetry">
+        <h2 data-i18n="options.telemetry.heading">Télémétrie</h2>
+        <p class="group-sub" data-i18n="options.telemetry.sub">
           Désactivée par défaut. N'émet que des compteurs agrégés — label utilisé, code
           d'erreur, mode, dépôt — jamais le texte d'un commentaire, d'un code ou d'un diff,
           ni l'adresse de la page. Elle ne s'active que si la politique d'entreprise de
-          votre organisation déclare un point de collecte <em>et</em> que vous cochez cette
-          case. Un dépôt ne peut ni l'activer, ni choisir la destination.
+          votre organisation déclare un point de collecte et que vous cochez cette case.
+          Un dépôt ne peut ni l'activer, ni choisir la destination.
         </p>
         <section class="panel">
           <label class="checkbox-row">
             <input id="telemetry-opt-in" type="checkbox" />
-            Autoriser l'envoi de compteurs agrégés à mon organisation
+            <span data-i18n="options.telemetry.optin">Autoriser l'envoi de compteurs agrégés à mon organisation</span>
           </label>
           <p class="endpoint-note" id="telemetry-endpoint" aria-live="polite">—</p>
         </section>
       </section>
 
-      <section class="group">
-        <h2>État</h2>
+      <section class="group" id="group-status">
+        <h2 data-i18n="options.status.heading">État</h2>
         <section class="panel">
           <div class="status-row" id="degraded-state">
             <span class="dot"></span>

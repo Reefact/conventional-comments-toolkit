@@ -33,7 +33,8 @@
     "check:relay-cors": "node spikes/relay-cors.mjs",
     "check:subject-line": "node spikes/subject-line.mjs",
     "check:composer-layout": "node spikes/composer-layout.mjs",
-    "check:open-tab-injection": "node spikes/open-tab-injection.mjs"
+    "check:open-tab-injection": "node spikes/open-tab-injection.mjs",
+    "check:options-tour": "node spikes/options-tour.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

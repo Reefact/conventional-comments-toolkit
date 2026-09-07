@@ -113,5 +113,13 @@ jobs:
       - name: Injection — ce qu'un enregistrement dynamique atteint (§A.4)
         run: npm run check:open-tab-injection
 
+      # Une visite guidée est une affirmation de MISE EN PAGE : happy-dom dit de quel élément
+      # un nœud est enfant, jamais où il tombe. Les deux défauts de sa première version — la
+      # dernière étape hors écran, la fiche débordant sous la fenêtre — étaient exactement de
+      # ce genre. Le parcours est donc CLIQUÉ pour de vrai, Playwright refusant de cliquer un
+      # élément hors écran : l'échec devient une mesure et non un avis.
+      - name: Visite guidée de la page d'options, parcourue au clic (§10)
+        run: npm run check:options-tour
+
       - name: Smoke test de sélecteurs (§9.4)
         run: node spikes/p1-prime/smoke.mjs

@@ -973,8 +973,12 @@ describe('F — la page d’options : consentir à ce que la POLITIQUE déclare 
             cb?.();
           },
         },
+        // La page d'options est bilingue depuis qu'elle applique la préférence de langue
+        // (§10) : ces assertions lisent du français, elles doivent donc le DEMANDER. Sans
+        // cette clé, la langue viendrait de `navigator.language` et la suite passerait ou
+        // échouerait selon la machine qui la joue.
         sync: {
-          get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}),
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({ language: 'fr' }),
           set: () => {},
         },
         managed: { get: (cb: (i: Record<string, unknown>) => void) => cb(managed) },
@@ -995,7 +999,7 @@ describe('F — la page d’options : consentir à ce que la POLITIQUE déclare 
     expect(line.textContent).toContain(`${ENDPOINT}`);
     // La phrase peut désormais nommer la politique d'entreprise sans mentir : le point de
     // collecte ne peut plus venir du fichier d'un dépôt (revue Codex, PR #31).
-    expect(line.textContent).toContain("politique d'entreprise");
+    expect(line.textContent).toContain('politique d\u2019entreprise');
 
     box.checked = true;
     box.dispatchEvent(new Event('change'));

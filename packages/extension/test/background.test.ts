@@ -19,6 +19,7 @@ interface FakeChrome {
     onMessage: { addListener: ReturnType<typeof vi.fn> };
     lastError: null;
     openOptionsPage: ReturnType<typeof vi.fn>;
+    onInstalled: { addListener: ReturnType<typeof vi.fn> };
   };
   action: { onClicked: { addListener: ReturnType<typeof vi.fn> } };
   permissions: {
@@ -65,7 +66,12 @@ function installFakeChrome(
   /** Les onglets qui portent le marqueur du script de contenu, à cet instant. */
   const marked = new Set<number>();
   const fake: FakeChrome = {
-    runtime: { onMessage: { addListener: vi.fn() }, lastError: null, openOptionsPage: vi.fn() },
+    runtime: {
+      onMessage: { addListener: vi.fn() },
+      lastError: null,
+      openOptionsPage: vi.fn(),
+      onInstalled: { addListener: vi.fn() },
+    },
     action: { onClicked: { addListener: vi.fn() } },
     permissions: {
       getAll: vi.fn((cb: (p: { origins: string[] }) => void) => cb({ origins: grantedOrigins })),
@@ -522,5 +528,64 @@ describe('rattrapage des onglets déjà ouverts', () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(fake.scripting.registerContentScripts).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('premier lancement : amener aux réglages', () => {
+  // Depuis qu'aucun hôte n'est pré-déclaré dans le manifeste, une extension fraîchement
+  // installée ne fait rien nulle part tant que personne n'a autorisé un domaine — sans
+  // erreur, sans icône barrée, donc sans rien qui l'explique. C'est aussi la seule migration
+  // possible pour qui met à jour : `permissions.request()` exige un geste humain, qu'un
+  // service worker ne peut pas produire.
+
+  function fireInstall(fake: FakeChrome, reason: string): void {
+    const listener = fake.runtime.onInstalled.addListener.mock.calls[0]![0] as (d: {
+      reason: string;
+    }) => void;
+    listener({ reason });
+  }
+
+  it('une INSTALLATION ouvre la page d’options', async () => {
+    const fake = installFakeChrome([]);
+    await import('../src/background.js');
+
+    fireInstall(fake, 'install');
+
+    expect(fake.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('une MISE À JOUR sans aucun domaine accordé l’ouvre aussi', async () => {
+    // Le cas de la migration : l'utilisateur avait github.com par le manifeste, la mise à
+    // jour le lui retire, et il n'a plus rien.
+    const fake = installFakeChrome([]);
+    await import('../src/background.js');
+
+    fireInstall(fake, 'update');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(fake.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('une MISE À JOUR avec un domaine déjà accordé n’ouvre RIEN', async () => {
+    // Sans cette condition, chaque mise à jour automatique du store ouvrirait un onglet à
+    // quelqu'un qui n'a rien demandé et n'a rien à y faire.
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    await import('../src/background.js');
+
+    fireInstall(fake, 'update');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(fake.runtime.openOptionsPage).not.toHaveBeenCalled();
+  });
+
+  it('une raison étrangère à l’extension n’ouvre rien', async () => {
+    const fake = installFakeChrome([]);
+    await import('../src/background.js');
+
+    fireInstall(fake, 'chrome_update');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(fake.runtime.openOptionsPage).not.toHaveBeenCalled();
   });
 });

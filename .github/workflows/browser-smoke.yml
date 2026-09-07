@@ -121,5 +121,15 @@ jobs:
       - name: Visite guidée de la page d'options, parcourue au clic (§10)
         run: npm run check:options-tour
 
+      # Une indirection de jetons ne se lit pas : la cascade, la spécificité et la substitution
+      # des `var()` se répondent d'une façon qu'aucune relecture ne tranche. Ce garde mesure les
+      # deux promesses de la scission par plateforme — hors GitHub, rien n'a changé depuis la
+      # feuille d'avant (contrôle différentiel contre `origin/main`) ; et une valeur injectée
+      # dans la couche GitHub n'atteint AUCUNE page dépourvue du marqueur de plateforme, tout en
+      # atteignant bien celles qui le portent. Cette contre-épreuve n'est pas décorative : sans
+      # elle, une couche devenue inerte passerait le contrôle d'isolation sans effort.
+      - name: Isolation des styles par plateforme (§9.1, §9.4)
+        run: npm run check:style-isolation
+
       - name: Smoke test de sélecteurs (§9.4)
         run: node spikes/p1-prime/smoke.mjs

@@ -27,7 +27,24 @@ await build({ ...common, entryPoints: [join(here, 'src/content.ts')], outfile: j
 await build({ ...common, entryPoints: [join(here, 'src/background.ts')], outfile: join(out, 'background.js') });
 await build({ ...common, entryPoints: [join(here, 'src/options/options.ts')], outfile: join(out, 'options.js') });
 
-await copyFile(join(here, 'src/styles.css'), join(out, 'styles.css'));
+// Une seule feuille livrée, assemblée de plusieurs : la feuille partagée, qui ne nomme aucune
+// plateforme, puis la feuille de CHAQUE adaptateur, qui déclare ce que les rôles valent chez
+// lui. Concaténer plutôt que déclarer plusieurs fichiers au manifeste évite d'avoir à toucher
+// `content_scripts` et `registerContentScriptForOrigin()` — l'isolation ne vient pas du
+// fichier, elle vient du scope `:root[data-cct-platform=…]` que chaque feuille de plateforme
+// pose autour de ses règles, et qu'un garde vérifie.
+//
+// L'ordre d'assemblage n'a délibérément AUCUNE importance : la spécificité (0,2,0) du scope
+// passe devant le `:root` (0,1,0) des valeurs neutres dans les deux sens. Une isolation qui
+// dépendrait de l'ordre de ce tableau serait une dépendance invisible, et le jour où
+// quelqu'un trie cette liste elle casserait sans rien dire.
+const PLATFORM_SHEETS = [
+  '../adapters/github/src/platform.css',
+  '../adapters/azdo/src/platform.css',
+];
+const sheets = [await readFile(join(here, 'src/styles.css'), 'utf8')];
+for (const rel of PLATFORM_SHEETS) sheets.push(await readFile(join(here, rel), 'utf8'));
+await writeFile(join(out, 'styles.css'), sheets.join('\n'));
 await copyFile(join(here, 'src/options/options.html'), join(out, 'options.html'));
 await copyFile(join(here, 'src/managed-schema.json'), join(out, 'managed-schema.json'));
 

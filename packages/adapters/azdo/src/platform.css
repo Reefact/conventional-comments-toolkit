@@ -1,0 +1,26 @@
+/* Ce que les rôles de rendu de l'extension valent SUR AZURE DEVOPS (§B).
+
+   **Ce fichier est délibérément vide de toute surcharge, et ce vide est une réponse.**
+
+   Azure DevOps a ses propres jetons de thème. Les nommer ici de mémoire serait exactement la
+   faute que la scission des feuilles corrige : ce dépôt a déjà écrit trois affirmations sur le
+   navigateur qui se sont révélées fausses, et la règle qui en est sortie est qu'une
+   affirmation sur une plateforme se VÉRIFIE, elle ne se rappelle pas. Aucun jeton d'Azure
+   DevOps n'a été observé depuis ce dépôt.
+
+   Sans surcharge, les valeurs neutres de la feuille partagée s'appliquent — mots-clés système
+   (`ButtonFace`, `Highlight`, `Canvas`, `currentColor`) qui suivent le thème du système
+   d'exploitation et le mode sombre. C'est EXACTEMENT ce que l'extension rendait sur Azure
+   DevOps avant la scission, puisque aucun jeton Primer n'y était défini et que seul le dernier
+   repli s'appliquait. La scission ne change donc rien au rendu de cette plateforme ; elle lui
+   donne un endroit où son rendu pourra être décidé.
+
+   Ce qu'il faut faire pour l'améliorer, quand quelqu'un aura accès à un vrai tenant
+   (A-FAIRE-fr.md, point 9) : relever les jetons de thème sur une page de PR réelle, en mode
+   clair ET en mode sombre, puis les déclarer ici sous `:root[data-cct-platform='azdo']` sur le
+   modèle de la feuille GitHub. Rien d'autre n'est à toucher — ni la feuille partagée, ni le
+   TypeScript, ni GitHub.
+
+   Le fichier existe malgré son vide plutôt que d'être absent : sa présence est ce qui rend la
+   question visible. Un fichier manquant se lit comme un oubli ; un fichier qui explique
+   pourquoi il est vide se lit comme une décision. */

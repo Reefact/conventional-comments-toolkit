@@ -1,16 +1,16 @@
 // Canari hebdomadaire des variables de thème GitHub (Primer) — vérifie que le repli mis
-// en place dans packages/extension/src/styles.css n'est pas en train de devenir la
+// en place dans packages/adapters/github/src/platform.css n'est pas en train de devenir la
 // norme silencieuse : si GitHub renomme une de ces variables lors d'une refonte, ce
 // script le détecte au lieu de laisser l'extension retomber sur ses replis système sans
 // que personne ne le remarque.
 //
-// La liste des variables à vérifier est EXTRAITE de styles.css (pas recopiée à la
+// La liste des variables à vérifier est EXTRAITE de cette feuille (pas recopiée à la
 // main) : tout nouveau var(--fgColor-... , repli) ajouté au fichier est couvert
 // automatiquement. Seuls les préfixes Primer connus sont retenus — les propriétés
 // propres à l'extension (--cct-label-color, posée par toolbar.ts) ne viennent pas de
 // GitHub et ne doivent pas être vérifiées ici.
 //
-// styles.css imbrique parfois un ANCIEN nom Primer en repli du nouveau (GitHub
+// La feuille imbrique parfois un ANCIEN nom Primer en repli du nouveau (GitHub
 // Enterprise Server est figé par version et peut encore servir les noms d'avant le
 // renommage — specifications-fr.md §A.5). Seul le nom Primer le plus prioritaire de
 // chaque CHAÎNE de repli est exigé ici : un nom imbriqué directement dans le repli d'un
@@ -26,7 +26,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const stylesPath = join(here, '..', 'packages', 'extension', 'src', 'styles.css');
+// La feuille de la plateforme GITHUB, et non la feuille partagée : depuis la scission, cette
+// dernière ne nomme plus aucun jeton Primer — elle ne dit que des rôles (--cct-*). Les noms
+// que ce canari surveille vivent désormais tous ici, et c'est le fichier qu'un renommage chez
+// GitHub oblige à corriger.
+const stylesPath = join(here, '..', 'packages', 'adapters', 'github', 'src', 'platform.css');
 // PLAYWRIGHT_CHROMIUM permet à la CI de forcer le binaire déjà téléchargé sans repasser
 // par la résolution ci-dessous ; en local (npm run check:github-theme-vars, hors
 // conteneur), chromium.executablePath() retrouve le Chromium installé par
@@ -166,9 +170,9 @@ if (missing.length > 0) {
     `\n${missing.length} variable(s) Primer disparue(s) de github.com : ${missing.join(', ')}.`
   );
   console.error(
-    'packages/extension/src/styles.css retombe sur son repli système pour ces propriétés — ' +
+    'packages/adapters/github/src/platform.css retombe sur son repli système pour ces propriétés — ' +
       "l'apparence reste correcte mais n'est plus alignée sur le thème GitHub actuel. " +
-      'Mettre à jour les noms de variables dans styles.css.'
+      'Mettre à jour les noms de variables dans packages/adapters/github/src/platform.css.'
   );
   // Signal sémantique distinct du seul code de sortie : une panne de navigation (réseau,
   // timeout) fait aussi échouer ce script, mais AVANT d'atteindre ce bloc — le workflow
@@ -178,4 +182,4 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-console.log('\n✓ toutes les variables Primer utilisées par styles.css sont toujours présentes.');
+console.log('\n✓ toutes les variables Primer utilisées par la feuille GitHub sont toujours présentes.');

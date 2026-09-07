@@ -100,15 +100,18 @@ export interface CloudPlatform {
  * dans le manifeste** : tous passent par `optional_host_permissions`, `github.com` comme
  * les autres.
  *
- * `github.com` y échappait — `content_scripts` l'injectait statiquement. Ce n'est pas qu'il
- * était alors « révocable par rien » : le navigateur garde ses propres contrôles d'accès
- * aux sites, et rien ici ne les remplace. C'est que L'EXTENSION ne voyait ni ne pilotait
- * cet accès — absent de `chrome.permissions`, ni demandable, ni retirable, ni observable —
- * donc impossible à montrer, à reprendre ou à suivre depuis le produit. L'exception se
- * payait par ailleurs en cas particuliers dispersés : un court-circuit dans
- * `selectPlatform()`, un autre dans `registerContentScriptForOrigin()`, et une ligne
- * « plateforme non précisée » affichée pour un octroi superflu sur un domaine où le choix
- * n'était de toute façon jamais lu. Un seul mécanisme supprime les trois.
+ * `github.com` y échappait — `content_scripts` l'injectait statiquement. La différence qui
+ * compte est étroite, et deux formulations successives l'ont manquée avant celle-ci (revues
+ * Reefact, PR #61) : ni « révocable par rien » — le navigateur garde ses propres contrôles
+ * d'accès aux sites —, ni « invisible pour l'extension », car `getAll()` rend bel et bien
+ * les permissions du manifeste. Ce qui est vrai, et MESURÉ par `npm run smoke:mv3` :
+ * `permissions.remove()` refuse une permission requise (« You cannot remove required
+ * permissions. »), là où il retire un octroi optionnel. L'extension ne peut donc pas rendre
+ * ce que le manifeste exige — donc pas bâtir un consentement qu'on reprend depuis le
+ * produit. L'exception se payait par ailleurs en cas particuliers dispersés : un
+ * court-circuit dans `selectPlatform()`, un autre dans `registerContentScriptForOrigin()`,
+ * et une ligne « plateforme non précisée » affichée pour un octroi superflu sur un domaine
+ * où le choix n'était de toute façon jamais lu. Un seul mécanisme supprime les trois.
  *
  * **Le critère d'entrée est l'hôte CONCRET, pas la plateforme ni l'offre cloud.** Un
  * suffixe connu ne suffit pas : `{organisation}.visualstudio.com` donne un sous-domaine par

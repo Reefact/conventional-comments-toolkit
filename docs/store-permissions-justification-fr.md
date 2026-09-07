@@ -9,6 +9,9 @@ l'extension). Il couvre les permissions déclarées dans
 À tenir à jour si `manifest.json` change ; sinon la revue Google et ce
 document divergent silencieusement.
 
+Voir aussi [`store-permissions-justification-en.md`](store-permissions-justification-en.md)
+pour la version anglaise.
+
 ## Single purpose (description de la finalité unique)
 
 > Conventional Comments Toolkit aide les personnes qui font des revues de
@@ -33,13 +36,17 @@ et `content-internal.ts`) :**
 - `chrome.storage.managed` : lecture du plancher de politique d'entreprise
   (§8.1.1), pas d'écriture côté extension.
 
-**Correction (revue Codex, second passage) :** `selectorFailures` n'est
-que **lu** depuis `chrome.storage.local` par la page d'options
-(`options.ts:85`) — rien dans le code de production ne l'y **écrit**.
-`SelectorLog` ne garde ses échecs qu'en mémoire (tableau interne). Le
-journal affiché dans les réglages est donc toujours vide en l'état
-actuel ; ne pas le décrire comme une donnée réellement persistée tant que
-cette écriture n'existe pas.
+**Correction (revue Codex sur ce document, ce tour-ci) :** l'affirmation
+précédente — « rien dans le code de production ne l'y écrit » — était
+fausse. `persistSelectorFailure()` (`content-internal.ts:286`) écrit
+bien dans `chrome.storage.local` sous la clé `selectorFailures`, via
+`appendToJournal()` (`storage.ts:69`) ; elle est câblée au rappel de
+`SelectorLog` (`content-internal.ts:436-437`), qui l'appelle à chaque
+nouvelle dégradation de sélecteur. Le journal affiché dans les réglages
+(`options.ts:85`, lecture seule côté page d'options) est donc bien
+alimenté par une écriture réelle, pas une donnée qui resterait
+éternellement vide — à décrire comme telle dans le formulaire de
+soumission.
 
 Il n'y a **pas** de liste de « dépôts autorisés » persistée, et le cache
 de lecture de `.conventional-comments.json` (`ClientConfigResolver`) est
@@ -289,10 +296,22 @@ mécanique de messagerie est vérifiée dans un vrai Chromium par
   émet en revanche des requêtes réseau**, et il faut le dire tel quel :
   la lecture de `.conventional-comments.json` par la route `raw` du
   dépôt affiché, et, si un plancher d'entreprise désigne un `configUrl`,
-  celle du document d'organisation. Ces requêtes portent les cookies de
-  session de l'utilisateur (`credentials: 'include'`) — la même
-  autorisation que s'il ouvrait ces URL dans un onglet — et ne
-  transportent aucun contenu vers l'extérieur : ce sont des lectures.
+  celle du document d'organisation. **Correction (revue Codex sur ce
+  document, ce tour-ci) :** dire que ces requêtes portent toutes les
+  cookies de session (`credentials: 'include'`) contredisait la section
+  `host_permissions` plus haut dans ce même document, et était faux pour
+  la route la plus fréquente. Trois cas, pas un seul : la lecture du
+  dépôt affiché part en **`same-origin`** sur `github.com` + route
+  `/raw/` (`configCredentials()`), pour la raison déjà détaillée plus
+  haut — le premier saut, de même origine que la page, emporte la
+  session, la redirection hors origine ne l'emporte plus ; un
+  `configUrl` d'organisation qui désigne un domaine **distinct** de la
+  plateforme passe par le relais du service worker, dont l'origine
+  `chrome-extension://` ne porte **aucun** cookie de github.com ; et
+  c'est seulement ailleurs — un `configUrl` de même origine que la page,
+  hors de cette route `raw` particulière — que `include` reste la règle
+  par défaut. Dans tous les cas, ce sont des lectures : aucun contenu ne
+  part vers l'extérieur.
 - Aucun code distant : `content_security_policy` interdit tout script qui
   ne soit pas empaqueté dans l'extension, aucune dépendance CDN.
 - Code source public et auditable (dépôt Apache-2.0).

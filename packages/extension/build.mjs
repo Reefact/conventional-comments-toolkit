@@ -68,7 +68,18 @@ const firefox = structuredClone(manifest);
 delete firefox.version_name;
 firefox.background = { scripts: ['background.js'], type: 'module' };
 firefox.browser_specific_settings = {
-  gecko: { id: 'conventional-comments-toolkit@example.org', strict_min_version: '128.0' },
+  gecko: {
+    id: 'conventional-comments-toolkit@conventionalcomments.io',
+    strict_min_version: '128.0',
+    // Obligatoire pour toute nouvelle extension soumise à AMO à partir du 3 novembre 2025
+    // (Extension Workshop, « Firefox built-in consent for data collection and
+    // transmission ») : `none` en `required` puisque rien n'est transmis par défaut, et
+    // `technicalAndInteraction` en `optional` pour la télémétrie du §10 — désactivée par
+    // défaut, soumise au triple verrou (politique d'entreprise et consentement explicite),
+    // et qui n'envoie que des compteurs agrégés (labels, codes de diagnostic), jamais de
+    // contenu. C'est la seule catégorie que Mozilla n'autorise pas à déclarer en `required`.
+    data_collection_permissions: { required: ['none'], optional: ['technicalAndInteraction'] },
+  },
 };
 await writeFile(join(out, 'firefox/manifest.json'), JSON.stringify(firefox, null, 2));
 await mkdir(join(out, 'firefox/icons'), { recursive: true });

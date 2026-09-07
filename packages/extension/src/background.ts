@@ -67,6 +67,7 @@ declare const chrome: {
   scripting?: {
     registerContentScripts: (scripts: RegisteredContentScript[], cb: () => void) => void;
     unregisterContentScripts: (filter: { ids: string[] }, cb: () => void) => void;
+    getRegisteredContentScripts?: (cb: (scripts: { id: string }[]) => void) => void;
   };
   storage?: {
     local?: {
@@ -185,7 +186,28 @@ chrome?.action?.onClicked.addListener(() => {
 /** Identifiant stable pour un origin — chrome.scripting exige un id sans caractère
  * spécial ; il sert aussi de clé pour désenregistrer proprement (§A.4, §B.4). */
 export function scriptIdFor(origin: string): string {
-  return `cct-${origin.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
+  return `${SCRIPT_ID_PREFIX}${origin.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${fingerprintOf(origin)}`;
+}
+
+/** Préfixe commun à tout ce que cette extension enregistre — la seule façon de reconnaître
+ * NOS enregistrements parmi ceux que `getRegisteredContentScripts()` rend. */
+const SCRIPT_ID_PREFIX = 'cct-';
+
+/** FNV-1a 32 bits, en base 36. Ce n'est pas une empreinte cryptographique et n'a pas à
+ * l'être : elle ne protège de rien, elle DISTINGUE. Le slug lisible seul ne le faisait pas
+ * — il écrase toute suite de caractères non alphanumériques en un seul `-`, si bien que
+ * `ghes.example.corp` et `ghes-example.corp`, deux noms d'intranet également plausibles,
+ * rendaient le même identifiant. Le second enregistrement échouait alors comme doublon, et
+ * révoquer l'un désenregistrait le script de l'autre : un hôte accordé restait sans script
+ * injecté (revue Codex, PR #60). Le slug est conservé devant l'empreinte parce qu'un
+ * identifiant se lit aussi dans un journal de débogage. */
+function fingerprintOf(origin: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < origin.length; i++) {
+    hash ^= origin.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
 }
 
 /** Tout hôte accordé s'enregistre ici, sans exception. `github.com` en était une : le
@@ -218,12 +240,45 @@ export async function unregisterContentScriptForOrigin(origin: string): Promise<
 
 /** Rattrape au démarrage les permissions déjà accordées (redémarrage du navigateur,
  * mise à jour de l'extension) : `registerContentScripts` ne survit pas à un rechargement
- * du service worker sans cet appel. */
+ * du service worker sans cet appel.
+ *
+ * **Et fait le ménage avant**, ce qui n'est pas une précaution de confort. Un
+ * enregistrement dynamique survit à une mise à jour de l'extension, alors que le CODE, lui,
+ * est remplacé : tout changement de la façon de nommer les identifiants — celui que la
+ * correction de collision vient d'introduire — laisserait les enregistrements de la version
+ * précédente en place sous leur ancien nom, que plus rien ne sait désenregistrer. Le même
+ * script serait alors injecté DEUX fois sur chaque page couverte. Le même passage rattrape
+ * une permission révoquée pendant que le worker dormait, dont l'enregistrement survivrait
+ * de la même façon.
+ *
+ * `getRegisteredContentScripts` est appelé derrière une garde : un navigateur qui ne
+ * l'exposerait pas doit continuer à enregistrer, faute de quoi l'extension ne s'injecterait
+ * plus nulle part — un ménage manqué coûte moins cher que ça. */
 export async function syncContentScriptsWithGrantedPermissions(): Promise<void> {
   if (!chrome?.permissions) return;
   const origins = await new Promise<string[]>((resolve) => {
     chrome!.permissions!.getAll((perms) => resolve(perms.origins ?? []));
   });
+
+  const expected = new Set(origins.map(scriptIdFor));
+  const registered = await new Promise<{ id: string }[]>((resolve) => {
+    const get = chrome?.scripting?.getRegisteredContentScripts;
+    if (!get) return resolve([]);
+    try {
+      get((scripts) => resolve(scripts ?? []));
+    } catch {
+      resolve([]);
+    }
+  });
+  const stale = registered
+    .map((script) => script.id)
+    .filter((id) => id.startsWith(SCRIPT_ID_PREFIX) && !expected.has(id));
+  if (stale.length > 0 && chrome?.scripting) {
+    await new Promise<void>((resolve) => {
+      chrome!.scripting!.unregisterContentScripts({ ids: stale }, () => resolve());
+    });
+  }
+
   for (const origin of origins) await registerContentScriptForOrigin(origin);
 }
 

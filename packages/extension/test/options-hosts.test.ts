@@ -32,6 +32,10 @@ interface FakeChrome {
   removed: string[][];
   /** Ce que la prochaine demande de permission répondra — une personne peut refuser. */
   grantNext: boolean;
+  /** Le navigateur refuse la révocation : `remove()` rappelle avec `false` et ne retire
+   * rien. C'est ce qu'il fait d'une permission non retirable — imposée par une politique
+   * d'entreprise, par exemple. */
+  refuseRemoval: boolean;
 }
 
 function installPage(init: Partial<FakeChrome> = {}): FakeChrome {
@@ -47,6 +51,7 @@ function installPage(init: Partial<FakeChrome> = {}): FakeChrome {
     requested: [],
     removed: [],
     grantNext: true,
+    refuseRemoval: false,
     ...init,
   };
 
@@ -60,6 +65,7 @@ function installPage(init: Partial<FakeChrome> = {}): FakeChrome {
       },
       remove: (perms: { origins: string[] }, cb: (removed: boolean) => void) => {
         state.removed.push(perms.origins);
+        if (state.refuseRemoval) return cb(false); // refusé : rien n'est retiré
         state.granted = state.granted.filter((o) => !perms.origins.includes(o));
         cb(true);
       },
@@ -164,6 +170,33 @@ describe('zone 1 — sites cloud : le catalogue moins ce qui est déjà accordé
     expect(configuredHosts()).toEqual([]);
   });
 
+  it('un octroi LARGE (`https://*/*`) n’est ni listé ni classable, et laisse le catalogue proposé', async () => {
+    // `https://*/*` est le motif que le manifeste déclare en `optional_host_permissions` :
+    // c'est donc le plus large que le navigateur puisse accorder ici, et il ne désigne aucun
+    // hôte. Listé comme un domaine ordinaire, il apparaissait en zone 4 sous un nom fantôme
+    // (`*`, ou `%2A` dans Chromium) ; le classer écrivait une étiquette que
+    // `hostMatchesPattern()` ne fait correspondre à rien, donc n'activait aucun adaptateur
+    // — un geste sans effet, proposé par l'écran lui-même (revue Codex, PR #60).
+    const state = installPage({ granted: ['https://*/*'] });
+    await loadOptions();
+
+    expect(configuredHosts()).toEqual([]);
+    expect(unconfiguredHosts()).toEqual([]);
+    expect(panelHidden('unconfigured-panel')).toBe(true);
+    // Le catalogue reste proposé : c'est par lui qu'on classe un domaine concret, et la
+    // demande de permission qu'il déclenche est déjà couverte par l'octroi large.
+    expect(cloudNames()).toEqual(CLOUD_PLATFORMS.map((p) => p.label));
+
+    const card = [...document.querySelectorAll('#cloud-list .cloud-card')].find(
+      (el) => el.querySelector('.name')?.textContent === 'GitHub.com'
+    );
+    buttonIn(card ?? null, 'Activer')!.click();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+
+    expect(state.local[HOST_PLATFORMS_KEY]).toEqual({ 'github.com': 'github' });
+    expect(configuredHosts()).toEqual(['github.com']);
+  });
+
   it('le joker `*.visualstudio.com` est demandé TEL QUEL, pas réduit à son domaine nu', async () => {
     // Chaque organisation historique a son propre sous-domaine : demander
     // `https://visualstudio.com/*` n'en couvrirait aucune.
@@ -217,6 +250,30 @@ describe('zone 3 — hôtes configurés : on y retire, on n’y reclasse plus', 
     expect(state.removed).toEqual([['https://ghes.example.corp:8443/*']]);
     expect(state.granted).toEqual([]); // réellement révoqué, pas seulement demandé
     expect(configuredHosts()).toEqual([]);
+  });
+
+  it('une révocation REFUSÉE ne purge pas l’étiquette et le dit', async () => {
+    // Purger l'étiquette d'une permission toujours accordée serait le pire des deux mondes :
+    // l'accès resterait, l'adaptateur s'éteindrait, et l'hôte réapparaîtrait parmi les
+    // domaines non configurés — l'écran affirmant avoir fait ce qu'il n'a pas fait (revue
+    // Codex, PR #60). `removed === false` est ce que rend le navigateur quand la permission
+    // n'est pas retirable, une politique d'entreprise forcée par exemple.
+    const state = installPage({
+      granted: ['https://force.corp.example/*'],
+      local: { [HOST_PLATFORMS_KEY]: { 'force.corp.example': 'github' } },
+      refuseRemoval: true,
+    });
+    await loadOptions();
+
+    buttonIn(document.querySelector('#host-list .host-row'), 'Retirer')!.click();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+
+    expect(state.granted).toEqual(['https://force.corp.example/*']); // rien n'a été retiré
+    expect(state.local[HOST_PLATFORMS_KEY]).toEqual({ 'force.corp.example': 'github' });
+    expect(configuredHosts()).toEqual(['force.corp.example']); // la ligne reste là où elle est
+    expect(panelHidden('unconfigured-panel')).toBe(true); // et ne bascule PAS en zone 4
+    expect(document.querySelector('#host-list')?.closest('section.panel')?.querySelector('.remove-state')?.textContent)
+      .toContain('force.corp.example');
   });
 
   it('un hôte classé par la POLITIQUE s’affiche en lecture seule, sans bouton de retrait', async () => {

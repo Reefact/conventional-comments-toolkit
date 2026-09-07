@@ -32,6 +32,7 @@ interface ChromePermissions {
 
 declare const chrome: {
   permissions?: ChromePermissions;
+  runtime?: { lastError?: { message?: string } | null };
   storage?: {
     sync?: {
       get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
@@ -173,11 +174,19 @@ function removeHostPlatform(host: string): Promise<void> {
  * joker (`https://*.visualstudio.com/*`) ne se retrouve pas à partir de son seul nom
  * d'hôte, et le reconstruire en `https://<hôte>/*` demanderait la révocation d'une origine
  * qui n'a jamais été accordée. */
-function removeHost(origin: string, host: string): Promise<void> {
+function removeHost(origin: string, host: string): Promise<boolean> {
   return new Promise((resolve) => {
-    if (!chrome?.permissions) return resolve();
-    chrome.permissions.remove({ origins: [origin] }, () => {
-      void removeHostPlatform(host).then(() => resolve());
+    if (!chrome?.permissions) return resolve(false);
+    chrome.permissions.remove({ origins: [origin] }, (removed) => {
+      // `lastError` est LU même quand on n'en fait rien d'autre : ne pas le consulter fait
+      // journaliser un « Unchecked runtime.lastError » par le navigateur.
+      const failed = Boolean(chrome?.runtime?.lastError) || removed === false;
+      // Purger l'étiquette d'une permission TOUJOURS accordée serait le pire des deux
+      // mondes : l'accès resterait, l'adaptateur s'éteindrait, et l'hôte réapparaîtrait
+      // parmi les domaines non configurés — l'écran affirmant avoir fait ce qu'il n'a pas
+      // fait. Une révocation refusée ne change donc rien du tout (revue Codex, PR #60).
+      if (failed) return resolve(false);
+      void removeHostPlatform(host).then(() => resolve(true));
     });
   });
 }
@@ -195,9 +204,18 @@ function makeButton(label: string, className: string, onClick: () => void): HTML
  * lecteur d'écran. Absent des hôtes classés par politique d'entreprise : révoquer une
  * permission imposée par l'administration ne relève pas de cet écran. */
 function makeRemoveButton(origin: string, host: string): HTMLButtonElement {
-  return makeButton('Retirer', 'btn btn-quiet', () => {
-    void removeHost(origin, host).then(() => void refreshHosts());
+  const button = makeButton('Retirer', 'btn btn-quiet', () => {
+    void removeHost(origin, host).then((removed) => {
+      if (removed) return void refreshHosts();
+      // Pas de rafraîchissement : rien n'a changé, et la ligne doit rester sous les yeux
+      // avec la raison. Un `refreshHosts()` effacerait justement ce message.
+      const state = button.closest('section.panel')?.querySelector('.remove-state');
+      if (state) {
+        state.textContent = `Le navigateur a refusé de retirer l'accès à ${host}.`;
+      }
+    });
   });
+  return button;
 }
 
 function makeKindBadge(platform: HostPlatform | null, isCloud: boolean): HTMLElement {

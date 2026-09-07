@@ -5,6 +5,7 @@
 import { TELEMETRY_CONSENT_KEY, managedEndpoint, parseConsent } from '../telemetry.js';
 import {
   HOST_PLATFORMS_KEY,
+  STATICALLY_INJECTED_HOST,
   hostnameOf,
   inferPlatform,
   parseManagedHostTags,
@@ -132,6 +133,12 @@ async function refreshHosts(): Promise<void> {
   list.textContent = '';
   for (const origin of perms.origins ?? []) {
     const host = hostnameOf(origin);
+    // `github.com` est déjà couvert par `content_scripts` (§2) : `selectPlatform()` le
+    // reconnaît avant même de consulter une étiquette (`STATICALLY_INJECTED_HOST`), donc
+    // un octroi optionnel superflu sur ce domaine — accordé ailleurs que par cet écran,
+    // p. ex. `chrome://extensions` — ne doit rien afficher ici. Le lister proposait un
+    // choix de plateforme qui n'est jamais lu pour lui.
+    if (host === STATICALLY_INJECTED_HOST) continue;
     const li = document.createElement('li');
     if (!host) {
       li.textContent = origin;

@@ -12,6 +12,39 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Changed
+
+- **GitHub enforcement no longer needs a server** (§6.4.1, §A.8). Blocking a merge on an
+  unresolved `issue:` used to mean deploying, exposing and operating a companion service.
+  It now means copying one workflow file and making one check required: the verifier runs
+  as a GitHub Action inside the repository it protects, authenticated by the token the
+  runner already provides. Nothing to host, no webhook endpoint, no database, no secret.
+  The setup is documented end to end in [`docs/github-setup-en.md`](docs/github-setup-en.md)
+  (French: [`docs/github-setup-fr.md`](docs/github-setup-fr.md)).
+
+  The rules did not change — the same `@cct/core` decides the same verdicts — only where
+  they run. Of the thirteen objects the hosted service persists, ten existed solely to
+  rebuild what the platform hides from a process sitting outside it; reading back the check
+  run it published recovers them all. The three that remain carry comment bodies that no
+  longer exist (an edited root, a corrected `E-CONFLICT`), and they now travel inside the
+  published check run itself, so the tool still stores nothing of its own anywhere.
+
+  Three GitHub behaviours shape the result and are documented rather than glossed over:
+  resolving a review thread fires no workflow event, so a green check can lag a
+  re-opened thread until the next trigger (§7 of the setup guide names three remedies, one
+  of which is "do nothing"); the token is read-only on fork pull requests, including for
+  review events, so repositories that accept them need the companion workflow; and the
+  check run's own re-run button does nothing, because GitHub does not deliver
+  `check_run: rerequested` for suites created by Actions.
+
+- **`@cct/server` is now the Azure DevOps path only.** Azure DevOps has no free equivalent
+  of "review trigger plus write token", so the hosted service remains the way to enforce
+  there. Its GitHub adapter, webhook route and `CCT_GITHUB_*` variables are removed;
+  setting any of them now makes the service refuse to start, naming the replacement.
+  Starting while ignoring them would be the worst outcome: the service would run and its
+  operator would believe GitHub repositories were being watched when no pull request was.
 ## [1.0.0-beta.12] - 2026-09-08
 
 ### Added

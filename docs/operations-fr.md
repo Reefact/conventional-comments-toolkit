@@ -1,7 +1,9 @@
 # Exploitation — activation, retour arrière, prérequis `enforce`
 
 Ce document rassemble les procédures d'exploitation dispersées dans la spécification et
-que le §14 désigne comme prérequis à `P6`. Il est le livrable attendu **avant** tout
+que le §14 désigne comme prérequis à `P6`. Il couvre les deux supports d'exécution du
+§6.4.1 ; la mise en place propre à GitHub, elle, tient dans
+[`github-setup-fr.md`](./github-setup-fr.md), et ne demande aucun hébergement. Il est le livrable attendu **avant** tout
 passage en `enforce` sur un dépôt pilote (§6.3.3, §14).
 
 ## Trajectoire d'adoption (§7)
@@ -99,9 +101,14 @@ Avant toute activation, exécuter le rapport à blanc pour connaître l'ampleur 
 
 ```
 POST /admin/dry-run
-{ "platform": "github", "repo": { "platform": "github", "host": "github.com",
-  "scope": ["org", "repo"] }, "activatedAt": "2026-09-01T00:00:00Z" }
+{ "platform": "azdo", "repo": { "platform": "azdo", "host": "dev.azure.com",
+  "scope": ["org", "projet", "depot"] }, "activatedAt": "2026-09-01T00:00:00Z" }
 ```
+
+Ce point d'entrée appartient au **service hébergé**, donc à Azure DevOps (§6.4.1). Sur
+GitHub, le même besoin se couvre sans rien exposer : passer le dépôt en `warn`, où le
+vérificateur publie un statut jamais rouge dont le corps liste exactement ce qui
+échouerait. C'est le rapport à blanc, rendu là où l'équipe regarde déjà.
 
 Il restitue les commentaires non conformes et les fils bloquants non résolus avec leurs
 liens permanents, **sans publier aucun statut**. Il sert aussi à calibrer `activatedAt`.

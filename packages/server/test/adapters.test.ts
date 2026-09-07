@@ -1,17 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createHmac } from 'node:crypto';
-import { decodeSummary, evaluate, type PrRef } from '@cct/core';
-import { GithubServerAdapter, githubFacts } from '../src/adapters/github/index.js';
+import { decodeSummary, defaultConfig, evaluate, type PrRef } from '@cct/core';
 import { AzdoServerAdapter, azdoFacts } from '../src/adapters/azdo/index.js';
-import { defaultConfig } from '@cct/core';
 
-const GH_PR: PrRef = {
-  platform: 'github',
-  createdAt: '2026-10-01T00:00:00Z',
-  host: 'github.com',
-  scope: ['acme', 'demo'],
-  number: 42,
-};
 const AZ_PR: PrRef = {
   platform: 'azdo',
   createdAt: '2026-10-01T00:00:00Z',
@@ -25,8 +15,8 @@ function sampleResult() {
   config.mode = 'enforce';
   config.server.statusTargetUrl = 'https://cc.example/status';
   const result = evaluate({
-    pr: GH_PR,
-    platform: { id: 'github', suggestionInfoString: 'suggestion' },
+    pr: AZ_PR,
+    platform: { id: 'azdo' },
     threads: [],
     loose: [],
     config,
@@ -56,101 +46,6 @@ function mockFetch(handler: (url: string, init?: RequestInit) => { status: numbe
   }) as typeof fetch;
   return { impl, calls };
 }
-
-describe('Annexe A — adaptateur serveur GitHub', () => {
-  it('faits de plateforme : provenance exposée, résolutions notifiées, corps de statut rendu', () => {
-    expect(githubFacts).toEqual({
-      threadStatusEmitsPrUpdated: true,
-      labelProvenanceExposed: true,
-      requiresStatusTargetUrl: false,
-    });
-  });
-
-  it('vérifie la signature HMAC X-Hub-Signature-256 et rejette les charges non signées (§6.4)', () => {
-    const adapter = new GithubServerAdapter({ token: async () => 't', webhookSecret: 'secret' });
-    const raw = JSON.stringify({ repository: {}, pull_request: {} });
-    const signature = `sha256=${createHmac('sha256', 'secret').update(raw).digest('hex')}`;
-    expect(adapter.verifySignature({}, { 'x-hub-signature-256': signature, 'x-raw-body': raw })).toBe(true);
-    expect(adapter.verifySignature({}, { 'x-hub-signature-256': 'sha256=deadbeef', 'x-raw-body': raw })).toBe(false);
-    expect(adapter.verifySignature({}, { 'x-raw-body': raw })).toBe(false);
-  });
-
-  it('publie un check run : ligne cc/1 dans output.title, sortie humaine dans le corps (§A.8)', async () => {
-    const { impl, calls } = mockFetch(() => ({ status: 201, body: {} }));
-    const adapter = new GithubServerAdapter({ token: async () => 't', webhookSecret: 's', fetchImpl: impl });
-    await adapter.publishStatus(GH_PR, sampleResult());
-    const call = calls.find((c) => c.url.endsWith('/repos/acme/demo/check-runs'))!;
-    const body = JSON.parse(String(call.init!.body)) as {
-      name: string;
-      head_sha: string;
-      conclusion: string;
-      output: { title: string; summary: string };
-    };
-    expect(body.name).toBe('conventional-comments');
-    expect(body.head_sha).toBe('abc123');
-    expect(body.conclusion).toBe('success');
-    // La ligne machine est relisible caractère pour caractère (§6.3.1).
-    const summary = decodeSummary(body.output.title);
-    expect(summary).not.toBeNull();
-    expect(summary!.mode).toBe('enforce');
-    expect(body.output.summary.length).toBeGreaterThan(0);
-  });
-
-  it('neutral → conclusion neutral, qui satisfait une vérification obligatoire (§A.8)', async () => {
-    const { impl, calls } = mockFetch(() => ({ status: 201, body: {} }));
-    const adapter = new GithubServerAdapter({ token: async () => 't', webhookSecret: 's', fetchImpl: impl });
-    const result = sampleResult();
-    result.state = 'neutral';
-    await adapter.publishStatus(GH_PR, result);
-    const body = JSON.parse(String(calls[0]!.init!.body)) as { conclusion: string };
-    expect(body.conclusion).toBe('neutral');
-  });
-
-  it('fetchConfigFile : 404 → absent, erreur réseau → unreachable, 200 → found (§9.2.2)', async () => {
-    const notFound = new GithubServerAdapter({
-      token: async () => 't',
-      webhookSecret: 's',
-      fetchImpl: mockFetch(() => ({ status: 404 })).impl,
-    });
-    expect((await notFound.fetchConfigFile(GH_PR)).status).toBe('absent');
-    const found = new GithubServerAdapter({
-      token: async () => 't',
-      webhookSecret: 's',
-      fetchImpl: mockFetch(() => ({ status: 200, text: '{"mode":"warn"}' })).impl,
-    });
-    expect(await found.fetchConfigFile(GH_PR)).toEqual({ status: 'found', text: '{"mode":"warn"}' });
-    const down = new GithubServerAdapter({
-      token: async () => 't',
-      webhookSecret: 's',
-      fetchImpl: (async () => {
-        throw new Error('network');
-      }) as unknown as typeof fetch,
-    });
-    expect((await down.fetchConfigFile(GH_PR)).status).toBe('unreachable');
-  });
-
-  it('removeLabel est idempotente : 404 n’est jamais une erreur (§9.2.4)', async () => {
-    const adapter = new GithubServerAdapter({
-      token: async () => 't',
-      webhookSecret: 's',
-      fetchImpl: mockFetch(() => ({ status: 404 })).impl,
-    });
-    await expect(adapter.removeLabel(GH_PR, 'cc-override')).resolves.toBeUndefined();
-  });
-
-  it('parseEvent extrait la PR — seuls pr et la séquence sont consommés (§9.2.1)', () => {
-    const adapter = new GithubServerAdapter({ token: async () => 't', webhookSecret: 's' });
-    const event = adapter.parseEvent({
-      action: 'created',
-      repository: { name: 'demo', owner: { login: 'acme' } },
-      pull_request: { number: 42, created_at: '2026-10-01T00:00:00Z' },
-      comment: { id: 1 },
-      sender: { id: 9, login: 'alice' },
-    });
-    expect(event.pr).toMatchObject({ platform: 'github', scope: ['acme', 'demo'], number: 42 });
-    expect(event.kind).toBe('comment.created');
-  });
-});
 
 describe('Annexe B — adaptateur serveur Azure DevOps', () => {
   const opts = {
@@ -302,26 +197,6 @@ function c(content: string) {
 }
 
 describe('résidu serveur — pagination de listOpenPrs (§6.4 source 2, §6.2.4)', () => {
-  it('GitHub : 250 PR ouvertes → 250 PrRef, en pages de 100', async () => {
-    const { impl, calls } = mockFetch((url) => {
-      const page = Number(/[?&]page=(\d+)/.exec(url)?.[1] ?? '1');
-      const start = (page - 1) * 100;
-      const count = Math.max(0, Math.min(100, 250 - start));
-      return {
-        status: 200,
-        body: Array.from({ length: count }, (_, i) => ({
-          number: start + i + 1,
-          created_at: '2026-10-01T00:00:00Z',
-        })),
-      };
-    });
-    const adapter = new GithubServerAdapter({ token: async () => 't', webhookSecret: 's', fetchImpl: impl });
-    const prs = await adapter.listOpenPrs({ host: 'github.com', scope: ['acme', 'demo'] });
-    expect(prs).toHaveLength(250);
-    expect(prs.at(-1)!.number).toBe(250);
-    expect(calls.filter((cl) => cl.url.includes('/pulls?state=open')).length).toBe(3);
-  });
-
   it('Azure DevOps : 250 PR actives → 250 PrRef via $top/$skip — la réconciliation est la seule voie de détection (§B.7)', async () => {
     const { impl, calls } = mockFetch((url) => {
       const skip = Number(/\$skip=(\d+)/.exec(url)?.[1] ?? '0');

@@ -90,3 +90,14 @@ export { encodeSummary, decodeSummary } from './summary.js';
 
 // i18n
 export { t, resolveLang, availableLanguages } from './i18n/index.js';
+
+// §6.3.1 — sortie humaine, commune aux deux supports d'exécution du §6.4.1
+export { renderHumanOutput } from './render.js';
+
+// §9.2.2, étape 10 du §6.4 — pré-résolution de l'habilitation
+export {
+  resolveOverrideMembership,
+  MembershipUnreachableError,
+  type InGroupReader,
+} from './membership.js';
+export { parseFloorDocument } from './config/floor-document.js';

@@ -14,7 +14,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
-import type { Floor, Mode } from '@cct/core';
+import { parseFloorDocument, type Floor } from '@cct/core';
 import type { ServerPlatformAdapter, PlatformOperationalFacts } from './compliance/adapter.js';
 import type { Storage } from './compliance/storage.js';
 import { MemoryStorage, FileStorage } from './compliance/storage.js';
@@ -24,7 +24,6 @@ import { Orchestrator } from './compliance/orchestrator.js';
 import { EvaluationScheduler, OrgModeWatch, Reconciler } from './compliance/scheduler.js';
 import { AdminEntryPoint } from './compliance/admin.js';
 import { createHttpServer } from './http.js';
-import { GithubServerAdapter, githubFacts, webHostFromApiBase } from './adapters/github/index.js';
 import { AzdoServerAdapter, azdoFacts } from './adapters/azdo/index.js';
 
 export type Env = Record<string, string | undefined>;
@@ -89,32 +88,14 @@ export function resolvePort(env: Env): number {
   return port;
 }
 
-const MODES: readonly Mode[] = ['off', 'assist', 'warn', 'enforce'];
-
-/** Validation de forme du plancher : le canal du composant B porte les garanties
- * d'entreprise du §8.1.1 — accepter `null`, un tableau ou un `minimumMode` inconnu
- * effacerait le plancher sans un mot. */
+/** Le contrôle de forme du plancher vit dans core/ (§8.1.1) : les deux supports
+ * d'exécution du §6.4.1 lisent le MÊME document, et deux contrôles finiraient par
+ * diverger sur la garantie d'entreprise elle-même. Ici, on n'ajoute que la conséquence
+ * propre au service — un plancher mal formé au démarrage est un refus de démarrer. */
 function validateFloorShape(raw: unknown, path: string): Floor {
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new BootstrapError(`CCT_FLOOR_FILE (${path}) must contain a JSON object`);
-  }
-  const f = raw as Record<string, unknown>;
-  if (f['minimumMode'] !== undefined && !MODES.includes(f['minimumMode'] as Mode)) {
-    throw new BootstrapError(
-      `CCT_FLOOR_FILE (${path}): unknown minimumMode "${String(f['minimumMode'])}" (expected ${MODES.join(', ')})`
-    );
-  }
-  if (f['floorVersion'] !== undefined && typeof f['floorVersion'] !== 'number') {
-    throw new BootstrapError(`CCT_FLOOR_FILE (${path}): floorVersion must be a number`);
-  }
-  if (
-    f['configUrl'] !== undefined &&
-    f['configUrl'] !== null &&
-    typeof f['configUrl'] !== 'string'
-  ) {
-    throw new BootstrapError(`CCT_FLOOR_FILE (${path}): configUrl must be a string or null`);
-  }
-  return raw as Floor;
+  const parsed = parseFloorDocument(raw);
+  if ('error' in parsed) throw new BootstrapError(`CCT_FLOOR_FILE (${path}): ${parsed.error}`);
+  return parsed.floor;
 }
 
 /** Canal de plancher du composant B (§8.1.1) : un fichier JSON de la configuration
@@ -244,46 +225,24 @@ export async function assembleFromEnv(
     platforms.push({ id, adapter, facts, scheduler, reconciler, watch, repos });
   };
 
-  // ————— GitHub (annexe A) : la présence de N'IMPORTE quelle variable CCT_GITHUB_*
-  // arme la plateforme et exige alors jeton ET secret de webhook —————
-  const GITHUB_VARS = [
+  // ————— GitHub n'est plus une plateforme de ce service (§6.4.1, §A.8) —————
+  // Le vérificateur GitHub est une GitHub Action : il s'exécute dans le dépôt, avec le
+  // jeton du runner, et ne demande ni hébergement ni webhook. Laisser ici un second chemin
+  // GitHub reviendrait à maintenir deux vérificateurs pour une plateforme qui n'a besoin
+  // d'aucun de ce genre. Un déploiement qui portait les anciennes variables doit
+  // l'apprendre au démarrage plutôt que de croire surveiller des dépôts qu'il ne voit plus.
+  const RETIRED_GITHUB_VARS = [
     'CCT_GITHUB_TOKEN',
     'CCT_GITHUB_WEBHOOK_SECRET',
     'CCT_GITHUB_API_BASE',
     'CCT_GITHUB_HOST',
     'CCT_GITHUB_REPOS',
   ];
-  if (anySet(env, GITHUB_VARS)) {
-    const token = required(env, 'CCT_GITHUB_TOKEN');
-    const webhookSecret = required(env, 'CCT_GITHUB_WEBHOOK_SECRET');
-    const apiBase = env['CCT_GITHUB_API_BASE'] ?? 'https://api.github.com';
-    let derivedHost: string;
-    try {
-      derivedHost = webHostFromApiBase(apiBase);
-    } catch (e) {
-      throw new BootstrapError(`CCT_GITHUB_API_BASE "${apiBase}" is not a valid URL: ${String(e)}`);
-    }
-    // UNE seule identité d'hôte pour la même PR : les clés du stockage §6.4 dérivent de
-    // l'hôte, et un webhook qui produirait `ghe.corp` pendant que la réconciliation
-    // produit `github.com` scinderait séquences, épinglages et verdicts en deux. L'hôte
-    // dérive donc d'apiBase — la même dérivation que parseEvent — et une surcharge
-    // explicite est passée à L'ADAPTATEUR AUSSI, jamais aux seuls dépôts réconciliés.
-    const host = env['CCT_GITHUB_HOST']?.trim() || derivedHost;
-    const adapter = new GithubServerAdapter({
-      token: async () => token,
-      webhookSecret,
-      apiBase,
-      webHost: host,
-      ...(opts.fetchImpl !== undefined ? { fetchImpl: opts.fetchImpl } : {}),
-    });
-    const repos = splitList(env['CCT_GITHUB_REPOS']).map((full) => {
-      const scope = full.split('/');
-      if (scope.length !== 2 || scope.some((s) => s === '')) {
-        throw new BootstrapError(`CCT_GITHUB_REPOS entry "${full}" is not of the form owner/repo`);
-      }
-      return { platform: 'github', host, scope };
-    });
-    attach('github', adapter, githubFacts, repos);
+  if (anySet(env, RETIRED_GITHUB_VARS)) {
+    throw new BootstrapError(
+      'GitHub is no longer served by this component: it is now a GitHub Action running in the repository itself (§6.4.1, §A.8). ' +
+        `Remove ${RETIRED_GITHUB_VARS.filter((v) => env[v] !== undefined).join(', ')} and follow docs/github-setup-en.md.`
+    );
   }
 
   // ————— Azure DevOps (annexe B) : même règle d'armement —————

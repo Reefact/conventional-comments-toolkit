@@ -1,0 +1,53 @@
+# Conventional Comments — companion workflow, needed ONLY by repositories that accept
+# pull requests from forks and want the check to keep up with review comments on them.
+#
+# Copy alongside conventional-comments.yml. A repository whose pull requests all come from
+# branches in the repository itself does not need this file.
+#
+# WHY IT EXISTS
+#
+# On a pull request opened from a fork, GitHub gives the GITHUB_TOKEN read-only
+# permissions — and not only for the `pull_request` event: the documentation states the
+# same for `pull_request_review` and `pull_request_review_comment`. A run triggered by an
+# external contributor's review comment therefore cannot publish a check run.
+#
+# Those pull requests are not left without a status: pull_request_target publishes one when
+# they are opened and on every push. What they lose is the REFRESH — a blocking `issue:`
+# written after the last push would not turn the check red. That is the dangerous
+# direction, and it is what this file closes.
+#
+# HOW IT WORKS
+#
+# `workflow_run` fires when the main workflow finishes, and it runs in the base
+# repository's context with a token that can write. It re-evaluates every open pull
+# request rather than trying to recover which one triggered it: `workflow_run` does not
+# carry the pull request for fork-originated runs, and passing it through an artifact
+# would add machinery for a value the reconciliation does not need.
+name: Conventional Comments (fork pull requests)
+
+on:
+  workflow_run:
+    workflows: ['Conventional Comments']
+    types: [completed]
+
+permissions:
+  checks: write
+  pull-requests: read
+  contents: read
+
+concurrency:
+  group: conventional-comments-forks
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    name: Reconcile open pull requests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Reefact/conventional-comments-toolkit@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # No pr-number: every open pull request is re-evaluated. Each one republishes
+          # only if its verdict actually changed, so this is cheap on the API and silent
+          # on the pull requests it does not affect.
+          # floor-url: https://intranet.example/cct/floor.json

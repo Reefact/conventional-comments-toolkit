@@ -4,8 +4,13 @@
 // (§6.4), jamais un « non habilité » : convertir une panne d'API en refus de résolution
 // ferait passer un check au rouge sur une information qui n'a pas pu être lue.
 
-import type { CommentInfo, EffectiveConfig, ThreadInfo, UserInfo, Zone } from '@cct/core';
-import type { ServerPlatformAdapter } from './adapter.js';
+import type { CommentInfo, EffectiveConfig, ThreadInfo, UserInfo, Zone } from './types.js';
+
+/** La seule chose que cette fonction demande à une plateforme. Elle prend un rappel
+ * plutôt qu'un adaptateur pour que les DEUX supports d'exécution du §6.4.1 l'emploient
+ * sans se dépendre l'un l'autre : la règle d'intersection du §8.2 est un jugement, et un
+ * jugement vit dans core/ (§9.1). */
+export type InGroupReader = (user: UserInfo, group: string) => Promise<boolean>;
 
 export class MembershipUnreachableError extends Error {
   constructor(cause: unknown) {
@@ -14,7 +19,7 @@ export class MembershipUnreachableError extends Error {
 }
 
 export async function resolveOverrideMembership(
-  adapter: ServerPlatformAdapter,
+  isInGroup: InGroupReader,
   config: EffectiveConfig,
   threads: ThreadInfo[],
   loose: { comment: CommentInfo; zone: Zone }[],
@@ -45,7 +50,7 @@ export async function resolveOverrideMembership(
     for (const group of groups) {
       let inGroup: boolean;
       try {
-        inGroup = await adapter.isInGroup(user, group);
+        inGroup = await isInGroup(user, group);
       } catch (e) {
         throw new MembershipUnreachableError(e);
       }

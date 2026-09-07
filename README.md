@@ -1,9 +1,15 @@
 # conventional-comments-toolkit
 
-Browser extension + server companion enforcing [Conventional Comments](https://conventionalcomments.org/) in code reviews, for GitHub (github.com, Enterprise Cloud/EMU, Enterprise Server) and Azure DevOps (Services, Server).
+Browser extension + verifier enforcing [Conventional Comments](https://conventionalcomments.org/) in code reviews, for GitHub (github.com, Enterprise Cloud/EMU, Enterprise Server) and Azure DevOps (Services, Server).
 
 - **Browser extension (component A)** — authoring assistance and real-time validation while writing review comments. Convenience and prevention; bypassable by construction.
-- **Server companion (component B)** — the actual source of truth: verifies every comment after the fact, computes "blocking threads resolved", and publishes a required status check, so a PR can't be completed with an unresolved blocking comment even without the extension installed.
+- **Verifier (component B)** — the actual source of truth: verifies every comment after the fact, computes "blocking threads resolved", and publishes a required status check, so a PR can't be completed with an unresolved blocking comment even without the extension installed.
+
+**On GitHub, the verifier is a GitHub Action — there is no server to deploy.** Copy one
+workflow file, make one check required, and you are done:
+[`docs/github-setup-en.md`](./docs/github-setup-en.md). A hosted service remains the path
+for Azure DevOps, which has no free equivalent of "review trigger plus write token"
+([`docs/deployment-fr.md`](./docs/deployment-fr.md)).
 
 No comment, code, or diff content ever leaves the browser. The full specification (the normative source) is [`specifications-fr.md`](./specifications-fr.md) (in French).
 
@@ -15,13 +21,14 @@ A TypeScript monorepo (npm workspaces). The full breakdown is in [`docs/architec
 packages/core           @cct/core            parser, validator, config, evaluation — shared verbatim by A and B
 packages/adapters/*     @cct/adapter-*        client (component A) platform adapters + shared editor plumbing
 packages/extension      @cct/extension        Manifest V3 extension — toolbar, quick input, feedback, guard
-packages/server         @cct/server           component B — orchestrator, storage, admin, platform adapters
+packages/action         @cct/action           component B on GitHub — a GitHub Action; no server, no storage
+packages/server         @cct/server           component B on Azure DevOps — hosted service: orchestrator, storage, admin
 spikes/p1-prime         P1' spike             programmatic-write assumption, validated in Chromium
 ```
 
 `packages/core/` holds every validation rule; it is consumed identically by both
 components so that a comment judged compliant by the extension is always judged compliant
-by the server, and conversely (§2). See [`docs/architecture-fr.md`](./docs/architecture-fr.md)
+by the verifier, and conversely (§2). See [`docs/architecture-fr.md`](./docs/architecture-fr.md)
 for how the A/B parity holds by construction.
 
 ## Getting started
@@ -65,7 +72,7 @@ and widens it to every slash command, by adding `"/*"` to `toolCommands`. The ex
 above carries the full recommended GitHub list, mentions included.
 
 Note that this behaviour lives in `core/`, not in the configuration, so `fingerprint()`
-(§9.2.2) cannot see it: while the extension and the server run different `core/` versions,
+(§9.2.2) cannot see it: while the extension and the verifier run different `core/` versions,
 they apply different rules on GitHub while still reporting that they agree. The lever for
 requiring a `core/` version across an organization is `coreMinVersion` (§8.2), not the
 fingerprint.
@@ -110,7 +117,7 @@ cleanly while no DOM captures are supplied, rather than giving assurance it does
 | P2 | Extension `assist` on GitHub | Implemented |
 | P3 | Azure DevOps adapter | Implemented, with the P1' fallbacks in place |
 | P4 | `warn` mode + indicators (§12) | Implemented (`computeIndicators`, admin endpoint) |
-| P5 | Server companion + status checks | Implemented |
+| P5 | Verifier + status checks — GitHub Action, Azure DevOps service | Implemented |
 | P6 | `enforce` on a pilot repo, then rollout | Prerequisites and rollback documented (`docs/operations-fr.md`); the org-admin steps are deployment-time |
 
 License: Apache-2.0.

@@ -27,8 +27,8 @@ import {
 import type { ServerPlatformAdapter, PlatformOperationalFacts } from './adapter.js';
 import type { Storage, PublishedRecord, IndicatorSample } from './storage.js';
 import { ConfigCache } from './cache.js';
-import { MembershipUnreachableError, resolveOverrideMembership } from './membership.js';
-import { renderHumanOutput } from './render.js';
+import { MembershipUnreachableError, resolveOverrideMembership } from '@cct/core';
+import { renderHumanOutput } from '@cct/core';
 import { prKey, prPathAlias, repoKey } from './keys.js';
 
 export interface OrchestratorDeps {
@@ -363,7 +363,7 @@ export class Orchestrator {
     // ————— Étape 10 : pré-résoudre isInGroup pour tout auteur de la PR, et pour
     // l'auteur de l'exemption active (§9.2.2) —————
     const isOverrideMember = await resolveOverrideMembership(
-      this.deps.adapter,
+      (u, g) => this.deps.adapter.isInGroup(u, g),
       config,
       current.threads,
       current.loose,

@@ -11,7 +11,6 @@ import { assembleFromEnv, resolvePort, BootstrapError } from '../src/bootstrap.j
 import { EvaluationScheduler } from '../src/compliance/scheduler.js';
 import { MemoryStorage, FileStorage } from '../src/compliance/storage.js';
 import { AdminEntryPoint, AdminError } from '../src/compliance/admin.js';
-import { GithubServerAdapter } from '../src/adapters/github/index.js';
 import { AzdoServerAdapter } from '../src/adapters/azdo/index.js';
 import type { Orchestrator } from '../src/compliance/orchestrator.js';
 import { FakeAdapter, fakeState } from './fake-adapter.js';
@@ -24,11 +23,16 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+// GitHub n'est plus servi par ce composant (§6.4.1, §A.8) : l'environnement de base est
+// celui d'Azure DevOps. Ce que ces tests gardent — identité d'hôte unique, plateforme à
+// moitié configurée refusée, rejeu d'une livraison — ne dépendait pas de la plateforme.
 const BASE_ENV = {
   CCT_ADMIN_TOKEN: 'secret-admin',
   CCT_STORAGE: 'memory',
-  CCT_GITHUB_TOKEN: 'ghp_x',
-  CCT_GITHUB_WEBHOOK_SECRET: 'wh',
+  CCT_AZDO_ORG_URL: 'https://dev.azure.com/acme',
+  CCT_AZDO_PROJECT: 'proj',
+  CCT_AZDO_TOKEN: 'pat',
+  CCT_AZDO_WEBHOOK_SECRET: 'wh',
 };
 
 function recordingFetch(handler?: (url: string) => Response | undefined) {
@@ -41,51 +45,17 @@ function recordingFetch(handler?: (url: string) => Response | undefined) {
   return { urls, impl };
 }
 
-describe('GHES — une PR n’a qu’UNE identité d’hôte (§6.4)', () => {
-  it('l’hôte des dépôts réconciliés dérive de CCT_GITHUB_API_BASE, comme parseEvent', async () => {
-    const a = await assembleFromEnv({
-      ...BASE_ENV,
-      CCT_GITHUB_API_BASE: 'https://ghe.interne.example/api/v3',
-      CCT_GITHUB_REPOS: 'acme/demo',
-    });
-    expect(a.platforms[0]!.repos[0]!.host).toBe('ghe.interne.example');
-    const event = (a.platforms[0]!.adapter as GithubServerAdapter).parseEvent({
-      repository: { name: 'demo', owner: { login: 'acme' } },
-      pull_request: { number: 7, created_at: '2026-10-01T00:00:00Z' },
-      sender: { id: 1, login: 'alice' },
-    });
-    // La clé de stockage (platform:host:scope#number) est identique des deux côtés.
-    expect(event.pr.host).toBe(a.platforms[0]!.repos[0]!.host);
-  });
-
-  it('CCT_GITHUB_HOST explicite s’applique aux DEUX côtés, jamais à un seul', async () => {
-    const a = await assembleFromEnv({
-      ...BASE_ENV,
-      CCT_GITHUB_API_BASE: 'https://ghe.interne.example/api/v3',
-      CCT_GITHUB_HOST: 'web.ghe.example',
-      CCT_GITHUB_REPOS: 'acme/demo',
-    });
-    const event = (a.platforms[0]!.adapter as GithubServerAdapter).parseEvent({
-      repository: { name: 'demo', owner: { login: 'acme' } },
-      pull_request: { number: 7, created_at: '2026-10-01T00:00:00Z' },
-      sender: { id: 1, login: 'alice' },
-    });
-    expect(a.platforms[0]!.repos[0]!.host).toBe('web.ghe.example');
-    expect(event.pr.host).toBe('web.ghe.example');
-  });
-});
-
 describe('assemblage — une plateforme à moitié configurée est REFUSÉE, jamais ignorée', () => {
   it('CCT_AZDO_WEBHOOK_SECRET seul (« l’inverse » documenté) : erreur nommant la variable manquante', async () => {
     await expect(
-      assembleFromEnv({ ...BASE_ENV, CCT_AZDO_WEBHOOK_SECRET: 's' })
+      assembleFromEnv({ CCT_ADMIN_TOKEN: 'a', CCT_STORAGE: 'memory', CCT_AZDO_WEBHOOK_SECRET: 's' })
     ).rejects.toThrow(/CCT_AZDO_ORG_URL/);
   });
 
-  it('CCT_GITHUB_REPOS seul : erreur, la plateforme ne disparaît pas en silence', async () => {
+  it('CCT_AZDO_REPOS seul : erreur, la plateforme ne disparaît pas en silence', async () => {
     await expect(
-      assembleFromEnv({ CCT_ADMIN_TOKEN: 'a', CCT_STORAGE: 'memory', CCT_GITHUB_REPOS: 'acme/demo' })
-    ).rejects.toThrow(/CCT_GITHUB_TOKEN/);
+      assembleFromEnv({ CCT_ADMIN_TOKEN: 'a', CCT_STORAGE: 'memory', CCT_AZDO_REPOS: 'repo1' })
+    ).rejects.toThrow(/CCT_AZDO_ORG_URL/);
   });
 
   it('CCT_AZDO_ORG_URL sans schéma : BootstrapError qui nomme la variable', async () => {
@@ -169,22 +139,22 @@ describe('stockage — un état illisible ou inaccessible REFUSE de démarrer', 
 
 describe('start()/stop() — le câblage réel, pas seulement le port', () => {
   const PR: PrRef = {
-    platform: 'github',
+    platform: 'azdo',
     createdAt: '2026-10-01T00:00:00Z',
-    host: 'github.com',
-    scope: ['acme', 'demo'],
+    host: 'dev.azure.com',
+    scope: ['acme', 'proj', 'demo'],
     number: 42,
   };
 
   it('start() déclenche le balayage de réconciliation IMMÉDIATEMENT (§6.4 source 2)', async () => {
     const { urls, impl } = recordingFetch();
     const a = await assembleFromEnv(
-      { ...BASE_ENV, CCT_GITHUB_REPOS: 'acme/demo' },
+      { ...BASE_ENV, CCT_AZDO_REPOS: 'demo' },
       { fetchImpl: impl }
     );
     await a.start(0);
     await new Promise((r) => setTimeout(r, 80));
-    expect(urls.some((u) => u.includes('/repos/acme/demo/pulls?state=open'))).toBe(true);
+    expect(urls.some((u) => u.includes('/pullrequests'))).toBe(true);
     await a.stop();
   });
 
@@ -192,7 +162,7 @@ describe('start()/stop() — le câblage réel, pas seulement le port', () => {
     const storage = new MemoryStorage();
     const cfg = defaultConfig();
     cfg.server.coalesceWindowSeconds = 0; // la fenêtre expire immédiatement
-    await storage.setLastEffectiveConfig('github:github.com:acme/demo', cfg);
+    await storage.setLastEffectiveConfig('azdo:dev.azure.com:acme/proj/demo', cfg);
     let completed = 0;
     const orchestrator = {
       evaluatePr: async () => {
@@ -217,17 +187,20 @@ describe('start()/stop() — le câblage réel, pas seulement le port', () => {
     const a = await assembleFromEnv(BASE_ENV, { fetchImpl: impl });
     const port = await a.start(0);
     const raw = JSON.stringify({
-      repository: { name: 'demo', owner: { login: 'acme' } },
-      pull_request: { number: 42, created_at: '2026-10-01T00:00:00Z' },
-      sender: { id: 1, login: 'alice' },
+      eventType: 'git.pullrequest.updated',
+      resource: {
+        pullRequestId: 42,
+        creationDate: '2026-10-01T00:00:00Z',
+        repository: { name: 'demo' },
+      },
     });
-    const signature = `sha256=${createHmac('sha256', 'wh').update(raw).digest('hex')}`;
+    const auth = `Basic ${Buffer.from('cct:wh').toString('base64')}`;
     const post = () =>
-      fetch(`http://127.0.0.1:${port}/webhook/github`, {
+      fetch(`http://127.0.0.1:${port}/webhook/azdo`, {
         method: 'POST',
         headers: {
-          'x-hub-signature-256': signature,
-          'x-github-delivery': 'delivery-1',
+          authorization: auth,
+          'x-request-id': 'delivery-1',
           'content-type': 'application/json',
         },
         body: raw,
@@ -237,7 +210,7 @@ describe('start()/stop() — le câblage réel, pas seulement le port', () => {
     const second = (await (await post()).json()) as { ignored?: boolean; reason?: string };
     expect(second.reason).toBe('replay');
 
-    const big = await fetch(`http://127.0.0.1:${port}/webhook/github`, {
+    const big = await fetch(`http://127.0.0.1:${port}/webhook/azdo`, {
       method: 'POST',
       body: Buffer.alloc(6 * 1024 * 1024, 0x61),
     }).catch(() => null); // le serveur détruit la connexion : un échec réseau est admis

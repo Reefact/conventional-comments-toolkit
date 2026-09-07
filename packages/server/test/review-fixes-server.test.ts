@@ -7,7 +7,6 @@ import { MemoryStorage } from '../src/compliance/storage.js';
 import { ConfigCache } from '../src/compliance/cache.js';
 import { AdminEntryPoint } from '../src/compliance/admin.js';
 import { OrgModeWatch } from '../src/compliance/scheduler.js';
-import { GithubServerAdapter } from '../src/adapters/github/index.js';
 import { FakeAdapter, fakeState } from './fake-adapter.js';
 
 const alice: UserInfo = { id: 'u-alice', login: 'alice', isServiceAccount: false };
@@ -219,32 +218,5 @@ describe('écart serveur — §6.3.3 : l’assouplissement du mode est observé 
     adapter.state.unreachable = false;
     adapter.state.orgConfig = { status: 'found', text: '{"mode": "nonsense"}' };
     expect(await orchestrator.probeOrgModeSoftening()).toEqual({ observed: null, invalidated: false });
-  });
-});
-
-describe('écart serveur — parseEvent GitHub ne fabrique pas de PR pour une issue simple', () => {
-  const gh = new GithubServerAdapter({ token: async () => 't', webhookSecret: 's' });
-
-  it('issue_comment sur une issue qui n’est pas une PR → rejeté', () => {
-    expect(() =>
-      gh.parseEvent({
-        action: 'created',
-        repository: { name: 'demo', owner: { login: 'acme' } },
-        issue: { number: 7, created_at: '2026-10-01T00:00:00Z' }, // pas de champ pull_request
-        comment: { id: 1 },
-        sender: { id: 9, login: 'alice' },
-      })
-    ).toThrow(/pull request/);
-  });
-
-  it('issue_comment sur une issue qui EST une PR → accepté', () => {
-    const event = gh.parseEvent({
-      action: 'created',
-      repository: { name: 'demo', owner: { login: 'acme' } },
-      issue: { number: 7, created_at: '2026-10-01T00:00:00Z', pull_request: { url: 'https://…' } },
-      comment: { id: 1 },
-      sender: { id: 9, login: 'alice' },
-    });
-    expect(event.pr.number).toBe(7);
   });
 });

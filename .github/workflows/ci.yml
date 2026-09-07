@@ -59,8 +59,10 @@ jobs:
             -p 18080:8080 \
             -v cct-ci-data:/data \
             -e CCT_ADMIN_TOKEN=ci-token \
-            -e CCT_GITHUB_TOKEN=x \
-            -e CCT_GITHUB_WEBHOOK_SECRET=y \
+            -e CCT_AZDO_ORG_URL=https://dev.azure.com/ci \
+            -e CCT_AZDO_PROJECT=ci \
+            -e CCT_AZDO_TOKEN=x \
+            -e CCT_AZDO_WEBHOOK_SECRET=y \
             cct-server
           for i in $(seq 1 20); do
             if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1; then break; fi

@@ -1,0 +1,70 @@
+# `action.yml` vit à la RACINE parce que GitHub l'y cherche : `uses: owner/repo@ref` ne
+# résout aucun autre emplacement. Le code, lui, est dans `packages/action/`.
+#
+# Action COMPOSITE, et non JavaScript : une action JavaScript exige un bundle committé,
+# donc un artefact de build dans l'historique et un garde pour vérifier qu'il n'a pas
+# divergé de ses sources. Le dépôt n'a aucune dépendance d'exécution et ne compile ici que
+# deux paquets ; le prix est quelques dizaines de secondes par exécution, contre un
+# artefact qui ment silencieusement le jour où quelqu'un oublie de le régénérer.
+name: 'Conventional Comments check'
+description: 'Evaluates a pull request against Conventional Comments and publishes a required check. No server to host.'
+author: 'Reefact'
+
+branding:
+  icon: 'message-square'
+  color: 'purple'
+
+inputs:
+  token:
+    description: >-
+      Token used to read the pull request and publish the check run. Pass
+      ${{ secrets.GITHUB_TOKEN }}. Needs checks:write, pull-requests:read and
+      contents:read — plus pull-requests:write only if the repository uses the PR
+      exemption label of §6.3.2.
+    required: true
+    default: ${{ github.token }}
+  pr-number:
+    description: >-
+      Pull request to evaluate. Leave empty to take it from the triggering event; when the
+      event names no pull request (schedule, workflow_run), every open pull request is
+      reconciled instead.
+    required: false
+    default: ''
+  floor-url:
+    description: >-
+      URL of the organization floor document (§8.1.1). It must be served from somewhere
+      the repository cannot edit — a workflow living in the repository it protects is not
+      a floor channel.
+    required: false
+    default: ''
+  check-name:
+    description: 'Name of the published check run. Change it only if you also change the required check.'
+    required: false
+    default: 'conventional-comments'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    # Zéro dépendance d'exécution (§10) : `npm ci` n'installe que l'outillage, et seuls
+    # `core` et `action` sont compilés — ni l'extension, ni le service hébergé.
+    - name: Build the verifier
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        npm ci --ignore-scripts --no-audit --no-fund
+        npx tsc -b packages/core packages/action
+
+    - name: Evaluate and publish the check
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        CCT_TOKEN: ${{ inputs.token }}
+        CCT_PR_NUMBER: ${{ inputs.pr-number }}
+        CCT_FLOOR_URL: ${{ inputs.floor-url }}
+        CCT_CHECK_NAME: ${{ inputs.check-name }}
+      run: node packages/action/dist/main.js

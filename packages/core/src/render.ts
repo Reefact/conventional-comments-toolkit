@@ -1,6 +1,8 @@
-// Sortie humaine du §6.3.1 — partagée entre l'adaptateur GitHub (corps du check run) et
-// la page servie derrière la targetUrl (§6.3.1 : elle porte « la même sortie »). Chaque
-// cause est identifiable en un clic (CA-25).
+// Sortie humaine du §6.3.1. Elle vit dans core/ parce que les DEUX supports d'exécution
+// du §6.4.1 la rendent : le corps du check run côté GitHub Action, la page servie derrière
+// la targetUrl côté service hébergé (§6.3.1 : elle porte « la même sortie »). La dupliquer
+// laisserait deux rendus diverger sur un même ComplianceResult. Chaque cause est
+// identifiable en un clic (CA-25).
 
 import type { ComplianceResult } from '@cct/core';
 

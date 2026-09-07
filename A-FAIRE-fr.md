@@ -8,10 +8,12 @@ partie d'aucune convention du chantier.
 
 ## En une phrase
 
-Le **code** de toute la spécification est écrit, testé (440 tests automatisés) et vérifié
-par plusieurs revues contradictoires. Ce qui **manque** n'est pas du code non écrit, mais
-des étapes humaines : essayer l'extension en vrai, choisir où héberger le serveur, et
-mener une phase de mesure (P0) qui ne peut se faire qu'avant tout déploiement.
+Le **code** de toute la spécification est écrit, testé et vérifié par plusieurs revues
+contradictoires. Ce qui **manque** n'est pas du code non écrit, mais des étapes humaines :
+essayer l'extension en vrai, poser le workflow GitHub sur un dépôt et le regarder bloquer
+une PR, et mener une phase de mesure (P0) qui ne peut se faire qu'avant tout déploiement.
+Sur GitHub, « choisir où héberger le serveur » ne figure plus dans cette liste : il n'y a
+plus de serveur à héberger.
 
 ## 1. Deux composants, deux niveaux de préparation très différents
 
@@ -21,19 +23,25 @@ Elle fonctionne **seule**, sans le composant serveur : en mode `assist` (celui l
 défaut), elle aide à écrire un commentaire conforme et affiche des diagnostics, mais ne
 bloque jamais rien. C'est ce que vous pouvez tester tout de suite.
 
-### Composant B — le serveur : **déployable, pas encore déployé**
+### Composant B — le vérificateur : **sur GitHub, plus rien à déployer**
 
-Le service auto-hébergeable existe : `packages/server/src/main.ts` (configuration par
-variables d'environnement `CCT_*`), une image Docker (`Dockerfile`, validée par le job
-CI « Image Docker du composant B »), et trois stockages au choix — mémoire, fichier
-JSON, SQLite — derrière l'interface `Storage`, point d'extension documenté pour une
-base externe. Tout est dans **`docs/deployment-fr.md`** : variables, `docker run`,
-branchement des webhooks, volume `/data`.
+Sur **GitHub**, le vérificateur est désormais une **GitHub Action** exécutée dans le dépôt
+qu'elle protège (`packages/action/`). Il n'y a plus de machine à trouver, plus d'URL HTTPS
+publique à exposer, plus de jeton à fabriquer : le runner fournit le sien. La mise en place
+tient en deux gestes — copier un fichier de workflow, déclarer le check obligatoire — et
+elle est écrite pas à pas dans **[`docs/github-setup-fr.md`](./docs/github-setup-fr.md)**
+(anglais : [`docs/github-setup-en.md`](./docs/github-setup-en.md)).
 
-Ce qui manque encore est **chez le client** : une machine où le faire tourner en
-continu, une URL HTTPS publique pour les webhooks, et de vrais jetons d'API. Tant que
-personne ne l'a déployé, aucune PR n'est réellement bloquée — c'est attendu (§2 : le
-composant A est contournable par construction, c'est B qui porte la contrainte réelle).
+Ce qui reste **chez vous** sur GitHub est donc une décision, pas une infrastructure :
+choisir la parade à la fenêtre de dé-résolution (§7 du guide), et le moment de passer de
+`warn` à `enforce`.
+
+Sur **Azure DevOps**, le service auto-hébergé demeure — la plateforme n'offre pas
+l'équivalent du couple « déclencheur de revue + jeton d'écriture » de GitHub :
+`packages/server/src/main.ts` (variables `CCT_*`), une image Docker (`Dockerfile`, validée
+par le job CI « Image Docker du composant B ») et trois stockages au choix derrière
+l'interface `Storage`. Tout est dans **`docs/deployment-fr.md`**. Là, il manque toujours
+une machine, une URL HTTPS et de vrais jetons.
 
 ## 2. Installer l'extension pour l'essayer
 
@@ -107,9 +115,10 @@ Chromium sans interface. Un passage humain reste donc utile, dans cet ordre :
 4. **Page d'options** — ajouter le domaine `dev.azure.com`, vérifier qu'une page Azure
    DevOps (PR réelle) fait apparaître la même barre d'outils. C'est le test qui valide
    la correction du jour, jamais exécuté en conditions réelles.
-5. **Mode `enforce` sans serveur** — sans composant B déployé, l'extension ne peut jamais
-   passer en blocage réel (c'est le mode `warn`/`assist` qui s'applique de fait) : rien à
-   tester ici tant que le serveur n'est pas en place.
+5. **Mode `enforce` avec le check GitHub** — c'est maintenant testable sans rien héberger :
+   suivre `docs/github-setup-fr.md` sur un dépôt bac à sable, ouvrir une PR, y écrire un
+   `issue:` et vérifier que le merge est refusé tant que le fil n'est pas résolu. C'est le
+   seul bout de la chaîne qui n'a jamais tourné sur un vrai GitHub.
 
 Deux critères d'acceptation de la spec (§11) ne sont *que partiellement* automatisés et
 attendent ce genre de passage manuel — voir `docs/ca-matrix-fr.md`, section « Critères
@@ -122,8 +131,9 @@ corps du check GitHub (`CA-25`).
 |---|-------|-----|---------------------------|
 | 1 | Essayer l'extension en vrai (§3 ci-dessus) | Vous | Non |
 | 2 | ~~Programme de déploiement du composant B~~ — **fait** : `docs/deployment-fr.md`, image Docker | — | — |
-| 3 | Choisir un hébergement pour le serveur (conteneur toujours actif, VM — pas de « sans serveur » qui endort le processus) et l'y déployer | Vous | Non — mais bloquant pour tout blocage réel de PR |
-| 4 | Créer une app GitHub / un service hook Azure DevOps (jetons, secret de webhook) | Vous | Non |
+| 3 | **GitHub** : poser `.github/workflows/conventional-comments.yml` sur un dépôt et déclarer le check obligatoire (`docs/github-setup-fr.md`) | Vous | Non — mais c'est ce qui donne le blocage réel de PR, et ça ne demande plus aucun hébergement |
+| 3b | **Azure DevOps seulement** : choisir un hébergement pour le service (conteneur toujours actif, VM — pas de « sans serveur » qui endort le processus) et l'y déployer | Vous | Non |
+| 4 | **Azure DevOps seulement** : créer un service hook (PAT, secret de webhook). Sur GitHub il n'y a plus ni app ni jeton à créer | Vous | Non |
 | 5 | **Mesure de référence P0** (temps de revue, taux de conformité *avant* l'outil) | Vous | Non, mais **irrattrapable** si l'outil est déployé avant — §14, `docs/operations-fr.md` |
 | 6 | Choisir un dépôt pilote et suivre la trajoire `assist → warn → enforce` | Vous | Non |
 | 7 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) : **toute livraison du composant A y passe** (§10, §14), et c'est le seul chemin qui donne la mise à jour automatique. Les zips de release (`docs/release-fr.md`) servent à l'essai et aux postes sans chaîne de build, ils ne s'y substituent pas | Vous | Non |

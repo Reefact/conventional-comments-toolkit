@@ -1,10 +1,14 @@
-# Déploiement du composant B — auto-hébergé, chez chaque client
+# Déploiement du composant B en service hébergé — Azure DevOps
+
+> **Sur GitHub, ce document ne vous concerne pas.** Le vérificateur y est une GitHub
+> Action, exécutée dans le dépôt qu'elle protège : rien à héberger, rien à exposer, aucun
+> secret à stocker. Voir [`github-setup-fr.md`](./github-setup-fr.md). C'est le profil A du
+> §6.4.1 ; ce qui suit décrit le profil B, aujourd'hui réservé à **Azure DevOps**, faute
+> d'équivalent au couple « déclencheur de revue + jeton d'écriture » que GitHub fournit.
 
 Le composant B se déploie **chez le client**, sur son infrastructure : une instance par
 organisation (ou par périmètre de dépôts qu'on lui confie), détenant ses propres jetons.
-Il n'existe pas de service central. Une instance peut porter **plusieurs plateformes**
-(GitHub et Azure DevOps) ; un client qui préfère un processus par organisation lance
-simplement plusieurs instances — c'est une pure affaire de configuration.
+Il n'existe pas de service central.
 
 Le service est un unique processus Node (≥ 20 ; ≥ 22.13 pour le stockage SQLite), sans
 aucune dépendance tierce (§10). Il doit tourner **en continu** : la réconciliation
@@ -25,9 +29,11 @@ docker run -d --name cct-server \
   -p 8080:8080 \
   -v cct-data:/data \
   -e CCT_ADMIN_TOKEN='un-secret-long' \
-  -e CCT_GITHUB_TOKEN='ghp_…' \
-  -e CCT_GITHUB_WEBHOOK_SECRET='un-autre-secret' \
-  -e CCT_GITHUB_REPOS='mon-org/depot-un,mon-org/depot-deux' \
+  -e CCT_AZDO_ORG_URL='https://dev.azure.com/mon-org' \
+  -e CCT_AZDO_PROJECT='mon-projet' \
+  -e CCT_AZDO_TOKEN='pat_…' \
+  -e CCT_AZDO_WEBHOOK_SECRET='un-autre-secret' \
+  -e CCT_AZDO_REPOS='depot-un,depot-deux' \
   cct-server
 ```
 
@@ -59,29 +65,27 @@ Le service expose `GET /healthz` (sonde de vitalité) ; l'image embarque le
 | `CCT_STORAGE_PATH` | non | `{CCT_DATA_DIR}/storage.json` ou `.sqlite` selon `CCT_STORAGE` | Chemin exact, si le défaut ne convient pas. |
 | `CCT_EXEMPTION_LOG_RETENTION_MONTHS` | non | `12` | Conservation du journal nominatif d'exemptions (§10) ; `0` = illimitée, sur décision explicite. |
 | `CCT_FLOOR_FILE` | non | — | Fichier JSON du **plancher** (§8.1.1, canal du composant B). Relu à chaque évaluation ; forme validée au démarrage (illisible = refus) ; corrompu en cours de route = le dernier contenu valide continue de s'appliquer. |
-| `CCT_GITHUB_TOKEN` | si GitHub | — | Jeton d'API — voir « Portées » ci-dessous. |
-| `CCT_GITHUB_WEBHOOK_SECRET` | si GitHub | — | Secret HMAC des webhooks (`X-Hub-Signature-256`). |
-| `CCT_GITHUB_API_BASE` | non | `https://api.github.com` | `https://{ghes}/api/v3` pour GitHub Enterprise Server. |
-| `CCT_GITHUB_HOST` | non | **dérivé de `CCT_GITHUB_API_BASE`** | Surcharge rare. L'identité des PR (clés de stockage, §6.4) dérive de l'hôte d'API — webhooks et réconciliation produisent la même ; ne poser cette variable que si l'hôte web diffère d'une manière que la dérivation (`api.` retiré, `/api/v3` ignoré) ne couvre pas. |
-| `CCT_GITHUB_REPOS` | non | — | Dépôts réconciliés périodiquement, `owner/repo` séparés par des virgules. |
 | `CCT_AZDO_ORG_URL` | si AzDO | — | `https://dev.azure.com/{organisation}` ou URL de collection Server. |
 | `CCT_AZDO_PROJECT` | si AzDO | — | Projet Azure DevOps. |
 | `CCT_AZDO_TOKEN` | si AzDO | — | PAT — voir « Portées » ci-dessous. |
 | `CCT_AZDO_WEBHOOK_SECRET` | si AzDO | — | Secret des service hooks (mot de passe Basic — voir ci-dessous). |
 | `CCT_AZDO_REPOS` | non | — | Noms de dépôts réconciliés (nom seul, sans organisation ni projet). |
 
-Configurer **au moins une** plateforme. Poser n'importe quelle variable `CCT_GITHUB_*`
+Les variables `CCT_GITHUB_*` sont **retirées** : les poser fait désormais **refuser le
+démarrage**, avec un message qui renvoie à [`github-setup-fr.md`](./github-setup-fr.md).
+Démarrer en les ignorant serait le pire des comportements — le service tournerait, et
+l'exploitant croirait ses dépôts GitHub surveillés alors qu'aucune PR ne le serait.
+
+Configurer **au moins une** plateforme. Poser n'importe quelle variable `CCT_AZDO_*`
 (resp. `CCT_AZDO_*`) arme la plateforme et exige alors toutes ses variables
 obligatoires — un secret sans jeton, un jeton sans secret, un `CCT_AZDO_REPOS` orphelin
 sont refusés au démarrage.
 
 ## Portées des jetons
 
-- **GitHub** (GitHub App recommandée, PAT possible) : *Checks* écriture (publier le
-  check), *Contents* lecture (fichier de configuration), *Pull requests* lecture
-  (fils, commentaires, revues), *Issues* écriture (étiquette `cc-override`), et
-  **Members / Organization lecture** (`read:org` en PAT) — sans cette dernière,
-  `resolverOverrideGroup` est illisible et les exemptions basculent en indisponibilité.
+Sur GitHub, il n'y a aucun jeton à créer : le runner en fournit un, et les permissions se
+déclarent dans le workflow (voir [`github-setup-fr.md`](./github-setup-fr.md), §3).
+
 - **Azure DevOps** (PAT) : *Code* lecture-écriture (`vso.code_write` — étiquettes,
   fichier, fils), **Code (status)** (`vso.code_status` — publier le PR Status, la seule
   sortie visible du composant B sur cette plateforme), et **Identity (read)**
@@ -90,10 +94,6 @@ sont refusés au démarrage.
 
 ## Brancher les plateformes
 
-- **GitHub** : un webhook (dépôt ou organisation) vers
-  `https://{votre-hote}/webhook/github`, content type `application/json`, secret =
-  `CCT_GITHUB_WEBHOOK_SECRET`, événements : `pull_request`, `pull_request_review`,
-  `pull_request_review_comment`, `issue_comment`, `pull_request_review_thread`.
 - **Azure DevOps** : des service hooks vers `https://{votre-hote}/webhook/azdo`
   (commentaires de PR, PR créée/mise à jour). Dans l'écran du service hook, renseigner
   le champ **« Basic authentication password »** avec `CCT_AZDO_WEBHOOK_SECRET` — le
@@ -105,7 +105,7 @@ sont refusés au démarrage.
 L'ingestion applique le §6.4 : signature vérifiée, charges non signées rejetées,
 **rejeu** d'une livraison déjà vue acquitté sans réévaluation, corps borné à 5 Mio.
 
-`CCT_GITHUB_REPOS` / `CCT_AZDO_REPOS` alimentent la réconciliation périodique — le filet
+`CCT_AZDO_REPOS` alimente la réconciliation périodique — le filet
 de sécurité contre les événements perdus (§6.4, source 2), avec un **premier balayage
 immédiat au démarrage** (c'est le moment où les événements manqués attendent d'être
 rattrapés). Un dépôt absent de ces listes est tout de même évalué à chaque webhook reçu.

@@ -1,0 +1,89 @@
+# Conventional Comments — the whole GitHub setup, in one file.
+#
+# Copy this to .github/workflows/conventional-comments.yml in the repository you want to
+# protect, then make the "conventional-comments" check required (see docs/github-setup-en.md).
+# There is no server to deploy, no webhook to route and no secret to store.
+#
+# NOTE: pull_request_target and the other triggers below only fire from the file as it
+# exists on the DEFAULT branch. The pull request that adds this workflow is therefore not
+# checked by it; the next one is.
+name: Conventional Comments
+
+on:
+  # The pull request's own lifecycle. pull_request_target — not pull_request — because it
+  # runs in the base repository's context and therefore carries a token that can publish a
+  # check, including on pull requests opened from forks. That trigger is dangerous in any
+  # workflow that builds or runs the proposed code; this one never checks the pull request
+  # out and reads nothing but API data.
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - converted_to_draft
+      - labeled
+      - unlabeled
+      - edited
+
+  # Review comments and submitted reviews: the events that open blocking threads.
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+
+  # Conversation comments (the "conversation" zone).
+  issue_comment:
+    types: [created, edited, deleted]
+
+  # Manual re-run for one pull request. Resolving a thread fires no workflow event on
+  # GitHub, so this is how you refresh a check that is red only because the thread it
+  # named has since been resolved.
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'Pull request to re-evaluate (empty = every open pull request)'
+        required: false
+        default: ''
+
+  # OPTIONAL — periodic reconciliation. Uncomment to bound the window during which a
+  # thread that was UN-resolved still shows a green check. See the "three remedies" in
+  # docs/github-setup-en.md before deciding you need it.
+  # schedule:
+  #   - cron: '*/30 * * * *'
+
+permissions:
+  checks: write # publish the check run
+  pull-requests: read # threads, comments, labels, draft state
+  contents: read # .conventional-comments.json
+  # pull-requests: write is needed ONLY if this repository uses the PR exemption label.
+  # Granting it means replacing the `pull-requests: read` line above.
+
+# One evaluation per pull request at a time: a newer run supersedes the one in flight,
+# which is what replaces the coalescing window and sequence counter a hosted service needs.
+concurrency:
+  group: conventional-comments-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Conventional Comments
+    runs-on: ubuntu-latest
+    # Two things are filtered out here.
+    #  1. issue_comment also fires on plain issues, which reference no pull request.
+    #  2. On a pull request from a FORK, GitHub gives the review events a read-only token,
+    #     so those runs could not publish anything. They are skipped rather than left to
+    #     fail; conventional-comments-forks.yml is what covers them, if you need it.
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request) ||
+      ((github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment') &&
+        github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - uses: Reefact/conventional-comments-toolkit@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ inputs.pr-number }}
+          # floor-url: https://intranet.example/cct/floor.json

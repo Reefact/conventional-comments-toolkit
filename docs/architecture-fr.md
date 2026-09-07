@@ -21,12 +21,22 @@ packages/
 │   ├── github/               # @cct/adapter-github — sélecteurs, générations DOM, Turbo (§A)
 │   └── azdo/                 # @cct/adapter-azdo — MutationObserver, replis P1' (§B)
 ├── extension/                # @cct/extension — MV3, content/background, barre, pastille, garde
-└── server/                   # @cct/server — composant B
+├── action/                   # @cct/action — composant B, PROFIL A (§6.4.1) : GitHub Action
+│   ├── client.ts             #   GraphQL fils, check run, lecture de config (§A.6, §A.8)
+│   ├── state.ts              #   les trois objets du besoin 4, portés par le check run
+│   ├── run.ts                #   séquence du §6.4.2, sans ordonnanceur ni stockage
+│   └── main.ts               #   environnement du runner → PR à évaluer
+└── server/                   # @cct/server — composant B, PROFIL B (§6.4.1) : service hébergé
     ├── compliance/           #   orchestrateur §6.4, stockage, cache, admin, indicateurs
-    └── adapters/
-        ├── github/           #   GraphQL fils, check run (§A.6, §A.8)
-        └── azdo/             #   PR Status, chemin de repli étiquettes (§B.5-B.7)
+    └── adapters/azdo/        #   PR Status, chemin de repli étiquettes (§B.5-B.7)
 ```
+
+**Deux supports pour un seul composant B.** Le §6.4.1 énonce cinq besoins ; GitHub les
+remplit tous, si bien que le vérificateur y tient dans une Action sans rien à héberger
+(`packages/action/`). Azure DevOps n'a pas d'équivalent : il garde le service
+(`packages/server/`). Les deux ne partagent que `@cct/core` — le **jugement** —, jamais
+l'orchestration ni la persistance : factoriser celles-ci ferait porter au support léger le
+coût du support lourd, ce qui annulerait sa raison d'être.
 
 ## Frontière A/B et parité (§2, §8.1.3)
 
@@ -84,4 +94,6 @@ choix de la technologie est libre ; l'existence de ce stockage ne l'est pas.
 
 `PlatformOperationalFacts` (dans `compliance/adapter.ts`) porte les hypothèses de
 plateforme que le spike doit établir, chacune avec son repli normatif déjà codé — voir
-`spikes/p1-prime/README-fr.md`. `githubFacts` et `azdoFacts` en donnent les valeurs connues.
+`spikes/p1-prime/README-fr.md`. `azdoFacts` en donne les valeurs connues. Ce type ne
+concerne que le profil B : le profil A ne l'emploie pas, les faits de plateforme GitHub
+étant tranchés une fois pour toutes en annexe A.8 plutôt que portés par un réglage.

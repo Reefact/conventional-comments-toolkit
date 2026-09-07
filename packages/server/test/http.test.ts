@@ -8,7 +8,7 @@ import { ConfigCache } from '../src/compliance/cache.js';
 import { Orchestrator } from '../src/compliance/orchestrator.js';
 import { EvaluationScheduler } from '../src/compliance/scheduler.js';
 import { AdminEntryPoint } from '../src/compliance/admin.js';
-import { GithubServerAdapter } from '../src/adapters/github/index.js';
+import { AzdoServerAdapter } from '../src/adapters/azdo/index.js';
 import { FakeAdapter, fakeState } from './fake-adapter.js';
 
 let server: Server;
@@ -30,9 +30,15 @@ beforeAll(async () => {
       groupMembers: { 'acme/leads': ['u-lead'] },
     })
   );
-  // GithubServerAdapter porte la vérification de signature réelle ; on la teste via son
-  // implémentation, indépendamment de l'orchestration.
-  const gh = new GithubServerAdapter({ token: async () => 't', webhookSecret });
+  // La vérification de signature réelle est celle d'un adaptateur de plateforme ; on la
+  // teste via l'implémentation Azure DevOps, seule plateforme encore servie par ce
+  // composant (§6.4.1), indépendamment de l'orchestration.
+  const az = new AzdoServerAdapter({
+    organizationUrl: 'https://dev.azure.com/acme',
+    project: 'proj',
+    token: async () => 't',
+    webhookSecret,
+  });
   const orchestrator = new Orchestrator({
     adapter,
     storage,
@@ -50,7 +56,7 @@ beforeAll(async () => {
 
   server = createHttpServer({
     platforms: [
-      { id: 'github', adapter: gh, scheduler },
+      { id: 'azdo', adapter: az, scheduler },
       { id: 'github-fake', adapter, scheduler },
     ],
     admin: new Map([['github-fake', admin]]),
@@ -68,23 +74,26 @@ afterAll(() => {
 
 describe('couche HTTP — webhooks (§6.4)', () => {
   it('rejette une charge non signée (401)', async () => {
-    const res = await fetch(`${base}/webhook/github`, {
+    const res = await fetch(`${base}/webhook/azdo`, {
       method: 'POST',
-      body: JSON.stringify({ repository: {}, pull_request: {} }),
+      body: JSON.stringify({ eventType: 'git.pullrequest.updated', resource: {} }),
     });
     expect(res.status).toBe(401);
   });
 
   it('accepte une charge correctement signée (202)', async () => {
     const raw = JSON.stringify({
-      repository: { name: 'demo', owner: { login: 'acme' } },
-      pull_request: { number: 42, created_at: '2026-10-01T00:00:00Z' },
-      sender: { id: 1, login: 'alice' },
+      eventType: 'git.pullrequest.updated',
+      resource: {
+        pullRequestId: 42,
+        creationDate: '2026-10-01T00:00:00Z',
+        repository: { name: 'demo' },
+      },
     });
-    const signature = `sha256=${createHmac('sha256', webhookSecret).update(raw).digest('hex')}`;
-    const res = await fetch(`${base}/webhook/github`, {
+    const auth = `Basic ${Buffer.from(`cct:${webhookSecret}`).toString('base64')}`;
+    const res = await fetch(`${base}/webhook/azdo`, {
       method: 'POST',
-      headers: { 'x-hub-signature-256': signature, 'content-type': 'application/json' },
+      headers: { authorization: auth, 'content-type': 'application/json' },
       body: raw,
     });
     expect(res.status).toBe(202);

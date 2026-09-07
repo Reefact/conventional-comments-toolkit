@@ -13,6 +13,7 @@ import {
 
 interface ChromePermissions {
   request: (perms: { origins: string[] }, cb: (granted: boolean) => void) => void;
+  remove: (perms: { origins: string[] }, cb: (removed: boolean) => void) => void;
   getAll: (cb: (perms: { origins?: string[] }) => void) => void;
 }
 
@@ -87,6 +88,37 @@ function setHostPlatform(host: string, platform: HostPlatform): Promise<void> {
   return next;
 }
 
+/** Purge l'étiquette locale d'un hôte — appelé après révocation de la permission, pour ne
+ * pas laisser une entrée orpheline dans `HOST_PLATFORMS_KEY` : sans effet fonctionnel tant
+ * que l'hôte n'est pas accordé (il n'apparaît plus dans `refreshHosts`), mais elle
+ * réapparaîtrait telle quelle si la même personne réautorisait le même hôte plus tard. */
+function removeHostPlatform(host: string): Promise<void> {
+  const next = writeQueue.then(async () => {
+    if (!chrome?.storage?.local) return;
+    const tags = await readHostPlatforms();
+    if (!(host in tags)) return;
+    const { [host]: _removed, ...rest } = tags;
+    await new Promise<void>((resolve) => {
+      chrome!.storage!.local!.set({ [HOST_PLATFORMS_KEY]: rest }, () => resolve());
+    });
+  });
+  writeQueue = next.catch(() => undefined);
+  return next;
+}
+
+/** Révoque la permission d'hôte accordée à `host` et purge son étiquette locale.
+ * `chrome.permissions.onRemoved` (background.ts) désenregistre le content script et
+ * republie `extraHostsByPlatform` en réaction — cette fonction ne fait qu'obtenir la
+ * révocation et rafraîchir l'écran ; elle ne duplique pas ce nettoyage. */
+function removeHost(host: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (!chrome?.permissions) return resolve();
+    chrome.permissions.remove({ origins: [`https://${host}/*`] }, () => {
+      void removeHostPlatform(host).then(() => resolve());
+    });
+  });
+}
+
 /** github.com est couvert par `content_scripts` (§2) et jamais renvoyé par
  * `chrome.permissions.getAll()` en tant qu'octroi optionnel : rien à étiqueter pour lui. */
 async function refreshHosts(): Promise<void> {
@@ -118,7 +150,7 @@ async function refreshHosts(): Promise<void> {
     if (known) {
       // `config` est une classification délibérée, pas une absence : l'afficher comme
       // telle, sans la renvoyer au rattrapage à chaque rafraîchissement (revue Codex).
-      li.textContent = `${host} — ${PLATFORM_LABELS[known] ?? known}`;
+      li.append(`${host} — ${PLATFORM_LABELS[known] ?? known} `, makeRemoveButton(host));
       list.appendChild(li);
       continue;
     }
@@ -139,9 +171,23 @@ async function refreshHosts(): Promise<void> {
     confirm.addEventListener('click', () => {
       void setHostPlatform(host, select.value as HostPlatform).then(() => void refreshHosts());
     });
-    li.append(select, confirm);
+    li.append(select, confirm, ' ', makeRemoveButton(host));
     list.appendChild(li);
   }
+}
+
+/** Bouton texte, jamais une icône seule (ni compréhensible sans style, ni lisible par un
+ * lecteur d'écran) — cohérent avec « Confirmer » ci-dessus. Absent des hôtes classés par
+ * politique d'entreprise : révoquer une permission imposée par l'administration ne relève
+ * pas de cet écran. */
+function makeRemoveButton(host: string): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = 'Retirer';
+  button.addEventListener('click', () => {
+    void removeHost(host).then(() => void refreshHosts());
+  });
+  return button;
 }
 
 const hostInput = document.getElementById('host-input') as HTMLInputElement | null;

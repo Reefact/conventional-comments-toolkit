@@ -1487,6 +1487,16 @@ interface SubmitControl {
   kind: 'submit' | 'submit-and-resolve' | 'complete-pr';
 }
 
+// Ce que seule la plateforme sait du CHÂSSIS entourant une zone de saisie. Chaque champ vaut `null`
+// pour dire « je ne me prononce pas », et le composant A applique alors une règle qui ne nomme
+// personne — voir la prose ci-dessous, qui dit pourquoi ce type existe et ce qu'il n'a pas le droit
+// de porter.
+interface EditorChrome {
+  framedContainer: Element | null;     // le conteneur qui encadre ensemble l'en-tête natif de la boîte,
+                                       // ses onglets, le champ et ce que l'extension injecte — celui à
+                                       // qui donner le retrait intérieur (§5.1, §5.3)
+}
+
 interface PlatformAdapter {
   matches(url: URL): boolean;          // §2 — activation par domaine, `optional_host_permissions` (§A.4, §B.4)
   platformProfile(): PlatformProfile;  // §9.2.2 — marqueurs propres à la plateforme, passés à `validate()`
@@ -1494,6 +1504,9 @@ interface PlatformAdapter {
   getOrgConfig(url: string | null): Promise<ConfigRead>;  // §8.1.2 niveau 2 — URL issue du canal de plancher
   observeEditors(cb: (editor: EditorHandle) => void): Disposable;  // §4.1 — zones ; l'appel du cb est l'instant
                                                                    // mesuré par la NFR d'injection (§10)
+  getEditorChrome(editor: EditorHandle): EditorChrome;  // §5.1, §5.3 — où l'extension s'accroche dans CE
+                                       // composeur. Obligatoire : une méthode optionnelle laisserait une
+                                       // plateforme nouvelle compiler sans jamais répondre
   getSubmitControls(editor: EditorHandle): SubmitControl[];  // §4.3 — tous les points de sortie, §5.4 — interception
   readValue(editor: EditorHandle): string;
   writeValue(editor: EditorHandle, text: string, caret?: number): void;  // §5.1, §5.2 — insertion de préfixe ;
@@ -1520,6 +1533,18 @@ Elle est compatible avec le §10, qui interdit trois choses précises : détenir
 Quand une lecture est **impossible** — route inaccessible, dépôt privé derrière une API à jeton, politique réseau —, la méthode renvoie `{ status: 'unreachable' }` et l'extension **se rabat sur le niveau inférieur, en signalant son état dégradé** dans les options et dans son indicateur. Elle ne bloque jamais l'envoi sur une règle qu'elle n'a pas pu lire : le composant B reste la source de vérité, et c'est lui qui tranchera.
 
 Le champ `context` est indispensable : sans lui, l'extension ne peut pas distinguer une racine de fil d'une réponse, ni une rédaction d'une édition — donc ne peut pas appliquer le tableau du §4.1, dont c'est pourtant le cœur, à commencer par son défaut « les réponses ne sont pas validées ».
+
+**`getEditorChrome()` existe pour que le §9.4 soit tenable.** Ce contrat décrivait comment *lire* une plateforme, jamais où l'interface de l'extension *s'accroche* — l'adaptateur tendait une zone de saisie et s'arrêtait là. Le composant A devait donc trouver seul le conteneur à parer, et il l'a fait comme on le fait toujours dans ce cas : en reconnaissant, dans du code partagé par toutes les plateformes, des noms propres à l'une d'elles. C'est précisément ce que le §9.4 interdit — « les sélecteurs DOM sont centralisés dans un fichier unique par adaptateur » —, et l'interdiction était **inapplicable** tant qu'aucune méthode ne permettait de demander ce conteneur. Une règle qu'aucun chemin légal ne permet de respecter n'est pas une règle ; c'est ce manque que cette méthode comble.
+
+Trois propriétés la rendent sûre, et chacune répond à un échec précis :
+
+- **`null` est une réponse, pas un trou.** Un adaptateur qui ne se prononce pas obtient une règle qui ne nomme personne — le composant A remonte au conteneur qui *dessine* le cadre, question de mise en page posée au moteur de style. C'est le comportement d'avant cette méthode, et c'est la réponse **juste** pour une plateforme dont la boîte de commentaire n'a pas été mesurée : ne rien affirmer plutôt qu'affirmer sur elle ce qu'on a relevé sur une autre.
+- **Elle porte des éléments, jamais des longueurs ni des couleurs.** La frontière n'est pas cosmétique : le contrat dit *quel élément joue quel rôle*, la feuille de style de la plateforme dit *combien il mesure*. Sans cette règle, une mesure faite sur une plateforme redevient une constante que toutes les autres subissent — le défaut exact que cette méthode corrige.
+- **Aucune signature de ce contrat ne nomme une plateforme.** Un port qui exposerait `isGitHubChangesView()` aurait échoué : il obligerait le code partagé à savoir de qui il parle, et le `if` que le polymorphisme doit supprimer reviendrait sous un autre nom. Cette propriété est vérifiable mécaniquement, et elle est vérifiée.
+
+Elle est **obligatoire**, et ce choix se paie : toute doublure de test doit y répondre. Une méthode optionnelle ne coûterait rien et laisserait une plateforme nouvelle compiler sans jamais se prononcer — son extension se logerait alors au jugé sur un DOM que personne n'a regardé, silencieusement. Le compilateur doit poser la question ; répondre « rien de spécial » ne coûte qu'un mot.
+
+En cas d'échec de reconnaissance, le §9.4 s'applique sans réserve : aucune exception ne remonte, la dégradation est journalisée, et l'absence de retrait intérieur ne dégrade que l'esthétique du composeur — jamais l'usage normal de la plateforme (`CA-11`).
 
 #### 9.2.4 Contrat serveur (composant B)
 

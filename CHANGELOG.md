@@ -12,6 +12,46 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Changed
+
+- **Fixing GitHub can no longer break Azure DevOps** (§9.1, §9.4). Two GitHub selectors lived
+  in the shared editor controller — a `comment-composer` composer and a `CommentBox` class —
+  and therefore ran on every Azure DevOps page. They matched nothing there, so nothing looked
+  broken; but §9.4 has always required DOM selectors to live "in a single file per adapter",
+  and a GitHub rename would have been fixed in a file both platforms execute. The rule was
+  unenforceable rather than merely unenforced: no contract method let the shared controller
+  *ask* an adapter for that container. The client contract (§9.2.3) gains `getEditorChrome()`,
+  which supplies it, and `renderedBodyShape()`, which supplies the shape of a rendered comment
+  body. Both are required, so a new platform is asked the question at compile time; both accept
+  a one-word "nothing special" that reproduces the previous behaviour exactly.
+
+- **A platform's palette now belongs to that platform** (§9.1). The stylesheet named 33 Primer
+  tokens across 53 declarations and shipped to Azure DevOps as well as GitHub — including three
+  lengths that are GitHub measurements, among them a frame inset equal to the margin of GitHub's
+  own comment container. Every platform inherited one platform's proportions. The rules stay
+  where they are and now read `--cct-*` roles; each platform declares what those roles are worth
+  in its own sheet, scoped so it cannot reach a page it does not serve. Azure DevOps renders
+  exactly as before, measured property by property in a real browser; its sheet is deliberately
+  empty, because nothing in this repository has ever observed its theme tokens and guessing them
+  would be the very fault being corrected.
+
+- **The subject boundary no longer assumes GitHub's markup** (§5.5). The paragraph container and
+  the line-break marker were written in place, measured on github.com and applied everywhere. On
+  a rendered body whose line break differs, an entire sibling slid into the highlighted subject.
+  Both platforms answer the same thing today, so nothing changes now — but the assumption has
+  become a question the platform answers.
+
+### Added
+
+- Three guards, because none of the above was visible to any test. `check:platform-isolation`
+  refuses a platform identifier in code every platform runs, deriving the forbidden vocabulary
+  from the adapters' own selector files rather than from a list — a GitLab adapter will be
+  covered without touching it. `check:style-isolation` measures the stylesheet split in a real
+  Chromium: no regression off GitHub, and a value injected into the GitHub layer reaching pages
+  that carry the platform marker and none that do not. `check:extension-css` now covers every
+  delivered sheet instead of one hardcoded path.
 ## [1.0.0-beta.13] - 2026-09-08
 
 ### Added

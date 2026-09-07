@@ -1125,7 +1125,12 @@ describe('G2bis — la page d’options REFUSE d’étiqueter sans choix explici
             cb?.();
           },
         },
-        sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}), set: vi.fn() },
+        sync: {
+          // Français demandé explicitement : la page applique désormais la préférence de
+          // langue (§10), et ces assertions lisent des libellés français.
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({ language: 'fr' }),
+          set: vi.fn(),
+        },
         managed: { get: (cb: (i: Record<string, unknown>) => void) => cb({}) },
       },
     };
@@ -1257,7 +1262,12 @@ describe('H3 — l’inférence se recalcule tant que personne n’a choisi', ()
       },
       storage: {
         local: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}), set: vi.fn() },
-        sync: { get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({}), set: vi.fn() },
+        sync: {
+          // Français demandé explicitement : la page applique désormais la préférence de
+          // langue (§10), et ces assertions lisent des libellés français.
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) => cb({ language: 'fr' }),
+          set: vi.fn(),
+        },
         managed: { get: (cb: (i: Record<string, unknown>) => void) => cb({}) },
       },
     };

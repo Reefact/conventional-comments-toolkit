@@ -60,6 +60,7 @@ declare const chrome: {
     };
     lastError?: { message?: string } | null;
     openOptionsPage?: () => void;
+    onInstalled?: { addListener: (cb: (details: { reason?: string }) => void) => void };
   };
   action?: {
     onClicked: { addListener: (cb: () => void) => void };
@@ -198,6 +199,30 @@ chrome?.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // démarrage pour un bouton.
 chrome?.action?.onClicked.addListener(() => {
   chrome?.runtime.openOptionsPage?.();
+});
+
+/** Amène aux réglages au PREMIER lancement, et après une mise à jour qui laisserait
+ * l'extension sans aucun domaine.
+ *
+ * Depuis qu'aucun hôte n'est pré-déclaré dans le manifeste, une extension fraîchement
+ * installée ne fait rien nulle part tant que personne n'a autorisé un domaine. Rien ne le
+ * signale : ni erreur, ni icône barrée — juste une extension qui a l'air cassée. C'est aussi
+ * la seule migration possible pour un utilisateur existant, `permissions.request()` exigeant
+ * un geste humain que le service worker ne peut pas produire.
+ *
+ * `update` est traité, mais SOUS CONDITION qu'aucun domaine ne soit accordé : ouvrir un
+ * onglet à chaque mise à jour automatique du store harcèlerait quelqu'un qui n'a rien
+ * demandé. La condition dit exactement ce qui justifie l'ouverture — il n'y a rien à faire
+ * ailleurs qu'ici. Les autres raisons (`chrome_update`, `shared_module_update`) ne
+ * concernent pas cette extension et n'ouvrent rien. */
+chrome?.runtime?.onInstalled?.addListener((details) => {
+  const reason = details?.reason;
+  if (reason === 'install') return void chrome?.runtime.openOptionsPage?.();
+  if (reason !== 'update') return;
+  chrome?.permissions?.getAll((perms) => {
+    const origins = perms?.origins ?? [];
+    if (origins.length === 0) chrome?.runtime.openOptionsPage?.();
+  });
 });
 
 /** Préfixe de tout ce que cette extension enregistre — la seule façon de reconnaître NOS

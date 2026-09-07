@@ -2,10 +2,11 @@
 // limitées (§8.1.2 — jamais le mode ni les labels), affichage de l'état dégradé (§5.4)
 // et du journal local de dégradation de sélecteurs (§9.4).
 //
-// L'écran des hôtes tient en quatre zones, et l'ordre raconte le cycle de vie d'un accès :
-//   1. SITES CLOUD — catalogue de domaines connus, autorisés et classés d'un seul clic.
-//   2. DOMAINE AUTO-HÉBERGÉ — saisie libre, plateforme choisie AVANT l'octroi.
-//   3. HÔTES CONFIGURÉS — ce qui est accordé ET classé ; on n'y modifie plus rien, on retire.
+// L'écran des domaines tient en quatre zones, et l'ordre raconte le cycle de vie d'un accès :
+//   1. DOMAINES CONNUS — catalogue de domaines dont l'adresse ET la plateforme sont déjà
+//      connues, donc autorisés et classés d'un seul clic.
+//   2. AUTRES DOMAINES — saisie libre, plateforme choisie AVANT l'octroi.
+//   3. DOMAINES CONFIGURÉS — ce qui est accordé ET classé ; on n'y modifie plus rien, on retire.
 //   4. DOMAINES NON CONFIGURÉS — accordés hors de cet écran, donc sans plateforme. Masquée
 //      tant qu'elle est vide, parce que les zones 1 et 2 ne peuvent pas la remplir : elles
 //      classent toujours dans le même geste qu'elles autorisent.
@@ -15,6 +16,9 @@
 // (`selectPlatform()` n'active rien sans étiquette) sans que rien ne l'explique.
 
 import { TELEMETRY_CONSENT_KEY, managedEndpoint, parseConsent } from '../telemetry.js';
+import { ui } from '../ui/strings.js';
+import { applyStaticStrings, currentLanguage } from './i18n.js';
+import { maybeStartTour, startTour } from './tour.js';
 import {
   CLOUD_PLATFORMS,
   HOST_PLATFORMS_KEY,
@@ -57,11 +61,24 @@ declare const chrome: {
  * domaine. Elle y trouvait « Azure DevOps Server », ce qu'elle n'est pas — c'est du cloud
  * Microsoft, sous son ancien nom. L'étiquette posée, elle, était déjà la bonne (`azdo`,
  * même adaptateur) : seul le libellé mentait, et il suffisait pour ne pas se reconnaître. */
-const PLATFORM_LABELS: Record<HostPlatform, string> = {
-  github: 'GitHub Enterprise Server / GHE Cloud',
-  azdo: 'Azure DevOps Server ou organisation visualstudio.com',
-  config: "Configuration d'organisation uniquement",
+/** Langue servie à CETTE page. Une variable de module plutôt qu'un paramètre traversant
+ * chaque fonction de rendu : elle est résolue une fois, avant le premier rendu, et ne change
+ * plus tant que la page vit — la modifier depuis le menu recharge la page. `en` d'ici là,
+ * pour que rien n'affiche une clé brute si un rendu partait trop tôt. */
+let lang = 'en';
+
+/** Une FONCTION et non plus une table figée : les libellés se lisent maintenant dans le
+ * catalogue, donc au moment du rendu — une table constante aurait gelé la langue à l'import
+ * du module, avant que `lang` ne soit résolue. */
+const PLATFORM_LABEL_KEYS: Record<HostPlatform, string> = {
+  github: 'options.platform.github',
+  azdo: 'options.platform.azdo',
+  config: 'options.platform.config',
 };
+
+function platformLabel(platform: HostPlatform): string {
+  return ui(lang, PLATFORM_LABEL_KEYS[platform] ?? platform);
+}
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -210,14 +227,14 @@ function makeButton(label: string, className: string, onClick: () => void): HTML
  * lecteur d'écran. Absent des hôtes classés par politique d'entreprise : révoquer une
  * permission imposée par l'administration ne relève pas de cet écran. */
 function makeRemoveButton(origin: string, host: string): HTMLButtonElement {
-  const button = makeButton('Retirer', 'btn btn-quiet', () => {
+  const button = makeButton(ui(lang, 'options.host.remove'), 'btn btn-quiet', () => {
     void removeHost(origin, host).then((removed) => {
       if (removed) return void refreshHosts();
       // Pas de rafraîchissement : rien n'a changé, et la ligne doit rester sous les yeux
       // avec la raison. Un `refreshHosts()` effacerait justement ce message.
       const state = button.closest('section.panel')?.querySelector('.remove-state');
       if (state) {
-        state.textContent = `Le navigateur a refusé de retirer l'accès à ${host}.`;
+        state.textContent = ui(lang, 'options.host.remove.refused', { host });
       }
     });
   });
@@ -254,7 +271,7 @@ function makeCloudCard(entry: (typeof CLOUD_PLATFORMS)[number]): HTMLElement {
   domain.textContent = hostnameOf(entry.origin) ?? entry.origin;
   info.append(name, domain);
 
-  const activate = makeButton('Activer', 'btn btn-p', () => {
+  const activate = makeButton(ui(lang, 'options.host.activate'), 'btn btn-p', () => {
     if (!chrome?.permissions) return;
     chrome.permissions.request({ origins: [entry.origin] }, (granted) => {
       if (!granted) return;
@@ -284,19 +301,19 @@ function makeUnconfiguredRow(origin: string, host: string): HTMLLIElement {
   const controls = document.createElement('div');
   controls.className = 'catch-up';
   const select = document.createElement('select');
-  select.setAttribute('aria-label', `Plateforme servie par ${host}`);
+  select.setAttribute('aria-label', ui(lang, 'options.host.platform.aria', { host }));
   const placeholder = document.createElement('option');
   placeholder.value = '';
   placeholder.selected = true;
-  placeholder.textContent = '— choisir la plateforme —';
+  placeholder.textContent = ui(lang, 'options.other.platform.none');
   select.appendChild(placeholder);
-  for (const [value, label] of Object.entries(PLATFORM_LABELS)) {
+  for (const value of Object.keys(PLATFORM_LABEL_KEYS) as HostPlatform[]) {
     const opt = document.createElement('option');
     opt.value = value;
-    opt.textContent = label;
+    opt.textContent = platformLabel(value);
     select.appendChild(opt);
   }
-  const activate = makeButton('Activer', 'btn btn-p', () => {
+  const activate = makeButton(ui(lang, 'options.host.activate'), 'btn btn-p', () => {
     const platform = select.value as HostPlatform | '';
     if (!platform) return void select.focus();
     void setHostPlatform(host, platform).then(() => void refreshHosts());
@@ -325,7 +342,7 @@ function makeConfiguredRow(
   name.textContent = host;
   const label = document.createElement('div');
   label.className = 'platform';
-  label.textContent = PLATFORM_LABELS[platform] ?? platform;
+  label.textContent = platformLabel(platform);
   body.append(name, label);
 
   li.append(makeKindBadge(platform, isCloud), body);
@@ -335,7 +352,7 @@ function makeConfiguredRow(
     // lecture seule, puisque aucune action locale ne pourrait la défaire.
     const lock = document.createElement('span');
     lock.className = 'lock';
-    lock.append(lockIcon(), document.createTextNode(" politique d'entreprise"));
+    lock.append(lockIcon(), document.createTextNode(` ${ui(lang, 'options.host.managed')}`));
     li.append(lock);
   } else {
     li.append(makeRemoveButton(origin, host));
@@ -435,7 +452,7 @@ document.getElementById('host-add')?.addEventListener('click', () => {
   const host = hostnameOf(hostInput?.value ?? '');
   if (!chrome?.permissions) return;
   if (!host) {
-    if (addState) addState.textContent = 'Domaine invalide.';
+    if (addState) addState.textContent = ui(lang, 'options.add.invalid');
     return;
   }
   // Aucun repli implicite : sans choix explicite, on ne devine pas. Un défaut silencieux
@@ -443,13 +460,13 @@ document.getElementById('host-add')?.addEventListener('click', () => {
   // aucun adaptateur — deux façons de casser l'installation sans rien dire.
   const platform = platformSelect?.value as HostPlatform | '' | undefined;
   if (!platform) {
-    if (addState) addState.textContent = 'Choisissez la plateforme servie par ce domaine.';
+    if (addState) addState.textContent = ui(lang, 'options.add.no-platform');
     platformSelect?.focus();
     return;
   }
   chrome.permissions.request({ origins: [`https://${host}/*`] }, (granted) => {
     if (!granted) {
-      if (addState) addState.textContent = 'Permission refusée.';
+      if (addState) addState.textContent = ui(lang, 'options.add.refused');
       return;
     }
     void setHostPlatform(host, platform).then(() => {
@@ -498,8 +515,8 @@ document.getElementById('direct-shortcuts-save')?.addEventListener('click', () =
   if (shortcutsState) {
     shortcutsState.textContent =
       rejected.length === 0
-        ? 'Enregistré.'
-        : `Enregistré — lignes ignorées : ${rejected.join(' ; ')}`;
+        ? ui(lang, 'options.shortcuts.saved')
+        : ui(lang, 'options.shortcuts.saved.partial', { rejected: rejected.join(' ; ') });
   }
 });
 
@@ -528,23 +545,17 @@ function renderTelemetry(endpoint: string | null, consented: string | null): voi
   }
   if (!telemetryLine) return;
   if (endpoint === null && consented !== null) {
-    telemetryLine.textContent =
-      `Votre organisation ne déclare plus de point de collecte, mais votre accord pour ` +
-      `${consented} reste enregistré. Décochez pour le retirer.`;
+    telemetryLine.textContent = ui(lang, 'options.telemetry.endpoint.revoked-only', { consented });
   } else if (endpoint === null) {
-    telemetryLine.textContent =
-      "La politique de votre organisation ne déclare aucun point de collecte : il n'y a rien à autoriser.";
+    telemetryLine.textContent = ui(lang, 'options.telemetry.endpoint.none');
   } else if (consented !== null && consented !== endpoint) {
-    telemetryLine.textContent =
-      `Point de collecte : ${endpoint} — votre accord précédent portait sur ${consented}, ` +
-      `il ne s'y applique pas. Cochez pour autoriser cette destination.`;
+    telemetryLine.textContent = ui(lang, 'options.telemetry.endpoint.moved', { endpoint, consented });
   } else {
     // « Politique d'entreprise » et non « configuration » : depuis que le point de collecte
     // vient de ce seul canal, cette phrase est vraie. Elle ne l'était pas quand le fichier
     // d'un dépôt pouvait le fournir — l'écran censé protéger d'un dépôt hostile certifiait
     // alors que son collecteur venait de l'organisation (revue Codex, PR #31).
-    telemetryLine.textContent =
-      `Point de collecte déclaré par la politique d'entreprise de votre organisation : ${endpoint}`;
+    telemetryLine.textContent = ui(lang, 'options.telemetry.endpoint.declared', { endpoint });
   }
 }
 
@@ -562,7 +573,6 @@ function refreshTelemetry(): void {
     void readPolicy.then((endpoint) => renderTelemetry(endpoint, consented));
   });
 }
-refreshTelemetry();
 
 telemetryOptIn?.addEventListener('change', () => {
   // `displayedEndpoint`, jamais une relecture : on consent à ce qui était sous les yeux.
@@ -591,33 +601,62 @@ function renderStatus(row: HTMLElement | null, text: string, degraded: boolean):
 }
 
 // État dégradé (§5.4, §9.2.3) et journal de dégradation de sélecteurs (§9.4).
-chrome?.storage?.local?.get(['degradedState', 'selectorFailures'], (items) => {
-  const degradedState = items['degradedState'];
-  renderStatus(
-    document.getElementById('degraded-state'),
-    degradedState
-      ? `Configuration non lue (${String(degradedState)}) : l'extension assiste sans bloquer.`
-      : 'Configuration lue normalement.',
-    Boolean(degradedState)
-  );
+function refreshStatus(): void {
+    chrome?.storage?.local?.get(['degradedState', 'selectorFailures'], (items) => {
+    const degradedState = items['degradedState'];
+    renderStatus(
+      document.getElementById('degraded-state'),
+      degradedState
+        ? ui(lang, 'options.status.degraded', { reason: String(degradedState) })
+        : ui(lang, 'options.status.ok'),
+      Boolean(degradedState)
+    );
 
-  const failures = (items['selectorFailures'] as { chain: string; at: string }[] | undefined) ?? [];
-  const log = document.getElementById('selector-log');
-  renderStatus(
-    log,
-    failures.length === 0
-      ? 'Aucune dégradation de sélecteur enregistrée.'
-      : `${failures.length} dégradation(s) de sélecteur enregistrée(s).`,
-    failures.length > 0
-  );
-  // Le détail sous la ligne, en monospace : ce sont des chaînes de sélecteurs, illisibles
-  // en corps de texte, et sans intérêt tant qu'il n'y en a aucune.
-  const body = log?.querySelector('.status-body');
-  if (body && failures.length > 0) {
-    const detail = document.createElement('pre');
-    detail.textContent = failures.map((f) => `${f.at} — ${f.chain}`).join('\n');
-    body.appendChild(detail);
-  }
+    const failures = (items['selectorFailures'] as { chain: string; at: string }[] | undefined) ?? [];
+    const log = document.getElementById('selector-log');
+    renderStatus(
+      log,
+      failures.length === 0
+        ? ui(lang, 'options.status.selectors.none')
+        : ui(lang, 'options.status.selectors.some', { count: failures.length }),
+      failures.length > 0
+    );
+    // Le détail sous la ligne, en monospace : ce sont des chaînes de sélecteurs, illisibles
+    // en corps de texte, et sans intérêt tant qu'il n'y en a aucune.
+    const body = log?.querySelector('.status-body');
+    if (body && failures.length > 0) {
+      const detail = document.createElement('pre');
+      detail.textContent = failures.map((f) => `${f.at} — ${f.chain}`).join('\n');
+      body.appendChild(detail);
+    }
+  });
+}
+/** Démarrage. L'ordre n'est pas cosmétique : `lang` doit être posée AVANT le premier rendu,
+ * sinon les chaînes construites par le code sortent en anglais sur une page française — le
+ * genre d'incohérence qui se voit une fois sur deux, au rythme d'une course. Les blocs qui
+ * ne font que câbler des écouteurs restent en tête de module : ils n'écrivent aucun texte. */
+async function boot(): Promise<void> {
+  lang = await currentLanguage();
+  applyStaticStrings(document, lang);
+  // TOUT rendu qui écrit du texte part d'ici, et pas d'un effet de bord d'import. Un test
+  // de télémétrie a trouvé ce défaut dans la première version de ce démarrage : la ligne du
+  // point de collecte se rendait depuis un rappel de `storage.managed` déclenché à
+  // l'import, donc en anglais sur une page française, sans que rien ne le signale.
+  refreshTelemetry();
+  refreshStatus();
+  await refreshHosts();
+  // La visite APRÈS le rendu des hôtes : l'une de ses étapes vise « Domaines non
+  // configurés », zone qui n'existe qu'une fois la liste construite. La lancer avant la
+  // ferait sauter systématiquement, et c'est justement l'étape qui mérite d'être montrée.
+  await maybeStartTour(document, lang);
+}
+
+// Rejouer la visite à la demande. Le drapeau « déjà vue » n'est PAS effacé au passage : il
+// reste vrai pendant et après, ce qu'il doit être — la visite A été vue. L'effacer pour le
+// reposer à la fin ne changerait rien, sinon d'ouvrir une fenêtre où un autre onglet de
+// réglages la relancerait tout seul.
+document.getElementById('tour-replay')?.addEventListener('click', () => {
+  startTour(document, lang);
 });
 
-void refreshHosts();
+void boot();

@@ -68,6 +68,7 @@ declare const chrome: {
     registerContentScripts: (scripts: RegisteredContentScript[], cb: () => void) => void;
     unregisterContentScripts: (filter: { ids: string[] }, cb: () => void) => void;
     getRegisteredContentScripts?: (cb: (scripts: { id: string }[]) => void) => void;
+    updateContentScripts?: (scripts: RegisteredContentScript[], cb: () => void) => void;
   };
   storage?: {
     local?: {
@@ -183,86 +184,95 @@ chrome?.action?.onClicked.addListener(() => {
   chrome?.runtime.openOptionsPage?.();
 });
 
-/** Identifiant stable pour un origin — chrome.scripting exige un id sans caractère
- * spécial ; il sert aussi de clé pour désenregistrer proprement (§A.4, §B.4). */
-export function scriptIdFor(origin: string): string {
-  return `${SCRIPT_ID_PREFIX}${origin.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-${fingerprintOf(origin)}`;
-}
-
-/** Préfixe commun à tout ce que cette extension enregistre — la seule façon de reconnaître
- * NOS enregistrements parmi ceux que `getRegisteredContentScripts()` rend. */
+/** Préfixe de tout ce que cette extension enregistre — la seule façon de reconnaître NOS
+ * enregistrements parmi ceux que `getRegisteredContentScripts()` rend. */
 const SCRIPT_ID_PREFIX = 'cct-';
 
-/** FNV-1a 32 bits, en base 36. Ce n'est pas une empreinte cryptographique et n'a pas à
- * l'être : elle ne protège de rien, elle DISTINGUE. Le slug lisible seul ne le faisait pas
- * — il écrase toute suite de caractères non alphanumériques en un seul `-`, si bien que
- * `ghes.example.corp` et `ghes-example.corp`, deux noms d'intranet également plausibles,
- * rendaient le même identifiant. Le second enregistrement échouait alors comme doublon, et
- * révoquer l'un désenregistrait le script de l'autre : un hôte accordé restait sans script
- * injecté (revue Codex, PR #60). Le slug est conservé devant l'empreinte parce qu'un
- * identifiant se lit aussi dans un journal de débogage. */
-function fingerprintOf(origin: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < origin.length; i++) {
-    hash ^= origin.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash.toString(36);
+/** **UN SEUL** script enregistré, portant TOUS les hôtes servis dans son `matches`.
+ *
+ * Le choix n'est pas cosmétique, et deux défauts distincts l'imposent (revue Reefact,
+ * PR #60). Un enregistrement PAR ORIGINE créait autant de scripts que d'octrois, et deux
+ * motifs peuvent parfaitement couvrir la même page — le motif large (toutes origines
+ * https, ce que le manifeste déclare en `optional_host_permissions`) accordé depuis
+ * `chrome://extensions` et `https://github.com` ajouté ici, ou un `*.corp.example`
+ * pré-autorisé par politique et le `ghes.corp.example` qu'il contient. Chaque
+ * enregistrement injectant pour son compte, `content.js` partait deux fois sur ces pages,
+ * et `bootstrap()` n'étant pas idempotent, l'interface s'y dédoublait. Un script unique
+ * s'injecte une fois par document, quel que soit le nombre de ses motifs qui matchent.
+ *
+ * Et un identifiant unique fait disparaître la question de sa fabrication : un identifiant
+ * PAR ORIGINE devait être injectif, ce qu'un slug puis un slug + FNV-1a 32 bits ne
+ * garantissaient toujours pas — deux hôtes construits pour entrer en collision partagent
+ * encore leur empreinte, et donc leur enregistrement. Il n'y a plus de nom à dériver. */
+const SCRIPT_ID = `${SCRIPT_ID_PREFIX}hosts`;
+
+/** Les origines réellement SERVIES : accordées **et** classées `github`/`azdo`.
+ *
+ * L'enregistrement suivait jusqu'ici la seule permission, alors que l'activation, elle,
+ * suit la classification (`selectPlatform`). L'écart n'était pas théorique : un octroi
+ * large — toutes origines https, ce que le manifeste déclare en
+ * `optional_host_permissions` — faisait
+ * enregistrer un script sur TOUTES les pages https, où il ne pouvait ensuite rien faire,
+ * faute d'étiquette. Aligner les deux, c'est n'injecter que là où un adaptateur tournera.
+ *
+ * `config` en est exclu à dessein : cet hôte n'est accordé que pour lire un `configUrl`,
+ * lecture qui vit dans ce worker. Aucun script de contenu n'y a affaire. */
+function servedOrigins(origins: string[], tags: Record<string, HostPlatform>): string[] {
+  return origins.filter((origin) => {
+    const host = hostnameOf(origin);
+    return host !== null && (tags[host] === 'github' || tags[host] === 'azdo');
+  });
 }
 
-/** Tout hôte accordé s'enregistre ici, sans exception. `github.com` en était une : le
- * manifeste l'injectait statiquement, il fallait donc l'écarter de l'enregistrement
- * dynamique pour ne pas injecter le script deux fois. Le manifeste ne déclare plus aucun
- * `content_scripts` — l'exception n'a plus d'objet, et sa disparition place l'injection sur
- * github.com sous le même octroi que partout ailleurs : demandé, retiré et observé via
- * `chrome.permissions`, donc désenregistré ici dès que la permission tombe. */
-export async function registerContentScriptForOrigin(origin: string): Promise<void> {
-  if (!chrome?.scripting) return;
+/** Amène l'enregistrement à l'état voulu — inscrit, mis à jour, ou retiré s'il ne reste
+ * rien à servir. `matches` vide n'est pas une option : `registerContentScripts` la refuse,
+ * et c'est heureux, un script sans motif ne voulant rien dire. */
+async function applyRegistration(matches: string[]): Promise<void> {
+  const scripting = chrome?.scripting;
+  if (!scripting) return;
+  const registered = await listRegisteredScripts();
+  const ours = registered.some((script) => script.id === SCRIPT_ID);
+
+  // Le ménage vise ce que les versions ANTÉRIEURES ont laissé : elles nommaient un script
+  // par origine, sous des identifiants que plus rien ici ne sait reconstruire. Un
+  // enregistrement dynamique survivant à une mise à jour de l'extension, ces orphelins
+  // continueraient d'injecter à côté du nôtre — le dédoublement, encore.
+  const stale = registered
+    .map((script) => script.id)
+    .filter((id) => id.startsWith(SCRIPT_ID_PREFIX) && id !== SCRIPT_ID);
+  if (stale.length > 0) {
+    await new Promise<void>((resolve) => scripting.unregisterContentScripts({ ids: stale }, () => resolve()));
+  }
+
+  if (matches.length === 0) {
+    if (ours) {
+      await new Promise<void>((resolve) =>
+        scripting.unregisterContentScripts({ ids: [SCRIPT_ID] }, () => resolve())
+      );
+    }
+    return;
+  }
+
   const script: RegisteredContentScript = {
-    id: scriptIdFor(origin),
-    matches: [origin],
+    id: SCRIPT_ID,
+    matches,
     js: ['content.js'],
     css: ['styles.css'],
     runAt: 'document_idle',
   };
   await new Promise<void>((resolve) => {
-    chrome!.scripting!.registerContentScripts([script], () => resolve());
-    // Un origin déjà enregistré (rechargement de l'extension, double octroi) lève une
-    // erreur côté chrome.runtime.lastError : sans conséquence, le script est déjà là.
+    // `update` plutôt que désenregistrer-puis-réenregistrer : ce dernier ouvrirait, à chaque
+    // changement d'étiquette, une fenêtre où plus aucun hôte n'est servi.
+    if (ours && scripting.updateContentScripts) {
+      scripting.updateContentScripts([script], () => resolve());
+    } else {
+      scripting.registerContentScripts([script], () => resolve());
+    }
   });
 }
 
-export async function unregisterContentScriptForOrigin(origin: string): Promise<void> {
-  if (!chrome?.scripting) return;
-  await new Promise<void>((resolve) => {
-    chrome!.scripting!.unregisterContentScripts({ ids: [scriptIdFor(origin)] }, () => resolve());
-  });
-}
-
-/** Rattrape au démarrage les permissions déjà accordées (redémarrage du navigateur,
- * mise à jour de l'extension) : `registerContentScripts` ne survit pas à un rechargement
- * du service worker sans cet appel.
- *
- * **Et fait le ménage avant**, ce qui n'est pas une précaution de confort. Un
- * enregistrement dynamique survit à une mise à jour de l'extension, alors que le CODE, lui,
- * est remplacé : tout changement de la façon de nommer les identifiants — celui que la
- * correction de collision vient d'introduire — laisserait les enregistrements de la version
- * précédente en place sous leur ancien nom, que plus rien ne sait désenregistrer. Le même
- * script serait alors injecté DEUX fois sur chaque page couverte. Le même passage rattrape
- * une permission révoquée pendant que le worker dormait, dont l'enregistrement survivrait
- * de la même façon.
- *
- * `getRegisteredContentScripts` est appelé derrière une garde : un navigateur qui ne
- * l'exposerait pas doit continuer à enregistrer, faute de quoi l'extension ne s'injecterait
- * plus nulle part — un ménage manqué coûte moins cher que ça. */
-export async function syncContentScriptsWithGrantedPermissions(): Promise<void> {
-  if (!chrome?.permissions) return;
-  const origins = await new Promise<string[]>((resolve) => {
-    chrome!.permissions!.getAll((perms) => resolve(perms.origins ?? []));
-  });
-
-  const expected = new Set(origins.map(scriptIdFor));
-  const registered = await new Promise<{ id: string }[]>((resolve) => {
+function listRegisteredScripts(): Promise<{ id: string }[]> {
+  return new Promise((resolve) => {
     const get = chrome?.scripting?.getRegisteredContentScripts;
     if (!get) return resolve([]);
     try {
@@ -271,16 +281,15 @@ export async function syncContentScriptsWithGrantedPermissions(): Promise<void> 
       resolve([]);
     }
   });
-  const stale = registered
-    .map((script) => script.id)
-    .filter((id) => id.startsWith(SCRIPT_ID_PREFIX) && !expected.has(id));
-  if (stale.length > 0 && chrome?.scripting) {
-    await new Promise<void>((resolve) => {
-      chrome!.scripting!.unregisterContentScripts({ ids: stale }, () => resolve());
-    });
-  }
+}
 
-  for (const origin of origins) await registerContentScriptForOrigin(origin);
+/** Conservé pour l'appel de démarrage : l'enregistrement ne survit pas à un rechargement du
+ * service worker sans être reposé. Il n'a plus de calcul propre — la publication de la
+ * répartition et l'enregistrement partent des MÊMES origines et des MÊMES étiquettes, et
+ * les faire diverger est exactement ce qui a produit l'injection sur des hôtes que rien
+ * n'activait. */
+export async function syncContentScriptsWithGrantedPermissions(): Promise<void> {
+  await publishExtraHostsByPlatform();
 }
 
 /** Étiquettes posées par la page d'options, et celles poussées par la politique
@@ -340,7 +349,41 @@ async function computeAndStoreExtraHosts(): Promise<ExtraHostsByPlatform> {
   await new Promise<void>((resolve) => {
     chrome!.storage!.local!.set({ [EXTRA_HOSTS_KEY]: result }, () => resolve());
   });
+  // MÊME source pour les deux : ce qui est injecté et ce qui est activé se déduisent du même
+  // croisement, dans le même passage. Les séparer, c'était laisser l'un injecter là où
+  // l'autre ne ferait rien.
+  await applyRegistration(servedOrigins(origins, tags));
   return result;
+}
+
+/** Oublie l'étiquette d'un hôte dont la permission vient d'être retirée.
+ *
+ * La page d'options le faisait déjà pour son bouton « Retirer », et c'était le seul chemin
+ * couvert : une révocation depuis `chrome://extensions` laissait l'étiquette derrière elle.
+ * Réautoriser le même hôte par ce même biais retrouvait alors silencieusement l'ancienne
+ * classification et rallumait l'adaptateur, au lieu de faire passer le domaine par
+ * « Domaines non configurés » comme n'importe quel octroi venu d'ailleurs (revue Reefact,
+ * PR #60). Le cycle se ferme ici, où le retrait est observé quelle qu'en soit l'origine.
+ *
+ * Les étiquettes de POLITIQUE ne vivent pas dans cette clé : rien à y purger, et rien à
+ * défaire d'une décision d'administration. */
+async function forgetPlatformTags(origins: string[]): Promise<void> {
+  const local = chrome?.storage?.local;
+  if (!local) return;
+  const hosts = origins.map(hostnameOf).filter((host): host is string => host !== null);
+  if (hosts.length === 0) return;
+  const tags = await new Promise<Record<string, HostPlatform>>((resolve) => {
+    local.get([HOST_PLATFORMS_KEY], (items) =>
+      resolve((items[HOST_PLATFORMS_KEY] as Record<string, HostPlatform> | undefined) ?? {})
+    );
+  });
+  const remaining = Object.fromEntries(
+    Object.entries(tags).filter(([host]) => !hosts.includes(host))
+  );
+  if (Object.keys(remaining).length === Object.keys(tags).length) return;
+  await new Promise<void>((resolve) => {
+    local.set({ [HOST_PLATFORMS_KEY]: remaining }, () => resolve());
+  });
 }
 
 /** File d'attente d'un seul écrivain — même motif que la page d'options. Chaque appel
@@ -354,13 +397,15 @@ export function publishExtraHostsByPlatform(): Promise<ExtraHostsByPlatform> {
   return next;
 }
 
-chrome?.permissions?.onAdded?.addListener((perms) => {
-  for (const origin of perms.origins ?? []) void registerContentScriptForOrigin(origin);
+// Un octroi ne demande rien de particulier : la publication recalcule tout, enregistrement
+// compris, à partir des permissions et des étiquettes du moment.
+chrome?.permissions?.onAdded?.addListener(() => {
   void publishExtraHostsByPlatform();
 });
+// Un RETRAIT demande une chose de plus : oublier l'étiquette avant de republier, pour que
+// la répartition se calcule sur un état déjà nettoyé.
 chrome?.permissions?.onRemoved?.addListener((perms) => {
-  for (const origin of perms.origins ?? []) void unregisterContentScriptForOrigin(origin);
-  void publishExtraHostsByPlatform();
+  void forgetPlatformTags(perms.origins ?? []).then(() => publishExtraHostsByPlatform());
 });
 // Une étiquette posée ou corrigée dans la page d'options doit republier la répartition :
 // la permission, elle, n'a pas bougé, donc aucun `onAdded`/`onRemoved` ne se déclenche.
@@ -369,5 +414,6 @@ chrome?.storage?.onChanged?.addListener((changes, areaName) => {
     void publishExtraHostsByPlatform();
   }
 });
+// Un SEUL appel : `syncContentScriptsWithGrantedPermissions()` n'a plus de calcul propre,
+// elle délègue à la publication, qui pose l'enregistrement dans le même passage.
 void syncContentScriptsWithGrantedPermissions();
-void publishExtraHostsByPlatform();

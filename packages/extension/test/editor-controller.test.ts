@@ -28,10 +28,6 @@ function setup(
 ) {
   const host = document.createElement('div');
   const textarea = document.createElement('textarea');
-  // Génération React du CommentBox GitHub (cf. selectors.ts, `class*="CommentBox"`) : c'est
-  // le cas par défaut que la plupart des tests exercent ; voir plus bas pour le cas où cette
-  // classe est absente (DOM hérité, Azure DevOps).
-  textarea.className = 'CommentBox-input';
   const submit = document.createElement('button');
   submit.type = 'submit';
   host.append(textarea, submit);
@@ -43,8 +39,17 @@ function setup(
     context: { zone: 'thread-root', action: 'compose', pr, canCarryBlockingState: true, inScope: true },
   };
 
+  // Le CHÂSSIS que l'adaptateur déclare (§9.2.3). Ce fichier teste le contrôleur PARTAGÉ : il
+  // ne doit donc connaître aucune forme de DOM de plateforme — ni la classe `CommentBox`, ni
+  // un composeur `data-testid`, qui vivaient ici et sont partis avec les sélecteurs qu'ils
+  // exerçaient (adapters/github/test/editor-chrome.test.ts). Ce qui se teste ICI est le
+  // CONTRAT : le contrôleur pare le conteneur que l'adaptateur nomme, quel qu'il soit, et
+  // retombe sur la géométrie quand l'adaptateur ne se prononce pas.
+  let framed: Element | null = host;
+
   const adapter: Partial<PlatformAdapter> = {
     platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
+    getEditorChrome: () => ({ framedContainer: framed }),
     getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
     readValue: () => textarea.value,
     writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),
@@ -65,7 +70,17 @@ function setup(
     telemetry: opts.telemetry,
     initialCountedCodes: opts.initialCountedCodes,
   });
-  return { controller, textarea, submit, host };
+  return {
+    controller,
+    textarea,
+    submit,
+    host,
+    /** Ce que l'adaptateur répondra au prochain `attach()` — `null` valant « je ne me
+     * prononce pas », la seule réponse d'une plateforme non mesurée. */
+    setFramedContainer: (el: Element | null) => {
+      framed = el;
+    },
+  };
 }
 
 describe('§9.3 — écriture programmatique (setter natif + input)', () => {
@@ -107,49 +122,35 @@ describe('§5 — contrôleur d’éditeur', () => {
     expect(textarea.classList.contains('cct-editor')).toBe(false);
   });
 
-  it('ne pose pas le retrait hors du CommentBox GitHub moderne (DOM hérité, Azure DevOps)', () => {
-    const { controller, textarea, host } = setup();
-    // Aucun conteneur borderless ni padding propre à neutraliser sur ces éditeurs (§ci-dessus
-    // dans editor-controller.ts) : la zone de saisie porte sa propre bordure et son propre
-    // padding, que ce retrait effacerait à tort.
-    textarea.className = 'comment-textarea';
+  it('ne pose aucun retrait quand l’adaptateur ne se prononce pas et qu’aucun cadre ne se mesure', () => {
+    const { controller, textarea, host, setFramedContainer } = setup();
+    // La réponse d'une plateforme non mesurée (`NEUTRAL_EDITOR_CHROME`). Sans cadre trouvé par
+    // la géométrie non plus, le contrôleur ne pose rien : ne rien savoir ne doit jamais faire
+    // pire que ce qui existait, et poser le retrait au jugé effacerait le padding propre d'un
+    // champ qu'on n'a pas regardé.
+    setFramedContainer(null);
     controller.attach();
     expect(host.classList.contains('cct-host')).toBe(false);
     expect(textarea.classList.contains('cct-editor')).toBe(false);
     controller.dispose();
   });
 
-  it('pose le retrait sur le composeur React reconnu par data-testid, sans classe CommentBox', () => {
-    const { controller, textarea, host } = setup();
-    // Second sélecteur candidat de la même génération React dans selectors.ts
-    // (`div[data-testid*="comment-composer"] textarea`) : le composeur, et non la classe
-    // du textarea, porte l'indice de reconnaissance.
-    textarea.className = '';
-    host.setAttribute('data-testid', 'comment-composer-foo');
+  it('pare le conteneur que l’adaptateur NOMME, même s’il n’est pas le parent direct du champ', () => {
+    const { controller, textarea, host, setFramedContainer } = setup();
+    // Le châssis peut être un ancêtre ÉLOIGNÉ : la zone de saisie est parfois nichée sous un
+    // wrapper intermédiaire (ici `host`, qui reste le parent direct où s'insère la barre
+    // d'outils) distinct du cadre à parer — en-tête et onglets natifs sont au niveau du cadre,
+    // pas à celui du wrapper. Le contrôleur suit l'adaptateur sans réinterpréter sa réponse.
+    const frame = document.createElement('div');
+    host.replaceWith(frame);
+    frame.appendChild(host);
+    setFramedContainer(frame);
     controller.attach();
-    expect(host.classList.contains('cct-host')).toBe(true);
-    expect(textarea.classList.contains('cct-editor')).toBe(true);
-    controller.dispose();
-  });
-
-  it('pose le retrait sur le composeur lui-même, pas sur un wrapper intermédiaire, quand la zone de saisie y est nichée', () => {
-    const { controller, textarea, host } = setup();
-    // Le sélecteur `div[data-testid*="comment-composer"] textarea` est un sélecteur
-    // descendant : la zone de saisie peut être nichée sous un wrapper intermédiaire (ici
-    // `host`, qui reste le parent direct utilisé pour insérer la barre d'outils) distinct
-    // du composeur qui doit recevoir le retrait — en-tête et onglets natifs sont à son
-    // niveau, pas à celui du wrapper.
-    textarea.className = '';
-    const composer = document.createElement('div');
-    composer.setAttribute('data-testid', 'comment-composer-foo');
-    host.replaceWith(composer);
-    composer.appendChild(host);
-    controller.attach();
-    expect(composer.classList.contains('cct-host')).toBe(true);
+    expect(frame.classList.contains('cct-host')).toBe(true);
     expect(host.classList.contains('cct-host')).toBe(false);
     expect(textarea.classList.contains('cct-editor')).toBe(true);
     controller.dispose();
-    expect(composer.classList.contains('cct-host')).toBe(false);
+    expect(frame.classList.contains('cct-host')).toBe(false);
   });
 
   it('§5.3 : rend une pastille et les diagnostics sous la zone', async () => {

@@ -80,6 +80,48 @@ export const selectors = {
     candidates: ['textarea', '[contenteditable="true"]'],
   } satisfies SelectorChain,
 
+  /** **Le châssis du composeur** (§5.1, §5.3) — le conteneur qui encadre ENSEMBLE l'en-tête
+   * natif de la boîte, ses onglets, la zone de saisie, et ce que l'extension injecte. C'est
+   * lui qui reçoit le retrait intérieur, faute de quoi notre barre et notre pastille touchent
+   * la bordure alors que le texte du champ, lui, s'en écarte par son propre padding.
+   *
+   * Ces deux candidats ont vécu jusqu'ici EN DUR DANS LE CONTRÔLEUR PARTAGÉ
+   * (`extension/src/editor-controller.ts`), ce que le §9.4 interdit — « les sélecteurs DOM sont
+   * centralisés dans un fichier unique par adaptateur ». Ils s'exécutaient donc aussi sur
+   * Azure DevOps, où ils ne matchent rien : sans conséquence visible, mais un renommage GitHub
+   * se serait corrigé dans un fichier partagé par les deux plateformes.
+   *
+   * Sélecteur d'ANCÊTRE, et c'est ce qui les distingue : la chaîne `editors` attrape le champ,
+   * celle-ci le cadre qui le contient. Le premier candidat peut désigner un ancêtre ÉLOIGNÉ —
+   * son homologue dans `editors` (`div[data-testid*="comment-composer"] textarea`) est un
+   * sélecteur descendant, la zone de saisie peut donc être nichée sous un wrapper
+   * intermédiaire. C'est bien le conteneur nommé qu'il faut padder, pas le parent direct du
+   * champ, pour que l'en-tête et les onglets natifs reçoivent le retrait eux aussi.
+   *
+   * Aucun candidat pour le DOM hérité, et c'est délibéré : sa boîte de commentaire dessine son
+   * propre cadre, que la règle géométrique du code partagé (`framedAncestor`) retrouve sans
+   * qu'on ait à la nommer. Ne rien nommer là où la mesure suffit est la règle d'ui/stacking.ts,
+   * et un nom de moins est un nom qui ne pourrira pas. */
+  composerFrame: {
+    name: 'composer-frame',
+    candidates: ['[data-testid*="comment-composer"]'],
+  } satisfies SelectorChain,
+
+  /** Génération React sans `data-testid` : le cadre n'est pas nommé, mais la ZONE DE SAISIE
+   * l'est — elle porte `CommentBox` dans sa liste de classes, et son châssis est alors son
+   * parent direct. Chaîne distincte de `composerFrame` parce que la question posée n'est pas
+   * la même : ici on interroge le champ lui-même (`matches`), là on remonte ses ancêtres
+   * (`closest`). Les confondre en une seule chaîne ferait remonter au premier ancêtre portant
+   * la classe, qui n'est pas le parent direct.
+   *
+   * Même origine que le candidat React de `editors` (`textarea[…][class*="CommentBox"]`) :
+   * jamais observé en direct dans ce dépôt, conservé parce que rien ne prouve qu'il ne décrit
+   * aucune vue. */
+  composerFrameOnField: {
+    name: 'composer-frame-on-field',
+    candidates: ['[class*="CommentBox"]'],
+  } satisfies SelectorChain,
+
   /** **Description de la PR — hors périmètre** (§4.1, dernière ligne du tableau : format non
    * validé, aucun état bloquant). L'éditeur qu'on y ouvre n'est pas une zone du §4.1 : il ne
    * doit recevoir ni barre d'outils, ni saisie rapide, ni garde d'envoi. Sans cette chaîne, il

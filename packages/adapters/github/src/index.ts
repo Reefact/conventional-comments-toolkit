@@ -18,10 +18,13 @@ import {
   closestChain,
   commentBodyText,
   hostMatchesAny,
+  matchesChain,
   queryChain,
   queryChainAll,
   writeToTextField,
+  NEUTRAL_EDITOR_CHROME,
   SelectorLog,
+  type EditorChrome,
   type EditorContext,
   type EditorHandle,
   type PlatformAdapter,
@@ -341,6 +344,27 @@ export class GithubClientAdapter implements PlatformAdapter {
         this.#doc.removeEventListener('turbo:frame-load', turboHandler);
       },
     };
+  }
+
+  /** Le châssis de cet éditeur (§5.1, §5.3, §9.4). Ces deux voies vivaient dans le contrôleur
+   * PARTAGÉ, en littéraux — un `closest('[data-testid*="comment-composer"]')` puis un
+   * `className.includes('CommentBox')` —, donc évaluées aussi sur une page Azure DevOps. Elles
+   * n'y matchaient rien, mais le §9.4 veut les sélecteurs DOM « centralisés dans un fichier
+   * unique par adaptateur », et un renommage de GitHub se serait corrigé dans un fichier que
+   * les deux plateformes exécutent. Les voici chez elles.
+   *
+   * L'ORDRE compte et il est celui d'avant : le conteneur nommé d'abord — c'est un ancêtre
+   * possiblement éloigné —, le parent direct du champ marqué ensuite. Puis on ne se prononce
+   * plus : sur le DOM hérité et sur toute vue non mesurée, la règle géométrique du code
+   * partagé retrouve le cadre sans le nommer, et rend là l'élément que ces deux voies
+   * désignaient déjà. Ne rien affirmer y est le comportement JUSTE, pas un renoncement. */
+  getEditorChrome(editor: EditorHandle): EditorChrome {
+    const framed = closestChain(editor.element, selectors.composerFrame);
+    if (framed.element) return { framedContainer: framed.element };
+    if (matchesChain(editor.element, selectors.composerFrameOnField).element) {
+      return { framedContainer: editor.element.parentElement };
+    }
+    return NEUTRAL_EDITOR_CHROME;
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {

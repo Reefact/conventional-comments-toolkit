@@ -265,28 +265,19 @@ export class EditorController {
     // chose — un sélecteur global restylerait aussi celles qu'elle ne touche pas. Retiré
     // à dispose(), comme tout ce que cette méthode pose.
     //
-    // Réservé à la génération React du CommentBox GitHub (« Files changed réécrite » dans
-    // selectors.ts) — reconnue via les deux mêmes indices que ses deux sélecteurs candidats
-    // pour cette génération : la classe `CommentBox` et le composeur `data-testid`. C'est
-    // cette génération dont le conteneur est borderless et sans padding propre (§ci-dessus).
-    // Sur le DOM hérité de GitHub et sur Azure DevOps, la zone de saisie porte sa propre
-    // bordure et son propre padding ; y poser ce retrait décalerait le conteneur sans
-    // corriger l'alignement visé, et effacerait à tort le padding qui donne sa forme au champ.
+    // QUEL conteneur encadre ce composeur est un fait de PLATEFORME, et il se demande donc à
+    // l'adaptateur (§9.2.3, `getEditorChrome`). Ces lignes ont porté deux littéraux GitHub —
+    // le composeur `data-testid` et la classe `CommentBox` — évalués sur toutes les
+    // plateformes ; le §9.4 veut les sélecteurs DOM « centralisés dans un fichier unique par
+    // adaptateur », et ils vivent désormais dans github/src/selectors.ts. Ce fichier ne sait
+    // plus de quelle plateforme il décore la page, et c'est le but.
     //
-    // Le composeur `data-testid` est un sélecteur DESCENDANT (`div[...] textarea`, sans
-    // combinateur d'enfant direct) : la zone de saisie peut y être nichée sous un wrapper
-    // intermédiaire, distinct de `host`. Le conteneur à padder est donc l'ancêtre réellement
-    // trouvé par ce sélecteur — pas `host` — pour que l'en-tête et les onglets natifs, situés
-    // au même niveau que ce wrapper, reçoivent eux aussi le retrait.
-    const commentBoxContainer = this.deps.editor.element.closest('[data-testid*="comment-composer"]');
-    // Troisième voie, et la seule qui ne nomme personne : le conteneur qui ENCADRE le champ
-    // (ui/stacking.ts). Elle rend, sur le DOM hérité, l'élément que les deux premières
-    // désignaient déjà — elle ne peut donc pas y changer le rendu — et elle donne enfin son
-    // retrait à la nouvelle vue des fichiers modifiés, dont le cadre serrait la barre, le
-    // champ et la pastille faute d'être reconnu.
+    // Un adaptateur qui ne se prononce pas (`null`) obtient la voie qui ne nomme personne : le
+    // conteneur qui DESSINE le cadre, retrouvé par la géométrie (ui/stacking.ts). Elle rend,
+    // sur le DOM hérité, l'élément que les voies nommées désignaient déjà — elle ne peut donc
+    // pas y changer le rendu.
     const paddedContainer =
-      commentBoxContainer ??
-      (this.deps.editor.element.className.includes('CommentBox') ? host : null) ??
+      this.deps.adapter.getEditorChrome(this.deps.editor).framedContainer ??
       framedAncestor(this.deps.editor.element);
     if (paddedContainer) {
       this.#keepClass(paddedContainer, 'cct-host');

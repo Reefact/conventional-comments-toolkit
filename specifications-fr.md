@@ -1780,7 +1780,9 @@ SPA (Turbo) — l'adaptateur écoute les événements de navigation Turbo pour r
 
 **Aucun domaine n'est pré-déclaré, `github.com` compris.** Tous relèvent du même mécanisme : `optional_host_permissions`, accordé à l'exécution depuis les options d'installation ou pré-autorisé par politique d'entreprise.
 
-La raison n'est pas qu'un domaine pré-déclaré serait « révocable par rien » — le navigateur garde ses propres contrôles d'accès aux sites, et cette règle n'y change rien. Elle est que **l'extension**, elle, ne voit ni ne pilote un accès pré-déclaré : il n'apparaît pas dans `chrome.permissions`, elle ne peut ni le demander, ni le retirer, ni être notifiée de son retrait. Elle ne peut donc rien construire autour de ce consentement — ni le montrer, ni le reprendre, ni s'éteindre quand il disparaît. Un octroi à l'exécution rend le consentement explicite, visible dans le produit et repris **depuis** le produit ; c'est cela, et cela seulement, que la règle obtient.
+La raison tient en une phrase, et elle est étroite : **l'extension ne peut pas rendre une permission que le manifeste exige.** `permissions.remove()` la refuse — « You cannot remove required permissions. » — là où il retire un octroi optionnel. Un accès pré-déclaré ne peut donc pas être repris depuis le produit, et le produit ne peut rien bâtir autour d'un consentement qu'il ne sait pas défaire.
+
+*Ce que cette règle ne prétend pas.* Un domaine pré-déclaré n'est pas « révocable par rien » : le navigateur garde ses propres contrôles d'accès aux sites, et rien ici ne les remplace. Il n'est pas non plus invisible pour l'extension : `permissions.getAll()` rend aussi ce que le manifeste déclare. Ces deux justifications-là ont été écrites, dans cet ordre, et l'une comme l'autre était fausse ; celle qui reste est mesurée dans un vrai navigateur par `npm run smoke:mv3`, à côté du code qu'elle justifie.
 
 Ce qui distingue ensuite les domaines n'est pas le droit d'être actif, mais la façon de le demander. Le critère est **l'hôte concret est-il connu à la compilation** — pas la plateforme, ni le fait d'être une offre cloud :
 

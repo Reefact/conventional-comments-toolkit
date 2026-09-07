@@ -555,7 +555,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
         local: {
           get: (keys: string[], cb: (i: Record<string, unknown>) => void) => {
             const picked: Record<string, unknown> = {
-              [EXTRA_HOSTS_KEY]: { github: [], azdo: [] },
+              [EXTRA_HOSTS_KEY]: { github: ['github.com'], azdo: [] },
               [TELEMETRY_CONSENT_KEY]: consentHolder.value,
             };
             for (const key of keys) if (key in written) picked[key] = written[key];
@@ -1045,7 +1045,7 @@ describe('D — dégradation de sélecteur : journal local TOUJOURS, télémétr
           // l'écrasement que ce test existe pour interdire.
           get: (keys: string[], cb: (i: Record<string, unknown>) => void) => {
             const picked: Record<string, unknown> = {
-              [EXTRA_HOSTS_KEY]: { github: [], azdo: [] },
+              [EXTRA_HOSTS_KEY]: { github: ['github.com'], azdo: [] },
             };
             for (const key of keys) if (key in written) picked[key] = written[key];
             cb(picked);

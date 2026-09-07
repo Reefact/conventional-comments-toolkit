@@ -292,12 +292,41 @@ describe('C — bootstrap() met le relais entre les mains de l’adaptateur', ()
     vi.doUnmock('@cct/adapter-github');
   });
 
-  it('hors contexte d’extension, AUCUN relais n’est imposé — la lecture directe reste possible', async () => {
+  it('hors contexte d’extension, `bootstrap()` aboutit sans rien activer', async () => {
     const ctorArgs: unknown[] = [];
     mockGithubAdapter(ctorArgs);
     // Pas de `chrome` du tout : `bootstrap()` doit malgré tout aboutir. `chrome` étant un
     // `declare const`, la simple mention de l'identifiant lève une ReferenceError hors
     // extension — une garde `?.` ne suffit pas, il faut un `try`.
+    const { bootstrap } = await import('../src/content-internal.js');
+    Object.defineProperty(document, 'location', {
+      value: new URL('https://github.com/acme/demo'),
+      configurable: true,
+    });
+    await bootstrap(document);
+    // Et n'active RIEN : la répartition publiée est le seul titre d'activation, et elle
+    // n'existe pas hors d'une extension. Ce test affirmait l'inverse — l'adaptateur y était
+    // construit sur `github.com` seul, du temps où `content_scripts` l'injectait
+    // statiquement et où `selectPlatform()` le court-circuitait pour cet hôte.
+    expect(ctorArgs).toHaveLength(0);
+
+    vi.doUnmock('@cct/adapter-github');
+  });
+
+  it('en contexte d’extension SANS relais, aucun n’est imposé — la lecture directe reste possible', async () => {
+    // `storage` sans `runtime` : c'est exactement ce que teste `hasExtensionRelay()`
+    // (`typeof chrome?.runtime?.sendMessage === 'function'`). L'hôte est actif — sans quoi
+    // aucun adaptateur ne serait construit et l'assertion ne porterait sur rien.
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (_k: string[], cb: (i: Record<string, unknown>) => void) =>
+            cb({ [EXTRA_HOSTS_KEY]: { github: ['github.com'], azdo: [] } }),
+        },
+      },
+    };
+    const ctorArgs: unknown[] = [];
+    mockGithubAdapter(ctorArgs);
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', {
       value: new URL('https://github.com/acme/demo'),
@@ -375,7 +404,7 @@ describe('E — le relais ne sert QUE les origines tierces (revue Codex, PR #30)
       storage: {
         local: {
           get: (_k: string[], cb: (i: Record<string, unknown>) => void) =>
-            cb({ [EXTRA_HOSTS_KEY]: { github: [], azdo: [] } }),
+            cb({ [EXTRA_HOSTS_KEY]: { github: ['github.com'], azdo: [] } }),
         },
       },
     };

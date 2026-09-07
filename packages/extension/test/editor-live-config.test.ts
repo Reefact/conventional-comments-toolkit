@@ -23,8 +23,9 @@
 // (déclenché ici par un changement visible du résumé publié, jamais par une mutation dont le
 // rendu ne dépend pas).
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fingerprint, resolveConfig } from '@cct/core';
+import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
 
 interface FakeState {
   configText: string;
@@ -136,6 +137,22 @@ async function flushAll(times = 8): Promise<void> {
 // finissent par s'écrire l'une sur l'autre sans jamais se stabiliser, jusqu'à épuiser la
 // mémoire du worker (constaté : OOM en exécutant ce fichier en entier sans ce nettoyage).
 const disposers: (() => void)[] = [];
+
+/** La répartition publiée est le SEUL titre d'activation d'un hôte, depuis que le manifeste
+ * ne déclare plus aucun `content_scripts` : sans elle, `bootstrap()` ne construit aucun
+ * adaptateur et tout ce fichier n'observerait qu'une page inerte. Ce n'était pas nécessaire
+ * tant que `selectPlatform()` court-circuitait `github.com`. */
+function grantedGithubLocal(): {
+  get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
+} {
+  return {
+    get: (_keys, cb) => cb({ [EXTRA_HOSTS_KEY]: { github: ['github.com'], azdo: [] } }),
+  };
+}
+
+beforeEach(() => {
+  (globalThis as { chrome?: unknown }).chrome = { storage: { local: grantedGithubLocal() } };
+});
 
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose();
@@ -362,6 +379,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     let releaseBlockedRead: (() => void) | null = null;
     (globalThis as { chrome?: unknown }).chrome = {
       storage: {
+        local: grantedGithubLocal(),
         sync: {
           get: (_keys: string[], cb: (items: Record<string, unknown>) => void) => {
             if (armed) {
@@ -448,6 +466,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     let releaseBlockedRead: (() => void) | null = null;
     (globalThis as { chrome?: unknown }).chrome = {
       storage: {
+        local: grantedGithubLocal(),
         sync: {
           get: (_keys: string[], cb: (items: Record<string, unknown>) => void) => {
             if (armed) {
@@ -533,6 +552,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     let releaseBlockedRead: (() => void) | null = null;
     (globalThis as { chrome?: unknown }).chrome = {
       storage: {
+        local: grantedGithubLocal(),
         sync: {
           get: (_keys: string[], cb: (items: Record<string, unknown>) => void) => {
             if (armed) {
@@ -621,6 +641,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     let releaseBlockedRead: (() => void) | null = null;
     (globalThis as { chrome?: unknown }).chrome = {
       storage: {
+        local: grantedGithubLocal(),
         sync: {
           get: (_keys: string[], cb: (items: Record<string, unknown>) => void) => {
             if (armed) {

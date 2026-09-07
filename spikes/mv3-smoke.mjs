@@ -163,6 +163,24 @@ try {
     `valeur du sélecteur : "${options.platform}"`
   );
 
+  // 5 bis. LA PRÉMISSE DU CONTOURNEMENT DE `hostnameOf()` : le parseur d'URL du navigateur
+  //    POUR-CENT-ENCODE un joker de tête. C'est mesurable ici et NULLE PART dans `npm test` :
+  //    Node rend `*.ghe.com` là où Chromium rend `%2A.ghe.com`, si bien que toute la suite
+  //    tournait dans le seul environnement où l'affirmation « le joker traverse `URL` » est
+  //    vraie. Elle était fausse en production : l'étiquette d'un `*.ghe.com` autorisé
+  //    partait sous `%2A.ghe.com`, que `matchScore()` ne reconnaît plus comme un joker —
+  //    la résidence de données du §A.4 ne s'activait donc jamais.
+  //
+  //    Si Chromium venait à préserver le `*`, cette assertion tomberait : le contournement
+  //    de `hostnameOf()` deviendrait inutile, et c'est ce qu'il faudrait alors constater
+  //    plutôt que de le garder par superstition.
+  const encoded = await page.evaluate(() => new URL('https://*.ghe.com').hostname);
+  assert(
+    'le navigateur encode bien le joker (ce que `hostnameOf` doit défaire)',
+    encoded !== '*.ghe.com',
+    `new URL('https://*.ghe.com').hostname === "${encoded}"`
+  );
+
   // 6. Le RELAIS de configuration d'organisation répond. C'est la prémisse du correctif du
   //    `configUrl` : un script de contenu reste soumis au CORS de sa page (doc Chrome) et
   //    ne peut pas lire un document hébergé hors de la plateforme affichée ; il passe donc

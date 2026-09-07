@@ -68,7 +68,7 @@ const firefox = structuredClone(manifest);
 delete firefox.version_name;
 firefox.background = { scripts: ['background.js'], type: 'module' };
 firefox.browser_specific_settings = {
-  gecko: { id: 'conventional-comments-toolkit@example.org', strict_min_version: '128.0' },
+  gecko: { id: 'conventional-comments-toolkit@conventionalcomments.io', strict_min_version: '128.0' },
 };
 await writeFile(join(out, 'firefox/manifest.json'), JSON.stringify(firefox, null, 2));
 await mkdir(join(out, 'firefox/icons'), { recursive: true });

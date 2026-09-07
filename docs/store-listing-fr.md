@@ -1,10 +1,17 @@
 # Fiche Chrome Web Store — contenu (FR)
 
-Brouillon des champs texte de la fiche de soumission. Voir aussi
-[`store-listing-en.md`](store-listing-en.md) pour la version anglaise et
+Brouillon des champs texte de la fiche de soumission **Chrome Web
+Store**. Voir aussi [`store-listing-en.md`](store-listing-en.md) pour la
+version anglaise et
 [`store-permissions-justification-fr.md`](store-permissions-justification-fr.md)
 (ou sa [version anglaise](store-permissions-justification-en.md)) pour la
 justification des permissions.
+
+Pour les autres stores, qui réutilisent ce contenu mais avec des
+formulaires différents : [`store-listing-edge-fr.md`](store-listing-edge-fr.md)
+(Microsoft Edge Add-ons) et
+[`store-listing-firefox-fr.md`](store-listing-firefox-fr.md) (Firefox
+Add-ons / AMO).
 
 ## Catégorie
 

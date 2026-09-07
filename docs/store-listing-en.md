@@ -1,10 +1,16 @@
 # Chrome Web Store listing — content (EN)
 
-Draft of the text fields for the submission form. See also
-[`store-listing-fr.md`](store-listing-fr.md) for the French version and
+Draft of the text fields for the **Chrome Web Store** submission form.
+See also [`store-listing-fr.md`](store-listing-fr.md) for the French
+version and
 [`store-permissions-justification-en.md`](store-permissions-justification-en.md)
 (or its [French original](store-permissions-justification-fr.md)) for the
 permission justification.
+
+For the other stores, which reuse this content against different forms:
+[`store-listing-edge-en.md`](store-listing-edge-en.md) (Microsoft Edge
+Add-ons) and [`store-listing-firefox-en.md`](store-listing-firefox-en.md)
+(Firefox Add-ons / AMO).
 
 ## Category
 

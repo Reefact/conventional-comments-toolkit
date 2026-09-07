@@ -11,12 +11,22 @@
 // pouvait le voir : un faux `chrome.scripting` fait ce qu'on lui dit de faire, et dira
 // toujours que l'enregistrement a réussi.
 //
-// Quatre faits sont mesurés ici, dont deux conditionnent le correctif :
+// Six faits sont mesurés ici, chacun conditionnant une partie du correctif :
 //   A. un onglet déjà ouvert ne reçoit PAS le script enregistré ;
 //   B. un onglet ouvert ensuite le reçoit — l'enregistrement lui-même est bien correct ;
 //   C. `tabs.query({url})` filtre SANS la permission `tabs`, la permission d'hôte suffisant ;
 //   D. `executeScript` atteint l'onglet déjà ouvert.
 // C et D disent que rattraper les onglets ouverts ne coûte aucune permission nouvelle.
+//
+// Les deux derniers portent sur la RÉPÉTITION du rattrapage, qui a lieu à chaque réveil du
+// service worker et à chaque republication des hôtes :
+//   E. `insertCSS` n'est PAS idempotente — trois insertions identiques demandent trois
+//      `removeCSS` pour disparaître, donc un onglet de longue vie accumulait une copie de
+//      la feuille par réveil. Le marqueur du script de contenu ne protège que `bootstrap()` ;
+//   F. `executeScript({func})` partage le MONDE ISOLÉ du script de contenu, donc lit ce
+//      marqueur — ce qui permet de demander « cet onglet l'a-t-il déjà ? » sans rien
+//      injecter, et de ne rattraper que les documents qui en ont besoin.
+// E dit pourquoi le rattrapage doit être conditionnel ; F dit avec quoi le conditionner.
 //
 // CE QU'IL NE VÉRIFIE PAS : l'idempotence du script de contenu lui-même, quand les deux
 // chemins d'injection visent le même document. Elle vit dans le monde isolé du script, que
@@ -30,6 +40,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const PORT = 8741;
+/** Une seconde origine, couverte par la permission d'hôte mais JAMAIS par l'enregistrement :
+ * elle donne un onglet dont on sait qu'il n'a pas le script, sans quoi la mesure F ne
+ * pourrait pas montrer que la sonde distingue — seulement qu'elle s'exécute. */
+const PORT_HORS = 8744;
 const EXECUTABLE =
   process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
@@ -52,17 +66,30 @@ writeFileSync(
     name: 'cct open-tab probe',
     version: '1.0.0',
     permissions: ['scripting'], // PAS `tabs` : c'est le fait C.
-    host_permissions: [`http://127.0.0.1:${PORT}/*`],
+    host_permissions: [`http://127.0.0.1:${PORT}/*`, `http://127.0.0.1:${PORT_HORS}/*`],
     background: { service_worker: 'bg.js' },
   })
 );
 writeFileSync(join(ext, 'bg.js'), 'self.__ready = true;\n');
-writeFileSync(join(ext, 'cs.js'), 'document.title = "INJECTED:" + document.title;\n');
+// Le faux script de contenu pose le même marqueur que le vrai, dans le même monde isolé :
+// c'est ce que la mesure F interroge.
+writeFileSync(
+  join(ext, 'cs.js'),
+  'document.title = "INJECTED:" + document.title;\nglobalThis.__cctContentScriptLoaded = true;\n'
+);
+// Une règle dont l'effet se LIT depuis la page : `document.styleSheets` n'expose pas les
+// feuilles posées par `insertCSS`, une première version de cette mesure y avait vu 0 avant
+// comme après et n'aurait rien conclu du tout.
+writeFileSync(join(ext, 'sheet.css'), 'body { color: rgb(1, 2, 3); }\n');
 
-const server = createServer((_req, res) => {
-  res.writeHead(200, { 'content-type': 'text/html' });
-  res.end('<title>page</title><body>hello</body>');
-}).listen(PORT);
+function serve(port) {
+  return createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end('<title>page</title><body>hello</body>');
+  }).listen(port);
+}
+const server = serve(PORT);
+const serverHors = serve(PORT_HORS);
 
 const profile = mkdtempSync(join(tmpdir(), 'cct-opentab-prof-'));
 const context = await chromium.launchPersistentContext(profile, {
@@ -178,9 +205,62 @@ try {
     executed === 'ok' && caught === 'INJECTED:page',
     `${executed} / ${caught ?? (await opened.title())}`
   );
+  // E. La répétition. `insertCSS` a un pendant `removeCSS` : si trois insertions
+  //    identiques ne se défont pas d'un seul retrait, c'est qu'il y en a bien trois.
+  const cssStack = await worker.evaluate(async (port) => {
+    const [tab] = await chrome.tabs.query({ url: `http://127.0.0.1:${port}/*` });
+    const color = () =>
+      chrome.scripting
+        .executeScript({ target: { tabId: tab.id }, func: () => getComputedStyle(document.body).color })
+        .then((r) => r[0].result);
+    const base = await color();
+    for (let i = 0; i < 3; i += 1) {
+      await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['sheet.css'] });
+    }
+    const applied = await color();
+    await chrome.scripting.removeCSS({ target: { tabId: tab.id }, files: ['sheet.css'] });
+    const afterOne = await color();
+    await chrome.scripting.removeCSS({ target: { tabId: tab.id }, files: ['sheet.css'] });
+    await chrome.scripting.removeCSS({ target: { tabId: tab.id }, files: ['sheet.css'] });
+    return { base, applied, afterOne, afterThree: await color() };
+  }, PORT);
+  assert(
+    'E. insertCSS s’EMPILE — trois insertions demandent trois removeCSS',
+    cssStack.base === 'rgb(0, 0, 0)' &&
+      cssStack.applied === 'rgb(1, 2, 3)' &&
+      cssStack.afterOne === 'rgb(1, 2, 3)' &&
+      cssStack.afterThree === 'rgb(0, 0, 0)',
+    JSON.stringify(cssStack)
+  );
+
+  // F. De quoi rendre le rattrapage conditionnel. Les DEUX réponses comptent : un `true`
+  //    partout dirait seulement que la sonde s'exécute, pas qu'elle distingue quoi que ce
+  //    soit.
+  const horsPage = await context.newPage();
+  await horsPage.goto(`http://127.0.0.1:${PORT_HORS}/`);
+  const worlds = await worker.evaluate(async ([servi, hors]) => {
+    const probe = async (pattern) => {
+      const [tab] = await chrome.tabs.query({ url: pattern });
+      const [{ result }] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => globalThis.__cctContentScriptLoaded === true,
+      });
+      return result;
+    };
+    return {
+      servi: await probe(`http://127.0.0.1:${servi}/*`),
+      hors: await probe(`http://127.0.0.1:${hors}/*`),
+    };
+  }, [PORT, PORT_HORS]);
+  assert(
+    'F. executeScript({func}) lit le marqueur du script de contenu, et DISTINGUE',
+    worlds.servi === true && worlds.hors === false,
+    JSON.stringify(worlds)
+  );
 } finally {
   await context.close();
   server.close();
+  serverHors.close();
   rmSync(ext, { recursive: true, force: true });
   rmSync(profile, { recursive: true, force: true });
 }

@@ -85,3 +85,43 @@ choix de la technologie est libre ; l'existence de ce stockage ne l'est pas.
 `PlatformOperationalFacts` (dans `compliance/adapter.ts`) porte les hypothèses de
 plateforme que le spike doit établir, chacune avec son repli normatif déjà codé — voir
 `spikes/p1-prime/README-fr.md`. `githubFacts` et `azdoFacts` en donnent les valeurs connues.
+
+## Deux niveaux de séparation par plateforme
+
+**Niveau 1 — entre plateformes.** Ce qui DÉCRIT une plateforme vit dans son paquet ; ce qui
+décrit le produit est partagé et ne connaît personne. Le critère de partage n'est pas une liste
+de fichiers mais la motivation du changement : « GitHub a bougé » va dans `adapters/github/`,
+« notre produit doit se comporter autrement » va dans le code partagé.
+
+Trois choses vivent donc par plateforme, et une seule y vivait avant :
+
+| | Où | Comment le partagé y accède |
+|---|---|---|
+| Sélecteurs DOM | `adapters/<p>/src/selectors.ts` | jamais directement |
+| Placement et forme du rendu | idem, via `getEditorChrome()` / `renderedBodyShape()` (§9.2.3) | par le port, qui rend des DONNÉES |
+| Couleurs, rayons, longueurs | `adapters/<p>/src/platform.css` | par des variables `--cct-*` |
+
+Le port transporte des **données**, jamais un drapeau nommant une plateforme : une signature
+`isGitHubChangesView()` obligerait le code partagé à savoir de qui il parle, et le conditionnel
+que le polymorphisme supprime reviendrait sous un autre nom. Le seul `if` de plateforme admis est
+le composition root (`content-internal.ts`), qui choisit l'adaptateur — quelqu'un doit le faire.
+
+Le TypeScript dit **quel élément joue quel rôle** ; la feuille de la plateforme dit **combien il
+mesure**. Sans cette frontière, une mesure faite sur une plateforme redevient une constante que
+toutes subissent — le défaut d'origine, où le retrait de 8 px du composeur était la marge propre
+d'un conteneur GitHub.
+
+Trois gardes tiennent l'ensemble, parce que rien de tout cela n'était visible d'un test :
+`check:platform-isolation` (vocabulaire dérivé des adaptateurs, pas d'une liste),
+`check:style-isolation` (mesuré dans Chromium), `check:extension-css` (toutes les feuilles
+livrées).
+
+**Niveau 2 — à l'intérieur d'une plateforme.** Non fait. `/pull/N` et `/pull/N/changes` sont deux
+surfaces GitHub VIVANTES EN MÊME TEMPS, et la distinction est aujourd'hui étalée sur les 24
+chaînes de `selectors.ts`, chacune portant son « React d'abord, puis hérité ». Une chaîne de repli
+modélise la dérive dans le TEMPS, pas deux surfaces simultanées : `queryChainAll` s'arrête au
+premier candidat qui rend quelque chose, si bien qu'une page mêlant les deux générations rendait
+le second champ invisible (commit 81e07bb). Le port accommode déjà ce niveau — `getEditorChrome`
+reçoit l'éditeur, l'adaptateur peut donc résoudre sa surface en interne, sans que le contrat ni le
+code partagé en sachent rien.
+

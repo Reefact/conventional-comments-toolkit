@@ -51,9 +51,15 @@ declare const chrome: {
   };
 } | undefined;
 
+/** Chaque libellé couvre DEUX situations, et le dit, parce que la deuxième n'a plus de
+ * chemin à elle : le catalogue de sites cloud ne propose que `dev.azure.com`, une
+ * organisation historique `contoso.visualstudio.com` passant désormais par la saisie d'un
+ * domaine. Elle y trouvait « Azure DevOps Server », ce qu'elle n'est pas — c'est du cloud
+ * Microsoft, sous son ancien nom. L'étiquette posée, elle, était déjà la bonne (`azdo`,
+ * même adaptateur) : seul le libellé mentait, et il suffisait pour ne pas se reconnaître. */
 const PLATFORM_LABELS: Record<HostPlatform, string> = {
   github: 'GitHub Enterprise Server / GHE Cloud',
-  azdo: 'Azure DevOps Server',
+  azdo: 'Azure DevOps Server ou organisation visualstudio.com',
   config: "Configuration d'organisation uniquement",
 };
 

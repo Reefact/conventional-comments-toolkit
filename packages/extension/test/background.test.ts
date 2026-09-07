@@ -31,7 +31,10 @@ interface FakeChrome {
     unregisterContentScripts: ReturnType<typeof vi.fn>;
     updateContentScripts: ReturnType<typeof vi.fn>;
     getRegisteredContentScripts: ReturnType<typeof vi.fn>;
+    executeScript: ReturnType<typeof vi.fn>;
+    insertCSS: ReturnType<typeof vi.fn>;
   };
+  tabs: { query: ReturnType<typeof vi.fn> };
   storage: {
     local: { get: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn> };
     managed: { get: ReturnType<typeof vi.fn> };
@@ -52,11 +55,13 @@ interface FakeChrome {
 function installFakeChrome(
   grantedOrigins: string[],
   tags: Record<string, string> = {},
-  alreadyRegistered: string[] = []
+  alreadyRegistered: string[] = [],
+  openTabs: string[] = []
 ): FakeChrome {
   const store: Record<string, unknown> = { [HOST_PLATFORMS_KEY]: { ...tags } };
   /** Ce que le navigateur a réellement enregistré à cet instant. */
   const live = new Map<string, { id: string }>(alreadyRegistered.map((id) => [id, { id }]));
+  const tabsById = openTabs.map((url, index) => ({ id: index + 1, url }));
   const fake: FakeChrome = {
     runtime: { onMessage: { addListener: vi.fn() }, lastError: null, openOptionsPage: vi.fn() },
     action: { onClicked: { addListener: vi.fn() } },
@@ -86,6 +91,30 @@ function installFakeChrome(
       getRegisteredContentScripts: vi.fn((cb: (s: { id: string }[]) => void) =>
         cb([...live.values()])
       ),
+      executeScript: vi.fn((_injection: unknown, cb?: () => void) => cb?.()),
+      insertCSS: vi.fn((_injection: unknown, cb?: () => void) => cb?.()),
+    },
+    // Le filtre `url` de `tabs.query` est ici parce que le vrai le fait : rendre TOUS les
+    // onglets quels que soient les motifs décrirait un monde où l'on injecte partout, et
+    // où le test ne pourrait pas voir la différence entre « les onglets servis » et « les
+    // onglets ». Le filtrage reste volontairement littéral — un motif de correspondance
+    // Chrome, pas une URL — et sa fidélité au navigateur n'est PAS ce que ce faux prétend
+    // établir : c'est `spikes/open-tab-injection.mjs` qui mesure que ce filtre existe et
+    // fonctionne sans la permission `tabs`.
+    tabs: {
+      query: vi.fn((filter: { url: string[] }, cb: (t: { id: number }[]) => void) => {
+        const patterns = filter.url.map(
+          (pattern) =>
+            new RegExp(
+              `^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`
+            )
+        );
+        cb(
+          tabsById
+            .filter(({ url }) => patterns.some((re) => re.test(url)))
+            .map(({ id }) => ({ id }))
+        );
+      }),
     },
     storage: {
       local: {
@@ -326,6 +355,90 @@ describe('bouton de la barre d’outils : le clic amène aux réglages', () => {
 
     await expect(import('../src/background.js')).resolves.toBeDefined();
     await new Promise((r) => setTimeout(r, 0));
+    expect(fake.scripting.registerContentScripts).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('rattrapage des onglets déjà ouverts', () => {
+  // Un enregistrement dynamique ne s'applique qu'aux chargements SUIVANTS : l'onglet déjà
+  // chargé ne reçoit rien. Mesuré dans un vrai Chromium par
+  // `spikes/open-tab-injection.mjs` — ce que ces tests-ci ne prétendent pas établir. Ils
+  // vérifient la CONSÉQUENCE dans ce code : que le worker injecte explicitement, et sur les
+  // bons onglets seulement.
+  //
+  // C'est le parcours principal du produit : on ouvre les réglages depuis un onglet de
+  // plateforme, et c'est cet onglet-là qui vient d'être autorisé. Sans rattrapage il reste
+  // inerte jusqu'à un rechargement, et le `watchExtraHosts()` du script de contenu ne peut
+  // rien y faire — aucun script n'y est présent pour observer le changement.
+
+  it('injecte JS et CSS dans un onglet déjà ouvert que l’enregistrement vient de couvrir', async () => {
+    const fake = installFakeChrome(
+      ['https://github.com/*'],
+      { 'github.com': 'github' },
+      [],
+      ['https://github.com/acme/repo/pull/7']
+    );
+
+    await import('../src/background.js');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(fake.scripting.executeScript).toHaveBeenCalledTimes(1);
+    const [injection] = fake.scripting.executeScript.mock.calls[0]!;
+    expect(injection).toMatchObject({ target: { tabId: 1 }, files: ['content.js'] });
+    expect(fake.scripting.insertCSS).toHaveBeenCalledWith(
+      { target: { tabId: 1 }, files: ['styles.css'] },
+      expect.any(Function)
+    );
+  });
+
+  it('laisse tranquilles les onglets que l’enregistrement ne couvre pas', async () => {
+    // Le pendant indispensable du test précédent : injecter dans TOUS les onglets ouverts
+    // le ferait passer tout aussi bien, en rétablissant exactement ce que l'enregistrement
+    // unique avait supprimé — un script sur des pages qu'aucun adaptateur ne sert.
+    const fake = installFakeChrome(
+      ['https://github.com/*'],
+      { 'github.com': 'github' },
+      [],
+      ['https://exemple.invalid/page', 'https://github.com/acme/repo']
+    );
+
+    await import('../src/background.js');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(fake.scripting.executeScript).toHaveBeenCalledTimes(1);
+    const [injection] = fake.scripting.executeScript.mock.calls[0]!;
+    expect(injection).toMatchObject({ target: { tabId: 2 } });
+  });
+
+  it('n’injecte nulle part quand plus aucun hôte n’est servi', async () => {
+    // Le retrait de l'enregistrement passe par le même chemin ; y interroger les onglets
+    // avec une liste de motifs VIDE rendrait, côté navigateur, tous les onglets.
+    const fake = installFakeChrome([], {}, [], ['https://github.com/acme/repo']);
+
+    await import('../src/background.js');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(fake.tabs.query).not.toHaveBeenCalled();
+    expect(fake.scripting.executeScript).not.toHaveBeenCalled();
+  });
+
+  it('un navigateur sans `tabs` ni `executeScript` enregistre quand même', async () => {
+    // Le rattrapage est un SUPPLÉMENT. Une variante qui n'offrirait pas ces API doit garder
+    // le comportement d'avant — enregistrement pour les chargements suivants — plutôt que
+    // d'échouer et de ne rien enregistrer du tout.
+    const fake = installFakeChrome(
+      ['https://github.com/*'],
+      { 'github.com': 'github' },
+      [],
+      ['https://github.com/acme/repo']
+    );
+    delete (fake as Partial<FakeChrome>).tabs;
+    delete (fake.scripting as Partial<FakeChrome['scripting']>).executeScript;
+
+    await expect(import('../src/background.js')).resolves.toBeDefined();
+    await new Promise((r) => setTimeout(r, 0));
+
     expect(fake.scripting.registerContentScripts).toHaveBeenCalledTimes(1);
   });
 });

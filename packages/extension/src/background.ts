@@ -10,6 +10,11 @@
 // et aucun test unitaire ne peut le voir, tous instanciant l'adaptateur directement, en
 // court-circuitant ce mécanisme d'activation. Aucun secret, aucun jeton (§10).
 //
+// Ce rôle a DEUX moitiés, et n'en avoir qu'une laissait le parcours principal cassé :
+// l'enregistrement dynamique ne sert que les chargements SUIVANTS, jamais un document déjà
+// chargé. L'onglet depuis lequel on ouvre les réglages pour s'autoriser est précisément
+// celui-là. `injectIntoOpenTabs()` est la seconde moitié.
+//
 // Le TROISIÈME rôle vit ici et pas dans le script de contenu pour une raison de contexte
 // d'exécution, pas de commodité : `chrome.permissions` n'est PAS exposé aux scripts de
 // contenu. Y appeler `getAll()` ne lève pas — l'objet est simplement absent, et toute
@@ -69,6 +74,17 @@ declare const chrome: {
     unregisterContentScripts: (filter: { ids: string[] }, cb: () => void) => void;
     getRegisteredContentScripts?: (cb: (scripts: { id: string }[]) => void) => void;
     updateContentScripts?: (scripts: RegisteredContentScript[], cb: () => void) => void;
+    executeScript?: (
+      injection: { target: { tabId: number }; files: string[] },
+      cb?: () => void
+    ) => void;
+    insertCSS?: (
+      injection: { target: { tabId: number }; files: string[] },
+      cb?: () => void
+    ) => void;
+  };
+  tabs?: {
+    query: (filter: { url: string[] }, cb: (tabs: { id?: number }[]) => void) => void;
   };
   storage?: {
     local?: {
@@ -269,6 +285,74 @@ async function applyRegistration(matches: string[]): Promise<void> {
       scripting.registerContentScripts([script], () => resolve());
     }
   });
+
+  await injectIntoOpenTabs(matches);
+}
+
+/** Injecte dans les onglets DÉJÀ OUVERTS que l'enregistrement vient de couvrir.
+ *
+ * Un enregistrement dynamique ne s'applique qu'aux chargements SUIVANTS : un document déjà
+ * chargé ne reçoit rien. Mesuré dans un vrai Chromium (`spikes/open-tab-injection.mjs`),
+ * pas rappelé — l'onglet resté ouvert garde son titre intact après
+ * `registerContentScripts`, et ne le change qu'après `executeScript`.
+ *
+ * C'est le parcours PRINCIPAL du produit qui en dépend, pas un cas de bord : on arrive sur
+ * la page d'options depuis un onglet de plateforme, par l'icône de la barre d'outils ; c'est
+ * cet onglet-là qui vient d'être autorisé, et il serait resté inerte jusqu'à un
+ * rechargement. Le `watchExtraHosts()` du script de contenu ne rattrape pas ce premier
+ * octroi : depuis que l'injection suit la classification, aucun script de contenu n'est
+ * présent dans cet onglet pour observer quoi que ce soit.
+ *
+ * Aucune permission nouvelle : `tabs.query` filtre sur `url` sans la permission `tabs` dès
+ * lors qu'une permission d'HÔTE couvre les onglets visés — ce qui est exactement le cas ici,
+ * `matches` ne contenant que des origines accordées. Même chose pour `executeScript`, dont
+ * c'est la condition. La mesure ci-dessus vérifie les deux.
+ *
+ * Le double emploi avec l'enregistrement est assumé et rendu inoffensif à l'ARRIVÉE : le
+ * point d'entrée du script de contenu pose un marqueur dans son monde isolé et ne bootstrape
+ * qu'une fois. Le résoudre ici — en interrogeant chaque onglet avant d'injecter — supposerait
+ * de savoir ce qu'il contient déjà, ce qui demande précisément une injection. */
+async function injectIntoOpenTabs(matches: string[]): Promise<void> {
+  const scripting = chrome?.scripting;
+  if (!scripting?.executeScript || !chrome?.tabs?.query || matches.length === 0) return;
+
+  const tabs = await new Promise<{ id?: number }[]>((resolve) => {
+    try {
+      chrome.tabs!.query({ url: matches }, (found) => resolve(found ?? []));
+    } catch {
+      resolve([]);
+    }
+  });
+
+  for (const tab of tabs) {
+    const tabId = tab.id;
+    if (typeof tabId !== 'number') continue;
+    // Un onglet peut disparaître, ou refuser l'injection (page d'erreur, document
+    // interdit). Chaque cible est donc indépendante : un échec n'annule pas les autres, et
+    // `lastError` est lu pour que Chrome ne le signale pas comme non traité.
+    if (scripting.insertCSS) {
+      await new Promise<void>((resolve) => {
+        try {
+          scripting.insertCSS!({ target: { tabId }, files: ['styles.css'] }, () => {
+            void chrome?.runtime?.lastError;
+            resolve();
+          });
+        } catch {
+          resolve();
+        }
+      });
+    }
+    await new Promise<void>((resolve) => {
+      try {
+        scripting.executeScript!({ target: { tabId }, files: ['content.js'] }, () => {
+          void chrome?.runtime?.lastError;
+          resolve();
+        });
+      } catch {
+        resolve();
+      }
+    });
+  }
 }
 
 function listRegisteredScripts(): Promise<{ id: string }[]> {

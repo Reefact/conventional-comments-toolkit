@@ -1778,12 +1778,16 @@ SPA (Turbo) — l'adaptateur écoute les événements de navigation Turbo pour r
 
 **Lecture du fichier de configuration par l'extension** (`getRepoConfig()`, §9.2.3, §10) : la route web `https://{hôte}/{owner}/{repo}/raw/{branche-par-défaut}/.conventional-comments.json`, servie sur la session de l'utilisateur, sans jeton. Elle fonctionne sur les dépôts privés auxquels la personne a accès, ce que `raw.githubusercontent.com` ne permettrait pas.
 
-**Aucun domaine n'est pré-déclaré, `github.com` compris.** Tous relèvent du même mécanisme : `optional_host_permissions`, accordé à l'exécution depuis les options d'installation ou pré-autorisé par politique d'entreprise. Un domaine pré-déclaré serait actif sans permission, et par conséquent révocable par rien — c'est la raison de fond, et elle ne connaît pas d'exception, ici pas plus qu'en B.4.
+**Aucun domaine n'est pré-déclaré, `github.com` compris.** Tous relèvent du même mécanisme : `optional_host_permissions`, accordé à l'exécution depuis les options d'installation ou pré-autorisé par politique d'entreprise.
 
-Ce qui distingue les domaines n'est donc pas le droit d'être actif, mais la façon de le demander :
+La raison n'est pas qu'un domaine pré-déclaré serait « révocable par rien » — le navigateur garde ses propres contrôles d'accès aux sites, et cette règle n'y change rien. Elle est que **l'extension**, elle, ne voit ni ne pilote un accès pré-déclaré : il n'apparaît pas dans `chrome.permissions`, elle ne peut ni le demander, ni le retirer, ni être notifiée de son retrait. Elle ne peut donc rien construire autour de ce consentement — ni le montrer, ni le reprendre, ni s'éteindre quand il disparaît. Un octroi à l'exécution rend le consentement explicite, visible dans le produit et repris **depuis** le produit ; c'est cela, et cela seulement, que la règle obtient.
 
-- **Domaine connu à la compilation** (`github.com`) : proposé dans un catalogue de la page d'options, où un seul geste l'autorise et désigne sa plateforme — celle-ci n'ayant pas à être choisie, elle est déjà connue.
-- **Domaine inconnu à la compilation** : GitHub Enterprise Server (domaine interne) **et** GitHub Enterprise Cloud with data residency — qui attribue à chaque client un sous-domaine dédié de `ghe.com`, avec ses propres points d'accès d'API. Le domaine se saisit, et sa plateforme se choisit **avant** l'octroi : un hôte autorisé sans plateforme associée n'active aucun adaptateur (§2).
+Ce qui distingue ensuite les domaines n'est pas le droit d'être actif, mais la façon de le demander. Le critère est **l'hôte concret est-il connu à la compilation** — pas la plateforme, ni le fait d'être une offre cloud :
+
+- **Hôte connu** (`github.com`) : proposé dans un catalogue de la page d'options, où un seul geste l'autorise et désigne sa plateforme — celle-ci n'ayant pas à être choisie, elle est déjà connue.
+- **Hôte inconnu, dont seul le suffixe l'est** : GitHub Enterprise Server (domaine interne), et GitHub Enterprise Cloud with data residency, qui attribue à chaque client un sous-domaine dédié de `ghe.com` avec ses propres points d'accès d'API. L'hôte se saisit, et sa plateforme se choisit **avant** l'octroi : un hôte autorisé sans plateforme associée n'active aucun adaptateur (§2).
+
+**Un suffixe connu ne vaut pas un hôte connu**, et la distinction porte une conséquence : demander `https://*.ghe.com/*` accorderait l'accès à *tous* les clients de la résidence de données, alors qu'un poste n'en sert qu'un. Les permissions minimales par poste (§2) l'interdisent. Un motif à joker ne s'emploie donc que là où la politique d'entreprise en pré-autorise un délibérément, jamais comme entrée de catalogue.
 
 ### A.5 Gestion du DOM multi-générations
 
@@ -1880,7 +1884,11 @@ SPA — pas d'équivalent de Turbo : l'adaptateur observe le conteneur racine vi
 
 ### B.4 Domaines et lecture de la configuration
 
-`dev.azure.com`, `*.visualstudio.com`, ou domaine on-premise pour Azure DevOps Server → `optional_host_permissions` dans **tous** les cas, selon la règle unique du §A.4. Les deux domaines cloud sont connus à la compilation, donc proposés au catalogue de la page d'options ; le domaine on-premise se saisit, plateforme choisie avant l'octroi.
+`dev.azure.com`, `{organisation}.visualstudio.com`, ou domaine on-premise pour Azure DevOps Server → `optional_host_permissions` dans **tous** les cas, selon la règle unique du §A.4. Le critère y étant l'hôte concret et non l'offre, les deux domaines cloud d'Azure DevOps ne se rangent pas du même côté :
+
+- **`dev.azure.com`** est un hôte fixe — l'organisation vit dans le CHEMIN. Il va donc au catalogue, et l'autoriser est le minimum possible pour ce domaine.
+- **`{organisation}.visualstudio.com`** (URLs historiques) donne au contraire un sous-domaine PAR organisation. Il relève du cas « suffixe connu, hôte inconnu » : l'hôte concret se saisit, exactement comme un sous-domaine de `ghe.com`. Le mettre au catalogue reviendrait à demander `https://*.visualstudio.com/*`, donc l'accès à toutes les organisations sur URLs historiques quand un poste n'en sert qu'une — ce que §2 interdit.
+- Le **domaine on-premise** se saisit de même, plateforme choisie avant l'octroi.
 
 **Lecture du fichier de configuration par l'extension** (`getRepoConfig()`, §9.2.3, §10) : Azure DevOps n'expose pas de route de fichier brut équivalente à celle de GitHub ; l'accès au contenu d'un fichier passe par un point d'API. Qu'il soit atteignable depuis la page sur la seule session de l'utilisateur est **à établir par le spike `P1'`** (§14), au même titre que le type de l'éditeur (§B.2). S'il ne l'est pas, `getRepoConfig()` y renvoie `{ status: 'unreachable' }` et l'extension y est en **état dégradé** au sens du §5.4 — elle assiste sans bloquer (§10) — le composant B restant, comme partout, la source de vérité.
 

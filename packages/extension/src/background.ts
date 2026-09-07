@@ -75,8 +75,8 @@ declare const chrome: {
     getRegisteredContentScripts?: (cb: (scripts: { id: string }[]) => void) => void;
     updateContentScripts?: (scripts: RegisteredContentScript[], cb: () => void) => void;
     executeScript?: (
-      injection: { target: { tabId: number }; files: string[] },
-      cb?: () => void
+      injection: { target: { tabId: number }; files?: string[]; func?: () => unknown },
+      cb?: (results?: { result?: unknown }[]) => void
     ) => void;
     insertCSS?: (
       injection: { target: { tabId: number }; files: string[] },
@@ -312,6 +312,37 @@ async function applyRegistration(matches: string[]): Promise<void> {
  * point d'entrée du script de contenu pose un marqueur dans son monde isolé et ne bootstrape
  * qu'une fois. Le résoudre ici — en interrogeant chaque onglet avant d'injecter — supposerait
  * de savoir ce qu'il contient déjà, ce qui demande précisément une injection. */
+/** Le script de contenu est-il déjà présent dans cet onglet ?
+ *
+ * La sonde lit le marqueur que pose le point d'entrée du script de contenu, et elle le voit
+ * parce que `executeScript({func})` s'exécute dans le MÊME monde isolé que le script —
+ * mesuré, la réponse valant `false` sur un onglet nu et `true` sur un onglet injecté. C'est
+ * ce qui permet de poser la question sans rien injecter d'abord.
+ *
+ * Un échec vaut « déjà présent » plutôt que « absent » : sur une page où l'injection est
+ * refusée, réessayer à chaque réveil ne réussira pas davantage, et se tromper dans ce sens
+ * ne coûte qu'un onglet non rattrapé — l'autre sens accumule les feuilles de style, ce que
+ * cette fonction existe pour empêcher. Le marqueur côté script de contenu reste la garde de
+ * dernier recours : deux publications rapprochées peuvent sonder avant que l'une ait
+ * injecté. */
+async function hasContentScript(tabId: number): Promise<boolean> {
+  const executeScript = chrome?.scripting?.executeScript;
+  if (!executeScript) return true;
+  return new Promise((resolve) => {
+    try {
+      executeScript(
+        { target: { tabId }, func: () => (globalThis as Record<string, unknown>)['__cctContentScriptLoaded'] === true },
+        (results) => {
+          if (chrome?.runtime?.lastError) return resolve(true);
+          resolve(results?.[0]?.result === true);
+        }
+      );
+    } catch {
+      resolve(true);
+    }
+  });
+}
+
 async function injectIntoOpenTabs(matches: string[]): Promise<void> {
   const scripting = chrome?.scripting;
   if (!scripting?.executeScript || !chrome?.tabs?.query || matches.length === 0) return;
@@ -327,6 +358,14 @@ async function injectIntoOpenTabs(matches: string[]): Promise<void> {
   for (const tab of tabs) {
     const tabId = tab.id;
     if (typeof tabId !== 'number') continue;
+    // Cet onglet a-t-il DÉJÀ le script ? Sans cette question, le rattrapage repasse sur
+    // tous les onglets servis à chaque réveil du worker et à chaque republication.
+    // `bootstrap()` y serait protégée par son marqueur, mais PAS la feuille de style :
+    // `insertCSS` est une insertion, pas un « ensure », et trois insertions identiques
+    // demandent trois `removeCSS` pour disparaître — mesuré, pas supposé
+    // (`spikes/open-tab-injection.mjs`). Un onglet de longue vie accumulait donc une copie
+    // de `styles.css` par réveil.
+    if (await hasContentScript(tabId)) continue;
     // Un onglet peut disparaître, ou refuser l'injection (page d'erreur, document
     // interdit). Chaque cible est donc indépendante : un échec n'annule pas les autres, et
     // `lastError` est lu pour que Chrome ne le signale pas comme non traité.

@@ -81,6 +81,39 @@ export const NEUTRAL_EDITOR_CHROME: EditorChrome = Object.freeze({
   framedContainer: null,
 });
 
+/** La FORME du HTML qu'une plateforme produit en rendant un corps de commentaire Markdown.
+ *
+ * Deux faits, et deux seulement, parce que ce sont les deux que le masquage de préfixe et la
+ * mise en avant du sujet (§5.5) interrogent. Ils vivaient en dur dans `extension/src/ui/badges.ts`
+ * — `tagName !== 'P'` et trois comparaisons à `'BR'` — sous la forme d'affirmations vraies de
+ * GitHub, mesurées sur github.com, et appliquées à toute plateforme.
+ *
+ * C'est la fuite dont l'absence coûte le plus cher : les autres RENONCENT proprement quand
+ * elles ne reconnaissent rien, celle-ci se trompe. Sur un corps rendu où la fin de ligne n'est
+ * pas un `<br>`, la borne du sujet ne se déclenche jamais et un frère entier passe dans le
+ * sujet — donc en gras, avec tout ce qui le suit.
+ *
+ * Les deux adaptateurs répondent aujourd'hui la même chose, et le déplacement est donc à
+ * comportement rigoureusement nul. Ce n'est pas une raison de s'en passer : la valeur cesse
+ * d'être une supposition tacite du code partagé pour devenir une réponse que chaque plateforme
+ * donne — et qu'une plateforme future peut donner autrement, au lieu de la subir. */
+export interface RenderedBodyShape {
+  /** Les conteneurs de PREMIER NIVEAU qui enveloppent une ligne de Markdown ordinaire sans
+   * avoir consommé de syntaxe de tête. Tout le reste — bloc de code, citation, liste, titre,
+   * tableau — fait renoncer le masquage, ce qui est toujours l'issue sûre (§9.4, CA-11). */
+  readonly paragraphTags: readonly string[];
+  /** Ce qui MATÉRIALISE une fin de ligne simple dans ce corps rendu. */
+  readonly lineBreakTag: string;
+}
+
+/** La forme d'un rendu Markdown → HTML ordinaire. Nommée plutôt qu'écrite en dur : une valeur
+ * par défaut qui porte un nom est une affirmation qu'on peut relire et contredire ; la même
+ * valeur dispersée en quatre littéraux est une supposition qu'on ne voit plus. */
+export const MARKDOWN_HTML_BODY_SHAPE: RenderedBodyShape = Object.freeze({
+  paragraphTags: Object.freeze(['P']),
+  lineBreakTag: 'BR',
+});
+
 export interface PlatformAdapter {
   matches(url: URL): boolean;
   platformProfile(): PlatformProfile;
@@ -94,6 +127,11 @@ export interface PlatformAdapter {
    * doit poser la question ; `NEUTRAL_EDITOR_CHROME` permet d'y répondre « rien de spécial »
    * en un mot. */
   getEditorChrome(editor: EditorHandle): EditorChrome;
+  /** §5.5 — la forme du HTML que cette plateforme produit en rendant un corps de commentaire.
+   * Obligatoire pour la même raison que `getEditorChrome` : c'est une question qu'une
+   * plateforme nouvelle doit se voir poser, et à laquelle `MARKDOWN_HTML_BODY_SHAPE` répond en
+   * un mot quand rien ne la distingue. */
+  renderedBodyShape(): RenderedBodyShape;
   readValue(editor: EditorHandle): string;
   writeValue(editor: EditorHandle, text: string, caret?: number): void;
   getThreads(): Promise<ThreadInfo[]>;

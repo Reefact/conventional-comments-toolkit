@@ -96,33 +96,37 @@ export interface CloudPlatform {
   platform: HostPlatform;
 }
 
-/** Les plateformes cloud que ce produit sait servir. **Aucune n'est pré-déclarée dans le
- * manifeste** : toutes passent par `optional_host_permissions`, `github.com` comme les
- * autres.
+/** Les hôtes que la page d'options peut proposer d'un seul clic. **Aucun n'est pré-déclaré
+ * dans le manifeste** : tous passent par `optional_host_permissions`, `github.com` comme
+ * les autres.
  *
- * C'était faux jusqu'ici — `content_scripts` injectait statiquement `github.com`, seul
- * hôte actif sans permission et, du même coup, seul hôte que l'utilisateur ne pouvait pas
- * révoquer. Cette exception se payait en cas particuliers dispersés : un court-circuit
- * dans `selectPlatform()`, un autre dans `registerContentScriptForOrigin()`, et une ligne
- * « plateforme non précisée » que la page d'options affichait pour un octroi superflu sur
- * un domaine où le choix n'était de toute façon jamais lu. Un seul mécanisme pour tout le
- * monde supprime les trois.
+ * `github.com` y échappait — `content_scripts` l'injectait statiquement. Ce n'est pas qu'il
+ * était alors « révocable par rien » : le navigateur garde ses propres contrôles d'accès
+ * aux sites, et rien ici ne les remplace. C'est que L'EXTENSION ne voyait ni ne pilotait
+ * cet accès — absent de `chrome.permissions`, ni demandable, ni retirable, ni observable —
+ * donc impossible à montrer, à reprendre ou à suivre depuis le produit. L'exception se
+ * payait par ailleurs en cas particuliers dispersés : un court-circuit dans
+ * `selectPlatform()`, un autre dans `registerContentScriptForOrigin()`, et une ligne
+ * « plateforme non précisée » affichée pour un octroi superflu sur un domaine où le choix
+ * n'était de toute façon jamais lu. Un seul mécanisme supprime les trois.
  *
- * `*.visualstudio.com` est un joker assumé : chaque organisation historique d'Azure DevOps
- * a son propre sous-domaine, inconnu à la compilation — même situation que `*.ghe.com`
- * (§A.4), et `hostnameOf()` conserve le joker exprès pour ce cas. */
+ * **Le critère d'entrée est l'hôte CONCRET, pas la plateforme ni l'offre cloud.** Un
+ * suffixe connu ne suffit pas : `{organisation}.visualstudio.com` donne un sous-domaine par
+ * organisation, et l'inscrire ici ferait demander `https://*.visualstudio.com/*`, donc
+ * l'accès à toutes les organisations sur URLs historiques quand un poste n'en sert qu'une.
+ * Ce catalogue l'a porté, contredisant son propre commentaire, qui reconnaissait déjà le
+ * cas comme « inconnu à la compilation, même situation que `*.ghe.com` » (revue Reefact,
+ * PR #61). Ces hôtes-là se saisissent dans la zone des domaines auto-hébergés, où
+ * `inferPlatform()` pré-remplit déjà Azure DevOps sur ce suffixe.
+ *
+ * `dev.azure.com` reste ici : l'organisation y vit dans le CHEMIN, c'est donc un hôte fixe,
+ * et l'autoriser est le minimum possible pour ce domaine. */
 export const CLOUD_PLATFORMS: readonly CloudPlatform[] = [
   { id: 'github', label: 'GitHub.com', origin: 'https://github.com/*', platform: 'github' },
   {
     id: 'azdo',
     label: 'Azure DevOps Services',
     origin: 'https://dev.azure.com/*',
-    platform: 'azdo',
-  },
-  {
-    id: 'azdo-legacy',
-    label: 'VisualStudio.com',
-    origin: 'https://*.visualstudio.com/*',
     platform: 'azdo',
   },
 ];
@@ -152,7 +156,9 @@ export function inferPlatform(host: string): HostPlatform | null {
  * reclassement d'hôte qui laissait l'onglet sur l'ancien adaptateur.
  *
  * **Aucun hôte n'est privilégié**, `github.com` compris : il doit figurer dans la
- * répartition comme n'importe quel autre. C'est ce qui rend sa révocation effective. */
+ * répartition comme n'importe quel autre. C'est ce qui met son activation sous le contrôle
+ * du même octroi que les autres — donc retirable depuis la page d'options, et suivie par
+ * `permissions.onRemoved`. */
 export function selectPlatform(
   hostname: string,
   extra: ExtraHostsByPlatform

@@ -197,20 +197,41 @@ describe('zone 1 — sites cloud : le catalogue moins ce qui est déjà accordé
     expect(configuredHosts()).toEqual(['github.com']);
   });
 
-  it('le joker `*.visualstudio.com` est demandé TEL QUEL, pas réduit à son domaine nu', async () => {
-    // Chaque organisation historique a son propre sous-domaine : demander
-    // `https://visualstudio.com/*` n'en couvrirait aucune.
+  it('le catalogue ne demande JAMAIS de motif à joker', async () => {
+    // Un suffixe connu n'est pas un hôte connu. Le catalogue a porté
+    // `https://*.visualstudio.com/*`, ce qui accordait l'accès à TOUTES les organisations
+    // Azure DevOps sur URLs historiques quand un poste n'en sert qu'une — contre la règle
+    // des permissions minimales du §2 (revue Reefact, PR #61). Le critère d'entrée est
+    // l'hôte concret : `dev.azure.com` le reste (l'organisation vit dans le chemin),
+    // `{organisation}.visualstudio.com` non.
+    installPage();
+    await loadOptions();
+
+    for (const entry of CLOUD_PLATFORMS) {
+      expect(entry.origin).not.toContain('*.');
+    }
+    expect(cloudNames()).not.toContain('VisualStudio.com');
+  });
+
+  it('une organisation historique passe par la saisie, plateforme pré-remplie', async () => {
+    // Le chemin de remplacement existe et fonctionne : `inferPlatform()` reconnaît le
+    // suffixe, donc la plateforme est proposée sans être devinée à la place de la personne.
     const state = installPage();
     await loadOptions();
 
-    const card = [...document.querySelectorAll('#cloud-list .cloud-card')].find(
-      (el) => el.querySelector('.name')?.textContent === 'VisualStudio.com'
-    );
-    buttonIn(card ?? null, 'Activer')!.click();
+    const input = document.getElementById('host-input') as HTMLInputElement;
+    const select = document.getElementById('host-platform') as HTMLSelectElement;
+    input.value = 'acme.visualstudio.com';
+    input.dispatchEvent(new Event('input'));
+    expect(select.value).toBe('azdo'); // pré-rempli, et modifiable
+
+    (document.getElementById('host-add') as HTMLButtonElement).click();
     for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
 
-    expect(state.requested).toEqual([['https://*.visualstudio.com/*']]);
-    expect(state.local[HOST_PLATFORMS_KEY]).toEqual({ '*.visualstudio.com': 'azdo' });
+    // L'octroi ne porte QUE sur cette organisation.
+    expect(state.requested).toEqual([['https://acme.visualstudio.com/*']]);
+    expect(state.local[HOST_PLATFORMS_KEY]).toEqual({ 'acme.visualstudio.com': 'azdo' });
+    expect(configuredHosts()).toEqual(['acme.visualstudio.com']);
   });
 });
 

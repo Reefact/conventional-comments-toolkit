@@ -949,7 +949,10 @@ describe('G1 — l’activation se décide sur la répartition publiée, pas sur
   // Ce test disait « seul github.com est actif sans figurer dans la répartition » : c'était
   // vrai tant que `content_scripts` l'injectait statiquement et que `selectPlatform()` le
   // court-circuitait. Le privilège a disparu avec l'entrée du manifeste — et c'est ce qui
-  // rend sa révocation possible, un hôte privilégié n'étant révocable par rien.
+  // met son accès entre les mains de l'extension : demandable, retirable et observable
+  // via `chrome.permissions`, ce qu'un hôte du manifeste n'est jamais (revue Reefact,
+  // PR #61 — « révocable par rien » était faux, le navigateur gardant ses propres
+  // contrôles d'accès aux sites).
   it('AUCUN hôte n’est actif sans figurer dans la répartition, github.com compris', () => {
     expect(selectPlatform('github.com', EMPTY_EXTRA_HOSTS)).toBeNull();
   });

@@ -213,8 +213,9 @@ function fingerprintOf(origin: string): string {
 /** Tout hôte accordé s'enregistre ici, sans exception. `github.com` en était une : le
  * manifeste l'injectait statiquement, il fallait donc l'écarter de l'enregistrement
  * dynamique pour ne pas injecter le script deux fois. Le manifeste ne déclare plus aucun
- * `content_scripts` — l'exception n'a plus d'objet, et sa disparition rend la révocation
- * de github.com effective au même titre que celle de n'importe quel autre domaine. */
+ * `content_scripts` — l'exception n'a plus d'objet, et sa disparition place l'injection sur
+ * github.com sous le même octroi que partout ailleurs : demandé, retiré et observé via
+ * `chrome.permissions`, donc désenregistré ici dès que la permission tombe. */
 export async function registerContentScriptForOrigin(origin: string): Promise<void> {
   if (!chrome?.scripting) return;
   const script: RegisteredContentScript = {

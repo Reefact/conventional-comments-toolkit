@@ -1,0 +1,74 @@
+/* Ce que les rôles de rendu de l'extension valent SUR GITHUB (§A.5).
+
+   Ce fichier est la seule chose du produit qui connaisse le nom d'un jeton Primer. Les 53
+   déclarations qui les portaient vivaient dans la feuille partagée, livrée à Azure DevOps
+   comme à GitHub : un renommage chez GitHub — il y en a eu un, « --color-fg- » vers
+   « --fgColor- » courant 2026 — se corrigeait donc dans un fichier que les deux plateformes
+   exécutent. Il se corrige désormais ici, et nulle part ailleurs.
+
+   Le scope `:root[data-cct-platform='github']` est posé par le script de contenu quand il
+   choisit cet adaptateur, et retiré quand il le relâche. Sa spécificité (0,2,0) passe devant
+   le `:root` (0,1,0) de la feuille partagée QUEL QUE SOIT l'ordre de concaténation : la
+   surcharge ne dépend donc pas de l'ordre dans lequel le build assemble les feuilles, ce qui
+   serait une dépendance invisible et fragile.
+
+   AUCUNE ÉTOILE SUIVIE D'UNE BARRE OBLIQUE dans ce commentaire : la séquence ferme le
+   commentaire, et le parseur avale ensuite tout jusqu'à la première accolade — c'est le
+   défaut qui a coûté une livraison sur la feuille partagée, et scripts/check-extension-css.mjs
+   couvre désormais ce fichier-ci pour la même raison.
+
+   Chaque valeur imbrique l'ANCIEN nom Primer avant le repli littéral : GitHub Enterprise
+   Server est figé par version et peut encore servir les noms d'avant le renommage. Et le
+   repli littéral est REPRIS de la feuille partagée plutôt qu'omis : un `var()` qui ne
+   résoudrait rien rendrait la déclaration invalide au calcul, et la propriété serait alors
+   perdue — pas rabattue sur la valeur neutre. Le doublon est le prix de cette garantie.
+
+   Le canari hebdomadaire (scripts/check-github-theme-vars.mjs) vérifie sur la vraie page que
+   ces noms existent toujours ; c'est ce fichier qu'il lit désormais. */
+:root[data-cct-platform='github'] {
+  /* Contrôles. */
+  --cct-control-bg: var(--button-default-bgColor-rest, var(--color-btn-bg, ButtonFace));
+  --cct-control-bg-flat: var(--button-default-bgColor-rest, var(--color-btn-bg, transparent));
+  --cct-control-border: var(--button-default-borderColor-rest, var(--color-btn-border, currentColor));
+  --cct-fg-on-control: var(--fgColor-default, var(--color-fg-default, ButtonText));
+
+  /* Texte et surfaces. */
+  --cct-fg-default: var(--fgColor-default, var(--color-fg-default, currentColor));
+  --cct-fg-muted: var(--fgColor-muted, var(--color-fg-muted, currentColor));
+  --cct-surface-bg: var(--bgColor-default, var(--color-canvas-default, transparent));
+  --cct-overlay-bg: var(--overlay-bgColor, var(--color-canvas-overlay, Canvas));
+  --cct-border-default: var(--borderColor-default, var(--color-btn-border, currentColor));
+  /* Sans le repli `--color-btn-border` du précédent, et c'est l'écart tel qu'il était écrit
+     dans la feuille partagée. Il n'est pas reproduit par étourderie : le corriger ici
+     changerait le rendu sur un GHES assez ancien pour ne plus définir `--borderColor-default`,
+     ce qui est un changement de comportement, pas un nettoyage. À trancher séparément. */
+  --cct-border-plain: var(--borderColor-default, currentColor);
+
+  /* Accent. */
+  --cct-accent-bg: var(--bgColor-accent-emphasis, var(--color-accent-emphasis, Highlight));
+  --cct-fg-on-accent: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis, HighlightText));
+  --cct-focus-ring: var(--fgColor-accent, var(--color-accent-fg, Highlight));
+  --cct-accent-line: var(--fgColor-accent, var(--color-accent-fg, currentColor));
+
+  /* Verdicts. */
+  --cct-success-ring: var(--fgColor-success, var(--color-success-fg, #2e7d32));
+  --cct-success-line: var(--fgColor-success, var(--color-success-fg, currentColor));
+  --cct-attention-ring: var(--fgColor-attention, var(--color-attention-fg, #f9a825));
+  --cct-attention-text: var(--fgColor-attention, var(--color-attention-fg, #8a6d00));
+  --cct-danger-strong: var(--fgColor-danger, var(--color-danger-fg, #b3261e));
+  --cct-danger-line: var(--fgColor-danger, var(--color-danger-fg, currentColor));
+
+  /* Formes. */
+  --cct-radius-md: var(--borderRadius-medium, 6px);
+  --cct-radius-sm: var(--borderRadius-small, 2px);
+
+  /* Longueurs du composeur, MESURÉES sur github.com (2026-09-04). Le retrait égale la marge
+     propre de `.CommentBox-container`, qui vaut `var(--base-size-8)` : c'est en l'égalant que
+     l'en-tête natif et nos éléments injectés cessent d'être collés au bord pendant que le
+     texte du champ, lui, s'en écarte par son propre padding. La gouttière et l'écart de la
+     pastille ont été tranchés à l'œil sur cette même page. Trois chiffres de GitHub, chez
+     GitHub. */
+  --cct-frame-padding: var(--base-size-8, 8px);
+  --cct-inner-gutter: 8px;
+  --cct-pastille-gap: 4px;
+}

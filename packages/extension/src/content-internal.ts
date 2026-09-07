@@ -384,6 +384,25 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
 
   if (!platform) return disposeAll;
 
+  // Le scope sous lequel la feuille de CETTE plateforme déclare ce que valent nos rôles de
+  // rendu (adapters/<plateforme>/src/platform.css). Une seule feuille est livrée, assemblée au
+  // build ; c'est cet attribut, et lui seul, qui décide laquelle de ses sections s'applique.
+  // Sans lui, aucune ne s'applique et les valeurs neutres tiennent — dégradation sûre, jamais
+  // une page sans style.
+  //
+  // Posé ICI parce que c'est le seul endroit qui connaisse la plateforme retenue, et retiré
+  // par `disposeAll` : une révocation ou un RECLASSEMENT d'hôte (le troisième cas du guet
+  // ci-dessus) laisserait sinon l'onglet peint aux couleurs de l'adaptateur précédent, sur une
+  // page servie par un autre.
+  doc.documentElement.dataset['cctPlatform'] = platform;
+  const unstamp = () => {
+    delete doc.documentElement.dataset['cctPlatform'];
+  };
+  // `teardown` est armé plus bas (`teardown = …`), après la construction de l'adaptateur : lui
+  // affecter le retrait ICI le ferait écraser, et l'attribut survivrait précisément aux deux
+  // transitions qu'il doit suivre. Il est donc COMPOSÉ à l'armement, pas assigné.
+  teardown = unstamp;
+
   // Hors contexte d'extension (aucun `chrome.runtime`), il n'y a pas de relais à employer :
   // laisser l'adaptateur lire par lui-même, ce qui est le comportement correct partout où
   // l'origine appelante a le droit de lire. Ne jamais imposer un relais absent, qui rendrait
@@ -804,7 +823,14 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // en place continue sinon d'observer le DOM, de poser la barre d'outils et de griser le
   // bouton d'envoi sur un hôte qui n'est plus autorisé, jusqu'au rechargement de la page
   // (revue Codex, PR #29). C'est `teardown` que le guet armé plus haut appellera.
-  teardown = revoke;
+  //
+  // COMPOSÉ avec `unstamp`, jamais substitué : le marqueur de plateforme posé sur
+  // `documentElement` doit partir avec le reste, sans quoi un hôte reclassé garderait le thème
+  // de l'adaptateur précédent sur une page servie par un autre.
+  teardown = () => {
+    unstamp();
+    revoke();
+  };
   return disposeAll;
 }
 

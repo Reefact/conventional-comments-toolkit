@@ -22,9 +22,11 @@ import {
   queryChain,
   queryChainAll,
   writeToTextField,
+  MARKDOWN_HTML_BODY_SHAPE,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
   type EditorChrome,
+  type RenderedBodyShape,
   type EditorContext,
   type EditorHandle,
   type PlatformAdapter,
@@ -365,6 +367,12 @@ export class GithubClientAdapter implements PlatformAdapter {
       return { framedContainer: editor.element.parentElement };
     }
     return NEUTRAL_EDITOR_CHROME;
+  }
+
+  /** §5.5 — MESURÉ à plusieurs reprises sur github.com : le corps rendu enveloppe une ligne de
+   * Markdown ordinaire dans un `<p>`, et matérialise une fin de ligne simple par un `<br>`. */
+  renderedBodyShape(): RenderedBodyShape {
+    return MARKDOWN_HTML_BODY_SHAPE;
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {

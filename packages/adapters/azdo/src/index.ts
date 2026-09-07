@@ -26,9 +26,11 @@ import {
   queryChain,
   queryChainAll,
   writeToTextField,
+  MARKDOWN_HTML_BODY_SHAPE,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
   type EditorChrome,
+  type RenderedBodyShape,
   type EditorContext,
   type EditorHandle,
   type PlatformAdapter,
@@ -175,6 +177,14 @@ export class AzdoClientAdapter implements PlatformAdapter {
    * ICI que le résultat se pose, et nulle part ailleurs. */
   getEditorChrome(_editor: EditorHandle): EditorChrome {
     return NEUTRAL_EDITOR_CHROME;
+  }
+
+  /** §5.5 — la forme d'un rendu Markdown → HTML ordinaire, faute d'avoir mesuré celle d'Azure
+   * DevOps. C'est la même réponse que GitHub, et c'est donc sans effet aujourd'hui ; ce qui
+   * change, c'est qu'elle est désormais DONNÉE ici plutôt que supposée par le code partagé, et
+   * qu'un jour de mesure elle se corrigera à cet endroit précis. */
+  renderedBodyShape(): RenderedBodyShape {
+    return MARKDOWN_HTML_BODY_SHAPE;
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {

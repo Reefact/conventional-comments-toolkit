@@ -2,7 +2,7 @@
 // Non-régression des écarts confirmés par la revue adversariale du composant A.
 
 import { describe, expect, it } from 'vitest';
-import { computePrefixInsertion, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { computePrefixInsertion, MARKDOWN_HTML_BODY_SHAPE, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { defaultConfig, type ConfigRead, type PrRef } from '@cct/core';
 import { ClientConfigResolver } from '../src/config-resolver.js';
 import type { PlatformAdapter } from '@cct/adapter-shared';
@@ -121,6 +121,7 @@ describe('écart A — §5.4 cond. 4 : une lecture unreachable n’est jamais ma
       getOrgConfig: async () => ({ status: 'absent' }),
       observeEditors: () => ({ dispose: () => {} }),
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
+      renderedBodyShape: () => MARKDOWN_HTML_BODY_SHAPE,
       getSubmitControls: () => [],
       readValue: () => '',
       writeValue: () => {},
@@ -182,6 +183,7 @@ describe('revue Codex, PR #39 : deux résolutions concurrentes pour la même cl�
       getOrgConfig: async () => ({ status: 'absent' }),
       observeEditors: () => ({ dispose: () => {} }),
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
+      renderedBodyShape: () => MARKDOWN_HTML_BODY_SHAPE,
       getSubmitControls: () => [],
       readValue: () => '',
       writeValue: () => {},

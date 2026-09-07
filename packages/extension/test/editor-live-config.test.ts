@@ -1,4 +1,4 @@
-import { NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { MARKDOWN_HTML_BODY_SHAPE, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 // @vitest-environment happy-dom
 //
 // Trois défauts trouvés en revue (Reefact, PR #39) dans le rafraîchissement en direct des
@@ -74,6 +74,9 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
       }
       getEditorChrome() {
         return NEUTRAL_EDITOR_CHROME;
+      }
+      renderedBodyShape() {
+        return MARKDOWN_HTML_BODY_SHAPE;
       }
       getSubmitControls() {
         return [{ element: submit, kind: 'submit' }];

@@ -20,7 +20,7 @@
 // (cf. `check:subject-line`, qui existe pour l'autre moitié de la question).
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
-import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { writeToTextField, MARKDOWN_HTML_BODY_SHAPE, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { EditorController } from '../src/editor-controller.js';
 import { framedAncestor, ringIsClipped, stackingMountFor } from '../src/ui/stacking.js';
@@ -100,6 +100,7 @@ function attachOn(root: string): { toolbar: Element; feedback: Element; champ: H
   const adapter: Partial<PlatformAdapter> = {
     platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
     getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
+      renderedBodyShape: () => MARKDOWN_HTML_BODY_SHAPE,
     getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
     readValue: () => champ.value,
     writeValue: (_e, text, caret) => writeToTextField(champ, text, caret),

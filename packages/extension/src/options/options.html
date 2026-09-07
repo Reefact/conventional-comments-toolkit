@@ -177,7 +177,8 @@
       .selfhost-form input[type="text"]::placeholder { color: var(--fg-faint); }
       .selfhost-form select { flex: 1 1 14rem; }
       .selfhost-form input:focus-visible, .selfhost-form select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-      .form-state { font-size: 0.8rem; color: var(--block); }
+      .form-state { font-size: 0.8rem; color: var(--block); margin: 0; }
+      .form-state:empty { display: none; }
 
       .host-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
       .host-row {
@@ -288,6 +289,7 @@
           <div class="panel-head"><h3>Hôtes configurés</h3></div>
           <ul class="host-list" id="host-list" aria-live="polite"></ul>
           <p class="empty-note" id="host-empty" hidden>Aucun domaine autorisé pour l'instant.</p>
+          <p class="form-state remove-state" aria-live="polite"></p>
         </section>
 
         <!-- Zone 4 : masquée tant qu'elle est vide, titre compris. Un domaine n'y arrive
@@ -303,6 +305,7 @@
             domaine, ou retirez l'accès.
           </p>
           <ul class="host-list" id="unconfigured-list"></ul>
+          <p class="form-state remove-state" aria-live="polite"></p>
         </section>
       </section>
 

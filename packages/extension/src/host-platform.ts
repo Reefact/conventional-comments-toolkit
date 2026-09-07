@@ -64,7 +64,17 @@ export function hostnameOf(input: string): string | null {
   if (bare === '') return null;
   const wildcard = bare.startsWith('*.');
   const rest = wildcard ? bare.slice(2) : bare;
-  if (rest === '') return null;
+  // Un motif qui ne désigne AUCUN hôte concret ne rend pas un hôte. Le cas qui compte est
+  // `https://*/*` — l'octroi large — et il n'est pas hypothétique : c'est le motif que ce
+  // manifeste déclare en `optional_host_permissions`, donc le plus large que le navigateur
+  // puisse accorder pour cette extension. Sans ce refus, `*` traversait `URL` et rendait un
+  // nom d'hôte fantôme (`%2A` dans Chromium) que `hostMatchesPattern()` ne fait
+  // correspondre à rien : la page d'options le listait comme un domaine à classer, et le
+  // classer n'activait aucun adaptateur. Rendre `null` le fait ignorer partout — la page
+  // d'options comme le calcul de la répartition sautent déjà les hôtes non exploitables —
+  // et les cartes du catalogue restent proposées, un clic suffisant alors à classer un
+  // domaine concret que l'octroi large couvre déjà (revue Codex, PR #60).
+  if (rest === '' || rest.includes('*')) return null;
   try {
     const hostname = new URL(`https://${rest}`).hostname;
     if (!hostname) return null;

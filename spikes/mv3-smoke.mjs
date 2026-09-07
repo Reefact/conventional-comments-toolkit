@@ -123,6 +123,17 @@ try {
     JSON.stringify(workerSurface)
   );
 
+  // 3 bis. `getRegisteredContentScripts` existe VRAIMENT. Le ménage des enregistrements
+  //    laissés par une version précédente repose entièrement dessus, et le faux de
+  //    `background.test.ts` l'expose : un faux qui offre une API absente du vrai
+  //    environnement décrit un monde où le code marche (CLAUDE.md, règle 2). Le code le
+  //    garde tout de même derrière un `?.` — un navigateur sans cette API doit continuer à
+  //    enregistrer, un ménage manqué coûtant moins cher qu'une extension muette.
+  const cleanupApi = await worker.evaluate(
+    () => typeof chrome?.scripting?.getRegisteredContentScripts === 'function'
+  );
+  assert('le worker expose scripting.getRegisteredContentScripts', cleanupApi);
+
   // 4. Le worker publie la répartition des hôtes au démarrage — c'est cette valeur, et elle
   //    seule, que le script de contenu peut lire. Sa PRÉSENCE est ce que la P1 livrée
   //    rendait impossible.

@@ -145,6 +145,18 @@ describe('B1 — hostnameOf canonicalise des deux côtés de la comparaison', ()
   // par `npm run smoke:mv3`, seul endroit où cette affirmation peut être vérifiée. Ce qui
   // est vérifié ici, c'est que le joker survit à `hostnameOf()` QUEL QUE SOIT ce que le
   // parseur en fait ; le fait navigateur qui rend le contournement nécessaire vit là-bas.
+  it('refuse un motif qui ne désigne aucun hôte concret', () => {
+    // `https://*/*` n'est pas une hypothèse : c'est le motif que le manifeste déclare en
+    // `optional_host_permissions`, donc le plus large que le navigateur puisse accorder
+    // pour cette extension. Il traversait `URL` et rendait un nom d'hôte fantôme (`*` ici,
+    // `%2A` dans Chromium) que la page d'options listait comme un domaine à classer, et que
+    // `hostMatchesPattern()` ne fait correspondre à rien : le classer n'activait aucun
+    // adaptateur (revue Codex, PR #60).
+    expect(hostnameOf('https://*/*')).toBeNull();
+    expect(hostnameOf('*')).toBeNull();
+    expect(hostnameOf('https://*.*.example.com/*')).toBeNull();
+  });
+
   it('conserve un joker de tête, sans le confier au parseur d’URL', () => {
     expect(hostnameOf('https://*.ghe.com/*')).toBe('*.ghe.com');
     expect(hostnameOf('https://*.visualstudio.com/*')).toBe('*.visualstudio.com');

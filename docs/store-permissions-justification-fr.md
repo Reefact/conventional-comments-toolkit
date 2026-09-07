@@ -9,6 +9,9 @@ l'extension). Il couvre les permissions déclarées dans
 À tenir à jour si `manifest.json` change ; sinon la revue Google et ce
 document divergent silencieusement.
 
+Voir aussi [`store-permissions-justification-en.md`](store-permissions-justification-en.md)
+pour la version anglaise.
+
 ## Single purpose (description de la finalité unique)
 
 > Conventional Comments Toolkit aide les personnes qui font des revues de

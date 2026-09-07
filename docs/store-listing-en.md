@@ -2,8 +2,9 @@
 
 Draft of the text fields for the submission form. See also
 [`store-listing-fr.md`](store-listing-fr.md) for the French version and
-[`store-permissions-justification-fr.md`](store-permissions-justification-fr.md)
-for the permission justification.
+[`store-permissions-justification-en.md`](store-permissions-justification-en.md)
+(or its [French original](store-permissions-justification-fr.md)) for the
+permission justification.
 
 ## Category
 

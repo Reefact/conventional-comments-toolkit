@@ -3,7 +3,8 @@
 Brouillon des champs texte de la fiche de soumission. Voir aussi
 [`store-listing-en.md`](store-listing-en.md) pour la version anglaise et
 [`store-permissions-justification-fr.md`](store-permissions-justification-fr.md)
-pour la justification des permissions.
+(ou sa [version anglaise](store-permissions-justification-en.md)) pour la
+justification des permissions.
 
 ## Catégorie
 
@@ -13,14 +14,12 @@ de revue de code, pas de la productivité générale ni des réseaux sociaux.
 
 ## Description courte (132 caractères max)
 
-> Assistant Conventional Comments pour vos revues de code sur GitHub (et Azure DevOps) : labels, validation, aucune donnée qui sort du navigateur.
-
-(144 caractères — **dépasse la limite de 132**, à raccourcir avant
-soumission. Variante conforme :)
-
 > Assistant Conventional Comments pour la revue de code GitHub : labels, validation, aucun code ni commentaire ne sort du navigateur.
 
-(131 caractères.)
+(131 caractères — conforme à la limite de 132. Une première variante,
+« ... sur GitHub (et Azure DevOps) : labels, validation, aucune donnée
+qui sort du navigateur. », dépassait la limite à 144 caractères et a
+été écartée.)
 
 **Correction (Codex, deuxième passage) :** l'ancienne formulation « rien
 ne quitte votre navigateur » était fausse sans nuance — `language` et

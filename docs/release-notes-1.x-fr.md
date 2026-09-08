@@ -28,7 +28,7 @@ _Toutes les plateformes s'autorisent désormais de la même façon — `github.c
 
 ### 🔧 Modifications
 
-- **Après cette mise à jour, l'extension se tait sur `github.com` jusqu'à ce que vous l'autorisiez.** Un clic sur « Activer » dans la page d'options, qui s'ouvre d'elle-même pour que ce soit visible. Il n'y a pas de contournement : un navigateur n'accorde une permission de site que sur un geste humain, donc rien ne peut le faire à votre place.
+- **Après cette mise à jour, l'extension se tait sur `github.com` jusqu'à ce que vous l'autorisiez.** Un clic sur « Activer » dans la page d'options. Il n'y a pas de contournement : un navigateur n'accorde une permission de site que sur un geste humain, donc rien ne peut le faire à votre place. La page s'ouvre d'elle-même pour le dire — mais seulement si la mise à jour ne vous laisse aucun domaine en service ; si vous en aviez déjà un autre configuré, il continue de fonctionner et rien ne signale que `github.com` s'est arrêté.
 - **L'écran des options est refait autour de ce qui arrive réellement à un accès** : les domaines que l'extension connaît déjà, où un clic autorise et classe à la fois ; tout autre domaine, où vous indiquez quelle plateforme le sert avant d'accorder ; la liste de ce qui est configuré ; et, seulement quand elle n'est pas vide, les domaines autorisés depuis le navigateur plutôt que depuis cet écran et qui ne font donc encore rien.
 - **Une organisation `visualstudio.com` s'autorise maintenant une par une** via le champ de saisie, avec Azure DevOps pré-rempli. L'entrée de catalogue qu'elle remplace demandait d'un coup toutes les organisations sur ces adresses historiques, quand un poste en utilise une.
 

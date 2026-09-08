@@ -13,8 +13,8 @@ _Every platform is now authorized the same way — `github.com` included — whi
 
 ### ✨ Features
 
-- **You choose where the extension works, and you can change your mind.** `github.com` used to be built into the extension: active from the moment you installed it, with nothing in the product able to hand that access back. It now goes through the same one-click authorization as every other platform, and every domain you have allowed carries a "Retirer" button. Domains authorized by your organisation's policy stay as they are — that is not this screen's call.
-- **The options page opens by itself the first time, and walks you through it.** A short guided tour names each section and says what it is for; it can be skipped at any point, closes on `Escape`, and never comes back on its own. A "Revoir la visite guidée" button in the page header replays it whenever you want.
+- **You choose where the extension works, and you can change your mind.** `github.com` used to be built into the extension: active from the moment you installed it, with nothing in the product able to hand that access back. It now goes through the same one-click authorization as every other platform, and every domain you have allowed carries a "Withdraw" button. Domains authorized by your organisation's policy stay as they are — that is not this screen's call.
+- **The options page opens by itself the first time, and walks you through it.** A short guided tour names each section and says what it is for; it can be skipped at any point, closes on `Escape`, and never comes back on its own. A "Replay the guided tour" button in the page header replays it whenever you want.
 - **The options page now speaks French or English, like the rest of the extension.** It was in French whatever you had chosen — including for someone who had set the interface to English and saw English everywhere except on the screen that took the setting. Changing the language now applies straight away instead of at the next reload.
 
 ### 🐛 Bug fixes
@@ -28,7 +28,7 @@ _Every platform is now authorized the same way — `github.com` included — whi
 
 ### 🔧 Changed
 
-- **After this update, the extension is silent on `github.com` until you allow it.** One click on "Activer" in the options page, which opens by itself to make that visible. There is no way around it: a browser only grants a site permission on a human gesture, so nothing can do it for you.
+- **After this update, the extension is silent on `github.com` until you allow it.** One click on "Activate" in the options page. There is no way around it: a browser only grants a site permission on a human gesture, so nothing can do it for you. The page opens by itself to say so — but only if the update left you with no working domain at all; if you already had another one configured, it keeps working and nothing announces that `github.com` has stopped.
 - **The options screen is rebuilt around what actually happens to an access**: domains the extension already knows, where one click both authorizes and classifies; any other domain, where you say which platform serves it before granting; the list of what is configured; and, only when it is not empty, the domains you allowed from the browser rather than from this screen and that therefore do nothing yet.
 - **A `visualstudio.com` organisation is now authorized one at a time** through the free-form field, with Azure DevOps pre-filled. The catalog entry it replaces asked for every organisation on those legacy addresses at once, when a workstation uses one.
 

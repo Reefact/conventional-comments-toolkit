@@ -7,6 +7,22 @@ cas limite, chaque section de la spécification sur laquelle une entrée s'appui
 L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. La
 source de vérité sur la conformité reste le compagnon serveur (composant B).
 
+## 1.0.0-beta.13 — 8 septembre 2026
+
+_Le journal de la section « État » dit désormais sur quelle page chaque sélecteur a échoué, et s'efface d'un clic pour refaire une mesure propre._
+
+### ✨ Nouveautés
+
+- **Chaque ligne du journal dit de quelle page elle vient.** Il indiquait quel sélecteur avait échoué et quand, jamais où : devant quatre lignes horodatées à la même seconde, rien ne permettait de savoir si elles venaient d'une seule page ou de quatre. Une marque de six caractères ouvre maintenant chaque ligne — même marque, même page —, et un clic dessus ouvre l'adresse exacte relevée dans un nouvel onglet. Cette adresse reste sur votre appareil : ce que la télémétrie transporte, quand vous l'avez autorisée, reste le seul nom du sélecteur.
+
+- **Le journal s'efface depuis la page d'options.** Un bouton le vide ; les onglets déjà ouverts recommencent aussitôt à mesurer, et la section se met à jour d'elle-même quand l'un d'eux y écrit, sans rechargement.
+
+- **La page d'options porte l'icône de l'extension**, devant son titre. Le bouton de la visite guidée s'appelle désormais « Visite guidée », son intitulé complet passant en infobulle.
+
+### 🐛 Corrections
+
+- **La politique de confidentialité décrivait un historique que l'extension ne garde pas.** Elle annonçait « les 50 dernières fois » où un élément n'a pas été reconnu, alors que le journal ne conserve qu'une ligne par règle de sélection — cinquante au plus, chacune avec son dernier relevé. Elle décrit maintenant ce qui est réellement conservé, adresse de la page comprise.
+
 ## 1.0.0-beta.12 — 8 septembre 2026
 
 _La visite guidée est enfin lisible — la page derrière elle s'assombrit vraiment, et sa fiche se détache au lieu de se fondre dans le décor — et la section « État » dit ce qu'elle a constaté plutôt que ce que cela pourrait vouloir dire._

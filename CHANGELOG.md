@@ -16,7 +16,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
-- **The guided tour no longer says the extension changed the pages' structure.** Its "Status" step read « les pages dont la structure a changé **sous elle** » / "pages whose structure changed **under it**", which reads as if the extension had done the changing — where in fact it reports the opposite: pages that moved underneath it, which is why a selector stopped matching. It now names what the section displays, in the same words as that section's own subtitle. The subtitle was written by copying this sentence, so the copy was corrected first and the original outlived it by one release.
+- **The "Status" section says what it observed, not what it inferred** (§9.4). Its two texts — the guided tour's step and the section's own subtitle — both spoke of the pages' *structure*: first « les pages dont la structure a changé **sous elle** », which reads as if the extension had done the changing, then « changements de structure détectés », which turns a symptom into a settled cause. What `SelectorLog.degraded()` actually records is that one selector chain matched nothing, and a chain matching nothing is not proof that anything changed: `getCompletionControl()` logs whenever the merge button is missing, and on a closed pull request its absence is the norm — the reason that log is deduplicated per chain in the first place. Both texts now report the symptom the extension can see: selectors that did not find the elements they expected.
 
 ### Added
 

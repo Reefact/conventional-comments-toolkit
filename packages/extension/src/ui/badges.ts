@@ -588,7 +588,7 @@ export function decorateComment(
    * l'adaptateur qui doit se voir poser la question, pas les quelque quatre-vingt-dix appels de
    * test qui ne s'intéressent pas au sujet. Le seul appel de production
    * (content-internal.ts) passe la réponse de l'adaptateur. */
-  shape: RenderedBodyShape = MARKDOWN_HTML_BODY_SHAPE
+  shape: RenderedBodyShape | null = MARKDOWN_HTML_BODY_SHAPE
 ): void {
   const a = analyze(
     {
@@ -619,7 +619,23 @@ export function decorateComment(
   // PR #38). Un simple retour sur signature/compte inchangés laisserait alors le préfixe
   // réapparu tel quel. Idempotent (firstTextNode ignore les `.cct-badge` déjà posés, encore
   // présents ici), donc gratuit quand rien n'a bougé.
-  applyPrefixVisibility(commentBodyElement, canHidePrefix ? a.prefixLine : null, bodyText, shape);
+  // `shape === null` : la plateforme n'a pas MESURÉ la forme de son corps rendu (§9.2.3). Le
+  // masquage du préfixe et la mise en avant du sujet renoncent alors entièrement — c'est la
+  // dégradation sûre du §9.4 (CA-11), et le seul repli honnête : deviner quelle balise borne une
+  // ligne, c'est risquer de faire glisser une partie de la discussion dans le sujet mis en avant.
+  // Les badges, eux, sont posés plus bas : ils ne dépendent d'aucune de ces deux balises, et le
+  // corps s'affiche entier.
+  //
+  // `applyPrefixVisibility(…, null, …)` — et non un simple saut : le second argument à `null`
+  // DÉFAIT un masquage antérieur. Sans cet appel, une plateforme passant de « mesurée » à
+  // « inconnue » (configuration, mise à jour) laisserait en place un préfixe masqué que plus
+  // rien n'entretient.
+  applyPrefixVisibility(
+    commentBodyElement,
+    shape !== null && canHidePrefix ? a.prefixLine : null,
+    bodyText,
+    shape ?? MARKDOWN_HTML_BODY_SHAPE
+  );
   // Où poser les badges — LU dans le DOM que la ligne ci-dessus vient d'établir, jamais déduit
   // de `canHidePrefix` seul, qui dit ce qu'on VOULAIT faire, pas ce qui a été fait (les replis
   // de `applyPrefixVisibility` renoncent sans le dire à l'appelant). Préfixe masqué → l'élément

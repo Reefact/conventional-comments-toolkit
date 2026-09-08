@@ -119,6 +119,34 @@ porte une LEÇON, pas pour faire l'inventaire — `package.json` fait foi sur ce
   son en-tête, et doit y rester : le monde isolé d'un script de contenu n'est pas
   atteignable sans permission d'hôte, que le manifeste ne déclare plus.
 
+## Mise en forme : le dépôt n'est PAS formaté par prettier
+
+`.prettierrc` existe, et il ne dit pas ce qu'on croit. Il ne déclare pas que le code est
+conforme à prettier : il **borne les dégâts** quand quelqu'un le lance quand même. La
+différence a été mesurée, sur l'ensemble des sources :
+
+| | fichiers touchés | lignes |
+|---|---|---|
+| `prettier --write` avec ses défauts | 140 | +17 850 / −10 662 |
+| avec ce `.prettierrc` | 106 | +3 611 / −1 122 |
+
+Un facteur neuf, et **toujours pas zéro**. Aucun réglage ne rend prettier idempotent ici :
+le code est mis en forme à la main, et prettier restructure plutôt qu'il n'enroule — les
+insertions dépassent partout les suppressions. Donc : **ne pas lancer `prettier --write`**
+sur ce dépôt, ni même sur un seul fichier.
+
+C'est arrivé, et c'est pourquoi cette section existe : un `prettier --write` lancé sur sept
+fichiers en cours de travail a produit ~580 lignes de bruit — guillemets doubles et virgules
+finales contre le style de tout le reste — dans un commit déjà poussé. Il a fallu restaurer
+les fichiers depuis leur version d'origine et réappliquer les modifications à la main. Le
+réflexe « je formate avant de committer » est ce qu'il faut désarmer.
+
+Les valeurs viennent du code, pas d'un goût : `singleQuote` et `trailingComma: es5` sont ce
+qu'il emploie partout, et `printWidth: 100` correspond à sa convention réelle — p95 des
+lignes de code à 94 colonnes, commentaires enroulés à la main autour de 95. `120` ferait
+moins de bruit (88 fichiers, +1 932) mais décrirait mal le code : ce serait choisir une
+largeur pour minimiser un reformatage que personne ne doit lancer.
+
 ## Commandes
 
 ```

@@ -1513,7 +1513,8 @@ interface PlatformAdapter {
   getOrgConfig(url: string | null): Promise<ConfigRead>;  // §8.1.2 niveau 2 — URL issue du canal de plancher
   observeEditors(cb: (editor: EditorHandle) => void): Disposable;  // §4.1 — zones ; l'appel du cb est l'instant
                                                                    // mesuré par la NFR d'injection (§10)
-  renderedBodyShape(): RenderedBodyShape;  // §5.5 — la forme du HTML rendu par cette plateforme.
+  renderedBodyShape(): RenderedBodyShape | null;  // §5.5 — la forme du HTML rendu par cette
+                                       // plateforme, ou `null` si elle n'a pas été MESURÉE.
                                        // Obligatoire pour la même raison que la suivante
   getEditorChrome(editor: EditorHandle): EditorChrome;  // §5.1, §5.3 — où l'extension s'accroche dans CE
                                        // composeur. Obligatoire : une méthode optionnelle laisserait une
@@ -1556,6 +1557,10 @@ Trois propriétés la rendent sûre, et chacune répond à un échec précis :
 Elle est **obligatoire**, et ce choix se paie : toute doublure de test doit y répondre. Une méthode optionnelle ne coûterait rien et laisserait une plateforme nouvelle compiler sans jamais se prononcer — son extension se logerait alors au jugé sur un DOM que personne n'a regardé, silencieusement. Le compilateur doit poser la question ; répondre « rien de spécial » ne coûte qu'un mot.
 
 `renderedBodyShape()` répond à la même nécessité pour le §5.5, et mérite d'être distinguée sur un point : c'est la seule de ces deux méthodes dont l'absence produisait un rendu **faux** plutôt qu'un renoncement. Les faits de forme y étaient écrits en dur — un conteneur de paragraphe, un marqueur de fin de ligne —, mesurés sur une seule plateforme et appliqués à toutes. Sur un corps rendu où la fin de ligne n'est pas ce marqueur, la borne du sujet ne se déclenche jamais et un fragment entier du corps passe dans le sujet mis en avant. Les autres fuites de ce genre renoncent proprement ; celle-là se trompe, et c'est pourquoi la donnée doit venir de la plateforme même lorsque toutes répondent, aujourd'hui, la même chose.
+
+**Elle rend `null` quand la forme n'a pas été mesurée, et cette troisième réponse est nécessaire.** Le châssis peut se passer d'une réponse : le composant A remonte alors au conteneur qui *dessine* le cadre, question de mise en page posée au moteur de style. Ici il n'existe aucun repli de ce genre — rien ne permet de **deviner** quelle balise matérialise une fin de ligne dans un corps rendu. Sans `null`, un adaptateur n'aurait le choix qu'entre affirmer une forme qu'il n'a pas observée et ne pas compiler ; déplacer une hypothèse depuis le code partagé vers l'adaptateur ne la rend pas vraie.
+
+`null` fait **renoncer** le masquage du préfixe et la mise en avant du sujet, sans rien retirer d'autre : les badges restent posés, le corps s'affiche entier. C'est la dégradation du §9.4 telle que `CA-11` la décrit — jamais un blocage de l'usage normal —, et c'est le seul repli honnête : un rendu incomplet se corrige, un rendu faux se remarque après coup. Rendre une forme est donc une **affirmation**, au même titre qu'un sélecteur mesuré, et non une valeur par défaut commode.
 
 En cas d'échec de reconnaissance, le §9.4 s'applique sans réserve : aucune exception ne remonte, la dégradation est journalisée, et l'absence de retrait intérieur ne dégrade que l'esthétique du composeur — jamais l'usage normal de la plateforme (`CA-11`).
 

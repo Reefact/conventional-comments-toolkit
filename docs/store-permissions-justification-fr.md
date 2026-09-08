@@ -34,10 +34,12 @@ et `content-internal.ts`) :**
 - `chrome.storage.managed` : lecture du plancher de politique d'entreprise
   (§8.1.1), pas d'écriture côté extension.
 
-**`selectorFailures`, ce qu'il contient.** Les 50 dernières fois où une
-règle de sélection n'a trouvé aucun élément : son nom, l'horodatage, et
-l'adresse de la page où c'est arrivé. Une ligne par règle — celle du
-dernier relevé —, écrite par le script de contenu via `appendToJournal`.
+**`selectorFailures`, ce qu'il contient.** Une ligne par règle de
+sélection n'ayant trouvé aucun élément, cinquante au plus : le nom de la
+règle, l'horodatage et l'adresse de la page de son DERNIER relevé. Ce
+n'est donc pas un historique des cinquante dernières occurrences — une
+règle qui échoue mille fois n'occupe jamais qu'une ligne. Écrite par le
+script de contenu via `appendToJournal`.
 La page d'options l'affiche et permet de l'effacer. Il ne quitte pas
 l'appareil : la remontée télémétrique, elle, ne porte que le nom de la
 règle (§10).

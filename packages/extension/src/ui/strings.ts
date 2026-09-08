@@ -118,7 +118,7 @@ const fr: Record<string, string> = {
   'options.status.selectors.some': '{count} dégradation(s) de sélecteur enregistrée(s).',
   'options.status.selectors.clear': 'Effacer le journal',
   'options.status.selectors.legend':
-    'Même marque = même page. Cliquer ouvre l’adresse relevée, dans un nouvel onglet.',
+    'Même marque = même page. Un clic ouvre l’adresse relevée dans un nouvel onglet.',
   'options.status.selectors.page.unknown': 'Page non enregistrée.',
   'options.platform.github': 'GitHub Enterprise Server / GHE Cloud',
   'options.platform.azdo': 'Azure DevOps Server ou organisation visualstudio.com',

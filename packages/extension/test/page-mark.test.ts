@@ -29,6 +29,20 @@ describe('§9.4 — ce qui fait « la même page »', () => {
     expect(pageKey('https://github.com/')).toBe('https://github.com/');
   });
 
+  it('garde la vue quand elle vit dans la REQUÊTE — Azure DevOps', () => {
+    // GitHub met la vue dans le chemin (`/files`, `/changes`) ; Azure DevOps la met dans la
+    // requête. Les écarter toutes donnait une seule marque à deux écrans différents, et la
+    // légende « même marque = même page » devenait fausse là où le journal doit aider
+    // (revue Reefact, PR #70).
+    const AZ = 'https://dev.azure.com/acme/proj/_git/repo/pullrequest/42';
+    expect(pageKey(`${AZ}?_a=files`)).not.toBe(pageKey(`${AZ}?_a=overview`));
+    expect(pageKey(`${AZ}?_a=files`)).toBe(`${AZ}?_a=files`);
+    // Ce qui n'est PAS une vue continue de sortir, sur les deux plateformes.
+    expect(pageKey(`${AZ}?_a=files&discussionId=7`)).toBe(pageKey(`${AZ}?_a=files`));
+    // L'ordre des paramètres ne fait pas deux pages : un retour d'historique les réordonne.
+    expect(pageKey(`${AZ}?discussionId=7&_a=files`)).toBe(pageKey(`${AZ}?_a=files`));
+  });
+
   it('rend `null` plutôt que de lever, sur une adresse inanalysable', () => {
     // Un journal de diagnostic ne fait jamais échouer son appelant : ici, la ligne perdrait
     // sa marque, elle ne ferait pas disparaître la dégradation.

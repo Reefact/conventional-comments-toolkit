@@ -21,10 +21,19 @@ afterEach(() => {
 
 /** Contexte d'un script de contenu, avec une aire locale qui RELIT ce qu'on y écrit —
  * `appendToJournal` relit avant d'écrire, un faux muet ne pourrait pas l'exprimer. */
-function installChrome(): { written: Record<string, unknown> } {
+function installChrome(): { written: Record<string, unknown>; clear: () => void } {
   const written: Record<string, unknown> = {};
+  const listeners: ((c: Record<string, { newValue?: unknown }>, a: string) => void)[] = [];
+  // Effacer depuis la page d'options, tel que le navigateur le fait voir à un onglet : la clé
+  // disparaît, ET `onChanged` le notifie. Un faux qui retirerait la clé sans notifier
+  // décrirait un navigateur qui n'existe pas.
+  const clear = () => {
+    delete written['selectorFailures'];
+    for (const l of listeners) l({ selectorFailures: {} }, 'local');
+  };
   (globalThis as { chrome?: unknown }).chrome = {
     storage: {
+      onChanged: { addListener: (l: (typeof listeners)[number]) => listeners.push(l), removeListener: () => {} },
       local: {
         get: (keys: string[], cb: (i: Record<string, unknown>) => void) => {
           // `github.com` doit être CLASSÉ, sinon `bootstrap()` n'instancie aucun adaptateur
@@ -43,7 +52,7 @@ function installChrome(): { written: Record<string, unknown> } {
       },
     },
   };
-  return { written };
+  return { written, clear };
 }
 
 type Captured = { log?: { degraded: (chain: { name: string; candidates: string[] }) => void } };
@@ -181,6 +190,31 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     // Une seule ligne — la déduplication du journal partagé tient —, mais à jour.
     expect(journal(written)).toHaveLength(1);
     expect(journal(written)[0]!.url).toBe('https://github.com/acme/demo/pull/99');
+
+    vi.doUnmock('@cct/adapter-github');
+  });
+
+  it('après effacement, la même chaîne réenregistre sur la MÊME page', async () => {
+    // « Effacer puis mesurer à nouveau » ne mesurait rien : le journal partait, mais les
+    // onglets ouverts tenaient toujours la chaîne pour déjà signalée, et reproduire le
+    // défaut sur la page même où on venait de le voir n'écrivait rien. Il fallait changer de
+    // PR ou recharger (revue Reefact, PR #70).
+    const { written, clear } = installChrome();
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42/files');
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    await settle();
+    expect(journal(written)).toHaveLength(1);
+
+    clear();
+    expect(journal(written)).toHaveLength(0);
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    // `appendToJournal` sérialise ses écritures : après plusieurs passages, la file compte
+    // plus d'un maillon, et un seul tour de boucle ne suffit plus à la vider.
+    for (let i = 0; i < 8; i++) await settle();
+    expect(journal(written)).toHaveLength(1);
+    expect(journal(written)[0]!.url).toBe('https://github.com/acme/demo/pull/42/files');
 
     vi.doUnmock('@cct/adapter-github');
   });

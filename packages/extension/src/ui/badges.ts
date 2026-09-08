@@ -346,6 +346,9 @@ function isLosslessBadgeProjection(prefixLine: string, shown: ResolvedDecoration
  * d'accessibilité une emphase que l'auteur n'a pas écrite (§10). Le poids visuel se lit à l'œil,
  * l'information, elle, est déjà portée par les badges. */
 const SUBJECT_CLASS = 'cct-subject';
+/** Marque posée par `decorateComment` sur l'élément où il écrit ses badges, quand ce n'est pas
+ * le corps lui-même. C'est la moitié DOM d'`OWN_BADGES` (adapter-shared). */
+const BADGE_HOST_CLASS = 'cct-badge-host';
 
 /** Nœuds du sujet, dans l'ordre : depuis le frère qui suit le préfixe masqué jusqu'à la fin de
  * la PREMIÈRE ligne. Deux frontières, parce que le corps rendu en connaît deux : un `<br>` —
@@ -492,6 +495,9 @@ function unwrapSubject(commentBodyElement: Element): void {
  * défaisage doit couvrir tout ce que le rendu pose, pas seulement ce qui se voit. */
 export function clearCommentDecorations(root: ParentNode): void {
   for (const badge of [...root.querySelectorAll('.cct-badge')]) badge.remove();
+  // La marque de l'hôte part avec les badges qu'elle désignait : la laisser ferait relire comme
+  // « nôtre » un élément où plus rien n'est à nous.
+  for (const h of [...root.querySelectorAll(`.${BADGE_HOST_CLASS}`)]) h.classList.remove(BADGE_HOST_CLASS);
   for (const spacer of [...root.querySelectorAll(`.${SUBJECT_BREAK_CLASS}`)]) spacer.remove();
   // Le sujet AVANT le préfixe : les deux vivent dans le même parent, et défaire le sujet
   // d'abord laisse `revealPrefix()` recoller la ligne entière d'un seul `normalize()`.
@@ -673,5 +679,10 @@ export function decorateComment(
   // prepend() insère tous les badges en une fois, dans l'ordre donné (label, puis les
   // décorations dans l'ordre d'écriture) — contrairement à insertAdjacentElement('afterbegin'),
   // répété, qui les aurait posés en ordre inverse.
+  // MARQUER l'hôte quand ce n'est pas le corps lui-même : `OWN_BADGES` (adapter-shared) s'y
+  // règle pour retrouver ces badges à la relecture. Sans cette marque il cherchait sous un
+  // `<p>`, ce qui cessait d'être vrai dès qu'une plateforme déclarait un autre conteneur de
+  // paragraphe (`renderedBodyShape()`). Retirée par `clearCommentDecorations`.
+  if (host !== commentBodyElement) host.classList.add(BADGE_HOST_CLASS);
   host.prepend(badge, ...decorationBadges(shown, hiddenDescriptive, config, lang));
 }

@@ -12,7 +12,7 @@
 // quatre-vingt-dix autres appels s'appuient sur le défaut et passeraient à l'identique.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { MARKDOWN_HTML_BODY_SHAPE, type RenderedBodyShape } from '@cct/adapter-shared';
+import { commentBodyText, MARKDOWN_HTML_BODY_SHAPE, type RenderedBodyShape } from '@cct/adapter-shared';
 import { defaultConfig } from '@cct/core';
 import { decorateComment } from '../src/ui/badges.js';
 
@@ -68,6 +68,31 @@ describe('§5.5 — la forme du corps rendu vient de la plateforme, pas d’une 
     // Le sujet s'arrête au `<hr>` : « après hr » n'y entre pas.
     expect(subject!.textContent).toBe('le sujet');
     expect(subject!.textContent).not.toContain('après hr');
+  });
+
+  it('un SECOND rendu sur une forme non-P n’accumule pas les badges, et le corps se relit', () => {
+    // Le défaut que ce test verrouille (revue Reefact, PR #66) : `decorateComment` pose ses
+    // badges dans le conteneur que la plateforme déclare, mais `OWN_BADGES` cherchait sous un
+    // `<p>` écrit en dur. Sur une forme non-`P`, la relecture ne les retirait plus — leur texte
+    // passait pour le corps — et le rendu suivant ne les retrouvait pas non plus, donc les
+    // empilait.
+    const el = document.createElement('div');
+    el.innerHTML = '<div>issue: le nom est ambigu</div>';
+    document.body.appendChild(el);
+
+    decorateComment(el, 'issue: le nom est ambigu', defaultConfig(), profile, 'en', OTHER_SHAPE);
+    const afterFirst = el.querySelectorAll('.cct-badge').length;
+    expect(afterFirst).toBeGreaterThan(0);
+
+    // Le corps relu ne doit contenir AUCUN texte de badge : c'est ce que `analyze()` recevra
+    // au tour suivant, et un corps pollué casse la reconnaissance du préfixe.
+    const reread = commentBodyText(el);
+    expect(reread).toContain('issue: le nom est ambigu');
+    expect(reread.trim()).toBe('issue: le nom est ambigu');
+
+    // Second passage, corps relu comme en production : le compte ne bouge pas.
+    decorateComment(el, reread, defaultConfig(), profile, 'en', OTHER_SHAPE);
+    expect(el.querySelectorAll('.cct-badge').length).toBe(afterFirst);
   });
 
   it('le défaut nommé vaut exactement ce que le code écrivait en dur', () => {

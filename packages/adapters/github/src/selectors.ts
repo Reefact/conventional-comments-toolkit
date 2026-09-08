@@ -9,16 +9,40 @@
 import type { SelectorChain } from '@cct/adapter-shared';
 
 export const selectors = {
-  /** **Les zones de saisie ont déménagé dans `surfaces.ts`.** Elles y sont réparties en trois
-   * surfaces — React, héritée, vue des fichiers modifiés — parce qu'elles ne posaient pas la
-   * question à laquelle une chaîne répond. Une chaîne modélise la dérive dans le TEMPS ;
-   * `/pull/N` et `/pull/N/changes` coexistent, et réunies dans une seule chaîne la première qui
-   * matchait faisait disparaître l'autre composeur. `surfaces.ts` dit pourquoi et ce que ça
-   * coûte.
+  /** Zones de saisie de la génération REACT — jamais observée en direct dans ce dépôt,
+   * conservée parce que rien ne prouve qu'elle ne décrive aucune vue.
    *
-   * Ce qui reste vrai des trois prises MESURÉES sur la vue des fichiers modifiés, et qui n'a pas
-   * sa place ailleurs — deux attributs du champ y sont inutilisables, `-snlco` étant un hachage
-   * de build de Primer et `_r_qm_` un identifiant `useId` de React :
+   * Les trois chaînes de composeur qui suivent sont assemblées en SURFACES par `surfaces.ts` :
+   * `/pull/N` et `/pull/N/changes` coexistent, et une chaîne unique rendait invisible le
+   * composeur de la seconde (une chaîne rend les éléments du premier candidat qui matche).
+   * Les sélecteurs restent ici — le §9.4 les veut « centralisés dans un fichier unique par
+   * adaptateur », et un second fichier de sélecteurs enfreindrait la règle que cette
+   * modélisation sert à honorer. `surfaces.ts` ne porte que la STRUCTURE. */
+  editorsReact: {
+    name: 'editors',
+    candidates: [
+      'textarea[aria-label*="omment"][class*="CommentBox"]',
+      'div[data-testid*="comment-composer"] textarea',
+    ],
+  } satisfies SelectorChain,
+
+  /** Zones de saisie de la génération HÉRITÉE. */
+  editorsLegacy: {
+    name: 'editors',
+    candidates: [
+      'textarea[name="comment[body]"]',
+      'textarea[name="pull_request_review_comment[body]"]',
+      'textarea[name="pull_request_review[body]"]',
+      'textarea.js-comment-field',
+    ],
+  } satisfies SelectorChain,
+
+  /** Zones de saisie de la NOUVELLE VUE DES FICHIERS MODIFIÉS (`/pull/N/changes`).
+   *
+   * MESURÉ en console sur `/pull/45/changes`, composeur de ligne ouvert (2026-09-04) — voir
+   * extension/test/changes-view-composer.test.ts, qui reproduit le relevé. Deux attributs du
+   * champ y sont inutilisables : `-snlco` est un hachage de build de Primer, `_r_qm_` un
+   * identifiant `useId` de React. Restent trois prises, de la plus spécifique à la plus large :
    *
    *   - `aria-label="Markdown value"` — nom accessible que Primer donne au champ de son éditeur
    *     Markdown. Il ne contient pas « comment », ce sur quoi tombait l'ancien premier candidat ;
@@ -27,10 +51,18 @@ export const selectors = {
    *   - `class*="prc-Textarea-TextArea"` — le composant Primer, hachage retiré : le filet le plus
    *     large, et le seul qui survive à une réécriture des deux précédents.
    *
-   * L'ordre à l'intérieur de leur surface va toujours de la prise la plus spécifique à la plus
-   * large, et pour la raison d'avant : une prise large en tête pourrait n'attraper qu'une partie
-   * des éditeurs de cette surface et faire disparaître le reste. Ce que le déménagement change,
-   * c'est que ce risque est désormais borné à UNE surface au lieu de traverser les trois. */
+   * L'ordre va du plus spécifique au plus large parce qu'une prise large en tête pourrait
+   * n'attraper qu'une partie des éditeurs de cette surface et faire disparaître le reste. Ce que
+   * la modélisation en surfaces change, c'est que ce risque est borné à UNE surface au lieu de
+   * traverser les trois. */
+  editorsChanges: {
+    name: 'editors',
+    candidates: [
+      'textarea[aria-label="Markdown value"]',
+      'textarea[placeholder="Leave a comment"]',
+      'textarea[class*="prc-Textarea-TextArea"]',
+    ],
+  } satisfies SelectorChain,
 
   /** Sonde générique « cette page porte-t-elle une surface de saisie ? » — elle ne sert qu'à
    * DÉCIDER si l'absence de match de `editors` est une dégradation (§9.4) ou le cas nominal.
@@ -45,11 +77,28 @@ export const selectors = {
     candidates: ['textarea', '[contenteditable="true"]'],
   } satisfies SelectorChain,
 
-  /** **Le châssis du composeur a déménagé dans `surfaces.ts`.** Il y vit COLLÉ aux zones de
-   * saisie de sa surface, et c'est le point : « où l'extension s'accroche » est une propriété de
-   * la surface, pas de la plateforme. Les tenir séparés laissait la question sans réponse unique
-   * — c'est ce qui avait produit huit correctifs de mise en page découvrant chacun un endroit de
-   * plus où les deux générations diffèrent. */
+  /** Le CHÂSSIS du composeur React — le conteneur qui encadre ENSEMBLE l'en-tête natif, les
+   * onglets, le champ et ce que l'extension injecte. Sélecteur d'ANCÊTRE, possiblement
+   * éloigné : son homologue dans `editorsReact` est un sélecteur descendant, le champ peut donc
+   * être niché sous un wrapper intermédiaire.
+   *
+   * Ces deux candidats ont vécu EN DUR DANS LE CONTRÔLEUR PARTAGÉ, donc évalués aussi sur une
+   * page Azure DevOps, où ils ne matchent rien. `surfaces.ts` les rattache à la surface qui les
+   * emploie ; ils sont définis ici, comme tous les sélecteurs de cet adaptateur (§9.4). */
+  composerFrame: {
+    name: 'composer-frame',
+    candidates: ['[data-testid*="comment-composer"]'],
+  } satisfies SelectorChain,
+
+  /** Génération React sans `data-testid` : la marque est portée par la ZONE DE SAISIE
+   * elle-même, et son châssis est alors son parent direct. Chaîne distincte de la précédente
+   * parce que la question posée n'est pas la même — ici on interroge le champ (`matches`), là on
+   * remonte ses ancêtres (`closest`). Les confondre ferait remonter au premier ancêtre portant
+   * la marque, qui n'est pas le parent direct. */
+  composerFrameOnField: {
+    name: 'composer-frame-on-field',
+    candidates: ['[class*="CommentBox"]'],
+  } satisfies SelectorChain,
 
   /** **Description de la PR — hors périmètre** (§4.1, dernière ligne du tableau : format non
    * validé, aucun état bloquant). L'éditeur qu'on y ouvre n'est pas une zone du §4.1 : il ne

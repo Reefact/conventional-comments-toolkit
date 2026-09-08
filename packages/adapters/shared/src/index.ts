@@ -127,11 +127,20 @@ export interface PlatformAdapter {
    * doit poser la question ; `NEUTRAL_EDITOR_CHROME` permet d'y répondre « rien de spécial »
    * en un mot. */
   getEditorChrome(editor: EditorHandle): EditorChrome;
-  /** §5.5 — la forme du HTML que cette plateforme produit en rendant un corps de commentaire.
-   * Obligatoire pour la même raison que `getEditorChrome` : c'est une question qu'une
-   * plateforme nouvelle doit se voir poser, et à laquelle `MARKDOWN_HTML_BODY_SHAPE` répond en
-   * un mot quand rien ne la distingue. */
-  renderedBodyShape(): RenderedBodyShape;
+  /** §5.5 — la forme du HTML que cette plateforme produit en rendant un corps de commentaire,
+   * ou `null` si elle n'a pas été MESURÉE.
+   *
+   * Obligatoire pour la même raison que `getEditorChrome` : c'est une question qu'une plateforme
+   * nouvelle doit se voir poser. Mais contrairement au châssis, il n'y a pas de repli
+   * géométrique ici — rien ne permet de DEVINER quelle balise matérialise une fin de ligne.
+   * `null` fait donc RENONCER le masquage du préfixe et la mise en avant du sujet ; les badges
+   * restent posés, et le corps s'affiche entier. C'est la dégradation sûre du §9.4 (CA-11), et
+   * le seul repli honnête : une valeur plausible mais non vérifiée peut faire glisser une partie
+   * de la discussion dans le sujet mis en avant (revue Reefact, PR #66).
+   *
+   * Rendre `MARKDOWN_HTML_BODY_SHAPE` est donc une AFFIRMATION — « j'ai mesuré, c'est bien
+   * `<p>`/`<br>` » — et non un défaut commode. */
+  renderedBodyShape(): RenderedBodyShape | null;
   readValue(editor: EditorHandle): string;
   writeValue(editor: EditorHandle, text: string, caret?: number): void;
   getThreads(): Promise<ThreadInfo[]>;

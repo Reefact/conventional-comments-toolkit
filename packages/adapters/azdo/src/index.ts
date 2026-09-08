@@ -26,7 +26,6 @@ import {
   queryChain,
   queryChainAll,
   writeToTextField,
-  MARKDOWN_HTML_BODY_SHAPE,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
   type EditorChrome,
@@ -179,12 +178,24 @@ export class AzdoClientAdapter implements PlatformAdapter {
     return NEUTRAL_EDITOR_CHROME;
   }
 
-  /** §5.5 — la forme d'un rendu Markdown → HTML ordinaire, faute d'avoir mesuré celle d'Azure
-   * DevOps. C'est la même réponse que GitHub, et c'est donc sans effet aujourd'hui ; ce qui
-   * change, c'est qu'elle est désormais DONNÉE ici plutôt que supposée par le code partagé, et
-   * qu'un jour de mesure elle se corrigera à cet endroit précis. */
-  renderedBodyShape(): RenderedBodyShape {
-    return MARKDOWN_HTML_BODY_SHAPE;
+  /** §5.5 — **`null` : la forme du corps rendu d'Azure DevOps n'a pas été mesurée.**
+   *
+   * Rendre `MARKDOWN_HTML_BODY_SHAPE` ici aurait été confortable et faux : c'est le couple
+   * `<p>`/`<br>` RELEVÉ SUR GITHUB, et déplacer une hypothèse dans l'adaptateur ne la rend pas
+   * vraie (revue Reefact, PR #66). Le commentaire d'à côté disait d'ailleurs qu'on n'avait rien
+   * mesuré, pendant que le code affirmait le contraire.
+   *
+   * Ce que ça coûte, écrit franchement : sur Azure DevOps, le préfixe n'est plus masqué et le
+   * sujet n'est plus mis en avant. Les badges, eux, restent posés — ils ne dépendent d'aucune
+   * de ces deux balises. Le corps s'affiche entier, jamais tronqué ni réordonné.
+   *
+   * Ce que ça évite : une mauvaise valeur de `lineBreakTag` ne borne pas le sujet là où il faut,
+   * et fait passer une partie de la discussion en gras dans le sujet. Un rendu incomplet se
+   * corrige ; un rendu faux se remarque après coup.
+   *
+   * Pour l'activer : mesurer un corps de commentaire rendu sur un vrai tenant (A-FAIRE-fr.md,
+   * point 9), et déclarer ici les deux balises observées. Rien d'autre à toucher. */  renderedBodyShape(): RenderedBodyShape | null {
+    return null;
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {

@@ -95,6 +95,40 @@ describe('§5.5 — la forme du corps rendu vient de la plateforme, pas d’une 
     expect(el.querySelectorAll('.cct-badge').length).toBe(afterFirst);
   });
 
+  it('forme INCONNUE (null) : le masquage renonce, les badges restent, le corps est entier', () => {
+    // La réponse d'une plateforme dont le rendu n'a pas été mesuré — celle d'Azure DevOps
+    // aujourd'hui (revue Reefact, PR #66). Deviner `<p>`/`<br>` serait plausible et non vérifié,
+    // et une mauvaise borne fait glisser une partie de la discussion dans le sujet mis en avant.
+    // Renoncer est la dégradation sûre du §9.4 (CA-11).
+    const el = document.createElement('div');
+    el.innerHTML = '<p>issue: le nom est ambigu<br>et la suite de la discussion</p>';
+    document.body.appendChild(el);
+
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en', null);
+
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+    expect(el.querySelector('.cct-subject')).toBeNull();
+    // Les badges ne dépendent d'aucune des deux balises : ils restent posés.
+    expect(el.querySelectorAll('.cct-badge').length).toBeGreaterThan(0);
+    // Et le corps reste ENTIER — c'est ce que « renoncer » doit vouloir dire.
+    expect(commentBodyText(el)).toContain('et la suite de la discussion');
+  });
+
+  it('une plateforme qui redevient INCONNUE défait le masquage déjà posé', () => {
+    // Une plateforme peut passer de « mesurée » à « inconnue » entre deux rendus. Sauter l'appel
+    // plutôt que de le faire avec `null` laisserait un préfixe masqué que plus rien n'entretient.
+    const el = document.createElement('div');
+    el.innerHTML = '<p>issue: le nom est ambigu</p>';
+    document.body.appendChild(el);
+
+    decorateComment(el, 'issue: le nom est ambigu', defaultConfig(), profile, 'en', MARKDOWN_HTML_BODY_SHAPE);
+    expect(el.querySelector('.cct-hidden-prefix')).not.toBeNull();
+
+    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en', null);
+    expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
+    expect(commentBodyText(el)).toContain('issue: le nom est ambigu');
+  });
+
   it('le défaut nommé vaut exactement ce que le code écrivait en dur', () => {
     // Contre-épreuve du déplacement : les deux adaptateurs répondent aujourd'hui la même
     // chose, et le refactoring devait être à comportement RIGOUREUSEMENT nul. Si ce défaut

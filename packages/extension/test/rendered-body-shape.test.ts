@@ -39,7 +39,7 @@ describe('§5.5 — la forme du corps rendu vient de la plateforme, pas d’une 
     document.body.appendChild(el);
 
     // Avec la forme de GitHub, ce `<div>` n'est pas un conteneur de paragraphe reconnu : le
-    // masquage RENONCE, ce qui est l'issue sûre (§9.4, CA-11).
+    // masquage RENONCE, ce qui est l'issue sûre (§5.5) : afficher moins, jamais afficher faux.
     decorateComment(el, 'issue: le nom est ambigu', defaultConfig(), profile, 'en', MARKDOWN_HTML_BODY_SHAPE);
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
   });
@@ -99,7 +99,8 @@ describe('§5.5 — la forme du corps rendu vient de la plateforme, pas d’une 
     // La réponse d'une plateforme dont le rendu n'a pas été mesuré — celle d'Azure DevOps
     // aujourd'hui (revue Reefact, PR #66). Deviner `<p>`/`<br>` serait plausible et non vérifié,
     // et une mauvaise borne fait glisser une partie de la discussion dans le sujet mis en avant.
-    // Renoncer est la dégradation sûre du §9.4 (CA-11).
+    // Renoncer est le repli de RENDU du §5.5 — pas une dégradation de sélecteur : la plateforme
+    // a répondu, et sa réponse est qu'elle n'a pas mesuré. Rien n'est donc journalisé.
     const el = document.createElement('div');
     el.innerHTML = '<p>issue: le nom est ambigu<br>et la suite de la discussion</p>';
     document.body.appendChild(el);

@@ -442,6 +442,20 @@ Le blocage d'envoi du mode `enforce` est donc un **garde-fou, pas un mur** : il 
   Le bandeau affiche donc **le décompte publié** comme titre, et les ancres qu'il a su apparier. Quand il en apparie moins, il l'indique — « 2 sur 3 localisés » — et renvoie au statut pour le détail. `CA-03` porte sur le décompte affiché, jamais sur le nombre d'ancres. En l'absence de résumé — composant B non déployé, ou première évaluation encore en cours — il se rabat sur les fils lus dans le DOM (`getThreads()`), un fil dont l'état n'y est pas rendu (`resolution: 'unknown'`) étant compté **non résolu**, comme au §B.5 ; il indique alors explicitement qu'il s'agit d'une vue locale et non de l'état de conformité.
 - Filtre local par label dans la liste des fils de discussion.
 
+**Masquage du préfixe et mise en avant du sujet.** Les badges disent déjà ce que le préfixe structuré écrit ; les laisser côte à côte fait lire deux fois la même chose. Quand les conditions ci-dessous sont réunies, le préfixe est donc **masqué dans le corps rendu** — jamais supprimé du contenu stocké (§5.5, premier point) —, les badges prennent sa place **en tête de la ligne du sujet**, et le **sujet** — le texte qui suit le préfixe jusqu'à la première fin de ligne — est mis en avant. La ligne se lit alors comme un titre : de quoi il s'agit, précédé de ce qui le qualifie.
+
+Le masquage n'est permis **que si la projection en badges est sans perte** : tout ce qui disparaît du texte doit rester lisible **par son nom** dans les badges. Une décoration syntaxiquement valide mais rejetée (§3.3), ou repliée dans un badge de dépassement « +N », interdit donc le masquage — la replier ET l'effacer du texte perdrait l'information au lieu de la déplacer.
+
+**Ces deux opérations interrogent la plateforme, et renoncent quand elle ne répond pas.** Ce qu'elles ont besoin de savoir — quelles balises enveloppent une ligne de Markdown ordinaire, laquelle matérialise une fin de ligne simple — est un fait de RENDU, propre à chaque plateforme, que le §9.2.3 fait déclarer par l'adaptateur (`renderedBodyShape()`). Le renoncement est obligatoire dans chacun de ces cas :
+
+- la plateforme n'a pas mesuré la forme de son corps rendu (`renderedBodyShape()` rend `null`) ;
+- le conteneur de premier niveau n'est pas l'une des balises de paragraphe déclarées ;
+- la projection en badges n'est pas sans perte, au sens ci-dessus.
+
+**Renoncer, c'est afficher moins, jamais afficher faux.** Les badges restent posés — au-dessus du corps plutôt que dans la ligne du sujet —, le corps s'affiche **entier**, préfixe compris, et rien n'est ni tronqué ni réordonné. C'est la dégradation du §9.4 que `CA-11` décrit, et c'est le seul repli admissible : un rendu incomplet se corrige, un rendu faux se remarque après coup. En particulier, une borne de sujet calculée sur une balise que la plateforme n'emploie pas ferait passer une partie de la discussion dans le sujet mis en avant — c'est le défaut que ces règles existent pour rendre impossible.
+
+Une plateforme qui **cesse** de répondre après avoir répondu — configuration modifiée, mise à jour de l'adaptateur — doit voir le masquage antérieur **défait**, et non simplement plus entretenu : un préfixe masqué que plus rien ne gouverne serait un contenu perdu pour le lecteur.
+
 ---
 
 ## 6. Blocage de la complétion de la PR (O3)
@@ -1499,6 +1513,9 @@ interface EditorChrome {
 
 // La FORME du HTML qu'une plateforme produit en rendant un corps de commentaire Markdown — les deux
 // seuls faits que le masquage de préfixe et la mise en avant du sujet (§5.5) interrogent.
+// Les noms de balises s'écrivent dans LA CASSE QU'ON VEUT : le code partagé normalise avant de
+// comparer. Imposer la casse de `Element.tagName` aurait fait d'une écriture naturelle — `'p'`,
+// `'br'` — une forme conforme au type et inerte à l'exécution, sans aucun diagnostic.
 interface RenderedBodyShape {
   paragraphTags: readonly string[];    // conteneurs de premier niveau enveloppant une ligne de Markdown
                                        // ordinaire sans avoir consommé de syntaxe de tête ; tout le reste
@@ -1534,7 +1551,7 @@ interface PlatformAdapter {
 }
 ```
 
-**Ces deux méthodes sont les seules requêtes réseau de l'extension, et elles demandent leur justification.** Sans elles, l'extension ne connaît ni les labels, ni `activatedAt`, ni les seuils : elle valide contre les défauts produit et diverge du serveur sur le cas le plus banal — un dépôt qui a ajouté un label. Le §8.1.5 lui prescrit d'ailleurs trois comportements de repli sur le fichier de dépôt, ce qui suppose qu'elle le lise.
+**`getRepoConfig()` et `getOrgConfig()` sont les seules requêtes réseau de l'extension, et elles demandent leur justification.** Sans elles, l'extension ne connaît ni les labels, ni `activatedAt`, ni les seuils : elle valide contre les défauts produit et diverge du serveur sur le cas le plus banal — un dépôt qui a ajouté un label. Le §8.1.5 lui prescrit d'ailleurs trois comportements de repli sur le fichier de dépôt, ce qui suppose qu'elle le lise.
 
 Il en faut **deux**, et pas seulement la première : le composant B résout trois niveaux (§8.1.2), et une extension qui n'en résoudrait que deux calculerait un `configFingerprint` qui ne peut **jamais** coïncider avec celui du serveur dès qu'une organisation renseigne le niveau 2. La règle 2 du §8.1.3 désarmerait alors le blocage d'envoi en permanence — le mode de défaillance exact que cette règle existe pour prévenir. Résoudre la même configuration des deux côtés n'est pas un confort, c'est la condition pour que l'empreinte veuille dire quelque chose.
 
@@ -1556,13 +1573,17 @@ Trois propriétés la rendent sûre, et chacune répond à un échec précis :
 
 Elle est **obligatoire**, et ce choix se paie : toute doublure de test doit y répondre. Une méthode optionnelle ne coûterait rien et laisserait une plateforme nouvelle compiler sans jamais se prononcer — son extension se logerait alors au jugé sur un DOM que personne n'a regardé, silencieusement. Le compilateur doit poser la question ; répondre « rien de spécial » ne coûte qu'un mot.
 
-`renderedBodyShape()` répond à la même nécessité pour le §5.5, et mérite d'être distinguée sur un point : c'est la seule de ces deux méthodes dont l'absence produisait un rendu **faux** plutôt qu'un renoncement. Les faits de forme y étaient écrits en dur — un conteneur de paragraphe, un marqueur de fin de ligne —, mesurés sur une seule plateforme et appliqués à toutes. Sur un corps rendu où la fin de ligne n'est pas ce marqueur, la borne du sujet ne se déclenche jamais et un fragment entier du corps passe dans le sujet mis en avant. Les autres fuites de ce genre renoncent proprement ; celle-là se trompe, et c'est pourquoi la donnée doit venir de la plateforme même lorsque toutes répondent, aujourd'hui, la même chose.
+`renderedBodyShape()` répond à la même nécessité pour le §5.5, et mérite d'être distinguée de `getEditorChrome()` sur un point : c'est la seule des deux dont l'absence produisait un rendu **faux** plutôt qu'un renoncement. Les faits de forme y étaient écrits en dur — un conteneur de paragraphe, un marqueur de fin de ligne —, mesurés sur une seule plateforme et appliqués à toutes. Sur un corps rendu où la fin de ligne n'est pas ce marqueur, la borne du sujet ne se déclenche jamais et un fragment entier du corps passe dans le sujet mis en avant. Les autres fuites de ce genre renoncent proprement ; celle-là se trompe, et c'est pourquoi la donnée doit venir de la plateforme même lorsque toutes répondent, aujourd'hui, la même chose.
 
 **Elle rend `null` quand la forme n'a pas été mesurée, et cette troisième réponse est nécessaire.** Le châssis peut se passer d'une réponse : le composant A remonte alors au conteneur qui *dessine* le cadre, question de mise en page posée au moteur de style. Ici il n'existe aucun repli de ce genre — rien ne permet de **deviner** quelle balise matérialise une fin de ligne dans un corps rendu. Sans `null`, un adaptateur n'aurait le choix qu'entre affirmer une forme qu'il n'a pas observée et ne pas compiler ; déplacer une hypothèse depuis le code partagé vers l'adaptateur ne la rend pas vraie.
 
 `null` fait **renoncer** le masquage du préfixe et la mise en avant du sujet, sans rien retirer d'autre : les badges restent posés, le corps s'affiche entier. C'est la dégradation du §9.4 telle que `CA-11` la décrit — jamais un blocage de l'usage normal —, et c'est le seul repli honnête : un rendu incomplet se corrige, un rendu faux se remarque après coup. Rendre une forme est donc une **affirmation**, au même titre qu'un sélecteur mesuré, et non une valeur par défaut commode.
 
 En cas d'échec de reconnaissance, le §9.4 s'applique sans réserve : aucune exception ne remonte, la dégradation est journalisée, et l'absence de retrait intérieur ne dégrade que l'esthétique du composeur — jamais l'usage normal de la plateforme (`CA-11`).
+
+**« Je ne me prononce pas » et « je ne reconnais plus » se ressemblent, et ne doivent pas se confondre.** Les deux rendent `framedContainer: null` ; le premier est le cas nominal d'une plateforme dont la boîte n'est pas nommée, le second est une rupture de la plateforme. Le contrat ne les distingue pas par sa valeur de retour, et il n'a pas à le faire — ce serait charger tous les appelants d'un état qui ne les regarde pas. **L'obligation porte donc sur l'adaptateur** : celui qui NOMME un châssis et ne le reconnaît plus doit journaliser la dégradation au sens du §9.4, comme pour n'importe quel sélecteur pourri ; celui qui n'en nomme aucun ne journalise rien, sous peine de noyer `CA-11` sous des non-événements. Sans cette règle, un renommage chez la plateforme retire le retrait intérieur **en silence**, et le journal qui existe pour révéler la pourriture des sélecteurs reste vide au moment précis où il devrait parler.
+
+La même règle vaut pour toute réponse qui se dérobe : un adaptateur ne peut rendre « rien » que là où il n'a jamais rien affirmé. Là où il a affirmé, l'absence est une mesure, et une mesure se journalise.
 
 #### 9.2.4 Contrat serveur (composant B)
 

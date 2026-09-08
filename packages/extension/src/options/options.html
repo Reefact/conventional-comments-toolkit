@@ -118,17 +118,28 @@
         flex-wrap: wrap;
       }
       header.top .titles { min-width: 0; }
+      /* L'icône est SŒUR des titres, jamais fille du `<h1>` : `applyStaticStrings` écrit
+         `textContent` sur tout `[data-i18n]`, et une `<img>` placée dedans serait effacée
+         au premier rendu, dans les deux langues. */
+      header.top .brand { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+      /* 48 px : la hauteur du bloc titre + sous-titre (titre 26 px, marge 5 px, sous-titre
+         21 px). L'icône le borde donc exactement, sans dépasser — l'en-tête ne grandit pas. */
+      header.top .brand-mark { flex: none; width: 48px; height: 48px; }
 
       /* Bouton discret, pas plein : il ne CHANGE rien, il raconte. En bleu, il aurait le
          poids visuel de « Autoriser », qui accorde une permission d'accès à un domaine. */
+      /* Plus menu que les autres boutons, et c'est voulu : il ne CHANGE rien, il raconte —
+         et l'en-tête doit tenir sur une ligne, icône de 48 px comprise. Le rétrécissement
+         vit ici, sur le seul bouton concerné. */
       .btn-tour {
         display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
+        gap: 0.35rem;
         flex: none;
-        margin-top: 0.15rem;
+        font-size: 0.72rem;
+        padding: 0.32rem 0.55rem;
       }
-      .btn-tour svg { width: 13px; height: 13px; }
+      .btn-tour svg { width: 12px; height: 12px; }
       header.top h1 {
         font-family: var(--font-display);
         font-weight: 700;
@@ -363,21 +374,25 @@
   <body>
     <div class="page">
       <header class="top">
-        <div class="titles">
-          <h1 data-i18n="options.title">Conventional Comments Toolkit</h1>
-          <p data-i18n="options.subtitle">Réglages de l'extension.</p>
+        <div class="brand">
+          <img class="brand-mark" src="icons/icon-128.png" alt="" aria-hidden="true" />
+          <div class="titles">
+            <h1 data-i18n="options.title">Conventional Comments Toolkit</h1>
+            <p data-i18n="options.subtitle">Réglages de l'extension.</p>
+          </div>
         </div>
         <!-- Toujours présent, y compris avant la première visite : le cacher tant qu'elle
              n'a pas été vue économiserait un bouton pour créer un cas de plus, et qui a
              cliqué « Passer » d'entrée doit pouvoir revenir. -->
-        <button id="tour-replay" class="btn btn-s btn-tour" type="button">
+        <button id="tour-replay" class="btn btn-s btn-tour" type="button"
+          title="Revoir la visite guidée" data-i18n-title="options.tour.replay.title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="9" />
             <path d="M9.6 9.2a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2.2-2.4 3.6" />
             <path d="M12 17.2h.01" />
           </svg>
-          <span data-i18n="options.tour.replay">Revoir la visite guidée</span>
+          <span data-i18n="options.tour.replay">Visite guidée</span>
         </button>
       </header>
 

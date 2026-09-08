@@ -1,4 +1,6 @@
-# Composant B (compagnon serveur) — image auto-hébergeable, une instance par client.
+# Composant B en service hébergé (profil B du §6.4.1) — image auto-hébergeable, une
+# instance par client. Ce profil ne sert plus que Azure DevOps : sur GitHub, le
+# vérificateur est une GitHub Action et rien n'est à héberger (§A.8).
 # Multi-étages : l'outillage de build (TypeScript, vitest) ne voyage jamais dans l'image
 # finale. Zéro dépendance runtime (§10) : `npm ci --omit=dev` ne crée que les liens de
 # workspaces, aucun paquet tiers n'entre dans l'image.
@@ -13,23 +15,21 @@ COPY packages/adapters/shared/package.json packages/adapters/shared/package.json
 COPY packages/adapters/github/package.json packages/adapters/github/package.json
 COPY packages/adapters/azdo/package.json packages/adapters/azdo/package.json
 COPY packages/extension/package.json packages/extension/package.json
+COPY packages/action/package.json packages/action/package.json
 COPY packages/server/package.json packages/server/package.json
 RUN npm ci
-# Puis uniquement ce que `tsc -b` consomme.
+# Puis uniquement ce que la compilation consomme. `build:server` est `tsc -b
+# packages/server`, qui tire `core` par référence de projet et RIEN d'autre : ni les
+# adaptateurs client, ni l'extension, ni le paquet action, dont aucun ne s'exécute ici.
+# L'ancien `npm run build` compilait tout le monorepo, ce qui obligeait à copier des
+# sources pour les jeter ensuite — et faisait échouer la construction dès qu'un paquet
+# était ajouté sans être copié.
 COPY tsconfig.base.json ./
 COPY packages/core/tsconfig.json packages/core/tsconfig.json
 COPY packages/core/src packages/core/src
-COPY packages/adapters/shared/tsconfig.json packages/adapters/shared/tsconfig.json
-COPY packages/adapters/shared/src packages/adapters/shared/src
-COPY packages/adapters/github/tsconfig.json packages/adapters/github/tsconfig.json
-COPY packages/adapters/github/src packages/adapters/github/src
-COPY packages/adapters/azdo/tsconfig.json packages/adapters/azdo/tsconfig.json
-COPY packages/adapters/azdo/src packages/adapters/azdo/src
-COPY packages/extension/tsconfig.json packages/extension/tsconfig.json
-COPY packages/extension/src packages/extension/src
 COPY packages/server/tsconfig.json packages/server/tsconfig.json
 COPY packages/server/src packages/server/src
-RUN npm run build
+RUN npm run build:server
 
 FROM node:22-alpine
 ENV NODE_ENV=production
@@ -43,6 +43,7 @@ COPY packages/adapters/shared/package.json packages/adapters/shared/package.json
 COPY packages/adapters/github/package.json packages/adapters/github/package.json
 COPY packages/adapters/azdo/package.json packages/adapters/azdo/package.json
 COPY packages/extension/package.json packages/extension/package.json
+COPY packages/action/package.json packages/action/package.json
 COPY packages/server/package.json packages/server/package.json
 RUN npm ci --omit=dev --ignore-scripts
 

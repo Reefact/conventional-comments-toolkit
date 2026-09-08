@@ -253,6 +253,25 @@ export class SelectorLog {
     this.#telemetry = telemetry;
   }
 
+  /** Oublie ce qui a déjà été signalé, pour que la page SUIVANTE puisse l'être à son tour.
+   *
+   * `#seen` borne le BRUIT — `getCompletionControl()` journalise à chaque mutation du DOM —,
+   * pas la durée de vie de l'onglet. Or GitHub navigue d'une PR à l'autre sans recharger :
+   * une chaîne déjà signalée restait muette sur toutes les PR suivantes, si bien que l'entrée
+   * gardait la page et l'horodatage de la PREMIÈRE. Un onglet ouvert sur dix PR n'en
+   * rapportait qu'une, et c'était la plus ancienne (revue Codex, PR #70).
+   *
+   * L'appelant qui SAIT qu'on a changé de PR le dit ici. Le compte reste alors d'une entrée
+   * par chaîne et par PR visitée — jamais par mutation, qui est ce que la déduplication
+   * existe pour empêcher. La remontée télémétrique suit la même cadence, et c'est cohérent :
+   * elle mesure alors sur combien de PR une chaîne a échoué, plutôt que le rythme des
+   * mutations, qui ne mesure rien.
+   *
+   * Ce que ce geste ne fait PAS : vider `failures`, qui garde ce qu'il a déjà vu. */
+  forgetSeen(): void {
+    this.#seen.clear();
+  }
+
   degraded(chain: SelectorChain): void {
     if (this.#seen.has(chain.name)) return;
     this.#seen.add(chain.name);

@@ -11,6 +11,7 @@
 // moment-là passerait le premier test sans rien enregistrer de juste.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { PrRef } from '@cct/core';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
 
 afterEach(() => {
@@ -49,8 +50,13 @@ type Captured = { log?: { degraded: (chain: { name: string; candidates: string[]
 
 /** Amarre le journal à un adaptateur mocké, comme le fait `telemetry.test.ts` : c'est le
  * seul moyen de déclencher une dégradation sans page réelle. */
-async function bootstrapWith(url: string): Promise<Captured> {
+async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promise<Captured> {
   let captured: Captured = {};
+  // `currentPr()` est interrogé à chaque passage de l'observateur : une file permet de
+  // simuler une navigation d'une PR à l'autre, la dernière valeur valant ensuite pour
+  // toujours.
+  const queue = [...prs];
+  const currentPr = () => (queue.length > 1 ? queue.shift()! : queue[0]!);
   vi.doMock('@cct/adapter-github', () => ({
     GithubClientAdapter: class {
       constructor(opts: Captured) {
@@ -69,11 +75,23 @@ async function bootstrapWith(url: string): Promise<Captured> {
             return { dispose: () => {} };
           },
           currentPr() {
-            return null;
+            return currentPr();
           },
           readPublishedResult() {
             return null;
           },
+          // L'observateur de navigation interroge la page à chaque tour pour décider si elle
+          // a bougé : sans ces réponses, il lève, et le test échouerait sur son harnais
+          // plutôt que sur ce qu'il mesure.
+          matches: () => true,
+          platformProfile: () => ({ id: 'github', suggestionInfoString: null }),
+          getSubmitControls: () => [],
+          readValue: () => '',
+          writeValue: () => {},
+          async getThreads() {
+            return [];
+          },
+          getCompletionControl: () => null,
         });
       }
     },
@@ -127,6 +145,42 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     // Sans la relecture de `location` dans le rappel, cette entrée porterait `/pull/42` —
     // l'URL d'injection —, et le journal accuserait la mauvaise page.
     expect(journal(written)[0]!.url).toBe('https://github.com/acme/demo/pull/99/changes');
+
+    vi.doUnmock('@cct/adapter-github');
+  });
+
+  it('après une navigation SPA, la MÊME chaîne réenregistre la nouvelle page', async () => {
+    // Le défaut signalé en revue (PR #70) : `SelectorLog` ne notifie qu'une fois par chaîne
+    // et par onglet. Relire `location` au moment de la dégradation ne servait donc qu'à la
+    // PREMIÈRE PR d'un onglet — sur toutes les suivantes, la chaîne restait muette et
+    // l'entrée gardait la page la plus ancienne. C'est exactement le cas que la PR
+    // annonçait couvrir.
+    const { written } = installChrome();
+    const pr = (number: number): PrRef => ({
+      platform: 'github',
+      host: 'github.com',
+      scope: ['acme', 'demo'],
+      number,
+      createdAt: null,
+    });
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42', [pr(42), pr(99)]);
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    await settle();
+    expect(journal(written)[0]!.url).toBe('https://github.com/acme/demo/pull/42');
+
+    // La navigation : l'URL change, et une mutation du DOM réveille l'observateur — c'est
+    // ainsi que Turbo et React changent de PR, sans rechargement.
+    setLocation('https://github.com/acme/demo/pull/99');
+    document.body.appendChild(document.createElement('span'));
+    for (let i = 0; i < 12; i++) await settle();
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    await settle();
+
+    // Une seule ligne — la déduplication du journal partagé tient —, mais à jour.
+    expect(journal(written)).toHaveLength(1);
+    expect(journal(written)[0]!.url).toBe('https://github.com/acme/demo/pull/99');
 
     vi.doUnmock('@cct/adapter-github');
   });

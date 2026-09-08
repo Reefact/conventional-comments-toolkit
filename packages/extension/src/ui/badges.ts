@@ -629,11 +629,17 @@ export function decorateComment(
   // réapparu tel quel. Idempotent (firstTextNode ignore les `.cct-badge` déjà posés, encore
   // présents ici), donc gratuit quand rien n'a bougé.
   // `shape === null` : la plateforme n'a pas MESURÉ la forme de son corps rendu (§9.2.3). Le
-  // masquage du préfixe et la mise en avant du sujet renoncent alors entièrement — c'est la
-  // dégradation sûre du §9.4 (CA-11), et le seul repli honnête : deviner quelle balise borne une
-  // ligne, c'est risquer de faire glisser une partie de la discussion dans le sujet mis en avant.
-  // Les badges, eux, sont posés plus bas : ils ne dépendent d'aucune de ces deux balises, et le
-  // corps s'affiche entier.
+  // masquage du préfixe et la mise en avant du sujet renoncent alors entièrement — c'est le seul
+  // repli honnête : deviner quelle balise borne une ligne, c'est risquer de faire glisser une
+  // partie de la discussion dans le sujet mis en avant. Les badges, eux, sont posés plus bas :
+  // ils ne dépendent d'aucune de ces deux balises, et le corps s'affiche entier.
+  //
+  // Ce renoncement n'est PAS une dégradation de sélecteur, et rien n'est journalisé ici. Le §9.4
+  // trace un ÉCHEC DE DÉTECTION — un sélecteur qu'on croyait bon ne ramène plus rien ; ici la
+  // plateforme a répondu, et sa réponse est qu'elle ne sait pas. Confondre les deux mettrait une
+  // plateforme entière en échec permanent et écrirait une entrée par commentaire rendu, à chaque
+  // mutation de la page, noyant les vraies dégradations — c'est le défaut déjà payé sur
+  // `merge-button`. Le commentaire d'ici a d'abord dit le contraire (revue Reefact, PR #65).
   //
   // `applyPrefixVisibility(…, null, …)` — et non un simple saut : le second argument à `null`
   // DÉFAIT un masquage antérieur. Sans cet appel, une plateforme passant de « mesurée » à

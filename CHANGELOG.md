@@ -30,7 +30,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 - **The options page is available in French and in English** (§10, Internationalisation). It was hardcoded French while offering an "Interface language" setting that changed every other surface but its own: someone who had set the interface to English saw English on their pull requests, and still saw French on the settings page where they made that choice. The language now resolves from your preference, then from the browser's — §8.1.2's middle level, the effective configuration, has no meaning here since it resolves for a repository and this page shows none — and changing it applies immediately rather than at the next reload.
 
-- **A guided tour, played once on the first opening of the options page**, naming each section and what it is for. It skips the "unconfigured domains" panel unless that anomaly is already present, remembers being finished *or* skipped, closes on `Escape`, confines the keyboard while it is open and returns it afterwards, and announces each step through an `aria-live` region (§10, Accessibilité). A "Replay the guided tour" button in the page header replays it.
+- **A guided tour, played once on the first opening of the options page**, naming each section and what it is for. It skips the "unconfigured domains" panel unless that anomaly is already present, remembers being finished *or* skipped, closes on `Escape`, keeps keyboard focus inside the tour while it is open and restores the previous focus afterwards, and announces each step through an `aria-live` region (§10, Accessibilité). A "Replay the guided tour" button in the page header replays it.
 
 ### Fixed
 

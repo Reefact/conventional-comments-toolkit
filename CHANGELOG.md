@@ -12,6 +12,16 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Added
+
+- **The "Status" section of the options page carries a subtitle**, like every other section on that screen. It was the only heading with nothing under it saying what the section is for.
+
+### Fixed
+
+- **The guided tour dims the page enough to be seen doing it, and its card no longer wears the colour of the panels it covers** (§10). Measured rather than judged: in the dark theme, a 55 % black veil laid over a background that is already almost black removed **less than 10 %** of its luminosity, so the tour claimed to spotlight one panel while the rest of the page looked untouched; and the card took `--bg-surface`, the panels' own colour, seven points away from the page background. The veil now removes at least 60 % of the background's luminosity in both themes, and the card is a raised surface — lighter than the panels in the dark theme, with a drop shadow that can actually be seen. `npm run check:options-tour` measures both on the pixels really painted, which is the only place they can be read: the dimming is a drop shadow, and `getComputedStyle` reports one on the element that casts it, never on the elements it covers.
+
 ## [1.0.0-beta.11] - 2026-09-08
 
 ### Changed

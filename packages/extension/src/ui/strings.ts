@@ -99,7 +99,7 @@ const fr: Record<string, string> = {
   'options.telemetry.optin': 'Autoriser l’envoi de compteurs agrégés à mon organisation',
   'options.status.heading': 'État',
   'options.status.sub':
-    'Lecture de la configuration et changements de structure détectés sur les pages.',
+    'Lecture de la configuration et sélecteurs n’ayant pas trouvé les éléments attendus.',
   // Chaînes posées par le code, pas par la page.
   'options.host.remove': 'Retirer',
   'options.host.activate': 'Activer',
@@ -147,7 +147,7 @@ const fr: Record<string, string> = {
     'Désactivée par défaut, et sans effet tant que votre organisation n’a pas déclaré de point de collecte. Elle n’émet que des compteurs — jamais le texte d’un commentaire, d’un code ou d’un diff, ni l’adresse de la page.',
   'tour.status.title': 'État',
   'tour.status.body':
-    'Dit si l’extension a pu lire la configuration de votre organisation, et signale les changements de structure détectés sur les pages. C’est ici qu’on regarde quand quelque chose ne se comporte pas comme prévu.',
+    'Dit si l’extension a pu lire la configuration de votre organisation, et signale les sélecteurs qui n’ont pas trouvé les éléments attendus. C’est ici qu’on regarde quand quelque chose ne se comporte pas comme prévu.',
   'tour.end.title': 'C’est tout',
   'tour.end.body':
     'Vous connaissez l’écran. Il ne reste qu’à autoriser votre plateforme, en haut de la page : le navigateur vous demandera confirmation, et l’extension se mettra au travail.',
@@ -259,7 +259,7 @@ const en: Record<string, string> = {
   'options.telemetry.optin': 'Allow sending aggregate counters to my organisation',
   'options.status.heading': 'Status',
   'options.status.sub':
-    'Whether the configuration was read, and the structure changes detected on the pages.',
+    'Whether the configuration was read, and the selectors that could not find the expected page elements.',
   // Strings set by the code rather than by the page.
   'options.host.remove': 'Withdraw',
   'options.host.activate': 'Activate',
@@ -307,7 +307,7 @@ const en: Record<string, string> = {
     'Off by default, and inert until your organisation declares a collection endpoint. It only emits counters — never the text of a comment, of code or of a diff, nor the page address.',
   'tour.status.title': 'Status',
   'tour.status.body':
-    'Says whether the extension could read your organisation’s configuration, and reports the structure changes detected on the pages. This is where to look when something does not behave as expected.',
+    'Says whether the extension could read your organisation’s configuration, and reports selectors that could not find the expected page elements. This is where to look when something does not behave as expected.',
   'tour.end.title': 'That’s it',
   'tour.end.body':
     'You know the screen. All that is left is to allow your platform, at the top of the page: the browser will ask you to confirm, and the extension will get to work.',

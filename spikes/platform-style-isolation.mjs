@@ -65,8 +65,9 @@ const AZDO = join(root, 'packages/adapters/azdo/src/platform.css');
 const BEFORE_REF = process.env.CCT_STYLES_BEFORE_REF ?? null;
 
 function stylesBefore() {
+  let text;
   try {
-    return execFileSync('git', ['show', BEFORE_REF], { cwd: root, encoding: 'utf8', maxBuffer: 8 << 20 });
+    text = execFileSync('git', ['show', BEFORE_REF], { cwd: root, encoding: 'utf8', maxBuffer: 8 << 20 });
   } catch (e) {
     console.error(
       `Impossible de lire la feuille de référence (${BEFORE_REF}) : ${e.message}\n` +
@@ -75,6 +76,27 @@ function stylesBefore() {
     );
     process.exit(1);
   }
+  // `git show` accepte une RÉVISION aussi bien qu'un `rev:chemin`, et rend alors le texte du
+  // commit — message et diff. Ce texte se charge sans erreur dans une balise `<style>`, où il
+  // ne produit aucune règle : la comparaison sortait « 33 éléments ne rendent plus la même
+  // chose », c'est-à-dire la totalité du fixture, en désignant une régression qui n'existait
+  // pas. Le contrôle échouait donc dans le bon sens avec le mauvais motif, ce qui coûte le
+  // temps qu'on met à ne pas le croire.
+  //
+  // Une feuille de styles contient au moins une accolade ; un commit qui n'en contient aucune
+  // n'est pas une feuille. C'est grossier et c'est suffisant : on ne cherche pas à valider du
+  // CSS, seulement à distinguer une feuille d'un objet git qui n'en est pas une.
+  if (!text.includes('{')) {
+    console.error(
+      `La référence ${BEFORE_REF} ne désigne pas une feuille de styles : aucune accolade dans\n` +
+        `${text.length} caractère(s) lus. « git show » accepte une révision seule et rend alors le\n` +
+        'TEXTE DU COMMIT, qui se charge sans erreur et ne produit aucune règle — tout le fixture\n' +
+        'ressort alors en régression.\n' +
+        'La forme attendue porte le chemin :  CCT_STYLES_BEFORE_REF=origin/main:packages/extension/src/styles.css'
+    );
+    process.exit(1);
+  }
+  return text;
 }
 
 /** Un exemplaire de chaque surface que l'extension peint, avec les classes réelles qu'elle

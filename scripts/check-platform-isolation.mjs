@@ -255,6 +255,59 @@ for (const rel of NEUTRAL_ROOTS) {
   }
 }
 
+// ————— LE MÊME CRITÈRE, DANS L'AUTRE LANGAGE —————
+//
+// Tout ce qui précède ne lit que du TypeScript (`walk()` filtre sur `.ts`). Or la scission des
+// styles vit dans des `.css`, et ce garde ne la couvrait pas : remettre `var(--fgColor-default,
+// currentColor)` dans `packages/extension/src/styles.css` — un jeton Primer dans la feuille que
+// TOUTES les plateformes reçoivent — laissait `npm run checks` ET `check:style-isolation` au
+// vert (revue Reefact, PR #66). Mesuré en le faisant, pas déduit.
+//
+// Les deux autres gardes ne rattrapaient rien : `check:github-theme-vars` ne lit que la feuille
+// de plateforme de GitHub, et les invariants permanents de `check:style-isolation` comparent la
+// feuille partagée courante à elle-même — ils mesurent le SCOPE, pas la provenance d'un jeton.
+//
+// Le critère est celui d'au-dessus, mot pour mot : ce qu'écrit une feuille de plateforme
+// appartient à cette plateforme. Une variable non préfixée `--cct-` référencée dans un
+// `platform.css` est donc un jeton de cette plateforme, et n'a rien à faire dans la feuille
+// partagée. Les `--cct-*`, eux, sont NOTRE vocabulaire : c'est précisément l'indirection que
+// cette PR installe, et la feuille partagée doit continuer de les employer.
+const SHARED_SHEET = 'packages/extension/src/styles.css';
+
+/** Le CSS sans ses commentaires. Même raison que côté TypeScript : un commentaire cite parfois
+ * le jeton qu'il explique, et l'interdire ferait disparaître la mémoire des défauts. */
+function stripCssComments(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+}
+
+const cssVocabularies = new Map(); // plateforme -> Set(noms de variables)
+for (const platform of readdirSync(ADAPTERS)) {
+  if (platform === 'shared') continue;
+  const sheet = join(ADAPTERS, platform, 'src', 'platform.css');
+  let css;
+  try {
+    css = stripCssComments(readFileSync(sheet, 'utf8'));
+  } catch {
+    continue; // pas de feuille pour cette plateforme : rien à dériver
+  }
+  const names = new Set(
+    [...css.matchAll(/--[A-Za-z0-9_-]+/g)].map((m) => m[0]).filter((n) => !n.startsWith('--cct-'))
+  );
+  if (names.size > 0) cssVocabularies.set(platform, names);
+}
+
+const cssFindings = [];
+{
+  const shared = stripCssComments(readFileSync(join(root, SHARED_SHEET), 'utf8'));
+  for (const [platform, names] of cssVocabularies) {
+    for (const name of names) {
+      // Borné à droite : `--fgColor-default` ne doit pas matcher via `--fgColor-defaultXyz`.
+      if (!new RegExp(`${name}(?![A-Za-z0-9_-])`).test(shared)) continue;
+      cssFindings.push({ platform, name });
+    }
+  }
+}
+
 /** Le contrat lui-même ne doit nommer aucune plateforme : un port exposant
  * `isGitHubChangesView()` obligerait le code partagé à savoir de qui il parle, et le
  * conditionnel que le polymorphisme supprime reviendrait sous un autre nom. */
@@ -267,11 +320,14 @@ for (const m of contractCode.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?=[(:<])/g)) {
   if (platformNames.some((p) => id.toLowerCase().includes(p))) contractLeaks.push(id);
 }
 
-if (findings.length === 0 && contractLeaks.length === 0 && scattered.length === 0) {
+if (findings.length === 0 && contractLeaks.length === 0 && scattered.length === 0 && cssFindings.length === 0) {
   const total = [...vocabularies.values()].reduce((a, s) => a + s.size, 0);
   const detail = [...vocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ');
   console.log(`✓ isolation des plateformes : ${total} mots dérivés — ${detail} — absents du code partagé.`);
   console.log('✓ §9.4 : chaque adaptateur définit ses sélecteurs dans un fichier unique.');
+  const cssTotal = [...cssVocabularies.values()].reduce((a, s) => a + s.size, 0);
+  const cssDetail = [...cssVocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ') || 'aucune feuille renseignée';
+  console.log(`✓ styles : ${cssTotal} jeton(s) de plateforme — ${cssDetail} — absents de la feuille partagée.`);
   process.exit(0);
 }
 
@@ -283,6 +339,15 @@ if (findings.length > 0) {
       "dont le code partagé a besoin par une méthode du contrat (§9.2.3), qui rend une DONNÉE et\n" +
       'ne nomme aucune plateforme — voir `getEditorChrome()`. Le code partagé s\'exécute sur\n' +
       'TOUTES les plateformes : ce qui est écrit ici est exécuté par toutes.'
+  );
+}
+if (cssFindings.length > 0) {
+  console.error(
+    `\n${cssFindings.length} jeton(s) de plateforme dans ${SHARED_SHEET}, que TOUTES les plateformes reçoivent :\n` +
+      cssFindings.map((f) => `  - «${f.name}»  (feuille ${f.platform})`).join('\n') +
+      "\n\nUne mesure faite sur une plateforme ne se déclare pas dans la feuille commune : elle y devient\n" +
+      'une constante que les autres subissent. Déclarez un rôle `--cct-*` ici, et donnez-lui sa valeur\n' +
+      'dans la feuille de la plateforme concernée, sous son propre marqueur.'
   );
 }
 if (scattered.length > 0) {

@@ -58,6 +58,14 @@ and what a reader needs from them is the behaviour, not the thirteen.
   rule bearing a token reached by an element the fixture really styles. `check:extension-css`
   now covers every delivered sheet instead of one hardcoded path.
 
+- **The isolation guard now covers the stylesheets too, not only the TypeScript.** It walked
+  `.ts` files alone, so putting a Primer token back into the sheet every platform receives left
+  every guard green — measured by doing it, not deduced. The other two could not catch it:
+  `check:github-theme-vars` reads only GitHub's own sheet, and the permanent invariants of
+  `check:style-isolation` compare the shared sheet to itself, which measures scoping rather than
+  where a token came from. The criterion is unchanged, only applied in the other language: a
+  variable that is not `--cct-*` and appears in a platform sheet belongs to that platform.
+
 - **A named composer chrome that matches nothing is now recorded, instead of passing silently.**
   Where the adapter names the container it decorates and no longer finds it, that failure joins
   the selector log the extension already keeps (§9.4, `CA-11`); where a surface names none — the

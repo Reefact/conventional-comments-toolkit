@@ -193,6 +193,11 @@ export class AzdoClientAdapter implements PlatformAdapter {
    * et fait passer une partie de la discussion en gras dans le sujet. Un rendu incomplet se
    * corrige ; un rendu faux se remarque après coup.
    *
+   * Ce que ça n'est PAS : une dégradation de sélecteur. Rien n'est journalisé ici, et ce serait
+   * une faute de le faire — le §9.4 trace un ÉCHEC DE DÉTECTION, alors que cette plateforme
+   * RÉPOND, et répond qu'elle ne sait pas. La tenir pour dégradée la mettrait en échec permanent
+   * et écrirait une entrée par commentaire rendu (revue Reefact, PR #65).
+   *
    * Pour l'activer : mesurer un corps de commentaire rendu sur un vrai tenant (A-FAIRE-fr.md,
    * point 9), et déclarer ici les deux balises observées. Rien d'autre à toucher. */
   renderedBodyShape(): RenderedBodyShape | null {

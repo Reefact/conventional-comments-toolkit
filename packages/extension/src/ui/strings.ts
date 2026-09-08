@@ -116,6 +116,10 @@ const fr: Record<string, string> = {
   'options.status.ok': 'Configuration lue normalement.',
   'options.status.selectors.none': 'Aucune dégradation de sélecteur enregistrée.',
   'options.status.selectors.some': '{count} dégradation(s) de sélecteur enregistrée(s).',
+  'options.status.selectors.clear': 'Effacer le journal',
+  'options.status.selectors.legend':
+    'Même marque = même page. Cliquer ouvre l’adresse relevée, dans un nouvel onglet.',
+  'options.status.selectors.page.unknown': 'Page non enregistrée.',
   'options.platform.github': 'GitHub Enterprise Server / GHE Cloud',
   'options.platform.azdo': 'Azure DevOps Server ou organisation visualstudio.com',
   'options.platform.config': 'Hôte de configuration uniquement',
@@ -276,6 +280,10 @@ const en: Record<string, string> = {
   'options.status.ok': 'Configuration read normally.',
   'options.status.selectors.none': 'No selector degradation recorded.',
   'options.status.selectors.some': '{count} selector degradation(s) recorded.',
+  'options.status.selectors.clear': 'Clear the log',
+  'options.status.selectors.legend':
+    'Same mark = same page. Click one to open the recorded address in a new tab.',
+  'options.status.selectors.page.unknown': 'Page not recorded.',
   'options.platform.github': 'GitHub Enterprise Server / GHE Cloud',
   'options.platform.azdo': 'Azure DevOps Server or visualstudio.com organisation',
   'options.platform.config': 'Configuration host only',

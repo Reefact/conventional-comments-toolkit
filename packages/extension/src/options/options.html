@@ -118,6 +118,7 @@
         flex-wrap: wrap;
       }
       header.top .titles { min-width: 0; }
+
       /* Bouton discret, pas plein : il ne CHANGE rien, il raconte. En bleu, il aurait le
          poids visuel de « Autoriser », qui accorde une permission d'accès à un domaine. */
       .btn-tour {
@@ -271,6 +272,18 @@
       .status-row.degraded .dot { background: var(--warn); }
       .status-row .status-body { min-width: 0; }
       .status-row .status-text { font-size: 0.85rem; }
+      .status-detail { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+      /* Pas de gouttière fantôme quand il n'y a rien à montrer. */
+      .status-detail:empty { display: none; }
+      .status-detail pre { margin: 0; }
+      /* La marque de page NAVIGUE — d'où le traitement de lien, et `pointer` plutôt que
+         `help` : `help` annoncerait une explication, pas une destination. */
+      .status-row .page-mark { color: var(--accent); text-decoration: underline dotted; }
+      .status-row .page-mark-none { color: var(--fg-faint); cursor: help; }
+      .status-hint { margin: 0; font-size: 0.74rem; color: var(--fg-faint); }
+      /* La gouttière du bouton le décalerait de la colonne : son libellé doit tomber sur le
+         même bord que le journal et sa légende, pas sur celui de sa propre boîte. */
+      .status-detail .btn { margin-left: -0.5rem; }
       .status-row pre {
         margin: 0.3rem 0 0; font-family: var(--font-mono); font-size: 0.76rem;
         color: var(--fg-muted); white-space: pre-wrap; word-break: break-all;
@@ -505,7 +518,15 @@
           </div>
           <div class="status-row" id="selector-log">
             <span class="dot"></span>
-            <div class="status-body"><span class="status-text">—</span></div>
+            <div class="status-body">
+              <span class="status-text" aria-live="polite">—</span>
+              <!-- Rempli par le code : le journal, sa légende et le bouton d'effacement. Un
+                   conteneur DÉDIÉ, et non `.status-body` : le vider est alors sûr, là où
+                   vider `.status-body` emporterait la ligne d'état elle-même. La région
+                   live se limite pour la même raison à `.status-text` — l'englober ferait
+                   annoncer les cinquante lignes du journal au chargement. -->
+              <div class="status-detail" id="selector-log-detail"></div>
+            </div>
           </div>
         </section>
       </section>

@@ -132,6 +132,27 @@ describe('ce que la visite retient', () => {
   });
 });
 
+describe('ce qui assombrit la page', () => {
+  beforeEach(() => {
+    mountPage();
+    installStorage();
+  });
+
+  it('le voile s’efface dès qu’une lucarne est affichée', () => {
+    // Les deux ensemble sont pires que l'un ou l'autre : le voile passe SOUS la lucarne,
+    // donc il grise aussi la zone qu'elle est censée éclairer. Le défaut n'a été vu que sur
+    // une capture — l'étape 1 encadrait une zone exactement aussi sombre que le reste.
+    const tour = startTour(document, 'fr')!;
+    expect((document.querySelector('.tour-veil') as HTMLElement).hidden).toBe(true);
+    expect((document.querySelector('.tour-spot') as HTMLElement).hidden).toBe(false);
+
+    // La dernière étape n'a pas de cible : là, le voile est le SEUL à assombrir.
+    for (let i = 0; i < tour.length - 1; i += 1) tour.next();
+    expect((document.querySelector('.tour-veil') as HTMLElement).hidden).toBe(false);
+    expect((document.querySelector('.tour-spot') as HTMLElement).hidden).toBe(true);
+  });
+});
+
 describe('la fiche est une vraie modale', () => {
   beforeEach(() => {
     mountPage();

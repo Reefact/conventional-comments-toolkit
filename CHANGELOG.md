@@ -16,7 +16,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Changed
 
-- **Fixing GitHub can no longer break Azure DevOps** (§9.1, §9.4). Two GitHub selectors lived
+- **GitHub fixes can no longer break Azure DevOps** (§9.1, §9.4). Two GitHub selectors lived
   in the shared editor controller — a `comment-composer` composer and a `CommentBox` class —
   and therefore ran on every Azure DevOps page. They matched nothing there, so nothing looked
   broken; but §9.4 has always required DOM selectors to live "in a single file per adapter",

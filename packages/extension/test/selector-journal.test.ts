@@ -111,6 +111,30 @@ describe('§9.4 — le journal partagé garde une ligne par chaîne, celle écri
     expect(entries[1]).toEqual({ chain: 'merge-button', at: 't49' });
   });
 
+  // La page enregistrée dans l'entrée (§9.4) ne doit RIEN changer à cette borne. C'est le
+  // seul endroit où le champ nouveau pourrait rouvrir un défaut déjà payé : dédupliquer par
+  // « chaîne + page » ferait qu'une chaîne pourrie sur soixante PR remplirait à nouveau les
+  // cinquante lignes et évincerait toute vraie dégradation.
+  it('cinquante pages DIFFÉRENTES ne remplissent pas davantage le journal', async () => {
+    const store = fakeArea({ selectorFailures: [{ chain: 'thread-container', at: 'ancien' }] });
+
+    for (let i = 0; i < 50; i++) {
+      await appendToJournal(
+        'selectorFailures',
+        [{ chain: 'merge-button', at: `t${i}`, url: `https://github.com/acme/demo/pull/${i}` }],
+        50,
+        (e) => e.chain
+      );
+    }
+    delete (globalThis as { chrome?: unknown }).chrome;
+
+    const entries = store['selectorFailures'] as { chain: string; at: string; url?: string }[];
+    expect(entries).toHaveLength(2); // la vraie dégradation a survécu
+    expect(entries[0]).toEqual({ chain: 'thread-container', at: 'ancien' });
+    // Une ligne par chaîne, celle du dernier relevé — donc la page du dernier relevé aussi.
+    expect(entries[1]!.url).toBe('https://github.com/acme/demo/pull/49');
+  });
+
   // Sans clé de déduplication, le comportement d'avant est intact : le journal est générique,
   // et cette clause ne doit rien changer pour un appelant qui ne la demande pas.
   it('sans `dedupeBy`, les entrées s’empilent comme avant', async () => {

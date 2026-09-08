@@ -28,18 +28,24 @@ et `content-internal.ts`) :**
   clavier directs (`directShortcuts`) — ces deux préférences **se
   synchronisent entre les appareils du compte Chrome de l'utilisateur**
   si la synchronisation est activée (voir la note ci-dessous).
-- `chrome.storage.local` : état dégradé courant (`degradedState`),
-  purement diagnostique.
+- `chrome.storage.local` : état dégradé courant (`degradedState`) et
+  journal de dégradation de sélecteurs (`selectorFailures`), tous deux
+  purement diagnostiques.
 - `chrome.storage.managed` : lecture du plancher de politique d'entreprise
   (§8.1.1), pas d'écriture côté extension.
 
-**Correction (revue Codex, second passage) :** `selectorFailures` n'est
-que **lu** depuis `chrome.storage.local` par la page d'options
-(`options.ts:85`) — rien dans le code de production ne l'y **écrit**.
-`SelectorLog` ne garde ses échecs qu'en mémoire (tableau interne). Le
-journal affiché dans les réglages est donc toujours vide en l'état
-actuel ; ne pas le décrire comme une donnée réellement persistée tant que
-cette écriture n'existe pas.
+**`selectorFailures`, ce qu'il contient.** Les 50 dernières fois où une
+règle de sélection n'a trouvé aucun élément : son nom, l'horodatage, et
+l'adresse de la page où c'est arrivé. Une ligne par règle — celle du
+dernier relevé —, écrite par le script de contenu via `appendToJournal`.
+La page d'options l'affiche et permet de l'effacer. Il ne quitte pas
+l'appareil : la remontée télémétrique, elle, ne porte que le nom de la
+règle (§10).
+
+*(Une version antérieure de ce document affirmait que rien n'écrivait
+cette clé et que le journal était donc toujours vide. C'était vrai le
+jour où la page d'options lisait une clé que personne n'alimentait ; ça
+ne l'est plus.)*
 
 Il n'y a **pas** de liste de « dépôts autorisés » persistée, et le cache
 de lecture de `.conventional-comments.json` (`ClientConfigResolver`) est

@@ -16,6 +16,7 @@
 // (`selectPlatform()` n'active rien sans étiquette) sans que rien ne l'explique.
 
 import { TELEMETRY_CONSENT_KEY, managedEndpoint, parseConsent } from '../telemetry.js';
+import { pageKey, pageMark } from '../page-mark.js';
 import { ui } from '../ui/strings.js';
 import { applyStaticStrings, currentLanguage } from './i18n.js';
 import { maybeStartTour, startTour } from './tour.js';
@@ -45,6 +46,7 @@ declare const chrome: {
     local?: {
       get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
       set: (items: Record<string, unknown>, cb?: () => void) => void;
+      remove: (keys: string[], cb?: () => void) => void;
     };
     managed?: { get: (cb: (items: Record<string, unknown>) => void) => void };
     onChanged?: {
@@ -629,7 +631,8 @@ function refreshStatus(): void {
       Boolean(degradedState)
     );
 
-    const failures = (items['selectorFailures'] as { chain: string; at: string }[] | undefined) ?? [];
+    const failures =
+      (items['selectorFailures'] as { chain: string; at: string; url?: string }[] | undefined) ?? [];
     const log = document.getElementById('selector-log');
     renderStatus(
       log,
@@ -640,12 +643,94 @@ function refreshStatus(): void {
     );
     // Le détail sous la ligne, en monospace : ce sont des chaînes de sélecteurs, illisibles
     // en corps de texte, et sans intérêt tant qu'il n'y en a aucune.
-    const body = log?.querySelector('.status-body');
-    if (body && failures.length > 0) {
-      const detail = document.createElement('pre');
-      detail.textContent = failures.map((f) => `${f.at} — ${f.chain}`).join('\n');
-      body.appendChild(detail);
+    //
+    // Le conteneur est REMPLACÉ, jamais complété. La version d'avant faisait `appendChild`
+    // sur `.status-body`, ce qui tenait tant que ce rendu n'avait lieu qu'une fois : le
+    // bouton d'effacement le rappelle, et comme le journal est alors vide, rien n'était
+    // ajouté — l'ancien `<pre>` SURVIVAIT, affichant un journal fantôme sous la ligne qui
+    // venait d'annoncer qu'il n'y en avait plus.
+    const detail = document.getElementById('selector-log-detail');
+    if (detail) {
+      while (detail.firstChild) detail.removeChild(detail.firstChild);
+      if (failures.length > 0) {
+        detail.append(renderSelectorJournal(failures), renderSelectorLegend(), renderSelectorClear());
+      }
     }
+  });
+}
+
+/** Le journal, une ligne par entrée, précédée de la marque de sa page (§9.4).
+ *
+ * La marque se calcule sur la page NORMALISÉE — `?diff=split` et `#discussion_r1` ne font pas
+ * deux pages —, tandis que le lien et l'info-bulle portent l'adresse ENTIÈRE relevée : la
+ * marque répond « laquelle », le lien y emmène.
+ *
+ * Ce que la marque ne dit pas, et qu'il ne faut pas lui faire dire : le journal ne garde
+ * qu'une ligne par chaîne (`appendToJournal`, dédupliqué par `chain`). La page affichée est
+ * donc celle du dernier relevé de cette chaîne, jamais « la seule page où elle a échoué ».
+ *
+ * `createElement` + `textContent`, jamais d'`innerHTML` : ces valeurs viennent du stockage. */
+function renderSelectorJournal(failures: { chain: string; at: string; url?: string }[]): HTMLElement {
+  const pre = document.createElement('pre');
+  failures.forEach((f, i) => {
+    pre.append(renderPageMark(f.url), document.createTextNode(`  ${f.at} — ${f.chain}`));
+    if (i < failures.length - 1) pre.append(document.createTextNode('\n'));
+  });
+  return pre;
+}
+
+/** La marque d'une entrée : un lien vers l'adresse relevée, ou un remplissage neutre.
+ *
+ * Le remplissage fait SIX caractères comme les marques, sinon la colonne se désaligne
+ * exactement là où elle doit rester lisible — sur les entrées écrites avant que l'adresse ne
+ * soit enregistrée.
+ *
+ * `pageKey` rend `null` sur tout ce qui n'est pas `http(s)` : c'est la liste blanche des
+ * schémas, et elle vaut ici pour la fabrication du `href`. Un script de contenu ne s'exécute
+ * que sur le web, mais cette valeur est relue du stockage, et un `href` fabriqué à partir de
+ * données stockées se vérifie. */
+function renderPageMark(url: string | undefined): HTMLElement {
+  const page = url === undefined ? null : pageKey(url);
+  if (page === null || url === undefined) {
+    const none = document.createElement('span');
+    none.className = 'page-mark-none';
+    none.textContent = '······';
+    none.title = ui(lang, 'options.status.selectors.page.unknown');
+    return none;
+  }
+  const link = document.createElement('a');
+  link.className = 'page-mark';
+  link.textContent = pageMark(page);
+  link.href = url;
+  link.title = url;
+  // Un nouvel onglet : la page d'options ne doit pas se perdre elle-même au clic.
+  // `noreferrer` évite d'annoncer l'identifiant de l'extension au site ouvert.
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  return link;
+}
+
+function renderSelectorLegend(): HTMLElement {
+  const hint = document.createElement('p');
+  hint.className = 'status-hint';
+  hint.textContent = ui(lang, 'options.status.selectors.legend');
+  return hint;
+}
+
+/** Vide le journal — et lui seul.
+ *
+ * PAS `degradedState` : cette ligne-là rapporte la dernière lecture de configuration, et la
+ * remettre à « lue normalement » affirmerait une lecture qui n'a pas eu lieu.
+ *
+ * `remove` plutôt que `set({ selectorFailures: [] })` : c'est l'opération que « effacer »
+ * désigne, et elle ne laisse pas une valeur pour dire qu'il n'y a rien. Ce qu'elle ne fait
+ * PAS, parce que `chrome.storage` n'offre aucune écriture conditionnelle : gagner la course
+ * contre un onglet dont `appendToJournal` serait entre sa lecture et son écriture. Le journal
+ * réapparaîtrait alors avec l'entrée de cet onglet — c'est la même perte qu'assume
+ * `storage.ts` pour un outil de diagnostic, pas un défaut que ce bouton introduit. */
+function renderSelectorClear(): HTMLElement {
+  return makeButton(ui(lang, 'options.status.selectors.clear'), 'btn btn-quiet', () => {
+    chrome?.storage?.local?.remove(['selectorFailures'], () => refreshStatus());
   });
 }
 /** Démarrage. L'ordre n'est pas cosmétique : `lang` doit être posée AVANT le premier rendu,

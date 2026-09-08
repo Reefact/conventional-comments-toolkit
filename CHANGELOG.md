@@ -14,6 +14,10 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The guided tour no longer says the extension changed the pages' structure.** Its "Status" step read « les pages dont la structure a changé **sous elle** » / "pages whose structure changed **under it**", which reads as if the extension had done the changing — where in fact it reports the opposite: pages that moved underneath it, which is why a selector stopped matching. It now names what the section displays, in the same words as that section's own subtitle. The subtitle was written by copying this sentence, so the copy was corrected first and the original outlived it by one release.
+
 ### Added
 
 - **The "Status" section of the options page carries a subtitle**, like every other section on that screen. It was the only heading with nothing under it saying what the section is for.

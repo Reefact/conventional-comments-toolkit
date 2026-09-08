@@ -90,13 +90,24 @@ function vocabularyOf(css) {
 const vocabularies = new Map(); // plateforme -> Set(mots)
 for (const platform of readdirSync(ADAPTERS)) {
   if (platform === 'shared') continue;
-  const file = join(ADAPTERS, platform, 'src/selectors.ts');
-  let src;
+  // TOUT le paquet de la plateforme, jamais un fichier nommé. Ce garde a lu
+  // `src/selectors.ts` pendant exactement un chantier : le jour où les candidats de composeur
+  // sont partis dans `src/surfaces.ts`, le vocabulaire GitHub est tombé de 60 mots à 54, le
+  // garde est resté AU VERT, et il ne rattrapait plus la fuite pour laquelle il avait été
+  // écrit. Trouvé en réintroduisant la fuite après le déplacement, jamais en relisant.
+  //
+  // Un nom de fichier est une liste d'un seul élément, et il vieillit comme les autres : la
+  // leçon que ce garde applique déjà aux noms de plateforme vaut aussi pour l'endroit où il
+  // va les chercher. Le critère juste est le PAQUET — tout ce qu'écrit un paquet de
+  // plateforme est, par construction, du vocabulaire de cette plateforme.
+  const dir = join(ADAPTERS, platform, 'src');
+  let files;
   try {
-    src = readFileSync(file, 'utf8');
+    files = walk(dir);
   } catch {
-    continue; // un adaptateur sans fichier de sélecteurs : rien à dériver
+    continue; // un adaptateur sans sources : rien à dériver
   }
+  const src = files.map((f) => readFileSync(f, 'utf8')).join('\n');
   // Les chaînes du fichier de sélecteurs, commentaires exclus — un commentaire y cite parfois
   // un sélecteur en exemple, ce qui n'en fait pas un candidat.
   // `minifyWhitespace` et non le transform nu : esbuild CONSERVE les commentaires attachés aux
@@ -113,9 +124,41 @@ for (const platform of readdirSync(ADAPTERS)) {
   //
   // `name:` porte l'étiquette de journalisation d'une chaîne (`merge-button`, `editors`), pas
   // un nom de la plateforme : l'interdire au code partagé n'aurait aucun sens.
-  const literals = [...code.matchAll(/(['"`])((?:(?!\1)[^\\]|\\.)*)\1/g)].map((m) => m[2]);
-  const chainNames = new Set([...code.matchAll(/name\s*:\s*['"`]([^'"`]+)['"`]/g)].map((m) => m[1]));
-  vocabularies.set(platform, vocabularyOf(literals.filter((l) => !chainNames.has(l)).join('\n')));
+  // Les TABLEAUX DE CANDIDATS, où qu'ils vivent dans le paquet — c'est le seul texte d'un
+  // adaptateur qui soit un sélecteur DOM. Élargir à toutes les chaînes du paquet paraissait
+  // plus sûr et ne l'était pas : les chemins d'API et le nom de notre propre fichier de
+  // configuration (`.conventional-comments.json`) entraient au vocabulaire, et le garde
+  // interdisait au code partagé des mots qui sont les siens.
+  //
+  // Le découpage est fait en ÉQUILIBRANT les crochets, pas par une expression régulière : un
+  // sélecteur en contient (`textarea[aria-label*="omment"][class*="CommentBox"]`), et une
+  // capture non gloutonne s'arrêtait au premier — le vocabulaire GitHub tombait alors à six
+  // mots et le garde passait avec ET sans la fuite. C'est le même défaut qui a coûté deux
+  // corrections à ce fichier ; il est ici traité à la source.
+  const candidates = [];
+  for (let i = code.indexOf('candidates'); i !== -1; i = code.indexOf('candidates', i + 1)) {
+    const open = code.indexOf('[', i);
+    if (open === -1) continue;
+    let depth = 0;
+    let quote = null;
+    let j = open;
+    for (; j < code.length; j++) {
+      const ch = code[j];
+      if (quote) {
+        if (ch === '\\') j++;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+      else if (ch === '[') depth++;
+      else if (ch === ']' && --depth === 0) break;
+    }
+    candidates.push(code.slice(open, j));
+  }
+  const literals = candidates.flatMap((block) =>
+    [...block.matchAll(/(['"`])((?:(?!\1)[^\\]|\\.)*)\1/g)].map((m) => m[2])
+  );
+  vocabularies.set(platform, vocabularyOf(literals.join('\n')));
 }
 
 if (vocabularies.size === 0) {
@@ -178,7 +221,7 @@ if (findings.length > 0) {
   console.error(
     `${findings.length} identifiant(s) de plateforme dans du code qui ne doit connaître aucune plateforme :\n` +
       findings.map((f) => `  - ${f.relPath}  «${f.word}»  (vocabulaire ${f.platform})`).join('\n') +
-      '\n\nCe mot vient du fichier de sélecteurs d\'un adaptateur. Sa place est là-bas : exposez ce\n' +
+      '\n\nCe mot est un candidat de sélecteur d\'un adaptateur. Sa place est dans ce paquet : exposez\n' +
       "dont le code partagé a besoin par une méthode du contrat (§9.2.3), qui rend une DONNÉE et\n" +
       'ne nomme aucune plateforme — voir `getEditorChrome()`. Le code partagé s\'exécute sur\n' +
       'TOUTES les plateformes : ce qui est écrit ici est exécuté par toutes.'

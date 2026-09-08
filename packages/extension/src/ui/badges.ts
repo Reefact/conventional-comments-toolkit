@@ -29,7 +29,12 @@ import {
   type PlatformProfile,
   type ResolvedDecoration,
 } from '@cct/core';
-import { MARKDOWN_HTML_BODY_SHAPE, OWN_BADGES, type RenderedBodyShape } from '@cct/adapter-shared';
+import {
+  MARKDOWN_HTML_BODY_SHAPE,
+  normalizeBodyShape,
+  OWN_BADGES,
+  type RenderedBodyShape,
+} from '@cct/adapter-shared';
 import { ui } from './strings.js';
 
 function labelBadge(label: { icon?: string; id: string; color?: string }, config: EffectiveConfig): HTMLElement {
@@ -588,8 +593,12 @@ export function decorateComment(
    * l'adaptateur qui doit se voir poser la question, pas les quelque quatre-vingt-dix appels de
    * test qui ne s'intéressent pas au sujet. Le seul appel de production
    * (content-internal.ts) passe la réponse de l'adaptateur. */
-  shape: RenderedBodyShape | null = MARKDOWN_HTML_BODY_SHAPE
+  rawShape: RenderedBodyShape | null = MARKDOWN_HTML_BODY_SHAPE
 ): void {
+  // Normalisé ICI, à l'entrée unique du module, et pas aux trois comparaisons qui l'emploient :
+  // une normalisation répartie s'oublie au quatrième site. `tagName` rend `P` en HTML, un
+  // adaptateur peut légitimement écrire `'p'` (revue Reefact, PR #65).
+  const shape = rawShape === null ? null : normalizeBodyShape(rawShape);
   const a = analyze(
     {
       body: bodyText,

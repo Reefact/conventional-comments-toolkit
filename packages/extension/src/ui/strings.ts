@@ -98,6 +98,8 @@ const fr: Record<string, string> = {
     'Désactivée par défaut. N’émet que des compteurs agrégés — label utilisé, code d’erreur, mode, dépôt — jamais le texte d’un commentaire, d’un code ou d’un diff, ni l’adresse de la page. Elle ne s’active que si la politique d’entreprise de votre organisation déclare un point de collecte et que vous cochez cette case. Un dépôt ne peut ni l’activer, ni choisir la destination.',
   'options.telemetry.optin': 'Autoriser l’envoi de compteurs agrégés à mon organisation',
   'options.status.heading': 'État',
+  'options.status.sub':
+    'Ce que l’extension a pu lire, et les pages dont la structure a changé sous elle.',
   // Chaînes posées par le code, pas par la page.
   'options.host.remove': 'Retirer',
   'options.host.activate': 'Activer',
@@ -256,6 +258,8 @@ const en: Record<string, string> = {
     'Off by default. It only emits aggregate counters — label used, error code, mode, repository — never the text of a comment, of code or of a diff, nor the page address. It turns on only if your organisation’s enterprise policy declares a collection endpoint and you tick this box. A repository can neither enable it nor choose the destination.',
   'options.telemetry.optin': 'Allow sending aggregate counters to my organisation',
   'options.status.heading': 'Status',
+  'options.status.sub':
+    'What the extension was able to read, and the pages whose structure changed under it.',
   // Strings set by the code rather than by the page.
   'options.host.remove': 'Withdraw',
   'options.host.activate': 'Activate',

@@ -41,11 +41,24 @@ if (!existsSync(EXECUTABLE)) {
 
 const SHARED = join(root, 'packages/extension/src/styles.css');
 const GITHUB = join(root, 'packages/adapters/github/src/platform.css');
+const AZDO = join(root, 'packages/adapters/azdo/src/platform.css');
 
-/** La feuille partagée telle qu'elle était AVANT la scission — lue dans git, jamais recopiée
- * ici : une copie figée cesserait d'être la référence dès le commit suivant, et le contrôle
- * différentiel comparerait alors deux fois la même chose sans le dire. */
-const BEFORE_REF = process.env.CCT_STYLES_BEFORE_REF ?? 'origin/main:packages/extension/src/styles.css';
+/** LA PREUVE DE MIGRATION, et elle est OPT-IN — ce qui est un correctif, pas une commodité.
+ *
+ * La première version comparait systématiquement la feuille d'aujourd'hui à `origin/main`. Deux
+ * défauts, tous deux trouvés en CI :
+ *
+ *  1. le `checkout` de browser-smoke.yml est SUPERFICIEL, donc `origin/main` n'existe pas sur le
+ *     runner : le garde échouait honnêtement (il refuse de se comparer à lui-même), mais il
+ *     échouait sur tout ;
+ *  2. et surtout, ce contrôle EXPIRE À LA FUSION. Une fois la scission sur `main`, « comparer à
+ *     avant » devient « se comparer à soi » : vert, et ne prouvant plus rien. Un garde qui
+ *     devient aveugle tout seul est précisément ce que ce dépôt corrige ailleurs.
+ *
+ * Le différentiel reste utile pour PROUVER une migration, une fois. Il s'exécute donc quand on
+ * le demande, et il doit alors réussir. Ce qui tourne en permanence, ce sont les invariants
+ * ci-dessous, qui ne se réfèrent à aucun passé. */
+const BEFORE_REF = process.env.CCT_STYLES_BEFORE_REF ?? null;
 
 function stylesBefore() {
   try {
@@ -53,9 +66,8 @@ function stylesBefore() {
   } catch (e) {
     console.error(
       `Impossible de lire la feuille de référence (${BEFORE_REF}) : ${e.message}\n` +
-        'Le contrôle différentiel n\'a alors AUCUNE valeur — il comparerait la feuille actuelle\n' +
-        'à elle-même et passerait au vert sans rien prouver. Échouer est le seul verdict honnête.\n' +
-        'Précisez une autre référence avec CCT_STYLES_BEFORE_REF=<rev>:<chemin>.'
+        "Le contrôle différentiel n'a alors AUCUNE valeur — il comparerait la feuille actuelle\n" +
+        'à elle-même et passerait au vert sans rien prouver. Échouer est le seul verdict honnête.'
     );
     process.exit(1);
   }
@@ -154,27 +166,38 @@ function diff(a, b) {
 
 const shared = readFileSync(SHARED, 'utf8');
 const github = readFileSync(GITHUB, 'utf8');
-const before = stylesBefore();
-const after = `${shared}\n${github}`;
+const azdo = readFileSync(AZDO, 'utf8');
+const after = `${shared}\n${github}\n${azdo}`;
 
 const browser = await chromium.launch({ executablePath: EXECUTABLE, args: ['--no-sandbox'] });
 const failures = [];
 try {
   const page = await browser.newPage();
 
-  // ————— 1. NON-RÉGRESSION hors GitHub —————
-  // Aucun jeton Primer n'est défini sur cette page, exactement comme sur Azure DevOps : c'est
-  // le dernier repli de chaque chaîne qui s'appliquait avant, et la valeur neutre qui doit
-  // s'appliquer maintenant. Les deux doivent coïncider, propriété par propriété.
-  const neutralBefore = await measure(page, { css: before, platform: null });
+  // ————— 1. AUCUNE feuille de plateforme n'atteint une page NON MARQUÉE —————
+  // L'invariant central de la scission, et il ne se réfère à aucun passé : sur une page sans
+  // marqueur — c'est-à-dire toute page qu'aucun adaptateur ne sert —, ajouter les feuilles de
+  // TOUTES les plateformes ne doit rien changer. Propriété par propriété, sur chaque surface
+  // que l'extension peint.
+  //
+  // C'est plus fort que d'empoisonner trois variables : celui-ci couvre toutes les
+  // déclarations que les feuilles de plateforme portent aujourd'hui ET porteront demain, sans
+  // qu'on ait à penser à étendre le poison.
+  const sharedOnly = await measure(page, { css: shared, platform: null });
   const neutralAfter = await measure(page, { css: after, platform: null });
-  const regressions = diff(neutralBefore, neutralAfter);
-  if (regressions.length > 0) {
+  const leakedByDefault = diff(sharedOnly, neutralAfter);
+  if (leakedByDefault.length > 0) {
     failures.push(
-      `RÉGRESSION hors GitHub : ${regressions.length} élément(s) ne rendent plus la même chose qu'avant la scission.\n` +
-        regressions
-          .map((r) => `  - #${r.id}\n` + r.changed.map(([w, n]) => `      avant ${w}\n      après ${n}`).join('\n'))
+      `FUITE : une feuille de plateforme atteint une page NON MARQUÉE — ${leakedByDefault.length} élément(s)\n` +
+        "changent selon que les feuilles de plateforme sont livrées ou non, sans marqueur.\n" +
+        'Une règle de plateforme est écrite hors de son scope.\n' +
+        leakedByDefault
+          .map((r) => `  - #${r.id} : ${r.changed.map(([w, n]) => `${w} → ${n}`).join(', ')}`)
           .join('\n')
+    );
+  } else {
+    console.log(
+      `✓ page non marquée : les feuilles de plateforme ne changent rien — ${IDS.length} éléments × ${PROPS.length} propriétés.`
     );
   }
 
@@ -231,8 +254,25 @@ try {
     console.log("✓ ordre : assembler les feuilles dans l'autre sens ne change rien.");
   }
 
-  if (regressions.length === 0) {
-    console.log(`✓ non-régression : ${IDS.length} éléments × ${PROPS.length} propriétés identiques à avant la scission.`);
+  // ————— 4. PREUVE DE MIGRATION, sur demande —————
+  // `CCT_STYLES_BEFORE_REF=<rev>:<chemin>` compare le rendu d'une page NON MARQUÉE à celui que
+  // produisait une feuille antérieure. Sert à démontrer qu'une scission n'a rien changé là où
+  // elle ne devait rien changer ; n'a plus de sens une fois cette scission fusionnée.
+  if (BEFORE_REF) {
+    const neutralBefore = await measure(page, { css: stylesBefore(), platform: null });
+    const regressions = diff(neutralBefore, neutralAfter);
+    if (regressions.length > 0) {
+      failures.push(
+        `RÉGRESSION vs ${BEFORE_REF} : ${regressions.length} élément(s) ne rendent plus la même chose.\n` +
+          regressions
+            .map((r) => `  - #${r.id}\n` + r.changed.map(([w, n]) => `      avant ${w}\n      après ${n}`).join('\n'))
+            .join('\n')
+      );
+    } else {
+      console.log(
+        `✓ migration : ${IDS.length} éléments × ${PROPS.length} propriétés identiques à ${BEFORE_REF}.`
+      );
+    }
   }
 } finally {
   await browser.close();

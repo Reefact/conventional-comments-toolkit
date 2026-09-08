@@ -254,12 +254,16 @@ export function startTour(doc: Document = document, lang = 'en'): TourHandle | n
       // visible pour le DOM, et restait inatteignable. Aucun test happy-dom ne pouvait le
       // voir : il n'y a pas de mise en page à interroger.
       spot.hidden = true;
+      veil.hidden = false;
       popover.style.top = '';
       popover.style.left = '';
       popover.classList.add('tour-popover-centered');
       return;
     }
     spot.hidden = false;
+    // Le voile s'efface dès qu'il y a une lucarne : c'est l'ombre de celle-ci qui assombrit,
+    // et superposer les deux grise aussi la zone mise en avant.
+    veil.hidden = true;
     popover.classList.remove('tour-popover-centered');
     const margin = 6;
     spot.style.top = `${rect.top - margin}px`;

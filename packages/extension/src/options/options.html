@@ -260,14 +260,22 @@
       }
 
       /* ---------- Visite guidée ---------- */
-      /* Le voile couvre le document entier, pas la seule fenêtre : la visite fait défiler,
-         et un voile en `position: fixed` laisserait apparaître le bas de la page. */
+      /* Le voile ne sert QUE la dernière étape, celle qui n'a pas de cible. Partout ailleurs
+         c'est l'ombre de la lucarne qui assombrit, et les deux ensemble sont pires que l'un
+         ou l'autre : le voile passe SOUS la lucarne, donc il grise aussi ce qu'elle est
+         censée éclairer. Vu sur une capture, pas dans un test — l'étape 1 encadrait une zone
+         exactement aussi sombre que le reste.
+
+         `fixed` et non `absolute` : `inset: 0` en absolu se résout contre le bloc conteneur
+         initial, haut d'un écran, pas du document. Le voile s'arrêtait donc net au premier
+         défilement, laissant une couture horizontale entre deux gris. */
       .tour-veil {
-        position: absolute;
+        position: fixed;
         inset: 0;
         background: rgba(6, 12, 22, 0.55);
         z-index: 40;
       }
+      .tour-veil[hidden] { display: none; }
       /* La lucarne n'est pas un trou : c'est un cadre dont l'ombre portée démesurée FAIT
          l'assombrissement autour de lui. Un vrai trou demanderait un masque SVG ou quatre
          rectangles à recalculer, pour le même rendu. */

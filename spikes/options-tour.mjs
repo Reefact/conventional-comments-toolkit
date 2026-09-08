@@ -168,6 +168,51 @@ try {
     await opened.evaluate(() => document.getElementById('tour') === null)
   );
 
+  // 5bis. Ce qui assombrit la page, et où. `inset: 0` en `position: absolute` se résout
+  //    contre le bloc conteneur INITIAL — haut d'un écran, pas du document : le voile
+  //    s'arrêtait net au premier défilement, laissant une couture horizontale entre deux
+  //    gris, et il passait SOUS la lucarne, grisant la zone qu'elle devait éclairer.
+  //    happy-dom ne peut voir ni l'un ni l'autre, il n'a pas de mise en page.
+  await opened.click('#tour-replay', { timeout: 4000 });
+  await opened.waitForSelector('.tour-popover', { timeout: 5000 });
+  const veilOnFirst = await opened.evaluate(
+    () => document.querySelector('.tour-veil')?.hidden === true
+  );
+  assert('tant qu’il y a une lucarne, le voile reste effacé', veilOnFirst);
+
+  // Jusqu'à la dernière étape, en comptant les clics plutôt qu'en devinant : le compteur
+  // annonce le total, et cliquer une fois de trop refermerait la visite.
+  const total = Number(/(\d+)\s*(?:sur|of)\s*(\d+)/.exec(
+    await opened.textContent('.tour-counter')
+  )?.[2] ?? 0);
+  for (let i = 1; i < total; i += 1) {
+    await opened.click('.tour-next', { timeout: 4000 });
+    await sleep(150);
+  }
+  const lastStep = await opened.evaluate(() => {
+    const veil = document.querySelector('.tour-veil');
+    const box = veil?.getBoundingClientRect();
+    return {
+      counter: document.querySelector('.tour-counter')?.textContent,
+      veilShown: veil ? !veil.hidden : false,
+      spotHidden: document.querySelector('.tour-spot')?.hidden === true,
+      // Le voile couvre-t-il RÉELLEMENT la fenêtre, à la position de défilement courante ?
+      covers:
+        Boolean(box) &&
+        box.top <= 0 &&
+        box.left <= 0 &&
+        box.bottom >= window.innerHeight &&
+        box.right >= window.innerWidth,
+    };
+  });
+  assert(
+    'à la dernière étape, le voile seul assombrit, et couvre la fenêtre entière',
+    lastStep.veilShown && lastStep.spotHidden && lastStep.covers,
+    JSON.stringify(lastStep)
+  );
+  await opened.click('.tour-next', { timeout: 4000 });
+  await sleep(200);
+
   // 6. …mais elle se REJOUE à la demande. Le bouton vit en haut de page, la visite fait
   //    défiler : après un parcours, la page est restée en bas, et un bouton qu'on ne peut
   //    plus atteindre ne sert à rien. Playwright refuse de cliquer hors écran, donc ce clic

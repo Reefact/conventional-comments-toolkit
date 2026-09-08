@@ -13,7 +13,7 @@ _The journal in the "Status" section now says which page each selector failed on
 
 ### ✨ Features
 
-- **Every line of the journal says which page it came from.** It recorded which selector failed and when, never where: faced with four lines stamped within the same second, nothing told you whether they came from one page or four. A six-character mark now opens each line — same mark, same page — and clicking it opens the exact address recorded, in a new tab. That address stays on your device: what telemetry carries, when you have allowed it, is still the selector's name and nothing more.
+- **Every line of the journal says which page it came from.** It recorded which selector failed and when, never where: faced with four lines stamped within the same second, nothing told you whether they came from one page or four. A six-character mark now opens each line — same mark, same page — and clicking it opens the exact address recorded, in a new tab. That address stays on your device: what telemetry carries, when you have allowed it, is still the selector's name and nothing more. Lines already in the journal before this update have no address — it was not being recorded — and carry a neutral mark until their selector fails again, or until you clear the journal.
 
 - **The journal clears from the options page.** A button empties it; tabs you already have open start measuring again straight away, and the section updates itself when one of them writes, without a reload.
 

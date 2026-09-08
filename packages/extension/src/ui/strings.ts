@@ -99,7 +99,7 @@ const fr: Record<string, string> = {
   'options.telemetry.optin': 'Autoriser l’envoi de compteurs agrégés à mon organisation',
   'options.status.heading': 'État',
   'options.status.sub':
-    'Lecture de la configuration, et changements de structure détectés sur les pages.',
+    'Lecture de la configuration et changements de structure détectés sur les pages.',
   // Chaînes posées par le code, pas par la page.
   'options.host.remove': 'Retirer',
   'options.host.activate': 'Activer',

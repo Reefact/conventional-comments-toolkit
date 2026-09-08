@@ -33,6 +33,7 @@ import {
   type SubmitControl,
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
+import { ALL_EDITORS, SURFACES } from './surfaces.js';
 
 export interface GithubClientOptions {
   /** Hôtes autorisés par l'utilisateur ou la politique (§2, §A.4) — github.com n'est que
@@ -289,7 +290,17 @@ export class GithubClientAdapter implements PlatformAdapter {
   observeEditors(cb: (editor: EditorHandle) => void): Disposable {
     const seen = new WeakSet<Element>();
     const scan = () => {
-      const found = queryChainAll(this.#doc, selectors.editors);
+      // L'UNION des surfaces, et non une chaîne unique : `/pull/N/changes` affiche des fils
+      // hérités à côté de son propre composeur React, et une chaîne rend les éléments du
+      // PREMIER candidat qui matche — l'autre composeur devenait invisible (surfaces.ts).
+      // À l'INTÉRIEUR de chaque surface, la chaîne garde sa sémantique de repli : c'est la
+      // dérive dans le temps, qu'elle modélise correctement.
+      //
+      // Dédoublonné, parce qu'un même champ répond souvent à plusieurs candidats de SA
+      // surface — le composeur mesuré de la vue des fichiers modifiés en satisfait trois — et
+      // qu'une union naïve poserait autant de barres d'outils sur un seul champ. `Set` plutôt
+      // qu'un filtre : l'ordre du document est préservé par surface, et le coût reste linéaire.
+      const found = [...new Set(SURFACES.flatMap((surface) => queryChainAll(this.#doc, surface.editors)))];
       const inconnues = queryChainAll(this.#doc, selectors.editingSurfaces).filter((s) => !found.includes(s));
       // Une surface de saisie que la chaîne n'a PAS ramenée : elle a pourri, en tout ou en
       // partie. C'est ce qu'a fait la nouvelle vue des fichiers modifiés (`/pull/N/changes`,
@@ -306,7 +317,7 @@ export class GithubClientAdapter implements PlatformAdapter {
       // voisin, champ masqué) vaut une entrée de journal à tort. Une seule, le journal
       // dédupliquant par chaîne — contre une extension muette dans le cas inverse.
       if (inconnues.length > 0) {
-        this.log.degraded(selectors.editors);
+        this.log.degraded(ALL_EDITORS);
       }
       for (const el of found) {
         if (seen.has(el)) continue;
@@ -361,10 +372,22 @@ export class GithubClientAdapter implements PlatformAdapter {
    * partagé retrouve le cadre sans le nommer, et rend là l'élément que ces deux voies
    * désignaient déjà. Ne rien affirmer y est le comportement JUSTE, pas un renoncement. */
   getEditorChrome(editor: EditorHandle): EditorChrome {
-    const framed = closestChain(editor.element, selectors.composerFrame);
-    if (framed.element) return { framedContainer: framed.element };
-    if (matchesChain(editor.element, selectors.composerFrameOnField).element) {
-      return { framedContainer: editor.element.parentElement };
+    // La PREMIÈRE surface qui reconnaît ce champ répond, et l'ordre de `SURFACES` reproduit
+    // exactement la cascade qui vivait dans le contrôleur partagé.
+    //
+    // La reconnaissance se fait sur les marques de CHÂSSIS, jamais sur la chaîne `editors` de
+    // la surface, et l'écart est délibéré : `[class*="CommentBox"]` reconnaît un champ que
+    // `textarea[aria-label*="omment"][class*="CommentBox"]` refuserait faute d'`aria-label`.
+    // Exiger la chaîne d'éditeurs resserrerait la reconnaissance et changerait le rendu d'un
+    // composeur qui marche aujourd'hui — un refactoring ne se paie pas d'une régression.
+    for (const surface of SURFACES) {
+      if (surface.composerFrame) {
+        const framed = closestChain(editor.element, surface.composerFrame);
+        if (framed.element) return { framedContainer: framed.element };
+      }
+      if (surface.composerFrameOnField && matchesChain(editor.element, surface.composerFrameOnField).element) {
+        return { framedContainer: editor.element.parentElement };
+      }
     }
     return NEUTRAL_EDITOR_CHROME;
   }

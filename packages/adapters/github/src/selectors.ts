@@ -9,63 +9,28 @@
 import type { SelectorChain } from '@cct/adapter-shared';
 
 export const selectors = {
-  /** Zone de saisie d'un commentaire — les deux générations encapsulent un <textarea> (§A.2).
+  /** **Les zones de saisie ont déménagé dans `surfaces.ts`.** Elles y sont réparties en trois
+   * surfaces — React, héritée, vue des fichiers modifiés — parce qu'elles ne posaient pas la
+   * question à laquelle une chaîne répond. Une chaîne modélise la dérive dans le TEMPS ;
+   * `/pull/N` et `/pull/N/changes` coexistent, et réunies dans une seule chaîne la première qui
+   * matchait faisait disparaître l'autre composeur. `surfaces.ts` dit pourquoi et ce que ça
+   * coûte.
    *
-   * MESURÉ sur `https://github.com/Reefact/conventional-comments-toolkit/pull/45/changes`
-   * (session ouverte, composeur de ligne ouvert, 2026-09-04). La page `…/changes` est la
-   * nouvelle vue des fichiers modifiés, et le composeur y est le SEUL <textarea> du
-   * document :
+   * Ce qui reste vrai des trois prises MESURÉES sur la vue des fichiers modifiés, et qui n'a pas
+   * sa place ailleurs — deux attributs du champ y sont inutilisables, `-snlco` étant un hachage
+   * de build de Primer et `_r_qm_` un identifiant `useId` de React :
    *
-   *   <textarea aria-label="Markdown value" placeholder="Leave a comment"
-   *             class="prc-Textarea-TextArea-snlco" id="_r_qm_">
+   *   - `aria-label="Markdown value"` — nom accessible que Primer donne au champ de son éditeur
+   *     Markdown. Il ne contient pas « comment », ce sur quoi tombait l'ancien premier candidat ;
+   *   - `placeholder="Leave a comment"` — texte visible, donc localisable, mais sans ambiguïté
+   *     sur la nature du champ ;
+   *   - `class*="prc-Textarea-TextArea"` — le composant Primer, hachage retiré : le filet le plus
+   *     large, et le seul qui survive à une réécriture des deux précédents.
    *
-   * Aucun des six candidats d'avant n'y matchait — ni les quatre hérités, ni les deux
-   * candidats React, écrits de mémoire et jamais observés nulle part. L'extension ne posait
-   * donc aucune barre d'outils sur la zone que le §4.1 appelle « cœur de la revue », et le
-   * silence était complet : `observeEditors` ne journalisait pas cet échec (§9.4).
-   *
-   * Deux attributs du champ sont inutilisables : `-snlco` est un hachage de build de Primer,
-   * `_r_qm_` un identifiant `useId` de React. Restent trois prises, de la plus spécifique à
-   * la plus large, chacune suffisante à elle seule :
-   *
-   *   - `aria-label="Markdown value"` — nom accessible que Primer donne au champ de son
-   *     éditeur Markdown. Il ne contient pas « comment », ce sur quoi tombait l'ancien
-   *     premier candidat ;
-   *   - `placeholder="Leave a comment"` — texte visible, donc localisable, mais sans
-   *     ambiguïté sur la nature du champ ;
-   *   - `class*="prc-Textarea-TextArea"` — le composant Primer, hachage retiré : le filet le
-   *     plus large, et le seul qui survive à une réécriture des deux précédents.
-   *
-   * CES TROIS PRISES SONT EN DERNIER, et l'ordre est le point délicat : `queryChainAll`
-   * s'arrête au premier candidat qui ramène un élément, et ne rend QUE les siens — un
-   * candidat placé trop haut masque donc tous les suivants. Or `placeholder` et la classe
-   * Primer sont larges : en tête de chaîne, sur une page servie par la génération héritée —
-   * celle où l'extension fonctionne aujourd'hui —, ils pourraient n'attraper qu'une partie
-   * des éditeurs (le composeur principal sans les réponses de fil) et faire DISPARAÎTRE le
-   * reste. Placé en fin de chaîne, l'ajout est strictement additif : il ne peut que changer
-   * « aucun éditeur » en « des éditeurs », jamais défaire une détection qui marche. Le prix
-   * est connu et assumé : sur une page hypothétique qui mélangerait les deux générations,
-   * la nouvelle resterait invisible — un cas non mesuré, et le journal le dira désormais.
-   *
-   * Les deux candidats React d'origine ne sont pas retirés pour autant : ils ne matchent
-   * rien de mesuré, mais rien ne prouve qu'ils ne décrivent aucune vue. */
-  editors: {
-    name: 'editors',
-    candidates: [
-      // Génération React — jamais observée, laissée telle quelle.
-      'textarea[aria-label*="omment"][class*="CommentBox"]',
-      'div[data-testid*="comment-composer"] textarea',
-      // Génération héritée.
-      'textarea[name="comment[body]"]',
-      'textarea[name="pull_request_review_comment[body]"]',
-      'textarea[name="pull_request_review[body]"]',
-      'textarea.js-comment-field',
-      // Nouvelle vue des fichiers modifiés (`/pull/N/changes`) — MESURÉ, voir ci-dessus.
-      'textarea[aria-label="Markdown value"]',
-      'textarea[placeholder="Leave a comment"]',
-      'textarea[class*="prc-Textarea-TextArea"]',
-    ],
-  } satisfies SelectorChain,
+   * L'ordre à l'intérieur de leur surface va toujours de la prise la plus spécifique à la plus
+   * large, et pour la raison d'avant : une prise large en tête pourrait n'attraper qu'une partie
+   * des éditeurs de cette surface et faire disparaître le reste. Ce que le déménagement change,
+   * c'est que ce risque est désormais borné à UNE surface au lieu de traverser les trois. */
 
   /** Sonde générique « cette page porte-t-elle une surface de saisie ? » — elle ne sert qu'à
    * DÉCIDER si l'absence de match de `editors` est une dégradation (§9.4) ou le cas nominal.
@@ -80,47 +45,11 @@ export const selectors = {
     candidates: ['textarea', '[contenteditable="true"]'],
   } satisfies SelectorChain,
 
-  /** **Le châssis du composeur** (§5.1, §5.3) — le conteneur qui encadre ENSEMBLE l'en-tête
-   * natif de la boîte, ses onglets, la zone de saisie, et ce que l'extension injecte. C'est
-   * lui qui reçoit le retrait intérieur, faute de quoi notre barre et notre pastille touchent
-   * la bordure alors que le texte du champ, lui, s'en écarte par son propre padding.
-   *
-   * Ces deux candidats ont vécu jusqu'ici EN DUR DANS LE CONTRÔLEUR PARTAGÉ
-   * (`extension/src/editor-controller.ts`), ce que le §9.4 interdit — « les sélecteurs DOM sont
-   * centralisés dans un fichier unique par adaptateur ». Ils s'exécutaient donc aussi sur
-   * Azure DevOps, où ils ne matchent rien : sans conséquence visible, mais un renommage GitHub
-   * se serait corrigé dans un fichier partagé par les deux plateformes.
-   *
-   * Sélecteur d'ANCÊTRE, et c'est ce qui les distingue : la chaîne `editors` attrape le champ,
-   * celle-ci le cadre qui le contient. Le premier candidat peut désigner un ancêtre ÉLOIGNÉ —
-   * son homologue dans `editors` (`div[data-testid*="comment-composer"] textarea`) est un
-   * sélecteur descendant, la zone de saisie peut donc être nichée sous un wrapper
-   * intermédiaire. C'est bien le conteneur nommé qu'il faut padder, pas le parent direct du
-   * champ, pour que l'en-tête et les onglets natifs reçoivent le retrait eux aussi.
-   *
-   * Aucun candidat pour le DOM hérité, et c'est délibéré : sa boîte de commentaire dessine son
-   * propre cadre, que la règle géométrique du code partagé (`framedAncestor`) retrouve sans
-   * qu'on ait à la nommer. Ne rien nommer là où la mesure suffit est la règle d'ui/stacking.ts,
-   * et un nom de moins est un nom qui ne pourrira pas. */
-  composerFrame: {
-    name: 'composer-frame',
-    candidates: ['[data-testid*="comment-composer"]'],
-  } satisfies SelectorChain,
-
-  /** Génération React sans `data-testid` : le cadre n'est pas nommé, mais la ZONE DE SAISIE
-   * l'est — elle porte `CommentBox` dans sa liste de classes, et son châssis est alors son
-   * parent direct. Chaîne distincte de `composerFrame` parce que la question posée n'est pas
-   * la même : ici on interroge le champ lui-même (`matches`), là on remonte ses ancêtres
-   * (`closest`). Les confondre en une seule chaîne ferait remonter au premier ancêtre portant
-   * la classe, qui n'est pas le parent direct.
-   *
-   * Même origine que le candidat React de `editors` (`textarea[…][class*="CommentBox"]`) :
-   * jamais observé en direct dans ce dépôt, conservé parce que rien ne prouve qu'il ne décrit
-   * aucune vue. */
-  composerFrameOnField: {
-    name: 'composer-frame-on-field',
-    candidates: ['[class*="CommentBox"]'],
-  } satisfies SelectorChain,
+  /** **Le châssis du composeur a déménagé dans `surfaces.ts`.** Il y vit COLLÉ aux zones de
+   * saisie de sa surface, et c'est le point : « où l'extension s'accroche » est une propriété de
+   * la surface, pas de la plateforme. Les tenir séparés laissait la question sans réponse unique
+   * — c'est ce qui avait produit huit correctifs de mise en page découvrant chacun un endroit de
+   * plus où les deux générations diffèrent. */
 
   /** **Description de la PR — hors périmètre** (§4.1, dernière ligne du tableau : format non
    * validé, aucun état bloquant). L'éditeur qu'on y ouvre n'est pas une zone du §4.1 : il ne

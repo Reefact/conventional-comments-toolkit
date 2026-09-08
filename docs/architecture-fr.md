@@ -116,12 +116,22 @@ Trois gardes tiennent l'ensemble, parce que rien de tout cela n'était visible d
 `check:style-isolation` (mesuré dans Chromium), `check:extension-css` (toutes les feuilles
 livrées).
 
-**Niveau 2 — à l'intérieur d'une plateforme.** Non fait. `/pull/N` et `/pull/N/changes` sont deux
-surfaces GitHub VIVANTES EN MÊME TEMPS, et la distinction est aujourd'hui étalée sur les 24
-chaînes de `selectors.ts`, chacune portant son « React d'abord, puis hérité ». Une chaîne de repli
-modélise la dérive dans le TEMPS, pas deux surfaces simultanées : `queryChainAll` s'arrête au
-premier candidat qui rend quelque chose, si bien qu'une page mêlant les deux générations rendait
-le second champ invisible (commit 81e07bb). Le port accommode déjà ce niveau — `getEditorChrome`
-reçoit l'éditeur, l'adaptateur peut donc résoudre sa surface en interne, sans que le contrat ni le
-code partagé en sachent rien.
+**Niveau 2 — à l'intérieur d'une plateforme.** `packages/adapters/github/src/surfaces.ts` déclare
+les trois surfaces qui coexistent — React, héritée, vue des fichiers modifiés — chacune portant SES
+zones de saisie et SON châssis. Deux mécanismes cessent d'être confondus :
 
+| Question | Mécanisme | Sémantique |
+|---|---|---|
+| Le nom a-t-il changé depuis l'an dernier ? | chaîne de sélecteurs, à l'intérieur d'une surface | premier candidat qui matche |
+| Quelles surfaces la page porte-t-elle ? | liste de surfaces | **union**, dédoublonnée |
+
+Le défaut que ça corrige n'était pas théorique : `/pull/N/changes` affiche des fils hérités à côté
+de son propre composeur React, et une chaîne unique rendait les éléments du premier candidat qui
+matche — l'autre composeur devenait invisible, sans barre d'outils ni garde d'envoi, sur la seule
+zone où un `issue:` bloque réellement (§4.1). Le commit 81e07bb avait vu le cas et n'en avait
+corrigé que le silence.
+
+Vingt et une des vingt-quatre chaînes de `selectors.ts` restent des chaînes, et c'est délibéré :
+elles répondent à une question qui n'a qu'une bonne réponse par page — quel conteneur de fil, quel
+corps rendu, quel bouton de fusion. Seul le composeur se scinde, parce que seul il a montré le
+défaut.

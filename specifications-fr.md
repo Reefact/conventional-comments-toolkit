@@ -32,7 +32,7 @@ L'équipe a adopté [Conventional Comments](https://conventionalcomments.org/) p
 
 ## 2. Avertissement d'architecture : périmètre du navigateur
 
-> **Cinq notions employées avant d'être définies, si vous lisez dans l'ordre.** Les quatre **modes de fonctionnement** (`off`, `assist`, `warn`, `enforce`) sont définis au §7 ; le **plancher** de configuration, et les **bornes** et **canaux** qui le portent, au §8.1.1 ; l'**épinglage** de la configuration d'une PR au §8.1.3 ; les **deux critères** du statut de conformité au §6.2.1 ; la notion de commentaire **conforme** au §3.5.2. Tout ce qui suit y renvoie sans les redéfinir.
+> **Cinq notions employées avant d'être définies, si vous lisez dans l'ordre.** Les quatre **modes de fonctionnement** (`off`, `assist`, `warn`, `enforce`) sont définis au §7 ; le **plancher** de configuration, et les **bornes** et **canaux** qui le portent, au §8.1.1 ; les **deux critères** du statut de conformité au §6.2.1 ; la notion de commentaire **conforme** au §3.5.2. Tout ce qui suit y renvoie sans les redéfinir.
 
 > **Point structurant.** Une extension navigateur agit **côté client uniquement**. Elle peut empêcher un utilisateur de cliquer sur un bouton, mais elle ne peut pas empêcher la publication d'un commentaire via l'API REST/GraphQL, une CLI, un IDE, un autre navigateur, ou un poste sans l'extension.
 
@@ -437,7 +437,7 @@ Le blocage d'envoi du mode `enforce` est donc un **garde-fou, pas un mur** : il 
 - Les labels des commentaires déjà publiés sont rendus sous forme de badges colorés (option `badgeStyle`, voir schéma §8.2), sans modifier le contenu stocké côté vérificateur. Un badge porte **l'identifiant du label et, lorsqu'elle est configurée, son icône** : `labels[].icon` est optionnel, et un label qui n'en déclare pas donne un badge à l'identifiant seul.
 - Un bandeau en tête de PR récapitule : *N **fils** bloquants non résolus*, avec liens d'ancrage vers chacun. Des **fils**, et non des commentaires : c'est ce que compte le critère 2 (§6.2.1) et ce que porte `unresolvedBlockingCount`, et `CA-03` exige que les trois décomptes concordent — en valeur comme en sens. **Sa source est le résumé publié par le composant B** (`readPublishedResult()`, §9.2.3) dès qu'il est présent sur la page : c'est ce qui garantit que le bandeau et le check comptent la même chose (`CA-03`). Le **décompte** vient toujours de ce résumé, qui fait autorité ; les **liens d'ancrage** viennent du DOM de la page, qui porte les fils — un fil dont l'état n'y est pas rendu (`resolution: 'unknown'`) recevant quand même son ancre, puisque rien n'est compté ici.
 
-  **Les deux divergent, et c'est assumé.** Trois règles du document garantissent que l'extension ne peut pas retrouver localement l'ensemble exact des fils que le vérificateur compte : une **résolution refusée** (§6.1) laisse le fil marqué *Resolved* dans la page ; une **édition affaiblissante** (§6.1) affiche `note:` là où le vérificateur maintient `issue:` ; et l'**épinglage** (§8.1.3) fait juger le vérificateur sur une configuration que l'extension n'a plus. Vouloir la concordance exacte imposerait à l'extension de trancher des autorisations, ce que le §10 lui interdit.
+  **Les deux divergent, et c'est assumé.** Trois règles du document garantissent que l'extension ne peut pas retrouver localement l'ensemble exact des fils que le vérificateur compte : une **résolution refusée** (§6.1) laisse le fil marqué *Resolved* dans la page ; une **édition affaiblissante** (§6.1) affiche `note:` là où le vérificateur maintient `issue:`. Vouloir la concordance exacte imposerait à l'extension de trancher des autorisations, ce que le §10 lui interdit.
 
   Le bandeau affiche donc **le décompte publié** comme titre, et les ancres qu'il a su apparier. Quand il en apparie moins, il l'indique — « 2 sur 3 localisés » — et renvoie au statut pour le détail. `CA-03` porte sur le décompte affiché, jamais sur le nombre d'ancres. En l'absence de résumé — vérificateur non actif sur le dépôt, ou première évaluation encore en cours — il se rabat sur les fils lus dans le DOM (`getThreads()`), un fil dont l'état n'y est pas rendu (`resolution: 'unknown'`) étant compté **non résolu**, comme au §B.5 ; il indique alors explicitement qu'il s'agit d'une vue locale et non de l'état de conformité.
 - Filtre local par label dans la liste des fils de discussion.
@@ -529,7 +529,7 @@ Principe commun aux deux plateformes : le composant B est réveillé par les év
 | 1 | Tous les commentaires **soumis à validation** — zones du §4.1, hors exclusions du §4.2, sur une PR dans le périmètre d'activation du §6.2.3 — sont conformes au format | **Avertissement** — n'échoue pas le check, listé dans le résumé | `formatSeverity: warn \| error` |
 | 2 | Aucun fil bloquant n'est non résolu (§4.1, colonne « peut porter un état bloquant ») | **Échec** — fait échouer le check | non |
 
-**Une troisième cause d'échec existe, hors critères.** Une configuration **syntaxiquement invalide, ou portant une valeur hors du domaine d'une clé connue** — la troisième ligne du tableau du §8.1.5 — fait échouer le check sous `enforce`. Une configuration simplement **illisible** relève, elle, de l'incapacité à évaluer et du délai de grâce : c'est une autre ligne du même tableau, au comportement inverse. Elle ne figure pas au tableau parce qu'elle ne porte sur aucun commentaire : ce n'est pas un critère de conformité, c'est l'aveu qu'aucun critère n'a pu être évalué. Elle emprunte le canal `forceState` du §9.2.2, et non `formatSeverity`.
+**Une troisième cause d'échec existe, hors critères.** Une configuration **syntaxiquement invalide, ou portant une valeur hors du domaine d'une clé connue** — la troisième ligne du tableau du §8.1.5 — fait échouer le check sous `enforce`. Une configuration simplement **illisible** relève, elle, de l'incapacité à évaluer : c'est une autre ligne du même tableau, au comportement inverse — le check y échoue (§6.4). Elle ne figure pas au tableau parce qu'elle ne porte sur aucun commentaire : ce n'est pas un critère de conformité, c'est l'aveu qu'aucun critère n'a pu être évalué. Elle emprunte le canal `forceState` du §9.2.2, et non `formatSeverity`.
 
 Cette séparation est délibérée. Confondre les deux revient à faire échouer un merge pour un `nitpik:` mal orthographié aussi sûrement que pour un `issue:` non traité — ce qui n'est défendable pour personne et n'est pas ce que demande O3. Le critère 2 seul porte l'objectif O3 ; le critère 1 relève de l'hygiène de forme et alimente les indicateurs du §12.
 
@@ -541,7 +541,7 @@ Une organisation qui veut la conformité de forme stricte peut passer `formatSev
 
 | Mode | Comportement du composant B |
 |------|------------------------------|
-| `off` | Ne publie aucun statut — **sauf les deux incidents du §8.1.5 sur un dépôt déjà évalué** : fichier disparu (`config-vanished`) et configuration invalide (`invalid-config`), publiés en neutre quel que soit le mode. **Attention** : si le check est déclaré obligatoire dans la protection de branche, son absence bloque toutes les PR — le retrait de la protection doit accompagner le passage en `off` (voir la procédure du §6.3.3). |
+| `off` | Ne publie aucun statut — **sauf les deux incidents du §8.1.5 ** : fichier disparu (`config-vanished`) et configuration invalide (`invalid-config`), publiés en neutre quel que soit le mode. **Attention** : si le check est déclaré obligatoire dans la protection de branche, son absence bloque toutes les PR — le retrait de la protection doit accompagner le passage en `off` (voir la procédure du §6.3.3). |
 | `assist` | Ne publie aucun statut. Mêmes réserve et mêmes deux exceptions. |
 | `warn` | Publie un statut **jamais en échec** — au vert dans le cas courant, neutre dans les deux cas où l'évaluation n'a pas pu se faire (configuration disparue et configuration invalide du §8.1.5). Le résumé liste les non-conformités et les fils bloquants non résolus à titre informatif. Ne bloque jamais. |
 | `enforce` | Publie un statut au vert ou en échec selon les critères du §6.2.1. |
@@ -597,9 +597,9 @@ Le composant B produit, pour chaque évaluation, une sortie structurée (`Compli
 - un **résumé humain** d'une ligne (`headline`) indiquant trois nombres, dont deux ne comptent pas la même chose : le nombre de **fils** bloquants non résolus, le nombre de **commentaires** non conformes au sens du §3.5.2 — un commentaire portant trois erreurs compte pour un —, et le nombre total de **diagnostics** de sévérité `warn`, qui se comptent un par un. Le §12 en tire un taux de conformité, qui n'a de sens que par commentaire ;
 - pour **chaque fil bloquant non résolu** (`unresolvedBlockingThreads`) : lien permanent vers le commentaire, auteur, label, et première ligne du sujet ;
 - pour **chaque diagnostic de format, quelle que soit sa sévérité** (`formatDiagnostics`) : lien permanent, code (§3.5), sévérité, et correction proposée quand elle est calculable. Toutes sévérités, et pas seulement les erreurs : un commentaire qui ne porte que des avertissements est **conforme** (§3.5.2) et sortirait donc de la liste, alors que le résumé humain ci-dessus doit les compter et que le §12 les suit séparément ;
-- **deux empreintes distinctes**, et non une seule : la **version de `core/`** (`coreVersion`) et l'**empreinte de la configuration** (`configFingerprint`) telle qu'elle a **effectivement servi à juger cette PR** — partie épinglée, modifications élargissantes ultérieures et bornes d'entreprise comprises (§8.1.3). Les séparer est nécessaire : la règle 5 du §8.1.3 pose qu'un écart de version entre l'extension et le vérificateur est **le cas normal**, et une empreinte unique confondrait cet écart permanent avec un désaccord de configuration, qui est l'anomalie ;
+- **deux empreintes distinctes**, et non une seule : la **version de `core/`** (`coreVersion`) et l'**empreinte de la configuration** (`configFingerprint`) telle qu'elle a **effectivement servi à juger cette PR** (§8.1.3). Les séparer est nécessaire : la règle 5 du §8.1.3 pose qu'un écart de version entre l'extension et le vérificateur est **le cas normal**, et une empreinte unique confondrait cet écart permanent avec un désaccord de configuration, qui est l'anomalie ;
 - un lien vers la documentation de la convention (`docUrl`) ;
-- les **faits signalés** (`notices`) — tout ce que les règles du document exigent de rendre visible sans que ce soit un diagnostic de format : édition affaiblissante et suppression d'une racine bloquante, avec leur auteur (§6.1) ; résolution refusée, avec sa cause, ou **acceptée sans auteur connu** sur une plateforme qui n'expose pas le résolveur (§6.1) ; clé de dépôt ignorée au titre du plancher (§8.1.2) ; configuration invalide, avec sa ligne fautive, ou **fichier de configuration disparu** d'un dépôt déjà évalué (§8.1.5) ; **avertissement de configuration** — clé inconnue ignorée, `configUrl` posée au mauvais niveau, expression d'allowlist écartée (§8.1.5, §8.2) ; version de **schéma, de plancher** ou de `core/` non supportée (§8.1.5, §8.1.3) ; délai de grâce dépassé (§6.4) ; retrait de l'étiquette d'exemption, et **restauration** de celle d'une exemption confirmée dont l'étiquette avait disparu (§6.3.2). Chacun porte son type, son message, et l'auteur et l'horodatage lorsqu'ils existent.
+- les **faits signalés** (`notices`) — tout ce que les règles du document exigent de rendre visible sans que ce soit un diagnostic de format : résolution refusée, avec sa cause, ou **acceptée sans auteur connu** sur une plateforme qui n'expose pas le résolveur (§6.1) ; clé de dépôt ignorée au titre du plancher (§8.1.2) ; configuration invalide, avec sa ligne fautive, ou **fichier de configuration disparu** d'un dépôt déjà évalué (§8.1.5) ; **avertissement de configuration** — clé inconnue ignorée, `configUrl` posée au mauvais niveau, expression d'allowlist écartée (§8.1.5, §8.2) ; version de **schéma, de plancher** ou de `core/` non supportée (§8.1.5, §8.1.3) ; retrait de l'étiquette d'exemption (§6.3.2). Chacun porte son type, son message, et l'auteur et l'horodatage lorsqu'ils existent.
 
 Ces six éléments sont **obligatoires au sens strict pour `ComplianceResult`** : chacun a un champ dédié (§9.2.1), et une implémentation qui n'en remplirait pas un serait détectable par le type. Ce que la **plateforme en publie**, en revanche, dépend de ce qu'elle sait rendre — voir ci-dessous. La distinction est nécessaire : le §9.2.4 interdit à l'adaptateur de juger, il ne lui promet pas un corps de statut qui n'existe pas partout.
 
@@ -608,7 +608,7 @@ Ces six éléments sont **obligatoires au sens strict pour `ComplianceResult`** 
 | | Ce que porte le statut | Où vit la ligne `cc/1` |
 |---|---|---|
 | **GitHub** | un *check run* avec un titre et un corps Markdown (§A.8) | le **titre** du check run, rendu sur la page de la PR |
-| **Azure DevOps** | un *PR Status* : un état, une **description d'une ligne**, une URL, un `context` (§B.7) | la **description**, rendue sur la page de la PR |
+| **Azure DevOps** | — | — : la vérification n'y est pas livrée (§B.7) |
 
 La ligne est publiée **là où la plateforme la rend sur la page de la PR**, et nulle part ailleurs : c'est la seule condition pour que `readPublishedResult()` puisse la lire sans appel d'API (§10). Le corps du check run, sur GitHub, n'est pas rendu sur cette page — il porte la sortie humaine du §6.3.1, pas la ligne machine.
 
@@ -657,17 +657,19 @@ Le composant B **n'est pas un service**. Il s'exécute dans l'intégration conti
 
 **Relire l'état courant, jamais le contenu de l'événement.** L'événement dit qu'il faut réévaluer ; il ne dit pas quoi. Le vérificateur relit les fils, les commentaires hors fil, les étiquettes, l'état brouillon et la configuration avant de juger. Sans cette règle, un `comment.created` non conforme arrivé après le `comment.edited` qui le corrige laisserait la PR rouge sans événement futur pour la rattraper.
 
-**Ordre des exécutions.** Deux évaluations concurrentes sur une même PR sont départagées par la plateforme, qui annule l'exécution supersédée — le document n'en demande pas davantage. Aucun compteur de séquence, aucune fenêtre de coalescence : ces mécanismes n'existaient que pour un service qui recevait des webhooks dans le désordre.
+**Ordre des exécutions.** Rien ne garantit que la plateforme les sérialise d'elle-même. Deux évaluations déclenchées coup sur coup sur une même PR peuvent s'exécuter en parallèle — c'est le comportement par défaut de GitHub Actions —, et c'est alors la dernière **publication** qui l'emporte, pas la lecture la plus fraîche. Le workflow ferme cela en déclarant un groupe de concurrence par PR, avec annulation de l'exécution en cours (§A.8). Ce que l'absence de mémoire garantit, en revanche, tient sans ce réglage : le pire cas est un verdict périmé affiché jusqu'au prochain événement, ou jusqu'à un rejeu, qui le corrige en relisant l'état — rien n'est corrompu, puisque rien n'est retenu. Aucun compteur de séquence, aucune fenêtre de coalescence : ces mécanismes n'existaient que pour un service qui recevait des webhooks dans le désordre.
 
 **SHA de publication.** Le statut est publié sur le SHA de tête de la PR au moment de la publication. Un statut publié sur un SHA devenu obsolète laisserait la PR bloquée.
 
-**Idempotence.** Une évaluation dont le résultat est identique au précédent ne republie pas de statut. Deux résultats sont identiques lorsque `headSha`, `state`, les trois compteurs, `configFingerprint`, l'ensemble des `kind` de `notices` et les identifiants des fils et commentaires listés coïncident — les horodatages restent hors comparaison, sans quoi un `notice` réémis à chaque tour rendrait la règle inopérante.
+**Republier n'a pas de coût qu'il faille éviter.** Une rédaction antérieure interdisait de republier un statut identique au précédent, et définissait par le menu ce que « identique » voulait dire. La règle existait pour un service qui recevait des rafales de webhooks et se coalesçait lui-même ; elle supposait de retenir le dernier résultat publié. Une exécution déclenchée par un événement publie une fois, et une publication de plus coûte un appel d'API — moins que la mémoire qu'il faudrait tenir pour l'éviter.
 
 **Quand la lecture échoue, le check échoue.** Une lecture impossible — API injoignable, limite d'appels atteinte — après les tentatives prévues fait publier un statut **en échec**, jamais un statut absent ni un neutre.
 
 C'est un choix, et il va contre l'intuition. Publier un neutre laisserait passer le merge : `neutral` satisfait une vérification obligatoire, exactement comme le statut vert périmé qu'on aurait laissé en place en ne publiant rien. Un vérificateur qui porte une garantie ne peut donc pas s'abstenir sur une panne — il rendrait la garantie fausse précisément au moment où personne ne regarde.
 
-Ce choix n'est tenable que parce que le **recours est immédiat et ne demande aucune habilitation** : rejouer l'exécution, depuis l'interface de la plateforme. C'est ce qui rend inutile le délai de grâce qu'un service hébergé devait prévoir — là où le recours était une procédure d'exploitation, il est ici un bouton.
+Ce choix n'est tenable que parce que le **recours est immédiat** : rejouer l'exécution, depuis l'interface de la plateforme. C'est ce qui rend inutile le délai de grâce qu'un service hébergé devait prévoir — là où le recours était une procédure d'exploitation, il est ici un bouton.
+
+Un bouton, mais pas pour tout le monde : sur GitHub, rejouer une exécution demande le rôle **Write** sur le dépôt, quand la voir n'exige que **Read**. Ce n'est pas une habilitation d'exploitation — c'est celle qu'a déjà quiconque peut fusionner —, mais l'auteur externe d'une PR de fork ne l'a pas et dépend d'un mainteneur. **Ce que devient le jeton d'un rejeu déclenché sur une PR de fork est à vérifier par une mesure** : GitHub documente qu'un rejeu s'exécute avec les privilèges de l'acteur qui a déclenché l'exécution d'origine, ce qui pourrait rendre le recours inopérant là même où il est le plus nécessaire.
 
 **Ce que cette section ne contient plus.** Ni webhooks à souscrire et à signer, ni réconciliation périodique, ni compteur de séquence, ni fenêtre de coalescence, ni délai de grâce, ni stockage. Chacun de ces mécanismes répondait à un problème que se pose un processus **extérieur** à la plateforme : recevoir ce qu'il n'a pas demandé, se souvenir de ce qu'il ne peut pas relire, survivre à une panne qui lui est propre. Un vérificateur qui s'exécute *dans* la plateforme n'a aucun de ces problèmes, et les reproduire lui coûterait le prix du service sans lui en donner la raison.
 
@@ -720,7 +722,7 @@ Un **plancher** fixe un mode minimum (`minimumMode`) et une liste de règles non
 | Composant | Canal | Portée |
 |-----------|-------|--------|
 | **A — Extension** | Politique d'entreprise poussée par le navigateur (clé de manifeste `storage.managed_schema`, API `chrome.storage.managed`, nœud de politique `3rdparty`) | Le poste de travail |
-| **B — Vérificateur** | Configuration d'installation du service : variable d'environnement, secret de déploiement, ou fichier de configuration dans un dépôt d'administration protégé | Le service, donc l'organisation entière |
+| **B — Vérificateur** | Le document de plancher, servi par une URL que l'organisation contrôle et référencée par la configuration d'exécution du vérificateur (annexes) | Les dépôts que cette configuration couvre |
 
 Un canal de navigateur est **structurellement illisible par le composant B**, qui n'a pas de navigateur. Faire porter le plancher au seul `managed_storage` reviendrait à ne le faire appliquer que par le composant explicitement décrit comme contournable (§2) — c'est-à-dire à ne pas l'appliquer du tout. Les deux canaux doivent donc porter **la même valeur de plancher**, et le composant B publie l'empreinte de la configuration qu'il applique (`configFingerprint`, §6.3.1), ce qui rend tout désaccord visible.
 
@@ -764,7 +766,7 @@ Toute clé absente n'est **pas** planchée. **En l'absence de politique d'entrep
 | `formatSeverity` | **Minimum** sur sa propre échelle, à deux valeurs : `error` > `warn`. |
 | `rules.minDecisionSubjectLength` | **Minimum** numérique : on peut exiger un motif plus long, jamais plus court. |
 | `severities` | Ensemble de codes dont la sévérité **ne peut pas être abaissée**. |
-| `activation.activatedAt` | Valeur effective : **`min(plancher, niveau inférieur)`** — et non `max`, comme sur les autres clés numériques. Une date plus ancienne élargit le périmètre, donc durcit ; repousser la bascule dans le futur est l'assouplissement à interdire. **Seule exception à la règle des bornes en direct** (§8.1.3) : un durcissement de cette clé ne s'applique pas aux PR déjà ouvertes, il est épinglé comme un changement restrictif ordinaire — sans quoi avancer la date ferait entrer d'un coup, sur toutes les PR ouvertes de l'organisation, l'historique que le §6.2.3 a construit une règle entière pour tenir dehors. |
+| `activation.activatedAt` | Valeur effective : **`min(plancher, niveau inférieur)`** — et non `max`, comme sur les autres clés numériques. Une date plus ancienne élargit le périmètre, donc durcit ; repousser la bascule dans le futur est l'assouplissement à interdire. Cette clé ne fait **aucune exception** à la règle 1 du §8.1.3 : reculer la date au plancher s'applique en direct, et fait donc entrer d'un coup, sur toutes les PR ouvertes de l'organisation, l'historique que le §6.2.3 tient dehors. Une rédaction antérieure l'exemptait — le durcissement y était épinglé, comme tout changement restrictif ; l'exception est tombée avec l'épinglage, et le §8.1.3 dit ce qui la remplace : durcir en `warn`, mesurer, puis passer en `enforce`. C'est le durcissement le plus large que ce document autorise, et rien d'autre ne l'amortit. |
 | `configCacheTtlSeconds` | **Valeur imposée**, ni minimum ni maximum : la règle 4 du §8.1.3 exige la **même** valeur des deux côtés, un écart rouvrant mécaniquement la fenêtre de divergence. |
 | `exemptUsers`, `allowlistPatterns`, `toolCommands` | Deux contraintes distinctes. `minimum` est le **sous-ensemble** qu'aucun niveau inférieur ne peut retirer. `closed` gouverne l'autre sens : à `true`, **aucun ajout** n'est admis en dessous du plancher. |
 | `labels` | `minimum` : ensemble d'`id` dont ni `enabled` ni `blockingByDefault` ne peuvent passer à `false` en dessous du plancher. Voir la justification ci-dessous — c'est la clé dont l'absence viderait le critère 2. |
@@ -782,7 +784,7 @@ Le drapeau `closed` mérite sa justification, car il fait exception à la fusion
               { "id": "chore", "enabled": false } ] }
 ```
 
-Plus aucun label n'est `blockingByDefault`. Tout `issue:` ressort en `E-UNKNOWN-LABEL` à l'étage 2, n'atteint donc jamais le temps 2, et **aucun fil n'est plus bloquant** : le critère 2 est vide, et sous le défaut `formatSeverity: warn` le check reste **au vert**. Le plancher `enforce`, la gouvernance du §6.1, la monotonie et le départage `E-CONFLICT` deviennent tous inopérants, par un commit qu'une seule personne peut pousser. C'est exactement le test que la phrase ci-dessus énonce — « se soustraire à la contrainte » — et `labels` y échoue plus complètement que `mode`, qui est protégé.
+Plus aucun label n'est `blockingByDefault`. Tout `issue:` ressort en `E-UNKNOWN-LABEL` à l'étage 2, n'atteint donc jamais le temps 2, et **aucun fil n'est plus bloquant** : le critère 2 est vide, et sous le défaut `formatSeverity: warn` le check reste **au vert**. Le plancher `enforce`, la gouvernance du §6.1 et le départage `E-CONFLICT` deviennent tous inopérants, par un commit qu'une seule personne peut pousser. C'est exactement le test que la phrase ci-dessus énonce — « se soustraire à la contrainte » — et `labels` y échoue plus complètement que `mode`, qui est protégé.
 
 Une erreur d'implémentation typique consisterait à appliquer `max(plancher, dépôt)` à toutes les clés scalaires : sur `activatedAt`, cela produit exactement l'inverse de l'effet recherché.
 
@@ -828,7 +830,7 @@ Quand aucun résultat n'est encore publié sur la PR — première évaluation e
 
 Avant d'émettre un rejet qui dépend de la configuration — `E-UNKNOWN-LABEL`, `E-UNKNOWN-DECORATION` — le composant B rafraîchit **les deux niveaux** de configuration en contournant leur cache : un label peut avoir été ajouté au fichier du dépôt aussi bien qu'au document d'organisation.
 
-Concrètement, l'évaluation se fait **en deux passes, et seulement quand il le faut** : une première passe avec la configuration en cache ; si elle produit un `E-UNKNOWN-LABEL` ou un `E-UNKNOWN-DECORATION`, une seconde après `fetchConfigFile(pr, { bypassCache: true })` **et** `fetchOrgConfig(url, { bypassCache: true })` (§9.2.4). Les **deux** niveaux, comme le dit le paragraphe précédent et comme l'exige l'étape 12 du §6.4 : un label peut avoir été déclaré au niveau du dépôt aussi bien qu'à celui de l'organisation. Seul le verdict de la seconde passe est publié. Les fonctions de `core/` étant pures, c'est le vérificateur qui porte cette boucle — elle ne peut pas vivre dans `validate()`.
+Concrètement, l'évaluation se fait **en deux passes, et seulement quand il le faut** : une première passe avec la configuration en cache ; si elle produit un `E-UNKNOWN-LABEL` ou un `E-UNKNOWN-DECORATION`, une seconde après `fetchConfigFile(pr, { bypassCache: true })` **et** `fetchOrgConfig(url, { bypassCache: true })` (§9.2.4). Les **deux** niveaux, comme le dit le paragraphe précédent et comme l'exige la règle 3 du §8.1.3 : un label peut avoir été déclaré au niveau du dépôt aussi bien qu'à celui de l'organisation. Seul le verdict de la seconde passe est publié. Les fonctions de `core/` étant pures, c'est le vérificateur qui porte cette boucle — elle ne peut pas vivre dans `validate()`.
 
 C'est une application directe de la règle 1 : l'ajout d'un label est une modification élargissante, donc évaluée en direct, y compris sur les PR déjà ouvertes. Sans ce rafraîchissement, la règle serait vraie sur le papier et fausse en pratique pendant toute la durée du cache.
 
@@ -862,8 +864,7 @@ Ces cas ne sont pas théoriques : casser le fichier de configuration serait, à 
 
 | Situation | Composant A | Composant B |
 |-----------|-------------|-------------|
-| Fichier absent, **jamais évalué auparavant** | Repli sur le niveau inférieur — organisation, puis défauts du produit — dans les bornes du plancher | **Ne publie aucun statut** — le dépôt n'a pas activé l'outil (§6.4, périmètre d'installation) |
-| Fichier absent, **dépôt déjà évalué** | Idem | Publie un statut **neutre** portant `config-vanished`, **quel que soit le mode effectif** — l'une des deux exceptions à la règle du §6.2.2, avec la ligne suivante. La disparition du fichier est un incident, pas une désactivation : sans cette distinction, `git rm .conventional-comments.json` désactiverait le contrôle sur un dépôt en `enforce` — ou, si le check est obligatoire, bloquerait toutes ses PR sans recours |
+| Fichier absent | Repli sur le niveau inférieur — organisation, puis défauts du produit — dans les bornes du plancher | Publie un statut **neutre** portant `config-vanished`, **quel que soit le mode effectif** — l'une des deux exceptions à la règle du §6.2.2, avec la ligne suivante. Le vérificateur ne s'exécutant que là où quelqu'un l'a installé, un fichier absent est toujours une disparition et jamais un dépôt qui n'aurait pas activé l'outil (§9.2.2) |
 | JSON syntaxiquement invalide, ou **valeur inconnue pour une clé connue** (`"mode": "banana"`) | Repli sur le **dernier niveau valide** (organisation, puis défauts), avertissement visible dans les options | Signale « configuration invalide » avec la ligne fautive. Sur un dépôt **déjà évalué**, il publie **quel que soit le mode effectif** — en échec sous `enforce`, neutre portant `invalid-config` sous tout mode inférieur — pour la même raison que la ligne précédente. Sur un dépôt jamais évalué, le mode reste maître |
 | **Lecture impossible** — API injoignable, limite d'appels atteinte (`{ status: 'unreachable' }`, §9.2.2) | Repli sur le niveau inférieur, **en état dégradé** au sens du §5.4 : l'extension assiste et ne bloque plus | Ce n'est ni une absence ni une invalidité, mais une **incapacité à évaluer** au sens du §6.4, et le vérificateur y répond par un check **en échec** — jamais par un silence, qui laisserait un statut périmé décider à sa place. Côté extension, le repli sur le niveau inférieur et l'état dégradé du §5.4 continuent de s'appliquer sur tous les dépôts non activés d'une organisation |
 | Version de schéma supérieure à celle supportée, ou `coreMinVersion` non satisfaite (§8.1.3) | Repli en mode `assist`, **ou au plancher en vigueur s'il est plus strict** (§8.1.1), avec avertissement | **Le même repli, mot pour mot** : mode `assist`, ou le plancher en vigueur s'il est plus strict. Le motif « version non supportée » est porté dans le statut que ce mode l'autorise à publier. Jamais de blocage implicite |
@@ -872,7 +873,7 @@ Ces cas ne sont pas théoriques : casser le fichier de configuration serait, à 
 
 Un fichier invalide ne fait donc **jamais** disparaître la contrainte : il la signale aussi bruyamment que le mode en vigueur le permet. **Le mode reste maître de ce que le composant B publie** — une configuration cassée ne peut pas faire échouer un check là où un mode inférieur l'interdit, sans quoi une faute de virgule bloquerait un dépôt en repli. Le repli est borné par le plancher, faute de quoi une simple montée de version du schéma permettrait de descendre sous un plancher `enforce`. Il est **identique pour les deux composants** : écrire « repli en `assist` » d'un côté et « applique le plancher » de l'autre les ferait diverger sur un déploiement public, où le plancher vaut `{"minimumMode": "off"}` — A assisterait, B se tairait, sur la même entrée.
 
-**Fichier absent contre `mode: off`.** Ces deux situations n'ont volontairement pas le même effet. Un fichier absent sur un dépôt **jamais évalué** signifie « ce dépôt n'a pas activé l'outil » (§6.4) et le composant B se tait ; sur un dépôt déjà évalué, il publie un neutre **quel que soit le mode effectif**. C'est, avec la configuration **invalide** sur un dépôt déjà évalué, la seule exception à « le mode reste maître », et elle est nécessaire : le fichier ayant disparu, le mode effectif est celui que donnent l'organisation puis les défauts, soit `assist` dans un déploiement courant — donc le silence. Or sur un dépôt où le check est déclaré obligatoire, ce silence bloque **toutes** les PR, sans statut et sans explication. Le mode qui commanderait le silence est ici une conséquence de l'incident, pas une décision : lui obéir reviendrait à laisser un `git rm` provoquer un blocage général muet. Le neutre laisse passer et dit pourquoi.
+**Fichier absent contre `mode: off`.** Ces deux situations n'ont volontairement pas le même effet. Un fichier absent fait publier un **neutre**, quel que soit le mode effectif ; `mode: off` fait taire le vérificateur. C'est nécessaire : le fichier ayant disparu, le mode effectif est celui que donnent l'organisation puis les défauts, soit `assist` dans un déploiement courant — donc le silence. Or sur un dépôt où le check est déclaré obligatoire, ce silence bloque **toutes** les PR, sans statut et sans explication. Le mode qui commanderait le silence est ici une conséquence de l'incident, pas une décision : lui obéir reviendrait à laisser un `git rm` provoquer un blocage général muet. Le neutre laisse passer et dit pourquoi.
 
 Le raisonnement vaut mot pour mot pour un fichier **cassé** plutôt que supprimé : le repli sur le niveau inférieur produit le même mode résiduel, donc le même silence, donc le même blocage général. Le §8.1.5 ouvre en observant que « casser le fichier de configuration serait, à défaut de règle, le moyen le plus simple de désactiver le contrôle » — sans exception, la règle écrite transformerait « désactiver » en « bloquer silencieusement », ce qui est pire. Les deux incidents sont donc traités de la même façon. Un `{"mode": "off"}` explicite est une **demande de désactivation**, qui reste soumise au plancher et peut donc être ignorée. Une organisation qui veut rendre l'activation obligatoire ne peut pas s'appuyer sur le seul plancher : elle doit imposer la présence du fichier, par exemple via un dépôt de modèles ou un contrôle d'organisation, hors périmètre de cet outil.
 
@@ -932,7 +933,6 @@ Là où cette valeur s'applique, le cas 2 du §6.1 est sans effet et seule la r�
   "badgeStyle": "pill",
   "shortcuts": { "abbreviations": { "?i": "issue: ", "?ib": "issue (blocking): " } },
   "docUrl": "https://conventionalcomments.org/",
-              "statusTargetUrl": null },
   "language": "fr",
   "telemetry": { "enabled": false, "endpoint": null }
 }
@@ -950,7 +950,7 @@ Clés introduites par le §6 et le §8.1 :
 | `coreMinVersion` | Version majeure minimale de `core/` requise pour appliquer cette configuration (§8.1.3). En deçà, le repli du §8.1.5 s'applique : mode `assist`, ou le plancher en vigueur s'il est plus strict. |
 | `scope.validateReplies` | Validation des réponses de fil (§4.1). `false` par défaut. |
 | `scope.validateReviewSummary` | Validation du corps d'une revue soumise en lot (§4.1). Sans objet sur les plateformes qui n'ont pas ce concept — voir annexes. |
-| `resolverOverrideGroup` | Groupe ou **liste de groupes** habilités à résoudre un fil bloquant à la place de l'auteur du commentaire (§6.1.1) et à **obtenir l'exemption d'une PR** (§6.3.2) — en posant l'étiquette, là où la plateforme en expose la provenance (§6.3.2). Une liste s'entend en **intersection** : être membre de tous. C'est ce qui rend exprimable la restriction du §8.1.1 — un champ scalaire unique ne le pouvait pas. **La forme de chaque identifiant dépend de la plateforme** et est donnée en annexe (`org/team-slug` sur GitHub, `[Scope]\Nom` sur Azure DevOps) ; le vérificateur les résout par autant d'appels à `isInGroup` (§9.2.4). Plancher-able. |
+| `resolverOverrideGroup` | Groupe ou **liste de groupes** habilités à résoudre un fil bloquant à la place de l'auteur du commentaire (§6.1.1) et à **obtenir l'exemption d'une PR** (§6.3.2) — en posant l'étiquette, là où la plateforme en expose la provenance (§6.3.2). Une liste s'entend en **intersection** : être membre de tous. C'est ce qui rend exprimable la restriction du §8.1.1 — un champ scalaire unique ne le pouvait pas. **La forme de chaque identifiant dépend de la plateforme** et est donnée en annexe (une liste de logins séparés par des virgules sur GitHub, `[Scope]\Nom` sur Azure DevOps) ; le vérificateur les résout par autant d'appels à `isInGroup` (§9.2.4). Plancher-able. |
 | `rules.minDecisionSubjectLength` | Longueur minimale du motif d'une réponse `decision` (§6.1.1). Défaut : 20. Plancher-able. |
 | `docUrl` | Lien vers la documentation de la convention, porté par la sortie du check (§6.3.1). Une organisation qui documente sa propre déclinaison y pointe la sienne. |
 | `labels[].enabled` | Active ou désactive un label sans le retirer de la liste (§8.1.4). Les labels optionnels `typo`, `polish`, `quibble` sont livrés à `false`. |
@@ -976,7 +976,7 @@ Ce coût est **strictement réservé aux dépôts qui emploient la clé**, et le
 
 Monter `version` serait le mauvais remède : la version du **schéma** dit qu'un document ne peut plus être lu, et un lecteur d'une version antérieure retomberait alors en mode `assist` (§8.1.5) — bien plus destructeur que d'ignorer une clé optionnelle. `coreMinVersion` ne convient pas davantage : elle porte sur la version **majeure** de `core/`, et l'ajout d'une clé optionnelle n'en est pas une. Une organisation qui veut l'exigence de façon homogène dispose déjà du levier juste : renseigner `coreMinVersion` au moment où elle **décide** que ses dépôts dépendent de la clé, ce qui fait retomber en `assist` les vérificateurs trop anciens plutôt que de les laisser rejeter.
 
-**Contrainte sur `allowlistPatterns`.** Ces motifs sont fournis par le dépôt et exécutés dans le navigateur du relecteur comme dans le service mutualisé : un motif tel que `^(a+)+$` gèlerait l'un et l'autre. Trois bornes, toutes **statiques**, c'est-à-dire vérifiables avant exécution : **au plus 50 motifs**, **256 caractères** par motif, et **aucun quantificateur imbriqué** — un quantificateur portant sur un groupe qui en contient déjà un, forme dont relève l'essentiel des ReDoS connus. Un motif qui dépasse ces bornes est **ignoré et signalé** (`config-warning`, §9.2.1).
+**Contrainte sur `allowlistPatterns`.** Ces motifs sont fournis par le dépôt et exécutés dans le navigateur du relecteur comme dans l'exécution du vérificateur : un motif tel que `^(a+)+$` gèlerait l'un et l'autre. Trois bornes, toutes **statiques**, c'est-à-dire vérifiables avant exécution : **au plus 50 motifs**, **256 caractères** par motif, et **aucun quantificateur imbriqué** — un quantificateur portant sur un groupe qui en contient déjà un, forme dont relève l'essentiel des ReDoS connus. Un motif qui dépasse ces bornes est **ignoré et signalé** (`config-warning`, §9.2.1).
 
 Un délai maximal d'exécution serait le contrôle évident, et il n'est pas retenu : une expression régulière JavaScript s'exécute sur le fil principal et ne s'interrompt pas. La seule façon de la borner dans le temps serait de l'exécuter dans un *worker* que l'on termine — coût disproportionné pour un motif dont on peut refuser la forme à la lecture.
 
@@ -1081,17 +1081,14 @@ interface Diagnostic {
 }
 
 type NoticeKind =
-  | 'weakening-edit'        // §6.1 — édition affaiblissante de la racine d'un fil bloquant
-  | 'root-deleted'          // §6.1 — suppression de cette racine
   | 'resolution-refused'    // §6.1 — résolution hors des deux cas admis
   | 'resolution-unattributed'  // §9.2.1 — plateforme n'exposant pas l'auteur de la résolution
   | 'floor-override'        // §8.1.2 — clé de dépôt ignorée au titre du plancher
   | 'invalid-config'        // §8.1.5 — JSON invalide ou valeur hors domaine
   | 'config-warning'        // §8.1.5 — clé inconnue ignorée ; §8.2 — expression d'allowlist écartée
-  | 'config-vanished'       // §8.1.5 — fichier de configuration disparu d'un dépôt déjà évalué
+  | 'config-vanished'       // §8.1.5 — fichier de configuration disparu
   | 'exemption-reset'       // §6.3.2 — étiquette d'exemption retirée après un nouveau commentaire bloquant
   | 'exemption-refused'     // §6.3.2 — étiquette posée par une personne non habilitée
-  | 'exemption-label-restored'  // §6.3.2 — étiquette d'une exemption confirmée, replacée par B
   | 'unsupported-version';  // §8.1.5, §8.1.3 — schéma, plancher ou core/ trop récent
 
 interface Notice {
@@ -1122,8 +1119,8 @@ interface ComplianceResult {
   unresolvedBlockingThreads: ThreadInfo[];  // critère 2
   notices: Notice[];                   // tout ce que le §6.3.1 exige de rendre visible sans en faire un diagnostic
   docUrl: string;                      // documentation de la convention (§6.3.1)
-  targetUrl?: string;                  // §6.3.1 — page servie par B portant la sortie complète ; requis
-                                       // dès que la plateforme ne rend pas de corps de statut (§B.7)
+  targetUrl?: string;                  // §6.3.1 — lien optionnel vers une page portant la sortie ; aucun
+                                       // porteur configurable ne le fournit plus
   counts: { unresolvedThreads: number;         // §6.3.1 — les trois compteurs de la ligne `cc/1`, comme
             nonCompliantComments: number;      // champs et non enfouis dans `headline`, sans quoi l'encodeur
             warnings: number };                // devrait reparser une phrase en langue naturelle
@@ -1170,7 +1167,7 @@ interface ReviewEvent {
 interface Disposable { dispose(): void; }
 ```
 
-**Pourquoi `state` figure dans le résultat.** Sans lui, l'adaptateur devrait recalculer le verdict à partir du mode, des deux listes et de l'exemption — donc **juger**, ce que le §9.2.4 lui interdit — et il ne le pourrait pas de toute façon, la règle du brouillon (§6.2.4) dépendant d'un appel séparé. `core/` produit les trois états, `neutral` couvrant le délai de grâce du §6.4 ; l'adaptateur les traduit vers `GitStatusState` ou vers la conclusion d'un *check run*.
+**Pourquoi `state` figure dans le résultat.** Sans lui, l'adaptateur devrait recalculer le verdict à partir du mode, des deux listes et de l'exemption — donc **juger**, ce que le §9.2.4 lui interdit — et il ne le pourrait pas de toute façon, la règle du brouillon (§6.2.4) dépendant d'un appel séparé. `core/` produit les trois états, `neutral` couvrant les incidents de configuration du §8.1.5 ; l'adaptateur les traduit vers `GitStatusState` ou vers la conclusion d'un *check run*.
 
 #### 9.2.2 Contrat de `core/`
 
@@ -1183,7 +1180,8 @@ Les deux contrats d'adaptateur des §9.2.3 et §9.2.4 sont typés à la virgule 
 type EffectiveConfig = /* §8.2, toutes clés résolues, dans les bornes du §8.1.1 */ object;
 type Floor           = /* §8.1.1, document de plancher */ object;
 
-// Ce que `core/` ne peut pas lire lui-même, et que le composant B lui passe (§6.4, stockage).
+// Ce que `core/` ne peut pas lire lui-même, et que le vérificateur lui passe après l'avoir lu
+// sur la plateforme (§6.4). Rien n'en vient d'un stockage : il n'y en a pas.
 // Trois résultats, et non deux : un fichier **absent** est le cas nominal du §8.1.5 et n'a rien de dégradé ;
 // une lecture **impossible** l'est, et c'est elle — et elle seule — qui désarme la condition 4 du §5.4.
 // Les confondre ferait qu'un dépôt sans fichier de configuration éteindrait `enforce` côté extension.
@@ -1205,40 +1203,29 @@ interface EvaluationInput {
   configNotices: Notice[];             // remontées par `resolveConfig()` : elles sont **transportées** vers
                                        // `ComplianceResult.notices`, que le §6.3.1 déclare obligatoire.
                                        // Elles ne commandent aucun verdict — c'est le rôle de `forceState`,
-                                       // que l'orchestrateur arme après les avoir lues
+                                       // que le vérificateur arme après les avoir lues
   forceState?: { state: 'neutral' | 'failure'; because: NoticeKind };  // le verdict est imposé, quoi que
                                        // disent les listes : `neutral` pour une configuration disparue, la
                                        // configuration disparue et la configuration invalide sous un mode
                                        // inférieur à `enforce` ; `failure` pour une configuration invalide
-                                       // **sous `enforce`** (§8.1.5). C'est **l'orchestrateur** qui
+                                       // **sous `enforce`** (§8.1.5). C'est **le vérificateur** qui
                                        // l'arme, en inspectant les `notices` rendues par `resolveConfig()`
   ctx: EvaluationContext;
 }
 
-// Ce que `core/` ne peut pas lire lui-même, et que le composant B lui passe (§6.4, stockage).
+// Ce que `core/` ne peut pas lire lui-même, et que le vérificateur lui passe après l'avoir lu
+// sur la plateforme (§6.4). Rien n'en vient d'un stockage : il n'y en a pas.
 interface EvaluationContext {
-  activatedAt: string | null;          // §6.2.3 — la date **effective**, résolue par l'orchestrateur :
-                                       // celle de la configuration effective si elle en porte une, sinon
-                                       // celle du stockage (§6.4), sinon `null`
+  activatedAt: string | null;          // §6.2.3 — la date **effective** : celle de la configuration
+                                       // effective si elle en porte une, sinon `null`. Il n'y a aucun
+                                       // autre porteur — plus de stockage pour en garder une
   isDraft: boolean;                    // §6.2.4
-  exemption?: { by: UserInfo; at: string;
-                labelPresent: boolean };  // §6.3.2 — telle que **posée**, pas telle qu'admise :
-                                       // c'est `evaluate()` qui vérifie l'habilitation et peut la refuser.
-                                       // Sa source dépend de la plateforme : la provenance de l'étiquette
-                                       // sur le chemin de repli — où seule une exemption **confirmée**
-                                       // est passée, jamais une exemption en attente. `core/` ne fait pas
-                                       // la différence. `labelPresent` dit si l'étiquette est sur la PR
-                                       // au moment du calcul : toujours vrai là où la provenance est
-                                       // exposée, l'exemption y venant de l'étiquette. C'est lui qui
-                                       // déclenche `actions.addLabel` quand l'exemption est admise et
-                                       // l'étiquette absente (§6.3.2)
+  exemption?: { by: UserInfo; at: string };  // §6.3.2 — lue de l'étiquette et de sa provenance
   isOverrideMember: (u: UserInfo) => boolean;   // §6.1, §6.1.1, §6.3.2 — appartenance à
-                                       // `resolverOverrideGroup`, **résolue en amont** par l'orchestrateur
+                                       // `resolverOverrideGroup`, **résolue en amont** par le vérificateur
                                        // via `isInGroup()` (§9.2.4) pour **tout auteur apparaissant sur la
                                        // PR** — restreindre aux résolveurs et poseurs d'étiquette omettrait
-                                       // les auteurs de réponses `decision`, et les refuserait toutes —
-                                       // chemin de repli, elle a été accordée hors de la PR et son auteur
-                                       // peut n'y apparaître nulle part.
+                                       // les auteurs de réponses `decision`, et les refuserait toutes.
                                        // La décision reste dans `core/` ; seule la lecture en sort
 }
 
@@ -1288,7 +1275,7 @@ function decodeSummary(line: string): PublishedSummary | null;                  
 
 `resolveConfig()` rend **aussi des `notices`**, et non la seule configuration : `floor-override`, `invalid-config` avec sa ligne fautive, `config-warning`, `config-vanished` et `unsupported-version` naissent tous de la résolution, et d'elle seule. Sans ce second membre, cinq `NoticeKind` du §9.2.1 n'auraient aucun producteur, alors que le §6.3.1 les déclare obligatoires dans la sortie.
 
-`evaluate()` est la fonction qui produit le verdict — `state` compris, que le §9.2.1 et le §B.7 attribuent tous deux à `core/`. Sans elle, ce verdict n'aurait aucun producteur déclaré, et l'adaptateur serait ramené à le recalculer, ce que le §9.2.4 lui interdit. Son `EvaluationContext` porte ce que `core/` ne peut pas lire lui-même : l'état brouillon, l'exemption de PR et la date d'activation.
+`evaluate()` est la fonction qui produit le verdict — `state` compris, que le §9.2.1 attribue à `core/`. Sans elle, ce verdict n'aurait aucun producteur déclaré, et l'adaptateur serait ramené à le recalculer, ce que le §9.2.4 lui interdit. Son `EvaluationContext` porte ce que `core/` ne peut pas lire lui-même : l'état brouillon, l'exemption de PR et la date d'activation.
 
 `fingerprint()` mérite d'être ici plutôt que dans chaque composant : c'est la fonction qui décide si A et B « se voient » d'accord (§8.1.3, règle 2). Deux implémentations qui sérialiseraient la configuration différemment — ordre des clés, valeurs par défaut incluses ou non — produiraient un désaccord permanent sur des configurations identiques. Elle est **normativement dans `core/`**, et son entrée est la configuration effective, jamais le texte des fichiers dont elle est issue.
 
@@ -1298,7 +1285,7 @@ function decodeSummary(line: string): PublishedSummary | null;                  
 
 **Les deux membres à comparaison insensible à la casse sont projetés en minuscules et dédoublonnés.** Ce sont `exemptUsers`, dont le §4.2 compare le `login` sans égard à la casse, et `toolCommands`, dont il compare les mentions de la même façon. La projection doit l'être avec eux : sans normalisation, `@Codex` et `@codex` — qui exemptent exactement les mêmes commentaires — produiraient deux empreintes.
 
-Le **dédoublonnage** ne se déduit pas de la normalisation et doit être exigé séparément : la fusion du §8.1.4 et le mélange du §8.1.3 comparent au caractère près, si bien qu'une correction de casse sur une PR déjà épinglée laisse les **deux** orthographes dans la configuration mélangée. Le vérificateur projetterait alors deux entrées là où l'extension n'en projette qu'une, et la règle 2 du §8.1.3 désarmerait le blocage d'envoi sur un désaccord fabriqué. C'est la même précaution que celle prise sur `severities`, dont une surcharge égale à la valeur du §3.5.2 n'est pas matérialisée.
+Le **dédoublonnage** ne se déduit pas de la normalisation et doit être exigé séparément : la fusion du §8.1.4 compare au caractère près, si bien qu'une correction de casse laisse les **deux** orthographes dans la configuration fusionnée. Le vérificateur projetterait alors deux entrées là où l'extension n'en projette qu'une, et la règle 2 du §8.1.3 désarmerait le blocage d'envoi sur un désaccord fabriqué. C'est la même précaution que celle prise sur `severities`, dont une surcharge égale à la valeur du §3.5.2 n'est pas matérialisée.
 
 **`toolCommands` est en outre OMIS de la projection quand sa liste est vide, et c'est la condition de compatibilité de son ajout.** L'entrée de `fingerprint()` est un objet sérialisé : un membre présent avec `[]` ne produit pas le même texte qu'un membre absent. Sans cette omission, faire entrer la clé dans le domaine changerait l'empreinte de **tout** dépôt, y compris ceux qui ne la configurent pas — mesuré sur une configuration par défaut : `f3c2a515` contre `becd76df`. Pendant toute la fenêtre de décalage entre l'extension et le vérificateur, que la règle 5 du §8.1.3 déclare **normale**, la règle 2 prendrait ce simple écart de version pour un désaccord de configuration et désarmerait le blocage d'envoi partout. Une liste vide et une clé absente exemptent exactement la même chose — rien —, les confondre dans la projection est donc juste et pas seulement commode.
 
@@ -1431,7 +1418,7 @@ La même règle vaut pour toute réponse qui se dérobe : un adaptateur ne peut 
 #### 9.2.4 Contrat du vérificateur (composant B)
 
 ```ts
-interface ServerPlatformAdapter {
+interface VerifierPlatformAdapter {
   platformProfile(): PlatformProfile;                // §9.2.2 — même profil que côté client, même source
   currentPr(): Promise<PrRef>;                       // §6.4 — la PR que l'exécution courante évalue,
                                        // désignée par le déclencheur de la plateforme. Il n'y a ni
@@ -1460,7 +1447,7 @@ interface ServerPlatformAdapter {
                                        // **idempotente** : retirer une étiquette absente est sans effet,
                                        // jamais une erreur. Il n'y a pas d'`addLabel()` : poser
                                        // l'étiquette pour le compte de quelqu'un n'existait que sur le
-                                       // chemin de repli du §6.3.2, qui demandait une mémoiree — une remise à zéro peut
+                                       // chemin de repli du §6.3.2, qui demandait une mémoire — une remise à zéro peut
                                        // suivre un retrait manuel, une restauration peut croiser une
                                        // repose à la main
   isInGroup(user: UserInfo, group: string): Promise<boolean>;  // resolverOverrideGroup (§6.1.1)
@@ -1469,7 +1456,7 @@ interface ServerPlatformAdapter {
 
 *Aucune méthode ne demande à la plateforme qui a le droit de résoudre un fil.* Les deux plateformes du périmètre l'autorisent à tout le monde (§A.6, §B.5), et la règle du §6.1 est de toute façon vérifiée **après coup** par `core/` sur `ThreadInfo.resolvedBy`. Une telle méthode n'aurait donc aucun appelant.
 
-**Ce qui reste hors des adaptateurs, donc dans `core/` :** le calcul de conformité, la résolution de la configuration et la **règle** de mélange de sa partie épinglée — l'accès au stockage restant en dehors (§9.2.2) —, la normalisation d'entrée, et la décision de **retenir ou non** une résolution au sens du §6.1. Un adaptateur traduit et transporte ; il ne juge jamais.
+**Ce qui reste hors des adaptateurs, donc dans `core/` :** le calcul de conformité, et la résolution de la configuration — l'accès au stockage restant en dehors (§9.2.2) —, la normalisation d'entrée, et la décision de **retenir ou non** une résolution au sens du §6.1. Un adaptateur traduit et transporte ; il ne juge jamais.
 
 La frontière passe exactement là : **traduire `fixed` ou `wontFix` en `ResolutionState.resolved` est une traduction**, et elle appartient donc à l'adaptateur — les tables des §A.6 et §B.5 sont sa spécification. **Décider qu'une résolution est retenue** parce que son auteur est celui du commentaire racine est un jugement, et il appartient à `core/`. C'est pourquoi `ThreadInfo.resolution` est déjà typé `ResolutionState` à la frontière : ce que l'adaptateur livre est normalisé, pas arbitré.
 
@@ -1505,7 +1492,7 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 **Confidentialité**
 - Aucun contenu de commentaire, de code ou de diff ne quitte le navigateur.
 - Télémétrie **désactivée par défaut**, opt-in explicite, et limitée à des compteurs agrégés (label utilisé, code d'erreur, mode, dépôt) — jamais de texte libre.
-- **Journalisation des exemptions de PR** (§6.3.2) : mécanisme distinct de la télémétrie ci-dessus, nominatif par nature (identifiant de PR, auteur, horodatage). Destination configurable. Cette collecte de données personnelles nécessite une base légale identifiée (ex. intérêt légitime de l'employeur pour la gouvernance du code, avec information préalable des personnes concernées) et une durée de conservation **par défaut de 12 mois**, configurable, alignée sur un cycle d'audit — à confirmer avant activation dans une organisation soumise au RGPD.
+- **Les exemptions de PR ne font l'objet d'aucune journalisation externe** (§6.3.2) : l'étiquette, son auteur et sa date vivent dans l'historique de la PR, sous le compte de la personne qui l'a posée. C'est la même raison qu'au point suivant pour les décisions de revue — aucun traitement de données nouveau n'est créé, donc aucune base légale ni durée de conservation à définir.
 - Les décisions de revue (`decision`, §6.1.1) ne font l'objet d'**aucune journalisation externe** : elles vivent dans la PR, sous le compte de leur auteur, comme n'importe quel commentaire de revue. C'est un avantage du mécanisme sur un journal de contournements — il ne crée aucun traitement de données nouveau.
 
 **Sécurité**
@@ -1549,7 +1536,7 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 - `CA-07` Une réponse dans un fil existant n'exige pas de label avec la configuration par défaut.
 - `CA-08` Les commentaires des bots de pipeline ne déclenchent aucune erreur.
 - `CA-09` Le passage en mode `warn` n'empêche aucune publication.
-- `CA-10` Une exemption de PR est journalisée avec son auteur et son horodatage.
+- `CA-10` Une exemption de PR est **attribuée et datée sur la PR elle-même** — étiquette, auteur, horodatage lisibles dans son historique — et le statut publié les nomme (§6.3.2).
 - `CA-11` **Dégradation silencieuse.** Sélecteurs volontairement invalidés : aucun dialogue, aucune exception remontée à l'utilisateur, tous les contrôles natifs de la plateforme restent fonctionnels, et l'échec de détection est tracé : dans la journalisation locale du §9.4 toujours, et par un événement de télémétrie **si la télémétrie est activée** — elle ne l'est pas par défaut (§10).
 - `CA-12` **Parcours clavier.** Script énuméré et rejoué : focus de l'éditeur → ouverture de la complétion → sélection d'un label → choix d'une décoration → envoi → lecture du message d'erreur en cas de rejet. Chaque étape atteignable et annoncée, sans souris.
 - `CA-13` Un fil bloquant résolu par un tiers **sans** réponse `decision` valide reste compté comme non résolu, et la sortie du check en donne la cause. Avec une réponse `decision` conforme au §6.1.1, la résolution est acceptée.
@@ -1564,21 +1551,21 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 - `CA-22` **Sévérités distinctes.** En mode `enforce` avec `formatSeverity: warn`, un commentaire mal formé n'échoue pas le check ; un fil `issue:` non résolu le fait échouer.
 - `CA-23` **Le vérificateur lit le mode.** Un dépôt en mode `warn` avec composant B actif et check déclaré obligatoire voit ses PR mergeables : le statut est publié au vert avec un résumé informatif.
 - `CA-24` **Plancher hors de portée du dépôt.** Un `{"mode": "off"}` poussé sur la branche par défaut d'un dépôt dont le plancher vaut `enforce` est ignoré pour la clé `mode`, et le fait apparaît dans la sortie du check.
-- `CA-25` **Sortie exploitable.** Un check en échec permet d'identifier, **en un clic au plus** (§6.3.1), chaque fil bloquant non résolu (lien, auteur, label) et chaque diagnostic de format (lien, code, sévérité, correction proposée) — un commentaire pouvant en porter plusieurs (§3.5.1). Vérifié sur les deux plateformes : dans le corps du check sur l'une, derrière la `targetUrl` du statut sur l'autre.
-- `CA-26` **Exemption de PR.** Une exemption obtenue par un membre habilité fait passer le statut au vert et journalise l'événement ; obtenue par une personne non habilitée, elle est refusée et l'étiquette reste en place. Un fil bloquant non résolu dont la racine est postérieure à la pose **fait disparaître l'étiquette** et repasse le statut en échec (§6.3.2). Ne se teste que là où la plateforme expose la provenance d'une étiquette ; ailleurs, il n'y a pas d'exemption de PR.
+- `CA-25` **Sortie exploitable.** Un check en échec permet d'identifier, **en un clic au plus** (§6.3.1), chaque fil bloquant non résolu (lien, auteur, label) et chaque diagnostic de format (lien, code, sévérité, correction proposée) — un commentaire pouvant en porter plusieurs (§3.5.1). Vérifié dans le corps du check run (§A.8).
+- `CA-26` **Exemption de PR.** Une exemption obtenue par un membre habilité fait passer le statut au vert ; obtenue par une personne non habilitée, elle est refusée et l'étiquette reste en place. Un fil bloquant non résolu dont la racine est postérieure à la pose **fait disparaître l'étiquette** et repasse le statut en échec (§6.3.2). Ne se teste que là où la plateforme expose la provenance d'une étiquette ; ailleurs, il n'y a pas d'exemption de PR.
 - `CA-27` **Retour arrière.** Le passage de `enforce` à `warn` au niveau de l'organisation débloque les PR sans exiger de modifier la protection de branche de chaque dépôt.
-- `CA-28` **Ordre des événements.** Un événement de création reçu après l'événement d'édition qui le corrige ne réintroduit pas un statut en échec périmé.
-- `CA-29` **Opt-in par dépôt.** Un dépôt **jamais évalué** et sans fichier `.conventional-comments.json` sur sa branche par défaut ne reçoit aucun statut, même si l'intégration est installée au niveau de l'organisation. Contre-épreuve : retirer ce fichier d'un dépôt déjà évalué produit un statut neutre portant `config-vanished`, jamais un silence, y compris si le mode résiduel est `assist` (§8.1.5).
-- `CA-30` **Épinglage.** Merger sur la branche par défaut une modification de configuration qui retire un label ne fait basculer au rouge le check d'**aucune PR déjà ouverte**. Une PR ouverte après ce merge applique la nouvelle configuration.
-- `CA-31` **Plancher en direct.** Durcir le plancher d'entreprise sur `mode` prend effet sur les PR **déjà ouvertes**, malgré l'épinglage de leur configuration. Contre-épreuve : le durcir sur `activation.activatedAt` ne change rien aux PR déjà ouvertes (§8.1.1).
+- `CA-28` **Une évaluation ne s'appuie jamais sur le contenu de l'événement.** Un commentaire non conforme créé puis corrigé avant que l'évaluation ne s'exécute produit un statut **conforme** : l'état courant est relu avant de juger (§6.4).
+- `CA-29` **Fichier disparu.** Un dépôt dont le fichier `.conventional-comments.json` est absent reçoit un statut **neutre** portant `config-vanished`, quel que soit le mode effectif (§8.1.5) — jamais un silence, qui bloquerait toutes ses PR sur un check déclaré obligatoire.
+- `CA-30` **Configuration en direct.** Merger sur la branche par défaut une modification de configuration s'applique **immédiatement**, y compris aux PR déjà ouvertes, dans les deux sens (§8.1.3, règle 1).
+- `CA-31` **Plancher en direct.** Durcir le plancher d'entreprise sur `mode` prend effet sur les PR **déjà ouvertes**. Contre-épreuve dans l'**autre sens** : l'assouplir vaut tout aussi immédiatement sur ces mêmes PR (§8.1.3, règle 1). C'est ce sens que raterait un cliquet — une implémentation qui n'appliquerait en direct que les durcissements et laisserait rouge une PR que la configuration courante accepte —, et que la moitié « durcissement » du critère, seule, ne verrait pas.
 - `CA-32` **Décalage visible.** Extension et vérificateur placés délibérément sur deux générations de **configuration** : l'extension signale l'écart, **cesse de bloquer l'envoi** tant qu'il dure (§8.1.3, règle 2), et la sortie du check porte l'empreinte appliquée. Aucun désaccord silencieux, aucun rejet que le vérificateur n'aurait pas prononcé. Contre-épreuve, dans le même test : sur deux versions de `core/` mais une **même** configuration, le blocage d'envoi reste actif.
 - `CA-33` **Anti-cache sur rejet.** Un label ajouté à la configuration d'organisation est accepté par le vérificateur **sans attendre l'expiration de son cache**, dès la première évaluation qui l'aurait rejeté.
-- `CA-34` **Rapport à blanc.** Un dépôt non activé peut obtenir la liste de ce qui échouerait, sans qu'aucun statut ne soit publié sur ses PR.
+- `CA-34` **Mesurer avant de contraindre.** Un dépôt en mode `warn` reçoit un statut qui n'échoue jamais et dont le corps liste ce qui échouerait sous `enforce` — commentaires non conformes et fils bloquants non résolus, avec leurs liens permanents (§6.2.4).
 - `CA-35` **Brouillon.** Une PR en brouillon comportant un fil `issue:` non résolu reçoit un statut informatif, jamais en échec ; sortir du brouillon le rend contraignant.
-- `CA-36` **Blocage monotone.** Éditer `issue:` en `note:` sur le commentaire racine d'un fil déjà observé comme bloquant ne le rend pas non bloquant ; l'édition est signalée dans la sortie du check, **avec son auteur là où la plateforme l'expose** (§6.1). Contre-épreuve : corriger un `E-CONFLICT` dans les conditions du §6.1 n'est pas signalé comme un affaiblissement.
+- `CA-36` **Le verdict se lit de l'état courant.** Éditer `issue:` en `note:` sur le commentaire racine rend le fil non bloquant au tour suivant, et rien n'est signalé : le vérificateur ne compare l'état courant à aucun passé qu'il ne détient pas (§6.1).
 - `CA-37` **Bloc de suggestion.** Un commentaire contenant un bloc de suggestion natif, suivi d'une phrase libre, est conforme sans label explicite, compte comme `suggestion` dans les indicateurs, et ne produit ni `W-MISSING-DECORATION` ni diagnostic de sujet.
 - `CA-38` **Préfixe mal formé.** `issue (blocking: x` produit `E-MALFORMED-PREFIX` désignant la parenthèse non fermée, jamais `E-NO-LABEL` ; `issue : le nom est ambigu` désigne l'espace avant le deux-points ; `Attention : le build casse` produit toujours `E-NO-LABEL` avec le format attendu.
-- `CA-40` **Commande adressée à un outil** (§4.2, §8.2). Le critère porte sur l'**étage −1** de l'échelle du §3.5.1, et sur lui seul : un commentaire qu'un étage antérieur écarte — zone éteinte par `scope` — ou qu'une **autre** exemption du §4.2 retient — motif de `allowlistPatterns`, auteur exempté, message de plateforme — sort de son périmètre, quel que soit le contenu de `toolCommands`. La **reconnaissance** se lit sur la configuration appliquée à la PR évaluée au sens du §8, jamais sur l'un de ses niveaux pris isolément : les trois niveaux du §8.1.2 y concourent, les bornes du §8.1.1 peuvent en écarter une entrée, et le mélange épinglé du §8.1.3 peut en retenir une que le dépôt a retirée depuis.
+- `CA-40` **Commande adressée à un outil** (§4.2, §8.2). Le critère porte sur l'**étage −1** de l'échelle du §3.5.1, et sur lui seul : un commentaire qu'un étage antérieur écarte — zone éteinte par `scope` — ou qu'une **autre** exemption du §4.2 retient — motif de `allowlistPatterns`, auteur exempté, message de plateforme — sort de son périmètre, quel que soit le contenu de `toolCommands`. La **reconnaissance** se lit sur la configuration appliquée à la PR évaluée au sens du §8, jamais sur l'un de ses niveaux pris isolément : les trois niveaux du §8.1.2 y concourent, et les bornes du §8.1.1 peuvent en écarter une entrée — `toolCommands` est plancher-able, et son drapeau `closed` interdit alors tout ajout en dessous du plancher.
   
   Cela posé : `toolCommands` étant **vide par défaut**, `@codex review` et `/rebase` restent des remarques de revue et produisent `E-NO-LABEL`. Le sentinel `/*` exempte ensuite toute commande slash — `/azp run`, `/lgtm`, `/rebase` qu'il reconnaît sans le nommer — sans qu'aucune ne soit énumérée, tandis qu'un chemin comme `/etc/hosts n'est pas le bon endroit` porte un second `/` dans son premier jeton et reste validé. Un handle déclaré exempte la commande sans égard à la casse — `@Codex review` comme `@codex review` —, un handle non déclaré ne l'exempte pas, et la reconnaissance porte sur le **jeton entier** : `@codexplique pourquoi` n'est pas une commande. `@alice peux-tu regarder ça ?` n'est exempté que si `@alice` est déclaré : aucun sentinel générique n'existe pour les mentions, si bien qu'aucune configuration ne peut les exempter en bloc — l'asymétrie avec `/*` que le §4.2 justifie.
 
@@ -1630,10 +1617,7 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 2. **La procédure de retour arrière est écrite et son exécutant désigné** (§6.3.3), y compris l'ordre des opérations.
 3. **Le check est déclaré obligatoire, et l'option interdisant le contournement des règles est activée** (§6.2.2, annexes) — sans quoi O3 n'est pas satisfait pour les administrateurs.
 
-Sur **Azure DevOps**, deux prérequis s'ajoutent, tous deux tranchés par le spike `P1'` :
-
-4. **La provenance des étiquettes est lisible sur la plateforme** (§6.3.2). Sans elle, il n'y a pas d'exemption de PR — et c'est une des deux soupapes du §6.3 qui manque.
-5. **La latence de détection respecte la NFR de 60 s** (§B.7) — voie événementielle établie, ou `server.reconcileIntervalSeconds` ≤ 60.
+Sur **Azure DevOps**, la vérification n'est pas livrée (§B.7) : `P5` ne s'y applique pas, et le mode `enforce` n'y a pas de porteur.
 
 `P4` ne dépend pas de `P3` : la trajectoire du §7 fait de `assist → warn` la première étape d'adoption, et attendre la seconde plateforme pour l'entamer sur la première n'aurait pas de sens. `P3` élargit le périmètre de `P4`, il ne le conditionne pas.
 
@@ -1658,7 +1642,7 @@ Couvre github.com, GitHub Enterprise Cloud (y compris EMU) et GitHub Enterprise 
 | **Offre** | github.com, GitHub Enterprise Cloud (EMU) | GitHub Enterprise Server |
 | **Domaine** | `github.com` ; sous-domaine dédié de `ghe.com` pour la résidence de données. Aucun des deux n'est pré-déclaré : tous relèvent du mécanisme runtime décrit en A.4, au même titre que l'auto-hébergé | Domaine interne, variable par instance |
 | **Rythme de mise à jour du produit** | Continu | Par release, plusieurs versions supportées en parallèle |
-| **Version minimale supportée** | — | *à définir avant P2 (génération de DOM à cibler) et avant P5 (webhooks disponibles, notamment `pull_request_review_thread`, nécessaire au §6)* |
+| **Version minimale supportée** | — | *à définir avant P2 (génération de DOM à cibler) et avant P5 (GitHub Actions et les déclencheurs employés au §A.8)* |
 
 ### A.2 Éditeur et écriture programmatique
 
@@ -1703,7 +1687,7 @@ Contrainte propre à GitHub, absente sur Azure DevOps : **github.com évolue en 
 
 **Auteur de la résolution :** GitHub expose `PullRequestReviewThread.resolvedBy` en GraphQL. La règle de gouvernance du §6.1 s'y applique donc **intégralement**, sans le repli qu'elle prévoit pour les plateformes qui n'exposent pas ce champ.
 
-**Point d'implémentation :** l'état de résolution d'un fil (`isResolved`) n'est correctement exposé que via l'**API GraphQL** (`PullRequestReviewThread.isResolved`) ; l'API REST ne le fournit pas de façon fiable. Le composant B doit donc consommer GraphQL pour cette partie, même si le reste de l'intégration passe par REST/webhooks.
+**Point d'implémentation :** l'état de résolution d'un fil (`isResolved`) n'est correctement exposé que via l'**API GraphQL** (`PullRequestReviewThread.isResolved`) ; l'API REST ne le fournit pas de façon fiable. Le composant B doit donc consommer GraphQL pour cette partie, même si le reste de l'intégration passe par REST. Il ne souscrit à aucun webhook (§9.2.4) : ce qui le déclenche, ce sont les événements de workflow de la plateforme (§A.8).
 
 GitHub autorise nativement l'auteur de la PR à résoudre les conversations — la règle de gouvernance du §6.1 — auteur du commentaire, ou membre de `resolverOverrideGroup` **avec** une réponse `decision` valide — est donc **vérifiée et signalée après coup** par le composant B, pas empêchée à la source par la plateforme.
 
@@ -1739,7 +1723,7 @@ Le premier fait 75 caractères, le second 17 ; aucun ne porte de quantificateur 
 
 La différence avec `bors` subsiste, mais elle porte sur les **arguments**, pas sur le délimiteur. `@notre-bot`, une fois correctement délimité, ne peut désigner qu'un compte : ce qui suit peut rester libre, comme dans la grammaire de `toolCommands`. `bors` est un mot ordinaire dans une phrase, que même un délimiteur exact ne suffit pas à distinguer — `bors retry is broken` commence bien par le jeton `bors` suivi d'une espace. Seule l'exigence que le corps **entier** soit la commande le rend discriminant. Deux familles, deux exigences : un délimiteur exact pour l'une, un ancrage complet pour l'autre.
 - **Provenance d'une étiquette** (§6.3.2) : exposée. L'API de timeline d'une *issue* rend les événements `labeled` avec leur acteur et leur horodatage, ce qui permet de vérifier l'habilitation du poseur et de journaliser l'exemption. Le mécanisme d'exemption par étiquette s'applique donc ici tel qu'il est décrit.
-- **`resolverOverrideGroup`** : un slug d'équipe de l'organisation, sous la forme `org/team-slug`. L'adaptateur de vérification le résout via l'API des équipes ; l'appartenance est transitive pour les équipes imbriquées.
+- **`resolverOverrideGroup`** : une **liste de comptes**, écrite comme un identifiant de groupe unique dont les logins sont séparés par des virgules — `alice,bob,carol`. Un slug d'équipe (`org/team-slug`) serait plus naturel et **n'est pas utilisable ici** : le résoudre demande la permission d'organisation *Members*, hors de portée du `GITHUB_TOKEN` (§A.8). L'adaptateur tranche donc l'appartenance sans aucun appel d'API, et l'intersection du §8.1.1 s'entend entre identifiants : le plancher pose `alice,bob,carol`, un niveau inférieur `bob,carol,dave`, l'habilitation effective est `bob,carol`.
 - **Bloc de suggestion** (§4.2, étage 0 du §3.5.1) : un bloc de code délimité dont l'*info string* est `suggestion` — ` ```suggestion ` —, inséré par le bouton dédié de l'éditeur de commentaire de diff. C'est ce marqueur, et lui seul, qui déclenche le label implicite.
 - **Comptes de service.** `dependabot[bot]`, `github-actions[bot]` et `azure-pipelines[bot]` — cette dernière identité étant le login de l'application GitHub d'Azure Pipelines, et non un compte Azure DevOps — figurent typiquement dans `exemptUsers` (§8.2).
 
@@ -1750,18 +1734,20 @@ La différence avec `bors` subsiste, mais elle porte sur les **arguments**, pas 
 **Les faits de plateforme qui décident, et qui se vérifient.** Trois d'entre eux vont contre l'intuition ; ils sont écrits ici pour qu'on ne les redécouvre pas.
 
 - **La résolution d'un fil ne déclenche aucun workflow.** `pull_request_review_thread` (`resolved` / `unresolved`) existe comme webhook, mais ne figure pas parmi les événements déclencheurs de workflows — et c'est le seul qui notifie une résolution. La conséquence est **asymétrique** : résoudre le dernier fil bloquant ne fait pas passer le check au vert de lui-même (gênant, jamais dangereux — la PR reste bloquée alors qu'elle pourrait passer) ; **dé-résoudre** un fil ne le fait pas repasser au rouge (c'est le sens dangereux, et il doit être décidé les yeux ouverts). Trois parades : une exécution planifiée qui borne la fenêtre ; l'option native *Require conversation resolution before merging*, qui la ferme complètement au prix d'exiger la résolution de **tous** les fils ; ou l'assumer.
-- **Sur une PR issue d'un fork, le `GITHUB_TOKEN` est en lecture seule — y compris sur les événements de revue.** La restriction est connue pour `pull_request` ; elle vaut aussi pour `pull_request_review` et `pull_request_review_comment`. Ces PR reçoivent bien un statut, publié par `pull_request_target` à l'ouverture et à chaque push, mais il **cesse d'être rafraîchi dès qu'un relecteur écrit**. Un dépôt qui accepte des PR de forks et veut le blocage sur elles ajoute un workflow compagnon déclenché par `workflow_run`, qui s'exécute dans le contexte du dépôt de base avec un jeton en écriture. **Les PR de Dependabot suivent les mêmes règles que celles d'un fork**, y compris sur un dépôt qui n'accepte aucun fork.
-- **Le bouton de rejeu d'un check run créé par une Action ne rejoue rien.** GitHub ne délivre pas `check_run` (`rerequested`) pour une *check suite* créée par GitHub Actions — c'est sa garde anti-récursion. Le rejeu du §6.4 passe donc par le **workflow**, natif dans l'onglet des exécutions.
+- **Sur une PR issue d'un fork, le `GITHUB_TOKEN` est en lecture seule — y compris sur les événements de revue.** La restriction est connue pour `pull_request` ; elle vaut aussi pour `pull_request_review` et `pull_request_review_comment`. Ces PR reçoivent bien un statut, publié par `pull_request_target` à l'ouverture et à chaque push, mais il **cesse d'être rafraîchi dès qu'un relecteur écrit**. Un dépôt qui accepte des PR de forks et veut le blocage sur elles ajoute un workflow compagnon déclenché par `workflow_run`, qui s'exécute dans le contexte du dépôt de base avec un jeton en écriture — son fichier doit vivre sur la **branche par défaut**, faute de quoi il ne se déclenche jamais. **Les PR de Dependabot suivent les mêmes règles que celles d'un fork**, y compris sur un dépôt qui n'accepte aucun fork. Un réglage de dépôt lève bien la restriction — *Send write tokens to workflows from pull requests* — mais il la lève pour **tous** les workflows, y compris ceux qui construisent le code proposé : ce n'est pas une case à cocher pour installer un vérificateur.
+- **Le bouton de rejeu d'un check run créé par une Action ne rejoue rien.** L'événement `check_run` (`rerequested`) **ne déclenche aucun workflow** lorsque la *check suite* du check run a été créée par GitHub Actions, ou lorsque le SHA de tête de cette suite est associé à GitHub Actions : c'est la garde anti-récursion de la plateforme. Elle porte sur le déclenchement, pas sur la livraison du webhook — la nuance ne change rien ici, un vérificateur qui ne souscrit à rien n'ayant que le déclenchement pour l'atteindre. Le rejeu du §6.4 passe donc par le **workflow**, natif dans l'onglet des exécutions.
 
-**`pull_request_target`, et non `pull_request`**, parce que lui seul porte un jeton capable de publier sur une PR de fork. Ce déclencheur est un piège de sécurité **dès qu'un workflow construit ou exécute le code proposé** ; le vérificateur ne fait jamais de `checkout` de la PR et n'exécute rien qui en provienne. La condition est structurelle et doit le rester.
+**`pull_request_target`, et non `pull_request`**, parce qu'il est le seul **déclencheur d'événement de PR** à porter un jeton capable de publier sur une PR de fork — le workflow compagnon ci-dessus est l'autre voie, indirecte. Ce déclencheur est un piège de sécurité **dès qu'un workflow construit ou exécute le code proposé** ; le vérificateur ne fait jamais de `checkout` de la PR et n'exécute rien qui en provienne. La condition est structurelle et doit le rester.
 
 **Permissions du jeton** : `checks: write` pour publier, `pull-requests: read` pour lire fils, commentaires, étiquettes et brouillon, `contents: read` pour le fichier de configuration. **`pull-requests: write` dès que le dépôt emploie l'étiquette d'exemption** (§6.3.2) — la remise à zéro doit pouvoir la retirer, et ce n'est pas un cas de repli mais le fonctionnement normal.
 
-**Ce que le vérificateur ne peut pas faire ici.** Le `GITHUB_TOKEN` n'a **aucune portée d'organisation** : la liste des permissions de workflow est purement de dépôt. L'appartenance à une équipe n'est donc pas lisible, et `resolverOverrideGroup` (§8.2) ne peut pas être résolu par un slug d'équipe sans un second identifiant — ce que ce document refuse. Sur GitHub, l'habilitation s'exprime donc par **une liste de comptes**, posée dans le document de plancher que l'organisation contrôle (§8.1.1) : aucun appel d'API, aucune permission supplémentaire, et la même garantie qu'un slug d'équipe puisque le dépôt ne peut pas modifier ce document.
+**Concurrence.** Le workflow déclare un groupe de concurrence par PR, avec annulation de l'exécution en cours : `concurrency`, un `group` formé du nom du check et du numéro de la PR — lu dans `pull_request` ou dans `issue` selon l'événement qui a déclenché l'exécution —, et `cancel-in-progress: true`. Sans ce bloc, GitHub exécute les rafales en parallèle, et c'est la dernière publication qui l'emporte plutôt que la lecture la plus fraîche (§6.4).
+
+**Ce que le vérificateur ne peut pas faire ici.** Le `GITHUB_TOKEN` n'a **aucune portée d'organisation** : la liste des permissions de workflow est purement de dépôt. L'appartenance à une équipe n'est donc pas lisible, et `resolverOverrideGroup` (§8.2) ne peut pas être résolu par un slug d'équipe sans un second identifiant — ce que ce document refuse. Sur GitHub, l'habilitation s'exprime donc par **une liste de comptes** (§A.7), posée dans le document de plancher que l'organisation contrôle (§8.1.1) : aucun appel d'API, aucune permission supplémentaire, et la même garantie qu'un slug d'équipe puisque le dépôt ne peut pas modifier ce document. Ce qu'on y perd est réel et doit être dit : une liste de comptes ne suit pas les mouvements d'une équipe, et se met à jour à la main.
 
 **Publication.** Le check run est nommé `conventional-comments` et calculé selon les deux critères du §6.2, en s'appuyant sur GraphQL pour l'état des fils (§A.6). La ligne `cc/1` (§6.3.1) est publiée dans l'`output.title`, le corps Markdown portant la sortie humaine. **Où GitHub rend exactement ce titre dans la page d'une PR est à vérifier par une mesure** — le §6.5 fait dépendre de cette ligne le grisage du bouton de merge par l'extension, et le §9.2.3 lui interdit tout appel d'API pour l'obtenir ; c'est donc une prémisse à établir, pas à supposer. Correspondance des états : `success` → `success`, `'failure'` → `failure`, `'neutral'` → `neutral`, GitHub comptant `neutral` parmi les conclusions qui **satisfont** une vérification obligatoire.
 
-**Rendre le check obligatoire** — protection de branche ou *ruleset* — est ce qui bloque le merge ; le vérificateur ne fait que publier un verdict. C'est aussi le seul levier dont dispose l'organisation : une *ruleset* peut exiger que le check passe, elle ne peut pas contraindre le contenu des règles, un workflow versionné dans le dépôt étant éditable par lui (§8.1.1).
+**Rendre le check obligatoire** — protection de branche ou *ruleset* — est ce qui bloque le merge ; le vérificateur ne fait que publier un verdict. Une *ruleset* de dépôt exige que le check passe ; elle ne dit rien du **contenu** des règles, un workflow versionné dans le dépôt étant éditable par lui — c'est ce que le document de plancher (§8.1.1) existe pour couvrir. Une organisation qui veut aller plus loin dispose de la règle *Require workflows to pass before merging*, déclarée dans une *ruleset* d'organisation ou d'entreprise : le fichier de workflow vit alors dans un dépôt qu'elle contrôle, hors de portée du dépôt protégé. Elle **ne remplace pas** celui décrit ici et ne suffit pas seule — elle ne supporte que `pull_request`, `pull_request_target` et `merge_group`, pas les événements de revue dont ce vérificateur dépend pour se rafraîchir —, et elle relève des offres Team et Enterprise.
 
 **Merge queues : hors périmètre.** Une file de merge crée un SHA de *merge group* et attend les checks requis sur ce SHA. Le vérificateur ne s'y déclenche pas, et le check n'arrivera donc jamais. **Un dépôt qui emploie une merge queue ne doit pas déclarer ce check obligatoire** tant que ce cas n'est pas conçu. C'est une limite, écrite comme telle plutôt que découverte par une file qui ne se vide plus.
 

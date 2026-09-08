@@ -736,6 +736,13 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   // sur l'ancienne configuration alors que l'interface adoptait la nouvelle (revue Codex,
   // PR #31).
   const stopPrChrome = observePrChromeNavigation(adapter, resolver, doc, Date.now, (pr, changed, resolved) => {
+    // Changement de PR : ce qui a déjà été journalisé l'a été pour une AUTRE page. Sans cet
+    // oubli, `SelectorLog` reste muet sur toutes les PR suivantes de l'onglet, et la relecture
+    // de `location` faite au moment de la dégradation ne profite qu'à la première d'entre
+    // elles — l'entrée garderait indéfiniment la page où la chaîne a échoué en premier
+    // (revue Codex, PR #70). La protection contre le bruit, elle, reste entière : une
+    // dégradation par chaîne et par PR visitée, pas une par mutation du DOM.
+    if (changed) log.forgetSeen();
     void armFor(pr, changed ? 'pr' : 'refresh');
     // Éditeurs DÉJÀ CONNUS (§5, revue Codex et Reefact, PR #39) : chacun garde la
     // configuration capturée à son propre `attach()` tant que rien ne la lui repousse —

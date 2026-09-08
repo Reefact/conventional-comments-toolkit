@@ -1,6 +1,6 @@
 # Politique de confidentialité — Conventional Comments Toolkit
 
-_Dernière mise à jour : 2026-08-24._
+_Dernière mise à jour : 2026-09-08._
 
 Cette page sert de politique de confidentialité publique pour l'extension
 navigateur **Conventional Comments Toolkit**, distribuée sur le Chrome Web
@@ -115,7 +115,7 @@ Pour toute question sur cette politique de confidentialité, ouvrez une
 
 # Privacy Policy — Conventional Comments Toolkit
 
-_Last updated: 2026-08-24._
+_Last updated: 2026-09-08._
 
 This page is the public privacy policy for the **Conventional Comments
 Toolkit** browser extension, distributed on the Chrome Web Store and

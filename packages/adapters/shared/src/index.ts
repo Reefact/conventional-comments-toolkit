@@ -153,9 +153,16 @@ export interface PlatformAdapter {
    * nouvelle doit se voir poser. Mais contrairement au châssis, il n'y a pas de repli
    * géométrique ici — rien ne permet de DEVINER quelle balise matérialise une fin de ligne.
    * `null` fait donc RENONCER le masquage du préfixe et la mise en avant du sujet ; les badges
-   * restent posés, et le corps s'affiche entier. C'est la dégradation sûre du §9.4 (CA-11), et
-   * le seul repli honnête : une valeur plausible mais non vérifiée peut faire glisser une partie
-   * de la discussion dans le sujet mis en avant (revue Reefact, PR #66).
+   * restent posés, et le corps s'affiche entier. C'est le REPLI DE RENDU du §5.5, et le seul
+   * repli honnête : une valeur plausible mais non vérifiée peut faire glisser une partie de la
+   * discussion dans le sujet mis en avant (revue Reefact, PR #66).
+   *
+   * Ce n'est PAS une dégradation de sélecteur, et rien ne se journalise ici. Le §9.4 trace un
+   * ÉCHEC DE DÉTECTION — un sélecteur qu'on croyait bon ne ramène plus rien —, alors qu'ici la
+   * plateforme RÉPOND, et répond qu'elle n'a pas mesuré. Les confondre mettrait une plateforme
+   * entière en échec permanent et écrirait une entrée de journal par commentaire rendu. Ce
+   * commentaire a dit le contraire le temps d'une revue, et c'était l'endroit le plus coûteux
+   * pour se tromper : le contrat est ce qu'un adaptateur tiers lit d'abord.
    *
    * Rendre `MARKDOWN_HTML_BODY_SHAPE` est donc une AFFIRMATION — « j'ai mesuré, c'est bien
    * `<p>`/`<br>` » — et non un défaut commode. */

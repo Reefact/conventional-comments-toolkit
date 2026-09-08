@@ -21,10 +21,18 @@
 // Ce que ce découpage n'est PAS : une reclassification de tout `selectors.ts`. Vingt et une des
 // vingt-quatre chaînes y répondent à une question qui n'a qu'une bonne réponse par page — quel
 // conteneur de fil, quel corps de commentaire rendu, quel bouton de fusion — et pour celles-là
-// le premier candidat qui matche est la sémantique voulue. Seules les trois chaînes du
-// COMPOSEUR se scindent, parce que seules elles ont montré le défaut.
+// le premier candidat qui matche est la sémantique voulue. Seules les chaînes du COMPOSEUR se
+// scindent, parce que seules elles ont montré le défaut.
+//
+// CE FICHIER NE DÉFINIT AUCUN SÉLECTEUR, et c'est une contrainte, pas un choix de présentation.
+// Le §9.4 exige que les sélecteurs DOM soient « centralisés dans un fichier unique par
+// adaptateur » ; une première version les écrivait ici, donnant DEUX fichiers de sélecteurs à
+// l'adaptateur GitHub — enfreignant la règle même que toute cette PR sert à faire respecter
+// (revue Reefact, PR #66). Les chaînes vivent donc dans `selectors.ts`, et ce fichier n'en porte
+// que l'ASSEMBLAGE : quelle chaîne appartient à quelle surface.
 
 import type { SelectorChain } from '@cct/adapter-shared';
+import { selectors } from './selectors.js';
 
 export interface GithubSurface {
   /** Nom stable, pour lire un diagnostic — jamais employé comme clé de journal : celui-ci
@@ -53,29 +61,13 @@ export interface GithubSurface {
 export const SURFACES: readonly GithubSurface[] = [
   {
     name: 'react-comment-box',
-    editors: {
-      name: 'editors',
-      candidates: [
-        // Jamais observée en direct dans ce dépôt, conservée parce que rien ne prouve qu'elle
-        // ne décrive aucune vue.
-        'textarea[aria-label*="omment"][class*="CommentBox"]',
-        'div[data-testid*="comment-composer"] textarea',
-      ],
-    },
-    composerFrame: { name: 'composer-frame', candidates: ['[data-testid*="comment-composer"]'] },
-    composerFrameOnField: { name: 'composer-frame-on-field', candidates: ['[class*="CommentBox"]'] },
+    editors: selectors.editorsReact,
+    composerFrame: selectors.composerFrame,
+    composerFrameOnField: selectors.composerFrameOnField,
   },
   {
     name: 'legacy',
-    editors: {
-      name: 'editors',
-      candidates: [
-        'textarea[name="comment[body]"]',
-        'textarea[name="pull_request_review_comment[body]"]',
-        'textarea[name="pull_request_review[body]"]',
-        'textarea.js-comment-field',
-      ],
-    },
+    editors: selectors.editorsLegacy,
     // La boîte de commentaire héritée dessine son propre cadre, que la géométrie du code
     // partagé retrouve sans qu'on ait à le nommer. Un nom de moins est un nom qui ne pourrira
     // pas (§9.4).
@@ -84,16 +76,7 @@ export const SURFACES: readonly GithubSurface[] = [
   },
   {
     name: 'changes',
-    editors: {
-      name: 'editors',
-      candidates: [
-        // MESURÉ en console sur `/pull/45/changes`, composeur de ligne ouvert (2026-09-04) —
-        // voir extension/test/changes-view-composer.test.ts, qui reproduit le relevé.
-        'textarea[aria-label="Markdown value"]',
-        'textarea[placeholder="Leave a comment"]',
-        'textarea[class*="prc-Textarea-TextArea"]',
-      ],
-    },
+    editors: selectors.editorsChanges,
     // Sur cette vue, l'ancêtre le plus proche portant un `data-testid` est la LISTE DE DIFFS
     // entière (mesuré, même relevé) : aucun conteneur de composeur à nommer. Le cadre y est
     // trouvé par la géométrie, qui l'a mesuré correctement.
@@ -101,6 +84,7 @@ export const SURFACES: readonly GithubSurface[] = [
     composerFrameOnField: null,
   },
 ];
+
 
 /** Tous les candidats de toutes les surfaces, pour le seul usage qui a besoin d'une chaîne
  * PLATE : la sonde de dégradation, qui demande « la détection a-t-elle pourri ? » et se

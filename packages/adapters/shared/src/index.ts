@@ -284,12 +284,25 @@ export function queryChainAll(root: ParentNode, chain: SelectorChain): Element[]
 }
 
 /** Les DEUX seuls emplacements où `decorateComment` pose ses badges, jamais un troisième :
- * enfant direct du corps de commentaire, ou enfant direct de son premier `<p>` — c'est là
- * qu'ils vont quand le préfixe a pu être masqué, pour partager la ligne du sujet plutôt que
- * de former un bandeau au-dessus de lui (§5.5). `:scope > p >`, et non un descendant
- * quelconque : un `.cct-badge` plus profond (citation, bloc de code d'un autre commentaire
- * cité) est du texte normal, pas notre propre badge, et le retirer amputerait le corps relu. */
-export const OWN_BADGES = ':scope > .cct-badge, :scope > p > .cct-badge';
+ * enfant direct du corps de commentaire, ou enfant direct de l'élément qu'il a lui-même MARQUÉ
+ * en y écrivant.
+ *
+ * **Plus aucun nom de balise.** Ce sélecteur a dit `:scope > p > .cct-badge`, c'est-à-dire
+ * « les paragraphes de cette plateforme sont des `<p>` » — un fait de plateforme dans le socle
+ * partagé, et surtout un fait que `renderedBodyShape()` autorise désormais chaque plateforme à
+ * démentir. Une plateforme déclarant un autre conteneur voyait `decorateComment` y poser ses
+ * badges pendant que `commentBodyText()` continuait de chercher sous un `<p>` : les badges
+ * n'étaient plus retirés à la relecture, leur texte pouvait passer pour le corps, et les
+ * anciens s'accumulaient au rendu suivant (revue Reefact, PR #66).
+ *
+ * Faire poser la marque par CELUI QUI ÉCRIT rend la divergence impossible, au lieu de la rendre
+ * seulement détectable : les deux fonctions ne peuvent plus parler d'ensembles différents,
+ * puisqu'elles parlent du même attribut.
+ *
+ * `:scope > …`, et non un descendant quelconque : un `.cct-badge` plus profond (citation, bloc
+ * de code d'un autre commentaire cité) est du texte normal, pas notre propre badge, et le
+ * retirer amputerait le corps relu. */
+export const OWN_BADGES = ':scope > .cct-badge, :scope > .cct-badge-host > .cct-badge';
 
 /** Texte d'un corps de commentaire, badges de l'extension EXCLUS (§5.5) : `decorateComment`
  * (extension/src/ui/badges.ts) insère un badge de label, suivi d'un badge par décoration

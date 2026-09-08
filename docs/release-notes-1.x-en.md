@@ -14,7 +14,7 @@ _You now authorize every platform the same way — `github.com` included — so 
 ### ✨ Features
 
 - **You choose where the extension works, and you can change your mind.** `github.com` used to be built into the extension: active from the moment you installed it, with no way to revoke that access from the extension itself. It now goes through the same one-click authorization as every other platform, and every domain you have allowed carries a "Withdraw" button. Domains authorized by your organisation's policy stay as they are — that is not this screen's call.
-- **The options page opens by itself the first time, and walks you through it.** A short guided tour names each section and says what it is for; it can be skipped at any point, closes on `Escape`, and never comes back on its own. A "Replay the guided tour" button in the page header replays it whenever you want.
+- **The options page opens automatically the first time and offers you a guided tour.** It introduces each section and explains what it is for; you can skip it at any point, close it with `Escape`, and it never comes back on its own. A "Replay the guided tour" button in the page header replays it whenever you want.
 - **The options page now speaks French or English, like the rest of the extension.** It stayed in French whatever you had chosen — so someone who had set the interface to English saw English everywhere except on the settings page where they made that choice. The new language now takes effect immediately, rather than at the next reload.
 
 ### 🐛 Bug fixes

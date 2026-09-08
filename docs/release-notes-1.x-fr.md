@@ -14,7 +14,7 @@ _Vous autorisez désormais l'accès à toutes les plateformes de la même façon
 ### ✨ Nouveautés
 
 - **Vous choisissez où l'extension travaille, et vous pouvez revenir sur ce choix.** `github.com` était jusqu'ici intégré à l'extension : actif dès l'installation, sans aucun moyen de révoquer cet accès depuis l'extension elle-même. Il passe maintenant par la même autorisation en un clic que toutes les autres plateformes, et chaque domaine autorisé porte un bouton « Retirer ». Les domaines imposés par la politique de votre organisation restent en place — ce n'est pas à cet écran d'en décider.
-- **La page d'options s'ouvre d'elle-même la première fois, et vous la présente.** Une courte visite guidée nomme chaque section et dit à quoi elle sert ; elle s'interrompt à tout moment, se ferme avec `Échap`, et ne revient jamais d'elle-même. Un bouton « Revoir la visite guidée » en haut de page la rejoue quand vous voulez.
+- **La page d'options s'ouvre automatiquement la première fois et vous propose une visite guidée.** Celle-ci présente chaque section et explique à quoi elle sert ; vous pouvez l'interrompre à tout moment, la fermer avec `Échap`, et elle ne revient jamais d'elle-même. Un bouton « Revoir la visite guidée » en haut de page la rejoue quand vous voulez.
 - **La page d'options parle enfin français ou anglais, comme le reste de l'extension.** Elle restait en français quel que soit votre choix : quelqu'un ayant réglé l'interface en anglais voyait de l'anglais partout, sauf sur la page de réglages où il venait de faire ce choix. Le changement de langue prend désormais effet immédiatement, et non au prochain rechargement.
 
 ### 🐛 Corrections

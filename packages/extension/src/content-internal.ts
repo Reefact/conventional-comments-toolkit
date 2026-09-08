@@ -708,6 +708,18 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     changes: Record<string, { newValue?: unknown }>,
     area: string
   ): void => {
+    // Le journal a été EFFACÉ depuis la page d'options : les chaînes déjà signalées doivent
+    // pouvoir l'être à nouveau, sinon « effacer puis mesurer » ne mesure rien tant que
+    // l'onglet n'a pas changé de PR ou rechargé — reproduire le défaut sur la page où il
+    // vient d'être vu n'écrivait rien du tout (revue Reefact, PR #70).
+    //
+    // AVANT le retour anticipé ci-dessous, qui ne laisse passer que le consentement et la
+    // zone `managed` : placé après, ce geste ne s'exécutait jamais — un correctif inerte, que
+    // seul son test a révélé.
+    if (area === 'local' && 'selectorFailures' in changes) {
+      const next = changes['selectorFailures']?.newValue;
+      if (!Array.isArray(next) || next.length === 0) log.forgetSeen();
+    }
     const consentChanged = area === 'local' && TELEMETRY_CONSENT_KEY in changes;
     if (!consentChanged && area !== 'managed') return;
     // Désarmer JETTE les compteurs, et c'est fait exprès : on vient d'apprendre qu'on n'a

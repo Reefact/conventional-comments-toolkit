@@ -35,6 +35,13 @@ function installPage(local: Record<string, unknown>, language = 'fr'): Record<st
   // clique. C'est un état du monde, pas un détail du faux — une personne qui a déjà vu la
   // visite est le cas courant.
   const store: Record<string, unknown> = { optionsTourSeen: true, ...local };
+  const listeners: ((c: Record<string, { newValue?: unknown }>, a: string) => void)[] = [];
+  // Le navigateur notifie `onChanged` pour TOUTE écriture de la zone, y compris celle du
+  // contexte qui écrit. Un faux muet décrirait un navigateur qui n'existe pas — et laisserait
+  // passer une page d'options qui ne suit pas ce que les onglets écrivent.
+  const notify = (changes: Record<string, { newValue?: unknown }>) => {
+    for (const l of listeners) l(changes, 'local');
+  };
 
   (globalThis as { chrome?: unknown }).chrome = {
     permissions: { getAll: (cb: (p: { origins?: string[] }) => void) => cb({ origins: [] }) },
@@ -48,12 +55,14 @@ function installPage(local: Record<string, unknown>, language = 'fr'): Record<st
         set: (items: Record<string, unknown>, cb?: () => void) => {
           Object.assign(store, items);
           cb?.();
+          notify(Object.fromEntries(Object.entries(items).map(([k, v]) => [k, { newValue: v }])));
         },
         // `remove` RETIRE la clé — un faux qui la mettrait à `[]` décrirait `set`, pas
         // `remove`, et laisserait passer un code qui ne fait ni l'un ni l'autre.
         remove: (keys: string[], cb?: () => void) => {
           for (const key of keys) delete store[key];
           cb?.();
+          notify(Object.fromEntries(keys.map((k) => [k, {}])));
         },
       },
       sync: {
@@ -61,7 +70,7 @@ function installPage(local: Record<string, unknown>, language = 'fr'): Record<st
         set: () => {},
       },
       managed: { get: (cb: (i: Record<string, unknown>) => void) => cb({}) },
-      onChanged: { addListener: () => {} },
+      onChanged: { addListener: (l: (typeof listeners)[number]) => listeners.push(l) },
     },
   };
   return store;
@@ -180,6 +189,24 @@ describe('§9.4 — effacer le journal', () => {
     expect(document.querySelectorAll('#selector-log pre')).toHaveLength(0);
     expect(marks()).toHaveLength(0);
     expect(clearButton()).toBeNull();
+  });
+
+  it('la section suit ce qu’un ONGLET écrit, sans rechargement', async () => {
+    // L'écran lisait le journal une seule fois, au chargement. Un onglet pouvait journaliser
+    // une dégradation pendant que cette page continuait d'afficher « aucune » — et après un
+    // effacement, elle ne montrait pas davantage la mesure suivante (revue Reefact, PR #70).
+    installPage({});
+    await loadOptions();
+    expect(statusText()).toBe(ui('fr', 'options.status.selectors.none'));
+
+    // Ce que fait un onglet quand une chaîne échoue : il écrit la clé.
+    (globalThis as { chrome?: { storage: { local: { set: (i: unknown, cb?: () => void) => void } } } }).chrome!.storage.local.set(
+      { selectorFailures: SEEDED }
+    );
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(statusText()).toBe(ui('fr', 'options.status.selectors.some', { count: SEEDED.length }));
+    expect(marks()).toHaveLength(SEEDED.length);
   });
 
   it('le libellé du bouton suit la langue de la page', async () => {

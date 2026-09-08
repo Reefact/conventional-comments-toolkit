@@ -607,8 +607,14 @@ telemetryOptIn?.addEventListener('change', () => {
 
 // La politique ou le consentement ont changé ailleurs : réafficher, pour que la case et la
 // ligne qui l'explique ne mentent jamais sur ce à quoi un clic consentirait.
+//
+// L'état, de même : le journal et l'état dégradé sont écrits par les ONGLETS, pas par cette
+// page. Lus une seule fois au chargement, ils se figeaient — un onglet pouvait journaliser une
+// dégradation pendant que cet écran continuait d'afficher « aucune », jusqu'à ce qu'on le
+// recharge (revue Reefact, PR #70).
 chrome?.storage?.onChanged?.addListener((changes, area) => {
   if (area === 'managed' || (area === 'local' && TELEMETRY_CONSENT_KEY in changes)) refreshTelemetry();
+  if (area === 'local' && ('selectorFailures' in changes || 'degradedState' in changes)) refreshStatus();
 });
 
 /** Une ligne d'état : la pastille porte le niveau, le texte porte le fait. */

@@ -25,13 +25,26 @@
 // n'importe rien d'ici : la normalisation appliquée au rendu vaut donc aussi pour les entrées
 // déjà écrites, et ce module ne quitte jamais le bundle de la page d'options.
 
-/** La page, réduite à ce qui l'identifie : origine et chemin.
+/** Les paramètres de requête qui désignent une VUE, et non une préférence d'affichage.
  *
- * Ni paramètres de requête ni fragment — `?diff=split` et `#discussion_r1` désignent la même
- * page, et les laisser entrer donnerait deux marques pour un seul écran. Le chemin, lui,
- * reste : `/pull/48/files` et `/pull/48/changes` sont deux vues différentes, deux DOM
- * différents, et c'est précisément la distinction qu'un diagnostic de sélecteurs doit rendre
- * visible.
+ * `_a` est celui d'Azure DevOps (`?_a=files`, `?_a=overview`) — un écran par valeur, un DOM par
+ * écran. La liste est courte et le restera : y ajouter un paramètre revient à dire qu'il change
+ * ce que la page REND, ce qui se mesure avant de s'écrire. */
+const VIEW_PARAMS = ['_a'];
+
+/** La page, réduite à ce qui l'identifie : origine, chemin, et la vue quand elle est en requête.
+ *
+ * Le critère est la VUE, pas la ponctuation de l'URL : deux adresses qui rendent le même DOM
+ * sont une seule page. Le fragment n'en change jamais (`#discussion_r1` déroule un fil), et la
+ * plupart des paramètres non plus (`?diff=split` change la mise en forme d'un diff) : ils
+ * sortent. Le chemin, lui, reste — `/pull/48/files` et `/pull/48/changes` sont deux DOM
+ * différents, et c'est la distinction qu'un diagnostic de sélecteurs doit rendre visible.
+ *
+ * Mais toutes les plateformes ne mettent pas la vue dans le chemin. **Azure DevOps la met dans
+ * la requête** : `/pullrequest/42?_a=files` et `/pullrequest/42?_a=overview` sont deux écrans,
+ * et les réduire à la même clé rendait FAUSSE, sur une plateforme supportée, la légende « même
+ * marque = même page » — précisément là où le journal doit aider (revue Reefact, PR #70). Les
+ * paramètres qui désignent une vue sont donc conservés, et eux seuls.
  *
  * `http:` et `https:` UNIQUEMENT. Un script de contenu ne s'exécute que là, mais cette valeur
  * est relue depuis le stockage pour fabriquer un `href` : le schéma se vérifie donc ici, une
@@ -51,7 +64,13 @@ export function pageKey(url: string): string | null {
   // Slash final retiré, sauf s'il EST le chemin : `/pull/48/` et `/pull/48` sont la même
   // page, la racine et la chaîne vide ne le seraient pas.
   const path = parsed.pathname.length > 1 ? parsed.pathname.replace(/\/+$/, '') : parsed.pathname;
-  return `${parsed.origin}${path}`;
+  // Rendus dans l'ordre de VIEW_PARAMS, jamais dans celui de l'URL : la clé est alors la même
+  // que la page ait été atteinte par un lien ou par un retour d'historique, qui réordonne.
+  const view = VIEW_PARAMS.reduce<string[]>((kept, name) => {
+    const value = parsed.searchParams.get(name);
+    return value === null ? kept : [...kept, `${name}=${value}`];
+  }, []);
+  return `${parsed.origin}${path}${view.length > 0 ? `?${view.join('&')}` : ''}`;
 }
 
 /** FNV-1a 32 bits, rendu en base 36 sur SIX caractères exactement.

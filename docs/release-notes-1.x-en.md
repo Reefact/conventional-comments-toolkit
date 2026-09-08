@@ -9,28 +9,28 @@ source of truth for conformance stays the server companion (component B).
 
 ## 1.0.0-beta.11 — September 8, 2026
 
-_Every platform is now authorized the same way — `github.com` included — which means the extension asks before it works anywhere, and lets you take that access back._
+_You now authorize every platform the same way — `github.com` included — so the extension asks before it works anywhere, and you can revoke that access at any time._
 
 ### ✨ Features
 
-- **You choose where the extension works, and you can change your mind.** `github.com` used to be built into the extension: active from the moment you installed it, with nothing in the product able to hand that access back. It now goes through the same one-click authorization as every other platform, and every domain you have allowed carries a "Withdraw" button. Domains authorized by your organisation's policy stay as they are — that is not this screen's call.
+- **You choose where the extension works, and you can change your mind.** `github.com` used to be built into the extension: active from the moment you installed it, with no way to revoke that access from the extension itself. It now goes through the same one-click authorization as every other platform, and every domain you have allowed carries a "Withdraw" button. Domains authorized by your organisation's policy stay as they are — that is not this screen's call.
 - **The options page opens by itself the first time, and walks you through it.** A short guided tour names each section and says what it is for; it can be skipped at any point, closes on `Escape`, and never comes back on its own. A "Replay the guided tour" button in the page header replays it whenever you want.
-- **The options page now speaks French or English, like the rest of the extension.** It was in French whatever you had chosen — including for someone who had set the interface to English and saw English everywhere except on the screen that took the setting. Changing the language now applies straight away instead of at the next reload.
+- **The options page now speaks French or English, like the rest of the extension.** It stayed in French whatever you had chosen — so someone who had set the interface to English saw English everywhere except on the settings page where they made that choice. The new language now takes effect immediately, rather than at the next reload.
 
 ### 🐛 Bug fixes
 
 - **GitHub Enterprise Cloud with data residency now works at all.** A domain allowed as `*.ghe.com` was recorded under a mangled name, so the extension never recognised the pages it was authorized for. This is older than this release, and no test could see it: the flaw only appears in a browser, and the tests ran where it does not.
-- **The tab you were on comes to life immediately.** Allowing a domain from the options page left the tab you came from inert until you reloaded it — which is precisely the tab you were about to use. It is now served straight away.
+- **The tab you came from no longer waits for a reload.** Allowing a domain from the options page left that tab inert — precisely the tab you were about to use. The extension now activates there immediately.
 - **Removing an access that the browser refuses to remove no longer looks like it worked.** The screen used to report the domain as unconfigured afterwards, an anomaly it had created itself while the access was in fact still granted. It now changes nothing and says why.
 - **An access withdrawn from `chrome://extensions` is really forgotten.** The platform you had chosen for that domain stayed behind, and granting it again the same way silently restored the old choice instead of asking you.
-- **The extension no longer loads itself on pages it cannot serve.** If you had granted access to all sites from the browser's own controls, its code was injected into every `https` page, where it could do nothing anyway. A domain a browser cannot resolve to a real host also stopped appearing in your list as something to configure.
+- **The extension no longer loads itself on pages it does not support.** If you had granted access to all sites from the browser's own controls, its code was injected into every `https` page, where it could do nothing anyway. Patterns that do not identify a concrete host no longer appear as domains to configure either.
 - **The interface no longer appears twice on a page covered by two of your authorizations**, and a tab left open for a long time no longer accumulates a copy of the extension's stylesheet.
 
 ### 🔧 Changed
 
-- **After this update, the extension is silent on `github.com` until you allow it.** One click on "Activate" in the options page. There is no way around it: a browser only grants a site permission on a human gesture, so nothing can do it for you. The page opens by itself to say so — but only if the update left you with no working domain at all; if you already had another one configured, it keeps working and nothing announces that `github.com` has stopped.
-- **The options screen is rebuilt around what actually happens to an access**: domains the extension already knows, where one click both authorizes and classifies; any other domain, where you say which platform serves it before granting; the list of what is configured; and, only when it is not empty, the domains you allowed from the browser rather than from this screen and that therefore do nothing yet.
-- **A `visualstudio.com` organisation is now authorized one at a time** through the free-form field, with Azure DevOps pre-filled. The catalog entry it replaces asked for every organisation on those legacy addresses at once, when a workstation uses one.
+- **After this update, the extension is silent on `github.com` until you allow it.** One click on "Activate" in the options page is enough. This step cannot be automated: the browser only grants a site permission after an explicit action from you. The page opens by itself to say so — but only if the update left you with no working domain at all; if you already had another one configured, it keeps working and nothing announces that `github.com` has stopped.
+- **The options screen is rebuilt around the actual access states**: domains the extension already knows, where one click both authorizes and classifies; any other domain, where you say which platform it belongs to before granting; the list of what is configured; and, only when it is not empty, the domains you allowed from the browser rather than from this screen, which therefore do nothing yet.
+- **Each `visualstudio.com` organisation is now authorized individually** through the free-form field, with Azure DevOps pre-filled. The catalog entry it replaces asked for every organisation on those legacy addresses at once, when a workstation uses one.
 
 ## 1.0.0-beta.10 — September 5, 2026
 

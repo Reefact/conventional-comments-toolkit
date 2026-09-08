@@ -210,19 +210,59 @@ chrome?.action?.onClicked.addListener(() => {
  * la seule migration possible pour un utilisateur existant, `permissions.request()` exigeant
  * un geste humain que le service worker ne peut pas produire.
  *
- * `update` est traité, mais SOUS CONDITION qu'aucun domaine ne soit accordé : ouvrir un
- * onglet à chaque mise à jour automatique du store harcèlerait quelqu'un qui n'a rien
- * demandé. La condition dit exactement ce qui justifie l'ouverture — il n'y a rien à faire
- * ailleurs qu'ici. Les autres raisons (`chrome_update`, `shared_module_update`) ne
- * concernent pas cette extension et n'ouvrent rien. */
+ * `update` est traité, sous DEUX conditions, et il en fallait bien deux (revue Reefact et
+ * Codex, PR #62) :
+ *
+ * 1. **Une seule fois.** La migration est un événement ponctuel, pas un état. Prendre
+ *    « aucun domaine servi » pour déclencheur permanent revenait à rouvrir un onglet à
+ *    CHAQUE mise à jour du store à quelqu'un qui a délibérément choisi de n'autoriser
+ *    aucun domaine — il aurait vu la même invitation refusée revenir indéfiniment. Un
+ *    marqueur dit ce que la condition ne peut pas dire : la proposition a déjà été faite.
+ * 2. **Aucun hôte SERVI**, et non « aucune permission ». Les deux diffèrent exactement là
+ *    où ça compte : une origine accordée depuis `chrome://extensions` sans étiquette, ou
+ *    étiquetée `config` seule, n'active aucun adaptateur. `servedOrigins()` est le même
+ *    croisement que celui qui décide de l'injection — les faire diverger ici aurait
+ *    déclaré la migration inutile à quelqu'un qui n'a de script de contenu nulle part.
+ *
+ * Les autres raisons (`chrome_update`, `shared_module_update`) ne concernent pas cette
+ * extension et n'ouvrent rien. */
+export const MIGRATION_PROMPTED_KEY = 'migrationPrompted';
+
+/** Les origines actuellement accordées. Extraite parce que deux appelants la lisent
+ * maintenant, et qu'un second `getAll()` recopié serait la première étape vers deux lectures
+ * qui divergent. */
+function grantedOrigins(): Promise<string[]> {
+  return new Promise((resolve) => {
+    if (!chrome?.permissions) return resolve([]);
+    chrome.permissions.getAll((perms) => resolve(perms?.origins ?? []));
+  });
+}
+
+async function alreadyPrompted(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const local = chrome?.storage?.local;
+    // Pas de stockage : ne PAS ouvrir. Se tromper dans ce sens coûte une invitation
+    // manquée ; dans l'autre, un onglet à chaque mise à jour, indéfiniment.
+    if (!local) return resolve(true);
+    local.get([MIGRATION_PROMPTED_KEY], (items) => resolve(items?.[MIGRATION_PROMPTED_KEY] === true));
+  });
+}
+
 chrome?.runtime?.onInstalled?.addListener((details) => {
   const reason = details?.reason;
   if (reason === 'install') return void chrome?.runtime.openOptionsPage?.();
   if (reason !== 'update') return;
-  chrome?.permissions?.getAll((perms) => {
-    const origins = perms?.origins ?? [];
-    if (origins.length === 0) chrome?.runtime.openOptionsPage?.();
-  });
+  void (async () => {
+    if (await alreadyPrompted()) return;
+    const origins = await grantedOrigins();
+    const tags = await readPlatformTags();
+    if (servedOrigins(origins, tags).length > 0) return;
+    // Le marqueur est posé AVANT d'ouvrir, et pas après : une ouverture qui échoue ne doit
+    // pas laisser la question rejouable à chaque mise à jour.
+    chrome?.storage?.local?.set({ [MIGRATION_PROMPTED_KEY]: true }, () =>
+      chrome?.runtime.openOptionsPage?.()
+    );
+  })();
 });
 
 /** Préfixe de tout ce que cette extension enregistre — la seule façon de reconnaître NOS
@@ -479,12 +519,7 @@ async function readPlatformTags(): Promise<Record<string, HostPlatform>> {
 async function computeAndStoreExtraHosts(): Promise<ExtraHostsByPlatform> {
   const result: ExtraHostsByPlatform = { github: [], azdo: [] };
   if (!chrome?.permissions || !chrome?.storage?.local) return result;
-  const [origins, tags] = await Promise.all([
-    new Promise<string[]>((resolve) => {
-      chrome!.permissions!.getAll((perms) => resolve(perms.origins ?? []));
-    }),
-    readPlatformTags(),
-  ]);
+  const [origins, tags] = await Promise.all([grantedOrigins(), readPlatformTags()]);
   for (const origin of origins) {
     const host = hostnameOf(origin);
     if (!host) continue;

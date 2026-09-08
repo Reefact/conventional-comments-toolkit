@@ -40,7 +40,7 @@ declare const chrome: {
   storage?: {
     sync?: {
       get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
-      set: (items: Record<string, unknown>) => void;
+      set: (items: Record<string, unknown>, cb?: () => void) => void;
     };
     local?: {
       get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
@@ -484,7 +484,24 @@ chrome?.storage?.sync?.get(['language'], (items) => {
   if (language && typeof items['language'] === 'string') language.value = items['language'];
 });
 language?.addEventListener('change', () => {
-  chrome?.storage?.sync?.set({ language: language.value || null });
+  // Recharger, et non réappliquer. Cet écran affichait du français en dur tout en proposant
+  // un réglage de langue qu'il n'appliquait qu'aux autres : le corriger pour qu'il ne
+  // s'applique pas à lui-même TOUT DE SUITE serait la même faute d'un cran plus loin — on
+  // choisit `en`, et la page qui vient de recevoir le réglage reste française (revue Reefact
+  // et Codex, PR #62).
+  //
+  // Le rechargement plutôt qu'un rendu différentiel parce que la langue traverse TOUT :
+  // chaînes statiques, lignes d'hôtes construites par le code, libellés de plateforme,
+  // messages d'état, et jusqu'aux textes d'une visite en cours. Une re-application manuelle
+  // devrait les énumérer, donc en oublier un jour — et un écran de réglages n'a rien à
+  // perdre à se recharger, tout y étant déjà persisté.
+  //
+  // Le rechargement attend le rappel d'écriture : le partir sans lui ferait relire la
+  // préférence précédente une fois sur deux, ce qui se lirait comme un réglage qui ne
+  // « prend » pas.
+  const sync = chrome?.storage?.sync;
+  if (!sync) return location.reload();
+  sync.set({ language: language.value || null }, () => location.reload());
 });
 
 // Raccourcis directs (§5.2) — préférence locale (§8.1.2), format « Alt+I=issue » par

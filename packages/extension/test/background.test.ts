@@ -539,6 +539,13 @@ describe('premier lancement : amener aux réglages', () => {
   // possible pour qui met à jour : `permissions.request()` exige un geste humain, qu'un
   // service worker ne peut pas produire.
 
+  /** Le chemin de migration enchaîne plusieurs rappels de stockage : un seul tour de boucle
+   * d'événements ne suffit pas, et un test qui n'en attendrait qu'un passerait pour de
+   * mauvaises raisons. */
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 6; i += 1) await new Promise((r) => setTimeout(r, 0));
+  }
+
   function fireInstall(fake: FakeChrome, reason: string): void {
     const listener = fake.runtime.onInstalled.addListener.mock.calls[0]![0] as (d: {
       reason: string;
@@ -555,26 +562,83 @@ describe('premier lancement : amener aux réglages', () => {
     expect(fake.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
   });
 
-  it('une MISE À JOUR sans aucun domaine accordé l’ouvre aussi', async () => {
+  it('une MISE À JOUR sans aucun domaine servi l’ouvre aussi', async () => {
     // Le cas de la migration : l'utilisateur avait github.com par le manifeste, la mise à
     // jour le lui retire, et il n'a plus rien.
     const fake = installFakeChrome([]);
     await import('../src/background.js');
 
     fireInstall(fake, 'update');
-    await new Promise((r) => setTimeout(r, 0));
+    await settle();
 
     expect(fake.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
   });
 
-  it('une MISE À JOUR avec un domaine déjà accordé n’ouvre RIEN', async () => {
+  it('une MISE À JOUR avec un domaine SERVI n’ouvre RIEN', async () => {
     // Sans cette condition, chaque mise à jour automatique du store ouvrirait un onglet à
     // quelqu'un qui n'a rien demandé et n'a rien à y faire.
     const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
     await import('../src/background.js');
 
     fireInstall(fake, 'update');
-    await new Promise((r) => setTimeout(r, 0));
+    await settle();
+
+    expect(fake.runtime.openOptionsPage).not.toHaveBeenCalled();
+  });
+
+  it('un domaine accordé mais NON CLASSÉ ne compte pas comme servi', async () => {
+    // « Accordé » et « servi » diffèrent exactement là où ça compte : une origine ajoutée
+    // depuis `chrome://extensions` sans étiquette n'active aucun adaptateur. Se fier au
+    // nombre de permissions déclarait la migration inutile à quelqu'un qui n'a de script de
+    // contenu nulle part (revue Codex, PR #62).
+    const fake = installFakeChrome(['https://ghes.example.corp/*'], {});
+    await import('../src/background.js');
+
+    fireInstall(fake, 'update');
+    await settle();
+
+    expect(fake.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('un hôte étiqueté `config` seul non plus — il ne sert aucun adaptateur', async () => {
+    const fake = installFakeChrome(['https://conf.example.corp/*'], {
+      'conf.example.corp': 'config',
+    });
+    await import('../src/background.js');
+
+    fireInstall(fake, 'update');
+    await settle();
+
+    expect(fake.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('la proposition n’est faite QU’UNE FOIS, quoi qu’il arrive ensuite', async () => {
+    // Qui choisit délibérément de n'autoriser aucun domaine verrait sinon la même invitation
+    // refusée revenir à chaque mise à jour du store, indéfiniment. La migration est un
+    // événement ponctuel, pas un état (revue Reefact, PR #62).
+    const fake = installFakeChrome([]);
+    // La clé est lue SUR LE MODULE, jamais recopiée : un import statique exécuterait le
+    // worker avant que le faux `chrome` existe, et une constante dupliquée dans le test
+    // continuerait de passer après un renommage.
+    const { MIGRATION_PROMPTED_KEY } = await import('../src/background.js');
+
+    fireInstall(fake, 'update');
+    await settle();
+    expect(fake.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
+    expect(fake.store[MIGRATION_PROMPTED_KEY]).toBe(true);
+
+    fireInstall(fake, 'update');
+    await settle();
+    expect(fake.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('un marqueur déjà posé suffit à ne rien rouvrir', async () => {
+    const fake = installFakeChrome([]);
+    fake.store['migrationPrompted'] = true;
+    await import('../src/background.js');
+
+    fireInstall(fake, 'update');
+    await settle();
 
     expect(fake.runtime.openOptionsPage).not.toHaveBeenCalled();
   });
@@ -584,7 +648,7 @@ describe('premier lancement : amener aux réglages', () => {
     await import('../src/background.js');
 
     fireInstall(fake, 'chrome_update');
-    await new Promise((r) => setTimeout(r, 0));
+    await settle();
 
     expect(fake.runtime.openOptionsPage).not.toHaveBeenCalled();
   });

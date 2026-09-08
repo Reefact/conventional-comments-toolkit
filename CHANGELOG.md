@@ -25,7 +25,8 @@ and what a reader needs from them is the behaviour, not the thirteen.
   *ask* an adapter for that container. The client contract (§9.2.3) gains `getEditorChrome()`,
   which supplies it, and `renderedBodyShape()`, which supplies the shape of a rendered comment
   body. Both are required, so a new platform is asked the question at compile time; both accept
-  a one-word "nothing special" that reproduces the previous behaviour exactly.
+  a one-word "nothing special" — for the chassis that reproduces the previous behaviour exactly,
+  while an unmeasured body shape deliberately stands down, as the Azure DevOps entry below says.
 
 - **A platform's palette now belongs to that platform** (§9.1). The stylesheet named 33 Primer
   tokens across 53 declarations and shipped to Azure DevOps as well as GitHub — including three

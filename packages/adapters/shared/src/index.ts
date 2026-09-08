@@ -93,10 +93,13 @@ export const NEUTRAL_EDITOR_CHROME: EditorChrome = Object.freeze({
  * pas un `<br>`, la borne du sujet ne se déclenche jamais et un frère entier passe dans le
  * sujet — donc en gras, avec tout ce qui le suit.
  *
- * Les deux adaptateurs répondent aujourd'hui la même chose, et le déplacement est donc à
- * comportement rigoureusement nul. Ce n'est pas une raison de s'en passer : la valeur cesse
- * d'être une supposition tacite du code partagé pour devenir une réponse que chaque plateforme
- * donne — et qu'une plateforme future peut donner autrement, au lieu de la subir. */
+ * Le déplacement a d'abord été présenté ici comme « à comportement rigoureusement nul, les deux
+ * adaptateurs répondant la même chose ». Ce n'est plus vrai, et l'écrire encore serait la même
+ * faute que celle qu'on corrige : Azure DevOps rend `null` — personne n'a jamais mesuré comment
+ * il rend un corps de commentaire —, et y renonce donc au masquage du préfixe et à la mise en
+ * avant du sujet. La valeur cesse d'être une supposition tacite du code partagé pour devenir une
+ * réponse que chaque plateforme donne, y compris la réponse « je ne sais pas » (revue Reefact,
+ * PR #66). */
 export interface RenderedBodyShape {
   /** Les conteneurs de PREMIER NIVEAU qui enveloppent une ligne de Markdown ordinaire sans
    * avoir consommé de syntaxe de tête. Tout le reste — bloc de code, citation, liste, titre,

@@ -262,9 +262,9 @@ const ABORT = Symbol('firstTextNode.abort');
  *
  * N'exclut PAS de renoncer aussi sur des plateformes ou des DOM légitimes qu'aucune mesure
  * n'a encore couverts (Azure DevOps, notamment — jamais vérifié en direct dans ce dépôt) : mais
- * y renoncer est TOUJOURS l'issue sûre (§9.4, CA-11 — dégradation silencieuse, jamais un
- * blocage de l'usage normal) puisque le masquage n'est qu'un affinage cosmétique du rendu
- * (§5.5) — son absence laisse le texte complet visible, jamais corrompu. Élargir cette
+ * y renoncer est TOUJOURS l'issue sûre — le repli de rendu du §5.5, et non une dégradation de
+ * sélecteur : rien n'a échoué à être détecté, c'est le masquage qui s'abstient. Il n'est qu'un
+ * affinage cosmétique du rendu, et son absence laisse le texte complet visible, jamais corrompu. Élargir cette
  * allow-list à un autre tag qu'un jour mesuré confirmerait coûte une ligne ; la resserrer après
  * l'avoir élargie à tort, une fois qu'un utilisateur a vu un texte corrompu, ne coûte jamais
  * rien de comparable.

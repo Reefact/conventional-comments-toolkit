@@ -93,6 +93,43 @@ function vocabularyOf(css) {
   return words;
 }
 
+
+/** Les tableaux `candidates: [ … ]` d'un source transformé, découpés en ÉQUILIBRANT les
+ * crochets — un sélecteur en contient (`textarea[aria-label*="omment"][class*="CommentBox"]`),
+ * et une capture non gloutonne s'arrêtait au premier, ne rendant qu'un fragment du premier
+ * candidat. Le vocabulaire GitHub tombait alors à six mots et ce garde passait AVEC ET SANS la
+ * fuite qu'il interdit. */
+function candidateBlocks(code) {
+  const blocks = [];
+  // `candidates` doit être une CLÉ DE PROPRIÉTÉ (`candidates: [`), jamais un accès membre
+  // (`selectors.x.candidates`). Deux défauts corrigés d'un coup : le contrôle du fichier unique
+  // comptait `index.ts` comme définissant des sélecteurs alors qu'il ne fait que les LIRE ; et
+  // la dérivation du vocabulaire, elle, cherchait « le prochain crochet » depuis cet accès —
+  // n'importe où plus loin dans le fichier — et pouvait donc avaler un bloc sans aucun rapport.
+  const KEY = /(^|[^.\w$])candidates\s*:\s*\[/g;
+  for (const m of code.matchAll(KEY)) {
+    const open = code.indexOf('[', m.index);
+    let depth = 0;
+    let quote = null;
+    let j = open;
+    for (; j < code.length; j++) {
+      const ch = code[j];
+      if (quote) {
+        if (ch === '\\') j++;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+      else if (ch === '[') depth++;
+      else if (ch === ']' && --depth === 0) break;
+    }
+    blocks.push(code.slice(open, j));
+  }
+  return blocks;
+}
+
+const scattered = [];
+
 const vocabularies = new Map(); // plateforme -> Set(mots)
 for (const platform of readdirSync(ADAPTERS)) {
   if (platform === 'shared') continue;
@@ -128,9 +165,11 @@ for (const platform of readdirSync(ADAPTERS)) {
   // `minifyWhitespace` et non le transform nu : esbuild CONSERVE les commentaires attachés aux
   // membres de classe, et un commentaire qui cite un sélecteur entre backticks ressemblerait à
   // un littéral. Mesuré, pas supposé. Les identifiants, eux, ne sont pas renommés.
-  const code = files
-    .map((f) => transformSync(readFileSync(f, 'utf8'), { loader: 'ts', format: 'esm', minifyWhitespace: true }).code)
-    .join('\n');
+  const perFile = files.map((f) => ({
+    file: relative(root, f).replaceAll('\\', '/'),
+    code: transformSync(readFileSync(f, 'utf8'), { loader: 'ts', format: 'esm', minifyWhitespace: true }).code,
+  }));
+  const code = perFile.map((x) => x.code).join('\n');
   // TOUTES les chaînes du fichier, MOINS les noms de chaînes de sélecteurs. Découper sur
   // `candidates: [ … ]` paraissait plus précis et ne l'était pas : un sélecteur contient
   // lui-même des crochets (`textarea[aria-label*="omment"][class*="CommentBox"]`), si bien que
@@ -152,30 +191,28 @@ for (const platform of readdirSync(ADAPTERS)) {
   // capture non gloutonne s'arrêtait au premier — le vocabulaire GitHub tombait alors à six
   // mots et le garde passait avec ET sans la fuite. C'est le même défaut qui a coûté deux
   // corrections à ce fichier ; il est ici traité à la source.
-  const candidates = [];
-  for (let i = code.indexOf('candidates'); i !== -1; i = code.indexOf('candidates', i + 1)) {
-    const open = code.indexOf('[', i);
-    if (open === -1) continue;
-    let depth = 0;
-    let quote = null;
-    let j = open;
-    for (; j < code.length; j++) {
-      const ch = code[j];
-      if (quote) {
-        if (ch === '\\') j++;
-        else if (ch === quote) quote = null;
-        continue;
-      }
-      if (ch === '"' || ch === "'" || ch === '`') quote = ch;
-      else if (ch === '[') depth++;
-      else if (ch === ']' && --depth === 0) break;
-    }
-    candidates.push(code.slice(open, j));
-  }
+  const candidates = candidateBlocks(code);
   const literals = candidates.flatMap((block) =>
     [...block.matchAll(/(['"`])((?:(?!\1)[^\\]|\\.)*)\1/g)].map((m) => m[2])
   );
   vocabularies.set(platform, vocabularyOf(literals.join('\n')));
+
+  // §9.4 — « les sélecteurs DOM sont centralisés dans un fichier UNIQUE par adaptateur ».
+  //
+  // Ce garde est présenté dans conformance.yml comme mécanisant cette règle, et il ne la
+  // vérifiait pas : il interdisait le vocabulaire d'une plateforme au code partagé, ce qui est
+  // une autre question. Remettre demain un sélecteur dans `surfaces.ts` — exactement ce que la
+  // première version de cette PR avait fait — le laissait vert (revue Reefact, PR #66).
+  //
+  // Le fichier central n'est PAS nommé ici, et c'est délibéré : un nom de fichier est une liste
+  // d'un seul élément, et ce garde a déjà payé cette leçon une fois. Le §9.4 dit « un fichier
+  // unique », pas « le fichier `selectors.ts` ». On vérifie donc la propriété telle qu'elle est
+  // écrite : combien de fichiers de ce paquet DÉFINISSENT des candidats ? Un seul est conforme,
+  // quel que soit son nom ; deux ne le sont pas, quels que soient les leurs.
+  const definingFiles = perFile.filter((x) => candidateBlocks(x.code).length > 0).map((x) => x.file);
+  if (definingFiles.length > 1) {
+    scattered.push({ platform, files: definingFiles });
+  }
 }
 
 if (vocabularies.size === 0) {
@@ -227,10 +264,11 @@ for (const m of contractCode.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?=[(:<])/g)) {
   if (platformNames.some((p) => id.toLowerCase().includes(p))) contractLeaks.push(id);
 }
 
-if (findings.length === 0 && contractLeaks.length === 0) {
+if (findings.length === 0 && contractLeaks.length === 0 && scattered.length === 0) {
   const total = [...vocabularies.values()].reduce((a, s) => a + s.size, 0);
   const detail = [...vocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ');
   console.log(`✓ isolation des plateformes : ${total} mots dérivés — ${detail} — absents du code partagé.`);
+  console.log('✓ §9.4 : chaque adaptateur définit ses sélecteurs dans un fichier unique.');
   process.exit(0);
 }
 
@@ -242,6 +280,15 @@ if (findings.length > 0) {
       "dont le code partagé a besoin par une méthode du contrat (§9.2.3), qui rend une DONNÉE et\n" +
       'ne nomme aucune plateforme — voir `getEditorChrome()`. Le code partagé s\'exécute sur\n' +
       'TOUTES les plateformes : ce qui est écrit ici est exécuté par toutes.'
+  );
+}
+if (scattered.length > 0) {
+  console.error(
+    `\n${scattered.length} adaptateur(s) définissent des sélecteurs dans PLUSIEURS fichiers, ` +
+      'contre le §9.4\n(« centralisés dans un fichier unique par adaptateur ») :\n' +
+      scattered.map((x) => `  - ${x.platform} : ${x.files.join(', ')}`).join('\n') +
+      "\n\nUn seul fichier par adaptateur DÉFINIT des candidats ; les autres peuvent les référencer.\n" +
+      'Son nom est libre — la règle porte sur leur nombre, pas sur leur nom.'
   );
 }
 if (contractLeaks.length > 0) {

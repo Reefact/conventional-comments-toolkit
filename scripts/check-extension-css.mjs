@@ -150,11 +150,11 @@ if (preludes.length === 0) {
 }
 if (braceInString) {
   console.error(
-    `${label} contient une accolade à l\'intérieur d\'une chaîne (par exemple\n' +
-      'content: "{"). Le parseur de happy-dom, sur lequel repose ce garde, jette toutes les\n' +
-      'règles qui suivent une telle chaîne — un vrai navigateur, non. Le contrôle ne peut\n' +
-      'donc rien affirmer ici : retirez cette construction du fichier, ou déplacez ce garde\n' +
-      'vers un Chromium réel. Échouer est le seul verdict honnête.`
+    `${label} contient une accolade à l'intérieur d'une chaîne (par exemple content: "{").\n` +
+      'Le parseur de happy-dom, sur lequel repose ce garde, jette toutes les règles qui suivent\n' +
+      "une telle chaîne — un vrai navigateur, non. Le contrôle ne peut donc rien affirmer ici :\n" +
+      'retirez cette construction du fichier, ou déplacez ce garde vers un Chromium réel.\n' +
+      'Échouer est le seul verdict honnête.'
   );
   process.exit(1);
 }

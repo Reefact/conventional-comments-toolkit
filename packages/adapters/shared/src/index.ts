@@ -267,7 +267,8 @@ export class SelectorLog {
    * elle mesure alors sur combien de PR une chaîne a échoué, plutôt que le rythme des
    * mutations, qui ne mesure rien.
    *
-   * Ce que ce geste ne fait PAS : vider `failures`, qui garde ce qu'il a déjà vu. */
+   * Ce que ce geste ne fait PAS : vider `failures`, dont `degraded()` maintient la borne
+   * lui-même — une entrée par chaîne, quel que soit le nombre d'oublis. */
   forgetSeen(): void {
     this.#seen.clear();
   }
@@ -275,7 +276,18 @@ export class SelectorLog {
   degraded(chain: SelectorChain): void {
     if (this.#seen.has(chain.name)) return;
     this.#seen.add(chain.name);
-    this.failures.push({ chain: chain.name, at: new Date().toISOString() });
+    // UNE entrée par chaîne, rafraîchie plutôt qu'ajoutée. `#seen` ne suffit plus à borner
+    // ce tableau depuis qu'il s'oublie à chaque changement de PR : sans cette recherche, un
+    // onglet promené sur cent PR y accumulerait cent lignes par chaîne pourrie, alors que le
+    // dépôt s'interdit ailleurs de le laisser croître au rythme des observations
+    // (`chromeSignatureOf`, extension/src/content-internal.ts) — revue Reefact, PR #70.
+    //
+    // C'est aussi la règle du journal PERSISTÉ (`appendToJournal`, dédupliqué par chaîne) :
+    // une seule sémantique à tenir en tête des deux côtés, en mémoire comme sur le disque.
+    const at = new Date().toISOString();
+    const seenBefore = this.failures.find((f) => f.chain === chain.name);
+    if (seenBefore) seenBefore.at = at;
+    else this.failures.push({ chain: chain.name, at });
     // Remontée télémétrique agrégée uniquement si la télémétrie est activée (§10, CA-11).
     this.#telemetry?.({ kind: 'selector-degradation', chain: chain.name });
   }

@@ -12,6 +12,38 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [1.0.0-beta.11] - 2026-09-08
+
+### Changed
+
+- **No host is pre-declared any more, `github.com` included** (§2, §A.1, §A.4, §B.4). It was the one host injected statically by the manifest's `content_scripts`: active without any permission, and with no way for the extension itself to revoke that access. That asymmetry is measured rather than assumed — `chrome.permissions.getAll()` does report a manifest-declared permission, and `remove()` refuses it with Chrome's own message, *"You cannot remove required permissions."* — and it is the whole reason for the rule: a consent the product cannot withdraw is not a consent the product can offer. Two earlier justifications for this rule were written from memory and were wrong (a manifest host is not "revocable by nothing" — the browser keeps its own site-access controls — and it does appear in `chrome.permissions`); the comments now carry the measured one. **Consequence for an existing installation: the extension stays silent on `github.com` until one click on "Activate".** `permissions.request()` requires a human gesture that a service worker cannot produce, so no automatic migration exists; the options page opens itself instead, once, on install and on an update that left no served domain.
+
+- **The options screen is rebuilt around the four states an access can be in.** Known domains, whose address and platform the extension already knows, so one click authorizes and classifies together; other domains, where the platform is chosen *before* the grant; configured domains, which can only be removed, never reclassified; and unconfigured domains — granted outside this screen, therefore carrying no platform — hidden entirely when empty. The first two panels were named after a way of hosting until a legacy `visualstudio.com` organisation broke the split: it is cloud and belongs to the second, while a data-residency GHE Cloud breaks it the other way. What separates them is whether the extension already knows the address.
+
+- **`*.visualstudio.com` is no longer offered in the catalog** (§2, minimal permissions). A known suffix is not a known host: that pattern grants access to every Azure DevOps organisation on legacy URLs when a workstation uses one. Such organisations now go through the free-form field, where `inferPlatform()` already pre-fills Azure DevOps on that suffix, so the grant covers that one organisation. `dev.azure.com` stays — the organisation lives in the path, so it is a fixed host and authorizing it is the minimum possible for that domain.
+
+- **The content script is registered once, over the hosts actually served**, rather than once per granted origin. Two granted patterns can cover the same page — a broad grant plus `github.com`, or a policy-authorized `*.corp.example` plus the `ghes.corp.example` inside it — and one registration per origin meant the script ran twice there. That also retires the per-origin identifier, whose derivation had to be injective and was not: a slug, then a slug plus a 32-bit FNV-1a, still collide.
+
+### Added
+
+- **A granted host can be withdrawn from the extension itself** (§A.4, §B.4). Each configured domain carries a "Withdraw" button; previously the only way to revoke an optional host permission was the browser's own extension page. Hosts classified by enterprise policy carry no such button — revoking a policy-mandated permission is not this screen's call.
+
+- **The options page is available in French and in English** (§10, Internationalisation). It was hardcoded French while offering an "Interface language" setting that changed every other surface but its own: someone who had set the interface to English saw English on their pull requests, and still saw French on the settings page where they made that choice. The language now resolves from your preference, then from the browser's — §8.1.2's middle level, the effective configuration, has no meaning here since it resolves for a repository and this page shows none — and changing it applies immediately rather than at the next reload.
+
+- **A guided tour, played once on the first opening of the options page**, naming each section and what it is for. It skips the "unconfigured domains" panel unless that anomaly is already present, remembers being finished *or* skipped, closes on `Escape`, keeps keyboard focus inside the tour while it is open and restores the previous focus afterwards, and announces each step through an `aria-live` region (§10, Accessibilité). A "Replay the guided tour" button in the page header replays it.
+
+### Fixed
+
+- **Data residency worked nowhere outside the tests** (§A.4). `hostnameOf()` trusted the URL parser to preserve a leading wildcard: Node does, Chromium percent-encodes it, so a granted `*.ghe.com` was tagged `%2A.ghe.com`, which `matchScore()` no longer reads as a wildcard. The defect predates this release and no test could see it — they ran in the only environment where the claim holds. The wildcard is now stripped before parsing and restored after, and `npm run smoke:mv3` measures the browser fact that makes the workaround necessary.
+
+- **A broad grant injected the extension into every `https` page.** Registration followed the permission while activation follows the classification, and the widest pattern the browser can grant here designates no host at all: `content.js` and `styles.css` were injected everywhere, where they could then do nothing for want of a tag. Registration now derives from the same crossing as the published split. That same phantom host appeared in the options list as a domain to classify, where classifying it activated no adapter; `hostnameOf()` now rejects any pattern with no concrete host.
+
+- **The tab you were looking at stayed inert until a reload.** A dynamic registration only applies to subsequent loads, which is exactly the main path: you open the options page from a platform tab, grant the host, and that tab received nothing. Measured in a real Chromium (`npm run check:open-tab-injection`), which also confirms that catching up requires no additional permission. The catch-up asks each tab whether it already has the script before injecting, so a long-lived tab no longer accumulates one copy of the stylesheet per service-worker wake — `insertCSS` is an insertion, not an "ensure", and three identical calls need three `removeCSS` to clear.
+
+- **A refused revocation claimed to have succeeded.** `permissions.remove()` reports whether it removed anything and the callback ignored it: the platform tag was purged for a still-granted permission, leaving the access in place, the adapter off, and the host in the unconfigured panel — the screen reporting an anomaly it had just created. A refused removal now changes nothing and says so.
+
+- **A host revoked from `chrome://extensions` kept its classification.** The purge lived only in the "Withdraw" button, so re-granting the same host outside this screen silently restored the old platform instead of surfacing the domain as unconfigured. `permissions.onRemoved` closes that cycle whatever the revocation's origin.
+
 ## [1.0.0-beta.10] - 2026-09-05
 
 ### Fixed

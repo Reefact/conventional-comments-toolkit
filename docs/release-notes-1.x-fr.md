@@ -7,6 +7,31 @@ cas limite, chaque section de la spécification sur laquelle une entrée s'appui
 L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. La
 source de vérité sur la conformité reste le compagnon serveur (composant B).
 
+## 1.0.0-beta.11 — 8 septembre 2026
+
+_Vous autorisez désormais l'accès à toutes les plateformes de la même façon — `github.com` compris — et pouvez le révoquer à tout moment._
+
+### ✨ Nouveautés
+
+- **Vous choisissez où l'extension travaille, et vous pouvez revenir sur ce choix.** `github.com` était jusqu'ici intégré à l'extension : actif dès l'installation, sans aucun moyen de révoquer cet accès depuis l'extension elle-même. Il passe maintenant par la même autorisation en un clic que toutes les autres plateformes, et chaque domaine autorisé porte un bouton « Retirer ». Les domaines imposés par la politique de votre organisation restent en place — ce n'est pas à cet écran d'en décider.
+- **La page d'options s'ouvre automatiquement la première fois et vous propose une visite guidée.** Celle-ci présente chaque section et explique à quoi elle sert ; vous pouvez l'interrompre à tout moment, la fermer avec `Échap`, et elle ne revient jamais d'elle-même. Un bouton « Revoir la visite guidée » en haut de page la rejoue quand vous voulez.
+- **La page d'options parle enfin français ou anglais, comme le reste de l'extension.** Elle restait en français quel que soit votre choix : quelqu'un ayant réglé l'interface en anglais voyait de l'anglais partout, sauf sur la page de réglages où il venait de faire ce choix. Le changement de langue prend désormais effet immédiatement, et non au prochain rechargement.
+
+### 🐛 Corrections
+
+- **GitHub Enterprise Cloud avec résidence des données fonctionne, tout simplement.** Un domaine autorisé sous la forme `*.ghe.com` était enregistré sous un nom déformé, si bien que l'extension ne reconnaissait jamais les pages pour lesquelles elle était autorisée. Le défaut est plus ancien que cette version, et aucun test ne pouvait le voir : il n'apparaît que dans un navigateur, et les tests tournaient là où il n'existe pas.
+- **Il n'est plus nécessaire de recharger l'onglet d'où vous venez.** Autoriser un domaine depuis la page d'options laissait cet onglet inerte — précisément celui que vous alliez utiliser. L'extension y est désormais active immédiatement.
+- **Un retrait refusé par le navigateur n'est plus présenté comme réussi.** L'écran affichait ensuite le domaine parmi les non configurés — une anomalie qu'il venait de créer lui-même, alors que l'accès était toujours accordé. Il ne change plus rien et dit pourquoi.
+- **Retirer l'autorisation depuis `chrome://extensions` efface désormais aussi la plateforme enregistrée.** Elle restait auparavant en place, si bien que réautoriser le domaine de la même façon rétablissait silencieusement l'ancien choix au lieu de vous le redemander.
+- **L'extension ne se charge plus sur des pages qu'elle ne prend pas en charge.** Si vous aviez accordé l'accès à tous les sites depuis les contrôles du navigateur, son code était injecté sur toutes les pages `https`, où il ne pouvait de toute façon rien faire. Un motif qui ne désigne aucun hôte concret n'apparaît plus non plus dans votre liste comme un domaine à configurer.
+- **L'interface n'apparaît plus en double sur une page couverte par deux de vos autorisations**, et un onglet laissé ouvert longtemps n'accumule plus une copie de la feuille de style de l'extension.
+
+### 🔧 Modifications
+
+- **Après cette mise à jour, l'extension se tait sur `github.com` jusqu'à ce que vous l'autorisiez.** Un clic sur « Activer » dans la page d'options suffit. Cette étape ne peut pas être automatisée : le navigateur n'accorde cette permission qu'à la suite d'une action explicite de votre part. La page s'ouvre d'elle-même pour le dire — mais seulement si la mise à jour ne vous laisse aucun domaine en service ; si vous en aviez déjà un autre configuré, l'extension continue d'y fonctionner et rien ne signale qu'elle n'est plus active sur `github.com`.
+- **L'écran des options est refait autour des états réels d'un accès** : les domaines que l'extension connaît déjà, où un clic autorise et classe à la fois ; tout autre domaine, où vous indiquez à quelle plateforme il correspond avant d'accorder l'accès ; la liste de ce qui est configuré ; et, seulement quand elle n'est pas vide, les domaines autorisés depuis le navigateur plutôt que depuis cet écran, où l'extension n'est donc pas encore active.
+- **Chaque organisation `visualstudio.com` est désormais autorisée individuellement** via le champ de saisie, avec Azure DevOps pré-rempli. L'entrée de catalogue qu'elle remplace demandait d'un coup toutes les organisations sur ces adresses historiques, quand un poste en utilise une.
+
 ## 1.0.0-beta.10 — 5 septembre 2026
 
 _GitHub a réécrit sa vue « Files changed », et l'extension s'y était tue : cette version y ramène tout l'outillage, et fait parler les diagnostics dans la langue que vous avez choisie._

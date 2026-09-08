@@ -163,7 +163,8 @@ const fr: Record<string, string> = {
     'Point de collecte : {endpoint} — votre accord précédent portait sur {consented}, il ne s’y applique pas. Cochez pour autoriser cette destination.',
   'options.telemetry.endpoint.declared':
     'Point de collecte déclaré par la politique d’entreprise de votre organisation : {endpoint}',
-  'options.tour.replay': 'Revoir la visite guidée',
+  'options.tour.replay': 'Visite guidée',
+  'options.tour.replay.title': 'Revoir la visite guidée',
 };
 
 const en: Record<string, string> = {
@@ -327,7 +328,8 @@ const en: Record<string, string> = {
     'Collection endpoint: {endpoint} — your previous consent was for {consented} and does not carry over. Tick to allow this destination.',
   'options.telemetry.endpoint.declared':
     'Collection endpoint declared by your organisation’s enterprise policy: {endpoint}',
-  'options.tour.replay': 'Replay the guided tour',
+  'options.tour.replay': 'Guided tour',
+  'options.tour.replay.title': 'Replay the guided tour',
 };
 
 /** Exporté pour le garde de parité (`test/i18n-strings.test.ts`) : une clé présente d'un

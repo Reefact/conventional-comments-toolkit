@@ -121,31 +121,43 @@ porte une LEÇON, pas pour faire l'inventaire — `package.json` fait foi sur ce
 
 ## Mise en forme : le dépôt n'est PAS formaté par prettier
 
-`.prettierrc` existe, et il ne dit pas ce qu'on croit. Il ne déclare pas que le code est
-conforme à prettier : il **borne les dégâts** quand quelqu'un le lance quand même. La
-différence a été mesurée, sur l'ensemble des sources :
+Le code est mis en forme **à la main**, et aucun réglage ne rend prettier idempotent ici :
+il restructure plutôt qu'il n'enroule, et les insertions dépassent partout les suppressions.
+Lancer `prettier --write` sur ce dépôt le réécrit, point.
 
-| | fichiers touchés | lignes |
+C'est pourquoi `.prettierrc` porte **`requirePragma: true`** : prettier ne formate alors que
+les fichiers portant un pragma `@format`, et aucun n'en porte. Mesuré dans les deux sens,
+sur l'ensemble des sources :
+
+| | fichiers réécrits | lignes |
 |---|---|---|
-| `prettier --write` avec ses défauts | 140 | +17 850 / −10 662 |
-| avec ce `.prettierrc` | 106 | +3 611 / −1 122 |
+| avec `requirePragma` (l'état livré) | **0** | — |
+| sans, mais avec le reste de ce `.prettierrc` | 106 | +3 611 / −1 122 |
+| sans configuration du tout (défauts de prettier) | 140 | +17 850 / −10 662 |
 
-Un facteur neuf, et **toujours pas zéro**. Aucun réglage ne rend prettier idempotent ici :
-le code est mis en forme à la main, et prettier restructure plutôt qu'il n'enroule — les
-insertions dépassent partout les suppressions. Donc : **ne pas lancer `prettier --write`**
-sur ce dépôt, ni même sur un seul fichier.
+**Ne pas retirer `requirePragma` sans savoir ce qu'on fait.** C'est lui, et lui seul, qui
+rend la commande inoffensive ; les trois autres clés ne font que réduire les dégâts d'un
+facteur 6 (28 512 lignes de churn contre 4 733) le jour où quelqu'un l'enlève.
 
-C'est arrivé, et c'est pourquoi cette section existe : un `prettier --write` lancé sur sept
-fichiers en cours de travail a produit ~580 lignes de bruit — guillemets doubles et virgules
-finales contre le style de tout le reste — dans un commit déjà poussé. Il a fallu restaurer
-les fichiers depuis leur version d'origine et réappliquer les modifications à la main. Le
-réflexe « je formate avant de committer » est ce qu'il faut désarmer.
+Le fichier ne dit donc PAS que le dépôt est conforme à prettier — il dit l'inverse, et
+l'applique. Il existe pour deux raisons :
 
-Les valeurs viennent du code, pas d'un goût : `singleQuote` et `trailingComma: es5` sont ce
-qu'il emploie partout, et `printWidth: 100` correspond à sa convention réelle — p95 des
-lignes de code à 94 colonnes, commentaires enroulés à la main autour de 95. `120` ferait
-moins de bruit (88 fichiers, +1 932) mais décrirait mal le code : ce serait choisir une
-largeur pour minimiser un reformatage que personne ne doit lancer.
+1. **Protéger les éditeurs humains.** L'extension VS Code de prettier a un réglage
+   `prettier.requireConfig`, que beaucoup activent : elle refuse de formater tant qu'aucune
+   configuration locale n'existe. Ajouter un `.prettierrc` fait donc basculer ces postes de
+   « ne formate pas » à « formate à chaque sauvegarde » — le fichier censé protéger créait
+   le danger. `requirePragma` referme ça (revue Reefact, PR #63).
+2. **Fixer le style** pour le jour où l'on déciderait d'adopter prettier, ou pour un fichier
+   qu'on y ferait entrer explicitement par un pragma. `singleQuote` et `trailingComma: es5`
+   sont ce que le code emploie partout ; `printWidth: 100` correspond à sa convention réelle
+   — p95 des lignes de code à 94 colonnes, commentaires enroulés à la main autour de 95.
+   `120` produirait moins de churn (88 fichiers, +1 932) mais décrirait mal le code.
+
+Tout cela est né d'un incident : un `prettier --write` lancé sur sept fichiers en cours de
+travail a produit ~580 lignes de bruit — guillemets doubles et virgules finales contre le
+style de tout le reste — dans un commit déjà poussé. Il a fallu restaurer les fichiers depuis
+leur version d'origine et réappliquer les modifications à la main. Le réflexe « je formate
+avant de committer » est ce qu'il faut désarmer.
 
 ## Commandes
 

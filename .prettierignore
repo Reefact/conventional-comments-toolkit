@@ -1,8 +1,7 @@
 # Sorties de build : régénérées à chaque `npm run build`, jamais relues.
 #
-# Les bundles produits par esbuild se trouvent aujourd'hui conformes au style de prettier,
-# donc ces lignes ne changent rien pour l'instant — elles valent pour le jour où l'on
-# minifie, où l'on change de bundler, ou où l'on touche à `.prettierrc`.
+# Ces lignes ne changent rien tant que `requirePragma` est en place — prettier ne touche
+# alors à aucun fichier, ignoré ou non. Elles valent pour le jour où on l'enlèverait.
 dist/
 dist-ext/
 node_modules/

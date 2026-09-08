@@ -1061,9 +1061,11 @@ interface CommentInfo {
   author: UserInfo;
   body: string;                        // corps stocké brut — la normalisation est faite par core/ (§3.4.1)
   createdAt: string;                   // ISO 8601
-  updatedAt?: string;
-  lastEditedBy?: UserInfo;             // §6.1 — exigé pour signaler une édition affaiblissante « avec son auteur » ;
-                                       // absent si la plateforme ne l'expose pas (voir §6.1)
+                                       // `updatedAt` et `lastEditedBy` ont été retirés d'ici : ils
+                                       // n'existaient que pour signaler une édition affaiblissante
+                                       // « avec son auteur » (§6.1), règle qui demandait de se souvenir
+                                       // du corps précédent. Une racine éditée se lit désormais telle
+                                       // qu'elle est, et plus rien n'appelait ces deux champs
   permalink: string;                   // requis par la sortie du check (§6.3.1)
   isSystemGenerated: boolean;          // §4.2 — l'adaptateur le pose depuis les marqueurs de sa plateforme
   canCarryBlockingState: boolean;      // §4.1 — pilote `W-NOT-BLOCKABLE`. Porté ici, et non par le seul

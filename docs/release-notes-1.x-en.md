@@ -7,6 +7,22 @@ every section of the specification an entry rests on — see
 The extension starts in `assist` mode: it helps and it flags, it never blocks a submission. The
 source of truth for conformance stays the server companion (component B).
 
+## 1.0.0-beta.13 — September 8, 2026
+
+_The journal in the "Status" section now says which page each selector failed on, and clears in one click so you can measure again._
+
+### ✨ Features
+
+- **Every line of the journal says which page it came from.** It recorded which selector failed and when, never where: faced with four lines stamped within the same second, nothing told you whether they came from one page or four. A six-character mark now opens each line — same mark, same page — and clicking it opens the exact address recorded, in a new tab. That address stays on your device: what telemetry carries, when you have allowed it, is still the selector's name and nothing more.
+
+- **The journal clears from the options page.** A button empties it; tabs you already have open start measuring again straight away, and the section updates itself when one of them writes, without a reload.
+
+- **The options page carries the extension's icon** before its title. The guided tour's button now reads "Guided tour", its full wording moving to the tooltip.
+
+### 🐛 Bug fixes
+
+- **The privacy policy described a history the extension does not keep.** It announced "the last 50 times" an element was not recognised, while the journal keeps only one line per selection rule — fifty at most, each with its most recent observation. It now describes what is actually kept, the page address included.
+
 ## 1.0.0-beta.12 — September 8, 2026
 
 _The guided tour is legible at last — the page behind it really does go dark, and its card sits above it instead of blending in — and the "Status" section says what it observed rather than what that might mean._

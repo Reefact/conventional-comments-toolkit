@@ -12,6 +12,20 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [1.0.0-beta.13] - 2026-09-08
+
+### Added
+
+- **Every line of the selector journal says which page its degradation came from** (§9.4). The journal recorded which selector chain failed and when, never where: four lines stamped within the same second gave no way to tell one page from four. Each entry now carries the page address, read at the moment of the degradation rather than at injection — GitHub navigates in place, so the URL a content script saw when it loaded is not the page the chain failed on, and a chain is re-reported when the tab changes pull request. The options page renders that address as a six-character mark computed on the normalised page — origin, path, and the query parameters that name a view — so `?diff=split` and `#discussion_r1` do not turn one page into three, while Azure DevOps's `?_a=files` and `?_a=overview` stay two: same mark, same page. The mark links to the exact address recorded, fragment included, and opens it in a new tab. That address stays on the device: telemetry still carries only the chain's name (§10).
+
+- **The journal can be emptied from the options page, and open tabs start measuring again** (§9.4). It had no way to be cleared, and its entries survived reloads and tabs. Clearing also tells the content scripts to forget which chains they have already reported: a chain is reported once per tab, so without that, reproducing a failure on the very page where it had just been seen wrote nothing. The section follows the storage now instead of reading it once at load, so what a tab records appears without reloading the screen.
+
+- **The options page carries the extension's icon before its title**, at the height of the title and its subtitle together. The guided tour's button reads *Guided tour*, with *Replay the guided tour* as its tooltip, and sits slightly lighter than the page's other buttons — at that icon size the header would otherwise no longer fit on one line.
+
+### Fixed
+
+- **The privacy policy described a journal nobody keeps** (§9.4, §10). Both languages announced "the last 50 times" the extension failed to recognise an element, while the journal is deduplicated by selector chain: fifty rules at most, each holding only its most recent observation — a rule that fails a thousand times still occupies one line. `docs/store-permissions-justification-fr.md` carried the same wording, contradicted it a line later, and still claimed that nothing writes `selectorFailures`. All three now describe the data that exists, including the page address this release adds to it, and both policy headers carry the date of that revision.
+
 ## [1.0.0-beta.12] - 2026-09-08
 
 ### Added

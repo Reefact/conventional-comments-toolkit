@@ -138,17 +138,22 @@ describe('ce qui assombrit la page', () => {
     installStorage();
   });
 
-  it('le voile s’efface dès qu’une lucarne est affichée', () => {
-    // Les deux ensemble sont pires que l'un ou l'autre : le voile passe SOUS la lucarne,
-    // donc il grise aussi la zone qu'elle est censée éclairer. Le défaut n'a été vu que sur
-    // une capture — l'étape 1 encadrait une zone exactement aussi sombre que le reste.
+  it('le voile cesse d’assombrir dès qu’une lucarne le fait, mais reste en place', () => {
+    // Deux rôles distincts, et les confondre a produit deux défauts. ASSOMBRIR : les deux à
+    // la fois grisent aussi la zone que la lucarne éclaire — vu sur une capture, l'étape 1
+    // encadrait une zone exactement aussi sombre que le reste. BLOQUER : l'ombre de la
+    // lucarne ne bloque rien (`pointer-events: none`), donc retirer le voile rendrait toute
+    // la page cliquable sous une fiche qui se déclare `aria-modal`.
     const tour = startTour(document, 'fr')!;
-    expect((document.querySelector('.tour-veil') as HTMLElement).hidden).toBe(true);
+    const veil = document.querySelector('.tour-veil') as HTMLElement;
+    expect(veil.hidden).toBe(false);
+    expect(veil.classList.contains('tour-veil-dim')).toBe(false);
     expect((document.querySelector('.tour-spot') as HTMLElement).hidden).toBe(false);
 
     // La dernière étape n'a pas de cible : là, le voile est le SEUL à assombrir.
     for (let i = 0; i < tour.length - 1; i += 1) tour.next();
-    expect((document.querySelector('.tour-veil') as HTMLElement).hidden).toBe(false);
+    expect(veil.hidden).toBe(false);
+    expect(veil.classList.contains('tour-veil-dim')).toBe(true);
     expect((document.querySelector('.tour-spot') as HTMLElement).hidden).toBe(true);
   });
 });
@@ -220,5 +225,69 @@ describe('rejouer la visite', () => {
     const tour = startTour(document, 'fr')!;
     tour.stop();
     expect(document.activeElement).toBe(button);
+  });
+});
+
+
+describe('la visite au clavier', () => {
+  beforeEach(() => {
+    mountPage();
+    installStorage();
+  });
+
+  const tab = (shiftKey = false) =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true }));
+
+  it('la tabulation ne sort pas de la fiche', () => {
+    // La visite est ajoutée en fin de `<body>` et se déclare `aria-modal` : sans cycle, une
+    // tabulation depuis le dernier bouton repart dans les contrôles de la page, que le voile
+    // bloque à la souris mais pas au clavier.
+    startTour(document, 'fr');
+    const forward = document.querySelector('.tour-next') as HTMLElement;
+    const skip = document.querySelector('.tour-skip') as HTMLElement;
+    forward.focus();
+    tab();
+    expect(document.activeElement).toBe(skip); // reboucle au premier, pas vers la page
+    tab(true);
+    expect(document.activeElement).toBe(forward);
+  });
+
+  it('un focus égaré est ramené dans la fiche', () => {
+    startTour(document, 'fr');
+    (document.getElementById('host-input') as HTMLElement).focus();
+    tab();
+    expect(document.querySelector('.tour-popover')?.contains(document.activeElement)).toBe(true);
+  });
+
+  it('le cycle ignore les boutons masqués', () => {
+    // « Passer » disparaît à la dernière étape : un cycle qui le compterait encore
+    // s'arrêterait sur un bouton invisible.
+    const tour = startTour(document, 'fr')!;
+    for (let i = 0; i < tour.length - 1; i += 1) tour.next();
+    const forward = document.querySelector('.tour-next') as HTMLElement;
+    const back = document.querySelector('.tour-back') as HTMLElement;
+    forward.focus();
+    tab();
+    expect(document.activeElement).toBe(back);
+  });
+
+  it('le focus ne reste pas sur un bouton que l’étape vient de masquer', () => {
+    const tour = startTour(document, 'fr')!;
+    (document.querySelector('.tour-skip') as HTMLElement).focus();
+    for (let i = 0; i < tour.length - 1; i += 1) tour.next();
+    expect(document.activeElement).toBe(document.querySelector('.tour-next'));
+  });
+
+  it('le texte qui change vit dans une région annoncée', () => {
+    // Sans elle, « Suivant » remplace titre et corps en silence pendant que le focus reste
+    // sur le bouton : rien ne dit que le sujet du dialogue a changé.
+    startTour(document, 'fr');
+    const live = document.querySelector('.tour-live');
+    expect(live?.getAttribute('aria-live')).toBe('polite');
+    expect(live?.contains(document.querySelector('.tour-title'))).toBe(true);
+    expect(live?.contains(document.querySelector('.tour-body'))).toBe(true);
+    // Les boutons N'Y SONT PAS : `aria-atomic` relit toute la région, et y inclure la
+    // navigation ferait relire « Passer Précédent Suivant » à chaque étape.
+    expect(live?.contains(document.querySelector('.tour-next'))).toBe(false);
   });
 });

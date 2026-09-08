@@ -175,10 +175,18 @@ try {
   //    happy-dom ne peut voir ni l'un ni l'autre, il n'a pas de mise en page.
   await opened.click('#tour-replay', { timeout: 4000 });
   await opened.waitForSelector('.tour-popover', { timeout: 5000 });
-  const veilOnFirst = await opened.evaluate(
-    () => document.querySelector('.tour-veil')?.hidden === true
+  const veilOnFirst = await opened.evaluate(() => {
+    const veil = document.querySelector('.tour-veil');
+    return {
+      present: Boolean(veil) && !veil.hidden,
+      dims: veil?.classList.contains('tour-veil-dim') ?? null,
+    };
+  });
+  assert(
+    'tant qu’il y a une lucarne, le voile bloque sans assombrir',
+    veilOnFirst.present === true && veilOnFirst.dims === false,
+    JSON.stringify(veilOnFirst)
   );
-  assert('tant qu’il y a une lucarne, le voile reste effacé', veilOnFirst);
 
   // Jusqu'à la dernière étape, en comptant les clics plutôt qu'en devinant : le compteur
   // annonce le total, et cliquer une fois de trop refermerait la visite.
@@ -194,7 +202,7 @@ try {
     const box = veil?.getBoundingClientRect();
     return {
       counter: document.querySelector('.tour-counter')?.textContent,
-      veilShown: veil ? !veil.hidden : false,
+      veilShown: veil ? !veil.hidden && veil.classList.contains('tour-veil-dim') : false,
       spotHidden: document.querySelector('.tour-spot')?.hidden === true,
       // Le voile couvre-t-il RÉELLEMENT la fenêtre, à la position de défilement courante ?
       covers:
@@ -242,6 +250,71 @@ try {
   assert(
     'un second appel n’empile pas une deuxième visite',
     (await opened.evaluate(() => document.querySelectorAll('.tour-popover').length)) === 1
+  );
+
+  // 8. Le voile BLOQUE, et pas seulement en apparence. L'ombre de la lucarne assombrit sans
+  //    rien arrêter (`pointer-events: none`) : sans voile, tous les contrôles de la page
+  //    resteraient cliquables sous une fiche qui se déclare `aria-modal`. Ce que
+  //    `elementFromPoint` rend au-dessus d'un bouton de la page est la seule réponse qui
+  //    vaille — un test unitaire ne connaît pas l'empilement.
+  const blocked = await opened.evaluate(() => {
+    const target = document.getElementById('host-add');
+    const box = target.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return { onTop: hit?.className ?? hit?.tagName, reachesButton: hit === target };
+  });
+  assert(
+    'pendant la visite, un bouton de la page n’est pas atteignable à la souris',
+    blocked.reachesButton === false,
+    JSON.stringify(blocked)
+  );
+  await opened.keyboard.press('Escape');
+  await opened.waitForSelector('.tour-popover', { state: 'detached', timeout: 5000 });
+
+  // 9. Changer la langue applique le catalogue TOUT DE SUITE. Corriger un écran qui
+  //    n'appliquait pas le réglage qu'il propose, pour qu'il ne se l'applique toujours pas
+  //    sur-le-champ, serait la même faute d'un cran plus loin.
+  // Partir du FRANÇAIS, sinon l'assertion est vide : le reste de ce fichier tourne en
+  // anglais, et vérifier qu'une page anglaise est anglaise passerait sans le correctif. La
+  // première version de cette mesure faisait exactement ça.
+  /** Choisir une langue et attendre que la PAGE la porte. L'attente est capturée plutôt que
+   * laissée remonter : sans le correctif elle expire, et une pile d'exception à la place
+   * d'un ✗ ne dit pas quelle propriété a lâché. */
+  async function chooseLanguage(code) {
+    await opened.selectOption('#language', code);
+    try {
+      await opened.waitForFunction(
+        (expected) => document.documentElement.lang === expected,
+        code,
+        { timeout: 8000 }
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Partir du FRANÇAIS, sinon l'assertion est vide : le reste de ce fichier tourne en
+  // anglais, et vérifier qu'une page anglaise est anglaise passerait sans le correctif. La
+  // première version de cette mesure faisait exactement ça.
+  const toFrench = await chooseLanguage('fr');
+  const toEnglish = toFrench && (await chooseLanguage('en'));
+  const switched = await opened.evaluate(() => ({
+    lang: document.documentElement.lang,
+    heading: document.querySelector('[data-i18n="options.hosts.heading"]')?.textContent,
+    // Une chaîne construite PAR LE CODE, pas seulement une chaîne statique : c'est là que la
+    // langue pouvait rester en arrière.
+    replay: document.querySelector('[data-i18n="options.tour.replay"]')?.textContent,
+    selected: document.getElementById('language')?.value,
+  }));
+  assert(
+    'changer la langue rhabille la page immédiatement',
+    toFrench &&
+      toEnglish &&
+      switched.lang === 'en' &&
+      switched.heading === 'Allowed domains' &&
+      switched.selected === 'en',
+    `fr:${toFrench} en:${toEnglish} ${JSON.stringify(switched)}`
   );
 } finally {
   await context.close();

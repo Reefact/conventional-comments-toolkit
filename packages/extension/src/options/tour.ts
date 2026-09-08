@@ -172,6 +172,18 @@ export function startTour(doc: Document = document, lang = 'en'): TourHandle | n
   popover.setAttribute('aria-labelledby', 'tour-title');
   popover.setAttribute('aria-describedby', 'tour-body');
 
+  /** Le texte qui change d'une étape à l'autre, dans une région VIVANTE.
+   *
+   * Sans elle, activer « Suivant » remplace silencieusement le titre et le corps pendant que
+   * le focus reste sur le bouton : un lecteur d'écran n'annonce rien, et rien ne dit que le
+   * sujet du dialogue a changé (revue Codex, PR #62). Déplacer le focus sur le titre à
+   * chaque étape marcherait aussi, mais coûterait la répétition de « Suivant » à la touche
+   * Entrée, qui est la façon la plus simple de parcourir la visite. */
+  const liveRegion = doc.createElement('div');
+  liveRegion.className = 'tour-live';
+  liveRegion.setAttribute('aria-live', 'polite');
+  liveRegion.setAttribute('aria-atomic', 'true');
+
   const counter = doc.createElement('p');
   counter.className = 'tour-counter';
 
@@ -204,17 +216,45 @@ export function startTour(doc: Document = document, lang = 'en'): TourHandle | n
   forward.className = 'btn btn-p tour-next';
 
   actions.append(skip, spacer, back, forward);
-  popover.append(counter, title, body, actions);
+  liveRegion.append(counter, title, body);
+  popover.append(liveRegion, actions);
   root.append(veil, spot, popover);
   doc.body.appendChild(root);
 
   let index = 0;
   let stopped = false;
 
+  /** Les boutons atteignables à cet instant — « Précédent » et « Passer » se masquent selon
+   * l'étape, et un cycle qui les compterait quand même s'arrêterait sur du vide. */
+  function focusables(): HTMLElement[] {
+    return [skip, back, forward].filter((el) => !el.hidden);
+  }
+
   const onKey = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
       event.preventDefault();
-      stop();
+      return stop();
+    }
+    if (event.key !== 'Tab') return;
+    // Le focus est CONFINÉ à la fiche. Elle se déclare `aria-modal`, et la visite est ajoutée
+    // en fin de `<body>` : sans ce cycle, une tabulation depuis « Suivant » repart dans les
+    // contrôles de la page derrière le voile — qui les bloque à la souris mais pas au clavier
+    // (revue Reefact et Codex, PR #62). Une modale qui ment sur sa modalité est pire qu'une
+    // fiche qui ne prétend rien.
+    const cycle = focusables();
+    if (cycle.length === 0) return;
+    const first = cycle[0]!;
+    const last = cycle[cycle.length - 1]!;
+    const active = doc.activeElement;
+    if (event.shiftKey && (active === first || !cycle.includes(active as HTMLElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    } else if (!cycle.includes(active as HTMLElement)) {
+      event.preventDefault();
+      first.focus();
     }
   };
 
@@ -241,6 +281,10 @@ export function startTour(doc: Document = document, lang = 'en'): TourHandle | n
     // « Passer » n'a plus de sens sur la dernière étape : il n'y a plus rien à passer, et
     // deux boutons qui font la même chose se lisent comme un choix.
     skip.hidden = last;
+    // Masquer le bouton qui a le focus le laisserait nulle part, et la tabulation repartirait
+    // du début du document — celui-là même que le cycle ci-dessus protège.
+    if (doc.activeElement === skip && skip.hidden) forward.focus();
+    if (doc.activeElement === back && back.hidden) forward.focus();
 
     const rect = unionRect(doc, step.targets);
     if (!rect) {
@@ -254,16 +298,16 @@ export function startTour(doc: Document = document, lang = 'en'): TourHandle | n
       // visible pour le DOM, et restait inatteignable. Aucun test happy-dom ne pouvait le
       // voir : il n'y a pas de mise en page à interroger.
       spot.hidden = true;
-      veil.hidden = false;
+      veil.classList.add('tour-veil-dim');
       popover.style.top = '';
       popover.style.left = '';
       popover.classList.add('tour-popover-centered');
       return;
     }
     spot.hidden = false;
-    // Le voile s'efface dès qu'il y a une lucarne : c'est l'ombre de celle-ci qui assombrit,
-    // et superposer les deux grise aussi la zone mise en avant.
-    veil.hidden = true;
+    // Le voile reste là — il bloque l'interaction —, mais cesse d'assombrir : c'est l'ombre
+    // de la lucarne qui s'en charge, et superposer les deux grise aussi la zone mise en avant.
+    veil.classList.remove('tour-veil-dim');
     popover.classList.remove('tour-popover-centered');
     const margin = 6;
     spot.style.top = `${rect.top - margin}px`;

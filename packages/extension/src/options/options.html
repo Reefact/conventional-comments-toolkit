@@ -260,11 +260,13 @@
       }
 
       /* ---------- Visite guidée ---------- */
-      /* Le voile ne sert QUE la dernière étape, celle qui n'a pas de cible. Partout ailleurs
-         c'est l'ombre de la lucarne qui assombrit, et les deux ensemble sont pires que l'un
-         ou l'autre : le voile passe SOUS la lucarne, donc il grise aussi ce qu'elle est
-         censée éclairer. Vu sur une capture, pas dans un test — l'étape 1 encadrait une zone
-         exactement aussi sombre que le reste.
+      /* Le voile a DEUX rôles, et les confondre a produit deux défauts successifs.
+         Il BLOQUE l'interaction, toujours : sans lui, l'ombre de la lucarne assombrit sans
+         rien arrêter (`pointer-events: none`), et une fiche qui se déclare `aria-modal` sur
+         une page dont tous les contrôles restent cliquables ment (revue Codex, PR #62).
+         Il ASSOMBRIT, seulement sur l'étape finale : partout ailleurs c'est l'ombre de la
+         lucarne qui s'en charge, et superposer les deux grise aussi la zone que la lucarne
+         est censée éclairer — vu sur une capture, pas dans un test.
 
          `fixed` et non `absolute` : `inset: 0` en absolu se résout contre le bloc conteneur
          initial, haut d'un écran, pas du document. Le voile s'arrêtait donc net au premier
@@ -272,10 +274,10 @@
       .tour-veil {
         position: fixed;
         inset: 0;
-        background: rgba(6, 12, 22, 0.55);
+        background: transparent;
         z-index: 40;
       }
-      .tour-veil[hidden] { display: none; }
+      .tour-veil.tour-veil-dim { background: rgba(6, 12, 22, 0.55); }
       /* La lucarne n'est pas un trou : c'est un cadre dont l'ombre portée démesurée FAIT
          l'assombrissement autour de lui. Un vrai trou demanderait un masque SVG ou quatre
          rectangles à recalculer, pour le même rendu. */

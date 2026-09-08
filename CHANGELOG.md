@@ -12,11 +12,7 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
-## [Unreleased]
-
-### Fixed
-
-- **The "Status" section says what it observed, not what it inferred** (§9.4). Its two texts — the guided tour's step and the section's own subtitle — both spoke of the pages' *structure*: first « les pages dont la structure a changé **sous elle** », which reads as if the extension had done the changing, then « changements de structure détectés », which turns a symptom into a settled cause. What `SelectorLog.degraded()` actually records is that one selector chain matched nothing, and a chain matching nothing is not proof that anything changed: `getCompletionControl()` logs whenever the merge button is missing, and on a closed pull request its absence is the norm — the reason that log is deduplicated per chain in the first place. Both texts now report the symptom the extension can see: selectors that did not find the elements they expected.
+## [1.0.0-beta.12] - 2026-09-08
 
 ### Added
 
@@ -25,6 +21,8 @@ and what a reader needs from them is the behaviour, not the thirteen.
 ### Fixed
 
 - **The guided tour dims the page enough to be seen doing it, and in the dark theme its card no longer wears the colour of the panels it covers** (§10). Measured rather than judged: in the dark theme, a 55 % black veil laid over a background that is already almost black removed **less than 10 %** of its luminosity, so the tour claimed to spotlight one panel while the rest of the page looked untouched; and the card took `--bg-surface`, the panels' own colour, seven points away from the page background. The veil now removes at least 60 % of the background's luminosity in both themes, and the card is a raised surface: lighter than the panels in the dark theme, and — in the light theme, where a raised surface is already white and no colour is left to gain — separated by a drop shadow strong enough to register against a properly dimmed page. `npm run check:options-tour` measures both on the pixels really painted, which is the only place they can be read: the dimming is a drop shadow, and `getComputedStyle` reports one on the element that casts it, never on the elements it covers.
+
+- **The "Status" section says what it observed, not what it inferred** (§9.4). Its two texts — the guided tour's step and the section's own subtitle — both spoke of the pages' *structure*: first « les pages dont la structure a changé **sous elle** », which reads as if the extension had done the changing, then « changements de structure détectés », which turns a symptom into a settled cause. What `SelectorLog.degraded()` actually records is that one selector chain matched nothing, and a chain matching nothing is not proof that anything changed: `getCompletionControl()` logs whenever the merge button is missing, and on a closed pull request its absence is the norm — the reason that log is deduplicated per chain in the first place. Both texts now report the symptom the extension can see: selectors that did not find the elements they expected.
 
 ## [1.0.0-beta.11] - 2026-09-08
 
@@ -441,6 +439,8 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[1.0.0-beta.12]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.11...v1.0.0-beta.12
+[1.0.0-beta.11]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.10...v1.0.0-beta.11
 [1.0.0-beta.10]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.9...v1.0.0-beta.10
 [1.0.0-beta.9]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.8...v1.0.0-beta.9
 [1.0.0-beta.8]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.7...v1.0.0-beta.8

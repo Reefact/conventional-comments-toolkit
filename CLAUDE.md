@@ -119,6 +119,27 @@ porte une LEÇON, pas pour faire l'inventaire — `package.json` fait foi sur ce
   son en-tête, et doit y rester : le monde isolé d'un script de contenu n'est pas
   atteignable sans permission d'hôte, que le manifeste ne déclare plus.
 
+## Un signal se rapporte, il ne s'interprète pas
+
+Ce qu'un texte dit d'un signal doit être ce que le signal EST, jamais ce qu'il voudrait dire.
+Le journal de sélecteurs (§9.4) enregistre un fait, un seul : cette chaîne n'a trouvé aucun
+candidat. La page d'options en a tiré « les pages dont la structure a changé sous elle », puis
+— la première faute corrigée, la seconde intacte — « changements de structure détectés ». Deux
+revues pour deux couches du même geste : d'abord le SENS de la causalité, qui accusait
+l'extension d'avoir déplacé la page, puis la causalité elle-même.
+
+Le contre-exemple vivait à trois lignes de la classe qui écrit la donnée :
+`getCompletionControl()` journalise dès qu'il ne trouve pas le bouton de fusion, et sur une PR
+fermée son absence est la NORME — c'est même la raison pour laquelle ce journal est dédupliqué.
+Un sélecteur qui échoue n'est donc pas la preuve qu'une page a bougé ; c'est une chose qu'on a
+cherchée sans la trouver, ce qui est exactement ce qu'il fallait écrire.
+
+Le signal d'alarme est un nom qui n'apparaît NULLE PART dans le code qui produit la donnée.
+« Changement de structure » n'existe ni dans `SelectorLog`, ni dans `selectorFailures`, ni dans
+les lignes que la section rend : il a été inventé à la rédaction. Quand un texte — d'interface,
+de changelog, de commentaire — nomme une cause, ouvrir le code qui écrit la donnée et vérifier
+qu'il la connaît. Sinon, décrire le symptôme.
+
 ## Mise en forme : le dépôt n'est PAS formaté par prettier
 
 Le code est mis en forme **à la main**, et aucun réglage ne rend prettier idempotent ici :

@@ -65,8 +65,8 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** Les mots DISTINCTIFS d'un fichier de sélecteurs : noms de classes, valeurs de `data-testid`,
- * de `name=`, d'`id=`, et noms de modules Primer. Volontairement PAS les noms de balises ni les
+/** Les mots DISTINCTIFS d'un fichier de sélecteurs : noms de classes, identifiants en dièse,
+ * valeurs de `data-testid`, de `name=`, d'`id=`, et noms de modules Primer. Volontairement PAS les noms de balises ni les
  * attributs standard (`textarea`, `aria-label`, `placeholder`…) : ceux-là appartiennent à HTML,
  * pas à une plateforme, et les interdire au code partagé n'aurait aucun sens. */
 function vocabularyOf(css) {
@@ -84,6 +84,12 @@ function vocabularyOf(css) {
   // .maClasse  /  [class*="maClasse"]  /  [data-testid*="mon-composeur"]  /  [name="x[y]"]
   for (const m of css.matchAll(/\[(?:class|data-testid|name|id)[^\]]*?["']([^"']+)["']\]/g)) push(m[1]);
   for (const m of css.matchAll(/\.([A-Za-z][\w-]*)/g)) push(m[1]);
+  // …et les sélecteurs d'ID en DIÈSE, que l'extraction ignorait : `#new_comment_form` chez
+  // GitHub, `#pull-request-complete-button` chez Azure DevOps étaient absents du vocabulaire
+  // « dérivé », si bien que recopier l'un ou l'autre dans du TypeScript partagé laissait ce
+  // garde au vert (Codex, PR #66). Un identifiant d'élément est aussi propre à une plateforme
+  // qu'un nom de classe.
+  for (const m of css.matchAll(/#([A-Za-z][\w-]*)/g)) push(m[1]);
   return words;
 }
 
@@ -107,13 +113,24 @@ for (const platform of readdirSync(ADAPTERS)) {
   } catch {
     continue; // un adaptateur sans sources : rien à dériver
   }
-  const src = files.map((f) => readFileSync(f, 'utf8')).join('\n');
+  // Transformé FICHIER PAR FICHIER, puis concaténé — jamais l'inverse. Concaténer d'abord fait
+  // partager un même scope de premier niveau à des modules sans rapport : `surfaces.ts` importe
+  // `selectors`, que `selectors.ts` déclare, et esbuild refuse alors le symbole dupliqué.
+  //
+  // Cette revue mérite d'être racontée exactement (Codex, PR #66). L'avertissement a été émis
+  // quand la concaténation passait encore — mesuré aux deux adaptateurs, `transformSync`
+  // l'acceptait, le garde rendait 0, la CI était verte —, et le SYMPTÔME étant absent la
+  // conclusion fut que la trouvaille était fausse. Elle ne l'était pas : elle décrivait un
+  // MÉCANISME, que le correctif suivant a déclenché en une ligne. Vérifier qu'un symptôme est
+  // absent aujourd'hui ne réfute pas un mécanisme.
   // Les chaînes du fichier de sélecteurs, commentaires exclus — un commentaire y cite parfois
   // un sélecteur en exemple, ce qui n'en fait pas un candidat.
   // `minifyWhitespace` et non le transform nu : esbuild CONSERVE les commentaires attachés aux
   // membres de classe, et un commentaire qui cite un sélecteur entre backticks ressemblerait à
   // un littéral. Mesuré, pas supposé. Les identifiants, eux, ne sont pas renommés.
-  const code = transformSync(src, { loader: 'ts', format: 'esm', minifyWhitespace: true }).code;
+  const code = files
+    .map((f) => transformSync(readFileSync(f, 'utf8'), { loader: 'ts', format: 'esm', minifyWhitespace: true }).code)
+    .join('\n');
   // TOUTES les chaînes du fichier, MOINS les noms de chaînes de sélecteurs. Découper sur
   // `candidates: [ … ]` paraissait plus précis et ne l'était pas : un sélecteur contient
   // lui-même des crochets (`textarea[aria-label*="omment"][class*="CommentBox"]`), si bien que
@@ -221,7 +238,7 @@ if (findings.length > 0) {
   console.error(
     `${findings.length} identifiant(s) de plateforme dans du code qui ne doit connaître aucune plateforme :\n` +
       findings.map((f) => `  - ${f.relPath}  «${f.word}»  (vocabulaire ${f.platform})`).join('\n') +
-      '\n\nCe mot est un candidat de sélecteur d\'un adaptateur. Sa place est dans ce paquet : exposez\n' +
+      '\n\nCe mot est un candidat de sélecteur d\'un adaptateur. Sa place est dans ce paquet : exposez ce\n' +
       "dont le code partagé a besoin par une méthode du contrat (§9.2.3), qui rend une DONNÉE et\n" +
       'ne nomme aucune plateforme — voir `getEditorChrome()`. Le code partagé s\'exécute sur\n' +
       'TOUTES les plateformes : ce qui est écrit ici est exécuté par toutes.'

@@ -1,23 +1,27 @@
 // Ce que la scission des feuilles par plateforme promet, MESURÉ dans un vrai Chromium.
 //
 // Une indirection de jetons ne se vérifie pas en lisant le CSS : la cascade, la spécificité et
-// la substitution des `var()` se répondent d'une façon qu'aucune lecture ne tranche. Deux
-// affirmations sont donc mesurées ici, et elles sont la raison d'être de tout le chantier :
+// la substitution des `var()` se répondent d'une façon qu'aucune relecture ne tranche. Quatre
+// affirmations sont donc mesurées, dans cet ordre :
 //
-//   1. NON-RÉGRESSION — hors GitHub, chaque propriété rend EXACTEMENT ce qu'elle rendait avant
-//      la scission. Contrôle DIFFÉRENTIEL : la feuille d'avant (reconstituée depuis git) et la
-//      feuille d'aujourd'hui sont chargées dans deux pages jumelles, et l'on compare valeur à
-//      valeur. C'est la seule façon de prouver qu'on n'a pas changé le rendu d'Azure DevOps en
-//      croyant ne toucher qu'à GitHub — le défaut même qu'on corrige.
+//   0. COUVERTURE — chaque élément mesuré matche au moins une règle de la feuille partagée.
+//      C'est le garde du garde, et il vient d'un défaut réel : le fixture employait
+//      `cct-active`, `cct-blocking`, `cct-non-blocking`, qui n'existent nulle part — les vrais
+//      états s'écrivent `[aria-pressed='true']`, `[aria-checked='true']`,
+//      `.cct-badge-deco-blocking`. Les comparaisons portaient donc sur des éléments que rien ne
+//      stylait : elles seraient restées vertes si les jetons d'accent ou de verdict avaient
+//      régressé (revue Reefact, PR #66). Un fixture qui ne touche rien mesure zéro.
 //
-//   2. ISOLATION — un changement dans la feuille GitHub ne peut PAS atteindre une page qui
-//      n'est pas GitHub. Vérifié en injectant une valeur absurde dans la couche GitHub et en
-//      constatant qu'aucune propriété ne bouge sans le marqueur de plateforme, et qu'elles
-//      bougent avec.
+//   1. ISOLATION — sur une page NON MARQUÉE, ajouter les feuilles de toutes les plateformes ne
+//      change rien. L'invariant central, et il ne se réfère à aucun passé.
 //
-// La seconde est le garde permanent : elle échoue le jour où quelqu'un écrit une règle de
-// plateforme hors de son scope. La première est une contre-épreuve de ce chantier-ci, gardée
-// parce qu'elle vaudra encore à la prochaine scission.
+//   2. CONTRE-ÉPREUVE — avec le marqueur, la couche GitHub change bien quelque chose. Sans
+//      elle, une couche devenue inerte passerait (1) sans effort.
+//
+//   3. ORDRE — assembler les feuilles dans l'autre sens ne change rien : l'isolation ne doit pas
+//      dépendre de l'ordre du tableau de build.mjs.
+//
+//   4. MIGRATION, sur demande (`CCT_STYLES_BEFORE_REF`) — comparaison à une feuille antérieure.
 //
 // Ce que ce garde ne peut PAS voir, et qui doit rester écrit ici : il mesure sur une page
 // FABRIQUÉE, pas sur github.com. Il dit que la mécanique du scope est correcte, jamais que les
@@ -76,14 +80,15 @@ function stylesBefore() {
 /** Un exemplaire de chaque surface que l'extension peint, avec les classes réelles qu'elle
  * pose. Ce sont les propriétés de ces éléments qu'on compare. */
 const FIXTURE = `
-  <div class="cct-host"><textarea class="cct-editor"></textarea></div>
-  <div class="cct-toolbar">
+  <div class="cct-host" id="host"><textarea class="cct-editor" id="editor"></textarea></div>
+  <div class="cct-toolbar" id="toolbar">
     <button class="cct-label-button" id="btn">issue</button>
-    <button class="cct-label-button cct-active" id="btnActive">todo</button>
+    <button class="cct-label-button" id="btnActive" aria-pressed="true">todo</button>
     <div class="cct-decoration-group" id="decoGroup">
-      <button class="cct-decoration-segment" id="seg">blocking</button>
-      <button class="cct-decoration-segment cct-active" id="segActive">none</button>
+      <button class="cct-decoration-segment" id="seg" aria-checked="false">blocking</button>
+      <button class="cct-decoration-segment" id="segActive" aria-checked="true">none</button>
     </div>
+    <button class="cct-free-decoration" id="freeDeco">+</button>
   </div>
   <div class="cct-feedback" id="feedback">
     <ul class="cct-diagnostics">
@@ -94,17 +99,37 @@ const FIXTURE = `
   <textarea class="cct-border-ok" id="ringOk"></textarea>
   <textarea class="cct-border-warn" id="ringWarn"></textarea>
   <textarea class="cct-border-error" id="ringError"></textarea>
+  <textarea class="cct-border-error cct-ring-inset" id="ringInset"></textarea>
   <div class="cct-banner" id="banner">
-    <span class="cct-banner-glyph" id="glyph">!</span>
-    <span class="cct-banner-label" id="bannerLabel">3</span>
-    <ul class="cct-banner-list"><li id="bannerLi">un</li><li>deux</li></ul>
+    <button class="cct-banner-head" id="bannerHead">
+      <span class="cct-banner-glyph" id="glyph">!</span>
+      <span class="cct-banner-label" id="bannerLabel">3</span>
+    </button>
+    <span class="cct-banner-hint" id="bannerHint">indice</span>
+    <ul class="cct-banner-list">
+      <li id="bannerLi">un
+        <span class="cct-banner-author" id="bannerAuthor">alice</span>
+        <span class="cct-banner-judged" id="bannerJudged">jugé</span>
+      </li>
+      <li class="cct-banner-unlocated" id="bannerUnlocated">deux</li>
+    </ul>
   </div>
-  <span class="cct-badge" id="badge">issue</span>
-  <span class="cct-badge cct-badge-flat" id="badgeFlat">issue</span>
-  <span class="cct-badge cct-blocking" id="badgeBlocking">blocking</span>
-  <span class="cct-badge cct-non-blocking" id="badgeNonBlocking">non-blocking</span>
+  <span class="cct-badge cct-badge-label" id="badge">issue</span>
+  <span class="cct-badge cct-badge-label cct-badge-flat" id="badgeFlat">issue</span>
+  <span class="cct-badge cct-badge-pill" id="badgePill">pill</span>
+  <span class="cct-badge cct-badge-deco cct-badge-deco-blocking" id="badgeBlocking">blocking</span>
+  <span class="cct-badge cct-badge-deco cct-badge-deco-nonblocking" id="badgeNonBlocking">non-blocking</span>
+  <span class="cct-badge cct-badge-deco cct-badge-deco-custom" id="badgeCustom">ux</span>
   <button class="cct-filter-chip" id="chip">filtre</button>
-  <ul class="cct-quick-list" id="quickList"><li class="cct-quick-item cct-active" id="quickItem">issue</li></ul>
+  <button class="cct-filter-chip" id="chipActive" aria-pressed="true">filtre actif</button>
+  <!-- quickinput.ts n'écrit AUCUNE classe sur les items : seul \`aria-selected\` les distingue,
+       et la feuille ne style que le sélectionné. L'item non sélectionné reste dans le fixture
+       pour que le contexte soit réaliste, mais il n'est pas MESURÉ : rien ne le style, donc
+       comparer ses valeurs ne prouverait rien — ce que le contrôle de couverture dit. -->
+  <ul class="cct-quick-list" id="quickList">
+    <li aria-selected="false">issue</li>
+    <li id="quickItemActive" aria-selected="true">todo</li>
+  </ul>
 `;
 
 /** Les propriétés qui portent une couleur, une forme ou un espacement issus d'un jeton — les
@@ -124,9 +149,13 @@ const PROPS = [
 ];
 
 const IDS = [
-  'btn', 'btnActive', 'decoGroup', 'seg', 'segActive', 'feedback', 'diagError', 'diagWarn',
-  'ringOk', 'ringWarn', 'ringError', 'banner', 'glyph', 'bannerLabel', 'bannerLi',
-  'badge', 'badgeFlat', 'badgeBlocking', 'badgeNonBlocking', 'chip', 'quickList', 'quickItem',
+  'editor', 'toolbar', 'btn', 'btnActive', 'decoGroup', 'seg', 'segActive', 'freeDeco',
+  'feedback', 'diagError', 'diagWarn',
+  'ringOk', 'ringWarn', 'ringError', 'ringInset',
+  'host', 'banner', 'bannerHead', 'glyph', 'bannerLabel', 'bannerHint', 'bannerLi',
+  'bannerAuthor', 'bannerJudged', 'bannerUnlocated',
+  'badge', 'badgeFlat', 'badgePill', 'badgeBlocking', 'badgeNonBlocking', 'badgeCustom',
+  'chip', 'chipActive', 'quickList', 'quickItemActive',
 ];
 
 async function measure(page, { css, platform }) {
@@ -173,6 +202,64 @@ const browser = await chromium.launch({ executablePath: EXECUTABLE, args: ['--no
 const failures = [];
 try {
   const page = await browser.newPage();
+
+  // ————— 0. LE FIXTURE ATTEINT-IL CHAQUE RÈGLE QUI PORTE UN JETON ? —————
+  // La question est posée DANS CE SENS, et c'est tout l'écart entre un garde qui protège et un
+  // garde qui rassure. « Chaque élément matche-t-il une règle ? » ne suffit pas : un bouton
+  // portant un état inventé (`cct-active`) matche encore sa classe de base, donc passe — pendant
+  // que la règle d'état `[aria-pressed='true']`, elle, n'est jamais atteinte. C'est exactement le
+  // défaut signalé (revue Reefact, PR #66), et la première version de ce contrôle ne le voyait
+  // pas : mesuré en réintroduisant `cct-active`, elle restait verte.
+  //
+  // Seules les règles PORTANT UN JETON `--cct-*` sont exigées : elles seules peuvent régresser
+  // du fait de la scission. Une règle purement géométrique n'a rien à prouver ici.
+  await page.setContent(
+    `<!doctype html><html><head><style>${shared}</style></head><body>${FIXTURE}</body></html>`
+  );
+  const unreached = await page.evaluate(
+    ({ ids }) => {
+      const tokenRules = (rules, out = []) => {
+        for (const r of rules) {
+          if (r.selectorText && /var\(--cct-/.test(r.cssText)) out.push(r.selectorText);
+          if (r.cssRules && r.cssRules.length) tokenRules(r.cssRules, out);
+        }
+        return out;
+      };
+      const measured = ids.map((id) => document.getElementById(id)).filter(Boolean);
+      const all = [...document.styleSheets].flatMap((sheet) => tokenRules(sheet.cssRules));
+      // Un sélecteur groupé (`a, b`) est couvert dès qu'UNE de ses branches l'est : c'est la
+      // même déclaration, et l'atteindre par n'importe quel chemin la met à l'épreuve.
+      return [...new Set(all)].filter(
+        (sel) =>
+          !sel.split(',').some((branch) => {
+            // Les pseudo-classes d'ÉTAT INTERACTIF sont retirées avant le test : `:focus-visible`
+            // exige un focus réel, qu'un seul élément peut porter à la fois — exiger qu'ils
+            // l'aient tous serait impossible. Ce qu'on garde est donc plus faible et il faut le
+            // dire : on vérifie que l'ÉLÉMENT existe dans le fixture, pas que son état de focus
+            // soit mesuré. Les états déclaratifs (`[aria-pressed]`, `[aria-checked]`,
+            // `[aria-selected]`), eux, sont exigés tels quels — ce sont ceux que la revue a
+            // trouvés manquants.
+            const b = branch.trim().replace(/:(?:focus-visible|focus|hover|active)\b/g, '');
+            try {
+              return measured.some((el) => el.matches(b));
+            } catch {
+              return false;
+            }
+          })
+      );
+    },
+    { ids: IDS }
+  );
+  if (unreached.length > 0) {
+    failures.push(
+      `FIXTURE INCOMPLET : ${unreached.length} règle(s) portant un jeton ne sont atteintes par AUCUN\n` +
+        "élément mesuré. Ces déclarations peuvent donc régresser sans que rien ne le dise.\n" +
+        unreached.map((sel) => `  - ${sel}`).join('\n') +
+        "\nAjoutez au fixture les classes et attributs réellement posés en production."
+    );
+  } else {
+    console.log(`✓ couverture : chaque règle portant un jeton est atteinte par le fixture.`);
+  }
 
   // ————— 1. AUCUNE feuille de plateforme n'atteint une page NON MARQUÉE —————
   // L'invariant central de la scission, et il ne se réfère à aucun passé : sur une page sans

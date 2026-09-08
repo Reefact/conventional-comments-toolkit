@@ -43,11 +43,24 @@ rien à un lecteur qui décide d'installer.
    et faussement porté au crédit de la suivante. On repart ensuite sans section
    `[Unreleased]` ; la prochaine PR la recrée.
 
+   Le titre d'une section EST une référence Markdown, et sa définition vit au PIED du fichier,
+   quatre cents lignes plus bas, avec toutes les autres dans le même ordre décroissant :
+
+   ```
+   [1.0.0-beta.13]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.12...v1.0.0-beta.13
+   ```
+
+   Rien ne le rappelle là où l'entrée s'écrit, et rien ne le vérifie : une référence sans
+   définition ne casse aucun test, elle rend seulement un titre qui ne clique pas. La
+   1.0.0-beta.13 est partie en revue ainsi, seule version du fichier à ne mener nulle part,
+   alors que les douze précédentes avaient la leur.
+
 4. **Écrire la note de version**, dans les DEUX fichiers, à partir de l'entrée du changelog —
    jamais l'inverse, et sans jamais y ajouter ce que le changelog ne dit pas.
 
-5. **Vérifier** : `node scripts/release-notes.mjs <version>` doit afficher la section. Puis
-   `npm test` (le garde bilingue et le garde de repli y sont).
+5. **Vérifier** : `node scripts/release-notes.mjs <version>` doit afficher la section, et
+   `grep "^\[<version>\]:" CHANGELOG.md` doit rendre sa ligne de définition. Puis `npm test`
+   (le garde bilingue et le garde de repli y sont).
 
 6. **S'arrêter là.** Poser le tag est l'affaire d'un humain. `release.yml` refuse de publier si
    la section manque — c'est voulu, et c'est ce qui rend l'étape 4 non facultative.

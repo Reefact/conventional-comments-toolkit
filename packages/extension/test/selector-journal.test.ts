@@ -41,6 +41,27 @@ describe('§9.4 — un onglet ne journalise qu’une fois par chaîne', () => {
     expect(telemetry).toHaveBeenCalledTimes(1);
   });
 
+  // L'oubli sert à RESIGNALER, jamais à faire enfler la mémoire de l'onglet.
+  it('après un oubli, la chaîne resignale — mais son entrée est rafraîchie, pas dupliquée', async () => {
+    const telemetry = vi.fn();
+    const log = new SelectorLog(telemetry);
+
+    log.degraded(chain('merge-button'));
+    const first = log.failures[0]!.at;
+    await new Promise((r) => setTimeout(r, 2)); // l'horodatage doit pouvoir changer
+
+    // Ce que fait l'onglet en changeant de PR, ou la page d'options en effaçant le journal.
+    log.forgetSeen();
+    log.degraded(chain('merge-button'));
+
+    // Resignalé — c'est la raison d'être de l'oubli…
+    expect(telemetry).toHaveBeenCalledTimes(2);
+    // …mais `failures` reste borné par le NOMBRE DE CHAÎNES, pas par celui des oublis.
+    // Sans le rafraîchissement, cent PR visitées valaient cent lignes par chaîne pourrie.
+    expect(log.failures).toHaveLength(1);
+    expect(log.failures[0]!.at).not.toBe(first);
+  });
+
   // Ce qui compte est préservé : deux sélecteurs pourris restent DEUX lignes.
   it('deux chaînes distinctes restent deux entrées', () => {
     const log = new SelectorLog();

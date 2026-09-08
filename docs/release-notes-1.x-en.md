@@ -7,6 +7,19 @@ every section of the specification an entry rests on — see
 The extension starts in `assist` mode: it helps and it flags, it never blocks a submission. The
 source of truth for conformance stays the server companion (component B).
 
+## 1.0.0-beta.12 — September 8, 2026
+
+_The guided tour is legible at last — the page behind it really does go dark, and its card sits above it instead of blending in — and the "Status" section says what it observed rather than what that might mean._
+
+### ✨ Features
+
+- **The "Status" section tells you what it is for.** It was the only section of the options page whose heading had nothing under it, so you had to read the two lines it shows to work out what it covered.
+
+### 🐛 Bug fixes
+
+- **The guided tour now dims the page around the part it is pointing at.** In the dark theme it barely dimmed at all — a dark veil over an already dark page changes almost nothing — so the tour looked like it was highlighting nothing, and its card, which had the same colour as the panels behind it, read as one more panel rather than as something floating above them. The rest of the page now goes properly dark in both themes, and the card carries a drop shadow you can actually see; in the dark theme it is also a lighter surface than the panels behind it.
+- **The "Status" section no longer suggests the extension changed your pages.** It reported "pages whose structure changed under it", which reads as an accusation and, either way, claims more than the extension knows: what it records is that one of its selectors found nothing on the page. That can mean the page changed — or simply that the element is legitimately absent, like the merge button on a closed pull request. Both the section and the tour step now report what was actually observed.
+
 ## 1.0.0-beta.11 — September 8, 2026
 
 _You now authorize every platform the same way — `github.com` included — so the extension asks before it works anywhere, and you can revoke that access at any time._

@@ -12,9 +12,14 @@
 //   • l'étape « État » visait la dernière section de la page, que le navigateur ne PEUT pas
 //     centrer faute de contenu après elle : sa fiche débordait sous le bord de la fenêtre.
 //
-// D'où la seule question que ce fichier pose, à chaque étape : la fiche est-elle réellement
+// D'où la première question que ce fichier pose, à chaque étape : la fiche est-elle réellement
 // DANS la fenêtre, et son bouton cliquable ? Le clic est fait pour de vrai — Playwright
 // refuse de cliquer hors écran, ce qui fait de l'échec une mesure et non un avis.
+//
+// La seconde est de la même famille : de quelle COULEUR la page est-elle peinte pendant la
+// visite ? L'assombrissement est une ombre portée, que `getComputedStyle` rapporte sur
+// l'élément qui la projette et jamais sur ceux qu'elle recouvre — il faut donc lire le pixel,
+// et le lire dans les DEUX thèmes, dont les jetons vivent dans des blocs distincts.
 //
 // CE QU'IL NE VÉRIFIE PAS : le contenu des textes. Leur présence dans les deux catalogues
 // est un problème de parité, tenu par `test/i18n-strings.test.ts`.
@@ -186,6 +191,85 @@ try {
     'tant qu’il y a une lucarne, le voile bloque sans assombrir',
     veilOnFirst.present === true && veilOnFirst.dims === false,
     JSON.stringify(veilOnFirst)
+  );
+
+  // 5ter. COMBIEN la page est assombrie autour de la lucarne, et la fiche se distingue-t-elle
+  //    de ce qu'elle recouvre ? Deux affirmations de couleur, et la première ne peut pas se
+  //    lire dans le DOM : l'assombrissement est une OMBRE PORTÉE, que `getComputedStyle`
+  //    rapporte sur l'élément qui la projette et jamais sur ceux qu'elle recouvre. Il faut
+  //    donc lire le pixel réellement peint.
+  //
+  //    Livrée, la visite assombrissait à 55 % de noir et donnait à sa fiche la couleur des
+  //    panneaux (`--bg-surface`) : en thème sombre, un fond de page déjà presque noir ne
+  //    noircissait plus guère, et la fiche se fondait dans les panneaux qu'elle recouvrait.
+  //    Rien de tout cela n'était visible ailleurs que sur une capture.
+  const luminance = ({ r, g, b }) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  /** La couleur RÉELLEMENT peinte en un point de la fenêtre, composition comprise. La
+   * capture est un carré d'UN pixel : le décodage tient alors dans un canvas, et coûte le
+   * prix d'une capture minuscule plutôt que celui d'une page entière. */
+  async function pixelAt(page, x, y) {
+    const png = (await page.screenshot({ clip: { x, y, width: 1, height: 1 } })).toString('base64');
+    return page.evaluate(async (data) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${data}`;
+      await img.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const context = canvas.getContext('2d');
+      context.drawImage(img, 0, 0);
+      const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+      return { r, g, b };
+    }, png);
+  }
+
+  /** Le fond de page tel qu'il est peint HORS lucarne, rapporté à ce qu'il vaut sans voile.
+   * Un rapport, et non une couleur : c'est la même exigence qui doit tenir dans les deux
+   * thèmes, alors que les couleurs, elles, n'y ont rien de commun. */
+  async function dimRatio(page) {
+    const clear = await page.evaluate(() => {
+      const [r, g, b] = getComputedStyle(document.body)
+        .backgroundColor.match(/\d+/g)
+        .map(Number);
+      return { r, g, b };
+    });
+    // (3, 3) : le coin de la fenêtre. La page fait 44rem centrées, la lucarne et la fiche
+    // vivent dedans — ce coin ne montre donc que le fond, sous l'assombrissement.
+    const dimmed = await pixelAt(page, 3, 3);
+    return { ratio: luminance(dimmed) / luminance(clear), clear, dimmed };
+  }
+
+  const dimLight = await dimRatio(opened);
+  assert(
+    'hors lucarne, le fond perd au moins 60 % de sa luminosité (thème clair)',
+    dimLight.ratio <= 0.4,
+    `${(dimLight.ratio * 100).toFixed(1)} % restants — ${JSON.stringify(dimLight.dimmed)}`
+  );
+
+  // Le thème sombre est l'autre moitié de la question, et la plus exposée : ses jetons
+  // vivent dans un bloc `@media` distinct, qu'une retouche du thème clair laisse en arrière.
+  await opened.emulateMedia({ colorScheme: 'dark' });
+  const dimDark = await dimRatio(opened);
+  const raised = await opened.evaluate(() => {
+    const read = (element) =>
+      getComputedStyle(element)
+        .backgroundColor.match(/\d+/g)
+        .map(Number);
+    const [pr, pg, pb] = read(document.querySelector('.tour-popover'));
+    const [sr, sg, sb] = read(document.getElementById('panel-known'));
+    return { popover: { r: pr, g: pg, b: pb }, surface: { r: sr, g: sg, b: sb } };
+  });
+  await opened.emulateMedia({ colorScheme: null });
+  assert(
+    'hors lucarne, le fond perd au moins 60 % de sa luminosité (thème sombre)',
+    dimDark.ratio <= 0.4,
+    `${(dimDark.ratio * 100).toFixed(1)} % restants — ${JSON.stringify(dimDark.dimmed)}`
+  );
+  assert(
+    'en thème sombre, la fiche est une surface SURÉLEVÉE, pas la couleur des panneaux',
+    luminance(raised.popover) > luminance(raised.surface) + 8,
+    JSON.stringify(raised)
   );
 
   // Jusqu'à la dernière étape, en comptant les clics plutôt qu'en devinant : le compteur

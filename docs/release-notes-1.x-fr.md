@@ -7,6 +7,19 @@ cas limite, chaque section de la spécification sur laquelle une entrée s'appui
 L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. La
 source de vérité sur la conformité reste le compagnon serveur (composant B).
 
+## 1.0.0-beta.12 — 8 septembre 2026
+
+_La visite guidée est enfin lisible — la page derrière elle s'assombrit vraiment, et sa fiche se détache au lieu de se fondre dans le décor — et la section « État » dit ce qu'elle a constaté plutôt que ce que cela pourrait vouloir dire._
+
+### ✨ Nouveautés
+
+- **La section « État » dit à quoi elle sert.** C'était la seule section de la page d'options dont le titre n'était suivi de rien : il fallait lire les deux lignes qu'elle affiche pour deviner ce qu'elle couvrait.
+
+### 🐛 Corrections
+
+- **La visite guidée assombrit désormais la page autour de ce qu'elle montre.** En thème sombre, elle ne l'assombrissait pratiquement pas — un voile sombre sur une page déjà sombre ne change presque rien —, si bien que la visite semblait ne rien mettre en avant ; et sa fiche, de la même couleur que les panneaux derrière elle, se lisait comme un panneau de plus plutôt que comme quelque chose posé au-dessus. La fiche est maintenant une surface plus claire, avec une ombre visible, et le reste de la page s'assombrit franchement dans les deux thèmes.
+- **La section « État » ne laisse plus croire que l'extension a modifié vos pages.** Elle annonçait « les pages dont la structure a changé sous elle », ce qui se lit comme une accusation et, dans tous les cas, affirme plus que ce que l'extension sait : ce qu'elle enregistre, c'est qu'un de ses sélecteurs n'a rien trouvé sur la page. Cela peut vouloir dire que la page a changé — ou simplement que l'élément est légitimement absent, comme le bouton de fusion sur une PR fermée. La section et l'étape de la visite guidée rapportent maintenant ce qui a réellement été constaté.
+
 ## 1.0.0-beta.11 — 8 septembre 2026
 
 _Vous autorisez désormais l'accès à toutes les plateformes de la même façon — `github.com` compris — et pouvez le révoquer à tout moment._

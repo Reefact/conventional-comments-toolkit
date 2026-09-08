@@ -194,7 +194,8 @@ export class AzdoClientAdapter implements PlatformAdapter {
    * corrige ; un rendu faux se remarque après coup.
    *
    * Pour l'activer : mesurer un corps de commentaire rendu sur un vrai tenant (A-FAIRE-fr.md,
-   * point 9), et déclarer ici les deux balises observées. Rien d'autre à toucher. */  renderedBodyShape(): RenderedBodyShape | null {
+   * point 9), et déclarer ici les deux balises observées. Rien d'autre à toucher. */
+  renderedBodyShape(): RenderedBodyShape | null {
     return null;
   }
 

@@ -216,8 +216,11 @@ for (const platform of readdirSync(ADAPTERS)) {
 }
 
 if (vocabularies.size === 0) {
+  // Le message ne nomme AUCUN fichier, pour la même raison que la dérivation n'en nomme aucun :
+  // il a nommé `src/selectors.ts` le temps d'une revue, alors que le garde lisait déjà tout le
+  // paquet — un diagnostic qui envoie regarder au mauvais endroit coûte plus qu'il ne rend.
   console.error(
-    "Aucun fichier de sélecteurs trouvé sous packages/adapters/*/src/selectors.ts.\n" +
+    'Aucun tableau de candidats trouvé sous packages/adapters/*/src.\n' +
       "Ce garde DÉRIVE de là le vocabulaire qu'il interdit ailleurs : sans source, il ne vérifie\n" +
       'rien tout en passant au vert. Corrigez la dérivation plutôt que de la contourner.'
   );

@@ -137,3 +137,47 @@ describe('§5.5 — la forme du corps rendu vient de la plateforme, pas d’une 
     expect(MARKDOWN_HTML_BODY_SHAPE.lineBreakTag).toBe('BR');
   });
 });
+
+describe('§9.2.3 — la CASSE des noms de balises ne peut pas piéger un adaptateur', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  /** La même forme que `OTHER_SHAPE`, écrite comme on écrit naturellement une balise. Le code
+   * partagé compare à `Element.tagName`, qui rend `DIV` en HTML : sans normalisation, cette
+   * forme est conforme au type, inerte à l'exécution, et rien ne le dit (revue Reefact, PR #65). */
+  const LOWERCASE_SHAPE: RenderedBodyShape = Object.freeze({
+    paragraphTags: Object.freeze(['div']),
+    lineBreakTag: 'hr',
+  });
+
+  it('masque le préfixe que la plateforme écrive <div> ou DIV', () => {
+    const el = document.createElement('div');
+    el.innerHTML = '<div>issue: le nom est ambigu</div>';
+    document.body.appendChild(el);
+
+    decorateComment(el, 'issue: le nom est ambigu', defaultConfig(), profile, 'en', LOWERCASE_SHAPE);
+    expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('issue: ');
+  });
+
+  it('borne le sujet sur la fin de ligne, que la plateforme écrive <hr> ou HR', () => {
+    // La casse est ici MIXTE, et c'est ce qui donne au test sa valeur : le conteneur est déclaré
+    // en majuscules, donc le masquage aboutit et le sujet est bien enveloppé. Seule la fin de
+    // ligne est écrite en minuscules. Le symptôme isolé est alors celui que la revue décrit —
+    // une borne qui ne se déclenche jamais et un sujet qui AVALE la suite du corps —, et non un
+    // masquage qui renonce proprement, lequel prouverait seulement que quelque chose a changé.
+    const MIXED_SHAPE: RenderedBodyShape = Object.freeze({
+      paragraphTags: Object.freeze(['DIV']),
+      lineBreakTag: 'hr',
+    });
+    const el = document.createElement('div');
+    el.innerHTML = '<div>issue: le sujet<hr>après hr<br>après br</div>';
+    document.body.appendChild(el);
+
+    decorateComment(el, 'issue: le sujet', defaultConfig(), profile, 'en', MIXED_SHAPE);
+    const subject = el.querySelector('.cct-subject');
+    expect(subject).not.toBeNull();
+    expect(subject!.textContent).toBe('le sujet');
+    expect(subject!.textContent).not.toContain('après hr');
+  });
+});

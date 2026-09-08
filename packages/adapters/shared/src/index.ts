@@ -114,6 +114,25 @@ export const MARKDOWN_HTML_BODY_SHAPE: RenderedBodyShape = Object.freeze({
   lineBreakTag: 'BR',
 });
 
+/** La CASSE des noms de balises, tranchée UNE FOIS pour toutes.
+ *
+ * Le code partagé compare ces valeurs à `Element.tagName`, qui rend `P` et `BR` en HTML. Un
+ * adaptateur qui décrit son balisage en écrivant `'p'` et `'br'` — la façon naturelle de nommer
+ * une balise — produisait alors une forme conforme en apparence et inerte en pratique : le
+ * masquage renonçait, la borne du sujet ne se déclenchait jamais, et rien ne le disait (revue
+ * Reefact, PR #65).
+ *
+ * Deux façons de fermer ça : imposer la casse dans le contrat, ou l'y rendre indifférente. La
+ * seconde est la seule qui ne se paie pas d'un piège — une règle qu'un adaptateur peut enfreindre
+ * sans diagnostic est une règle qui sera enfreinte. Le contrat accepte donc les deux écritures et
+ * le code partagé normalise à l'entrée, en un seul endroit. */
+export function normalizeBodyShape(shape: RenderedBodyShape): RenderedBodyShape {
+  return Object.freeze({
+    paragraphTags: Object.freeze(shape.paragraphTags.map((tag) => tag.toUpperCase())),
+    lineBreakTag: shape.lineBreakTag.toUpperCase(),
+  });
+}
+
 export interface PlatformAdapter {
   matches(url: URL): boolean;
   platformProfile(): PlatformProfile;

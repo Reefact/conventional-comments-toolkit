@@ -40,18 +40,31 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - **The subject boundary no longer assumes GitHub's markup** (§5.5). The paragraph container and
   the line-break marker were written in place, measured on github.com and applied everywhere. On
   a rendered body whose line break differs, an entire sibling slid into the highlighted subject.
-  Both platforms answer the same thing today, so nothing changes now — but the assumption has
-  become a question the platform answers.
+  It is now a question the platform answers — and a platform may answer that it does not know.
+  **On Azure DevOps it does**, because nobody has ever measured how it renders a comment body,
+  so the prefix is no longer hidden there and the subject is no longer emphasised. Badges stay,
+  and the body renders whole: an incomplete rendering gets fixed, a wrong one gets noticed later.
+  Reinstating both takes one measurement on a real tenant, recorded as an open task.
 
 ### Added
 
 - Three guards, because none of the above was visible to any test. `check:platform-isolation`
-  refuses a platform identifier in code every platform runs, deriving the forbidden vocabulary
-  from the adapters' own selector files rather than from a list — a GitLab adapter will be
-  covered without touching it. `check:style-isolation` measures the stylesheet split in a real
-  Chromium: no regression off GitHub, and a value injected into the GitHub layer reaching pages
-  that carry the platform marker and none that do not. `check:extension-css` now covers every
-  delivered sheet instead of one hardcoded path.
+  refuses a platform identifier in code every platform runs, and also enforces §9.4's "a single
+  file per adapter": it derives both the forbidden vocabulary and that count from the adapters'
+  own candidate arrays rather than from a list of names — a GitLab adapter will be covered
+  without touching it, and the central file's name is free. `check:style-isolation` measures the
+  stylesheet split in a real Chromium: no regression off GitHub, a value injected into the
+  GitHub layer reaching pages that carry the platform marker and none that do not, and every
+  rule bearing a token reached by an element the fixture really styles. `check:extension-css`
+  now covers every delivered sheet instead of one hardcoded path.
+
+- **A named composer chrome that matches nothing is now recorded, instead of passing silently.**
+  Where the adapter names the container it decorates and no longer finds it, that failure joins
+  the selector log the extension already keeps (§9.4, `CA-11`); where a surface names none — the
+  legacy generation, the changed-files view — nothing is logged, since finding no name there is
+  the normal case. The log says what was looked for and not found, and stops there: a selector
+  that matches nothing is not by itself evidence that the platform changed anything.
+
 ## [1.0.0-beta.13] - 2026-09-08
 
 ### Added

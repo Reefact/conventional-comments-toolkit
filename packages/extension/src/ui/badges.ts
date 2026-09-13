@@ -29,12 +29,11 @@ import {
   type PlatformProfile,
   type ResolvedDecoration,
 } from '@cct/core';
-import {
-  MARKDOWN_HTML_BODY_SHAPE,
-  normalizeBodyShape,
-  OWN_BADGES,
-  type RenderedBodyShape,
-} from '@cct/adapter-shared';
+// Ce module ne nomme plus AUCUNE forme de corps rendu : `MARKDOWN_HTML_BODY_SHAPE` n'est plus
+// importé ici. Il l'était pour deux replis — le défaut de `decorateComment()` et le bouche-trou
+// que prenait `applyPrefixVisibility()` en défaisant —, tous deux retirés. Le rendu partagé
+// reçoit désormais la forme, il ne l'invente jamais (revue Reefact, PR #66).
+import { normalizeBodyShape, OWN_BADGES, type RenderedBodyShape } from '@cct/adapter-shared';
 import { ui } from './strings.js';
 
 function labelBadge(label: { icon?: string; id: string; color?: string }, config: EffectiveConfig): HTMLElement {
@@ -532,12 +531,18 @@ export function clearCommentDecorations(root: ParentNode): void {
  * adjacents. */
 function applyPrefixVisibility(
   commentBodyElement: Element,
-  prefixLine: string | null,
-  bodyText: string,
-  shape: RenderedBodyShape
+  /** Le masquage DEMANDÉ, ou `null` pour DÉFAIRE celui qui serait en place.
+   *
+   * Les deux données voyagent ensemble parce qu'elles ne se séparent pas : masquer exige une
+   * forme de corps rendu, défaire n'en exige aucune. Séparées, l'appelant devait en fournir
+   * une même quand il renonçait, et il y passait `MARKDOWN_HTML_BODY_SHAPE` — une hypothèse
+   * GitHub que ce corps de fonction ne lit jamais, mais que la prochaine relecture aurait
+   * prise pour un fait (revue Reefact, PR #66). Le couple la rend inexprimable. */
+  masking: { prefixLine: string; shape: RenderedBodyShape } | null,
+  bodyText: string
 ): void {
   const existing = commentBodyElement.querySelector('.cct-hidden-prefix');
-  if (prefixLine === null) {
+  if (masking === null) {
     if (existing) {
       // Le sujet part avec le préfixe : sa mise en avant ne se lit qu'avec les badges, qui
       // disparaissent au même instant. Avant `replaceWith`, pour que le `normalize()` final
@@ -547,6 +552,7 @@ function applyPrefixVisibility(
     }
     return;
   }
+  const { prefixLine, shape } = masking;
   if (existing) {
     wrapSubject(existing, shape); // réentretien, comme le masquage lui-même : gratuit si rien n'a bougé
     return;
@@ -588,12 +594,19 @@ export function decorateComment(
   config: EffectiveConfig,
   platform: PlatformProfile,
   lang: string,
-  /** La forme du HTML rendu par la plateforme (§5.5). Optionnel avec un défaut NOMMÉ, alors
-   * que la méthode du contrat qui le produit (`renderedBodyShape()`) est obligatoire : c'est
-   * l'adaptateur qui doit se voir poser la question, pas les quelque quatre-vingt-dix appels de
-   * test qui ne s'intéressent pas au sujet. Le seul appel de production
-   * (content-internal.ts) passe la réponse de l'adaptateur. */
-  rawShape: RenderedBodyShape | null = MARKDOWN_HTML_BODY_SHAPE
+  /** La forme du HTML rendu par la plateforme (§5.5), ou `null` si elle n'a pas été MESURÉE.
+   *
+   * OBLIGATOIRE, et le défaut nommé qui vivait ici a été retiré. Il se justifiait par les
+   * appels de TEST qui ne s'intéressent pas au sujet — plus de cent —, ce qui oubliait à qui
+   * d'autre profite un défaut : un futur appel de PRODUCTION omettant de consulter
+   * l'adaptateur compilait, et recevait `<p>` / `<br>`. L'hypothèse GitHub que cette PR sort
+   * du code partagé rentrait par la porte laissée ouverte au bout du chemin (revue Reefact,
+   * PR #66). Le compilateur pose maintenant la question à l'appelant, comme le contrat la pose
+   * à l'adaptateur.
+   *
+   * Les tests qui ne portent pas sur la forme passent par `test/helpers/decorate.ts` : le
+   * raccourci existe toujours, mais il vit du côté des tests, où son coût est une ligne. */
+  rawShape: RenderedBodyShape | null
 ): void {
   // Normalisé ICI, à l'entrée unique du module, et pas aux trois comparaisons qui l'emploient :
   // une normalisation répartie s'oublie au quatrième site. `tagName` rend `P` en HTML, un
@@ -641,16 +654,17 @@ export function decorateComment(
   // mutation de la page, noyant les vraies dégradations — c'est le défaut déjà payé sur
   // `merge-button`. Le commentaire d'ici a d'abord dit le contraire (revue Reefact, PR #65).
   //
-  // `applyPrefixVisibility(…, null, …)` — et non un simple saut : le second argument à `null`
+  // `masking` à `null`, et un APPEL quand même — jamais un simple saut : c'est ce `null` qui
   // DÉFAIT un masquage antérieur. Sans cet appel, une plateforme passant de « mesurée » à
   // « inconnue » (configuration, mise à jour) laisserait en place un préfixe masqué que plus
   // rien n'entretient.
-  applyPrefixVisibility(
-    commentBodyElement,
-    shape !== null && canHidePrefix ? a.prefixLine : null,
-    bodyText,
-    shape ?? MARKDOWN_HTML_BODY_SHAPE
-  );
+  //
+  // Le couple `{ prefixLine, shape }` plutôt que deux arguments : masquer exige les deux,
+  // défaire n'exige ni l'un ni l'autre. Séparés, le cas « je renonce » devait tout de même
+  // produire une forme, et il y passait la forme Markdown — inutilisée, mais écrite.
+  const masking =
+    shape !== null && canHidePrefix && a.prefixLine !== null ? { prefixLine: a.prefixLine, shape } : null;
+  applyPrefixVisibility(commentBodyElement, masking, bodyText);
   // Où poser les badges — LU dans le DOM que la ligne ci-dessus vient d'établir, jamais déduit
   // de `canHidePrefix` seul, qui dit ce qu'on VOULAIT faire, pas ce qui a été fait (les replis
   // de `applyPrefixVisibility` renoncent sans le dire à l'appelant). Préfixe masqué → l'élément

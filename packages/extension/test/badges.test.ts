@@ -8,7 +8,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { commentBodyText } from '@cct/adapter-shared';
 import { defaultConfig } from '@cct/core';
-import { clearCommentDecorations, decorateComment } from '../src/ui/badges.js';
+import { clearCommentDecorations } from '../src/ui/badges.js';
+import { decorateWithHtmlShape } from './helpers/decorate.js';
 
 const profile = { id: 'github', suggestionInfoString: 'suggestion' };
 
@@ -21,7 +22,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'praise: nice work';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     const hidden = el.querySelector('.cct-hidden-prefix');
     expect(hidden?.textContent).toBe('praise: ');
@@ -33,7 +34,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'issue (blocking): fix this';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     const hidden = el.querySelector('.cct-hidden-prefix');
     expect(hidden?.textContent).toBe('issue (blocking): ');
@@ -44,7 +45,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'issue (blocking, security): fuite mémoire';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-hidden-prefix')).not.toBeNull();
     expect(commentBodyText(el)).toBe(body); // badges ET préfixe masqué exclus de la relecture
@@ -54,10 +55,10 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'praise: nice work';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
     const first = el.querySelector('.cct-hidden-prefix');
 
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll('.cct-hidden-prefix')).toHaveLength(1);
     expect(el.querySelector('.cct-hidden-prefix')).toBe(first); // même nœud, pas reconstruit
@@ -67,12 +68,12 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'praise: nice work';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
     expect(el.querySelector('.cct-hidden-prefix')).not.toBeNull();
 
     const disabled = defaultConfig();
     disabled.labels.find((l) => l.id === 'praise')!.enabled = false;
-    decorateComment(el, body, disabled, profile, 'en');
+    decorateWithHtmlShape(el, body, disabled, profile, 'en');
 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
     expect(el.textContent).toBe(body); // texte complet reconstitué, rien perdu
@@ -82,7 +83,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'issue (blocking): fix this';
     const el = document.createElement('div');
     el.innerHTML = '<em>issue</em> (blocking): fix this'; // premier nœud de texte : "issue" seul, 5 caractères
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
     expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull(); // les badges, eux, se posent normalement
@@ -92,7 +93,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'issue (\uFEFFblocking): x';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
     expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull(); // analyze() le résout quand même
@@ -102,7 +103,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'issue:';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
     expect(el.textContent).toContain('issue:');
@@ -112,7 +113,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = '\nissue: fix this';
     const el = document.createElement('div');
     el.textContent = body; // un seul nœud de texte : "\nissue: " est un bandeau blanc unique
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('\nissue: ');
     expect(el.querySelector('.cct-hidden-prefix')?.nextSibling?.textContent).toBe('fix this');
@@ -122,7 +123,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = '🔥 issue: fix this';
     const el = document.createElement('div');
     el.textContent = body; // un seul nœud de texte : émoji, label et sujet y vivent tous ensemble
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     const hidden = el.querySelector('.cct-hidden-prefix');
     expect(hidden?.textContent).toBe('issue: '); // l'émoji n'entre pas dans le masquage…
@@ -139,7 +140,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('td');
     el.innerHTML = '\n          <p dir="auto">issue (blocking, security): Manual rendering check.</p>\n';
     const body = el.textContent!; // "\n          issue (blocking, security): Manual rendering check.\n"
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     const hidden = el.querySelector('.cct-hidden-prefix');
     expect(hidden?.textContent).toBe('issue (blocking, security): ');
@@ -157,7 +158,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<pre><code>issue: fake</code></pre><p>real subject, not a prefix</p>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('pre')?.textContent).toBe('issue: fake'); // le code affiché reste intact
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -171,7 +172,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<blockquote><p>issue: fake</p></blockquote><p>real subject, not a prefix</p>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('blockquote')?.textContent).toBe('issue: fake'); // la citation reste intacte
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -185,7 +186,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<ul><li>issue: fake</li></ul><p>real subject, not a prefix</p>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('li')?.textContent).toBe('issue: fake'); // l'élément de liste reste intact
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -198,7 +199,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<h1>issue: fake</h1><p>real subject, not a prefix</p>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('h1')?.textContent).toBe('issue: fake'); // le titre reste intact
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -212,7 +213,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<table><tbody><tr><td>issue: fake</td></tr></tbody></table><p>real subject, not a prefix</p>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('td')?.textContent).toBe('issue: fake'); // la cellule reste intacte
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -227,7 +228,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<details><summary>issue: fake</summary><p>real subject, not a prefix</p></details>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('summary')?.textContent).toBe('issue: fake'); // le résumé reste intact
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -244,7 +245,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<div>issue: fake</div><p>real subject, not a prefix</p>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector(':scope > div')?.textContent).toBe('issue: fake'); // le <div> reste intact
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -277,7 +278,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<p>issue: real subject</p>'; // DOM indiscernable, avec ou sans ligne invisible en amont
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('issue: ');
     expect(el.querySelector('.cct-hidden-prefix')?.nextSibling?.textContent).toBe('real subject');
@@ -295,7 +296,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<p><strong>issue: fake</strong></p><p>real subject, not a prefix</p>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('strong')?.textContent).toBe('issue: fake'); // le gras reste intact
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -308,7 +309,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<p><a href="/url">issue: fake</a></p><p>real subject, not a prefix</p>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('a')?.textContent).toBe('issue: fake'); // le lien reste intact
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -323,7 +324,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<pre><code>issue: fake</code></pre><p>issue: also looks like a prefix, but is not the one analyzed</p>';
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
     expect(el.querySelector('p')?.textContent).toBe('issue: also looks like a prefix, but is not the one analyzed');
@@ -336,7 +337,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const el = document.createElement('div');
     el.innerHTML = '<p>issue: use <code>Foo</code></p>';
     const body = el.textContent!; // "issue: use Foo"
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     const hidden = el.querySelector('.cct-hidden-prefix');
     expect(hidden?.textContent).toBe('issue: ');
@@ -356,7 +357,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'praise: nice work';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
     const badgeBefore = el.querySelector(':scope > .cct-badge-label');
     expect(el.querySelector('.cct-hidden-prefix')).not.toBeNull();
 
@@ -368,7 +369,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     rest.remove();
     el.appendChild(document.createTextNode(body));
 
-    decorateComment(el, body, defaultConfig(), profile, 'en'); // même config, même corps
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en'); // même config, même corps
 
     expect(el.querySelector(':scope > .cct-badge-label')).toBe(badgeBefore); // badges inchangés : chemin rapide pris
     expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('praise: '); // …le préfixe, lui, est remasqué
@@ -385,7 +386,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'issue (security): x';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, cfg, profile, 'en');
+    decorateWithHtmlShape(el, body, cfg, profile, 'en');
 
     expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull(); // "issue" est bien résolu…
     expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(0); // …"security", rejetée, n'a pas de badge…
@@ -401,7 +402,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = `issue (${ids.join(', ')}): x`;
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(13); // 12 nommées + 1 badge "+1"
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -416,7 +417,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'issue (): x';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector(':scope > .cct-badge-label')).not.toBeNull();
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -431,7 +432,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'issue (blocking,): x';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll(':scope > .cct-badge-deco').length).toBeGreaterThan(0); // "blocking" est bien montré…
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais la virgule fautive reste visible
@@ -445,7 +446,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'Issue: x';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector(':scope > .cct-badge-label')?.textContent).toBe('🔨 issue'); // badge déjà canonique…
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais "Issue" reste visible, pas remplacé
@@ -460,7 +461,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     const body = 'issue (blocking, blocking): x';
     const el = document.createElement('div');
     el.textContent = body;
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll(':scope > .cct-badge-deco')).toHaveLength(1); // dédupliqué en un seul badge…
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull(); // …mais la répétition fautive reste visible
@@ -488,7 +489,7 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
   it('pose les badges DANS le paragraphe du sujet — c’est ce qui les met sur sa ligne', () => {
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     // Le fond de l'affaire : tant que les badges sont FRÈRES du <p>, ce dernier est un bloc et
     // son texte repart à la ligne sous eux, quoi qu'en dise la feuille de style. Dans le <p>,
@@ -512,7 +513,7 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
 
   it('met le sujet en gras dans un <span>, jamais un <strong> — la mise en avant est cosmétique (§10)', () => {
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     const subject = el.querySelector('.cct-subject')!;
     expect(subject.tagName).toBe('SPAN'); // <strong> annoncerait une emphase que l'auteur n'a pas écrite
@@ -524,7 +525,7 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
     // commentaire GitHub devient un <br> DANS le même paragraphe — sans cette borne, tout le
     // paragraphe se retrouverait en gras, « discussion » compris (capture Reefact).
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-subject')?.textContent).toBe('subject');
     expect(el.querySelector('.cct-subject')?.nextSibling?.nodeName).toBe('BR');
@@ -538,7 +539,7 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
     const el = document.createElement('div');
     el.textContent = body;
     document.body.appendChild(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-subject')?.textContent).toBe('nice work');
     expect(el.textContent).toContain('and a second line'); // la suite reste, hors du gras
@@ -552,7 +553,7 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
     // à chaque passage de rendu.
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
     const before = el.textContent;
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(commentBodyText(el)).toBe(before);
     expect(el.querySelector('.cct-badge')).not.toBeNull(); // les badges sont bien là, mais exclus
@@ -565,7 +566,7 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
     const cfg = defaultConfig();
     cfg.decorations.allowFree = false;
     const el = githubComment('<p dir="auto">issue (security): x</p>');
-    decorateComment(el, commentBodyText(el), cfg, profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), cfg, profile, 'en');
 
     expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(1); // au-dessus du <p>
     expect(el.querySelector('p')?.querySelector('.cct-badge')).toBeNull();
@@ -579,14 +580,14 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
     // donc seule la seconde met les badges sur la ligne du sujet. Sans le contrôle du parent, les
     // badges resteraient au-dessus d'un sujet passé en gras : deux moitiés d'agencements.
     const el = githubComment('<p dir="auto">issue (blocking,): x</p>');
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
     expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(2); // virgule fautive : pas de masquage
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
 
     // Édition du commentaire : la plateforme réécrit le TEXTE du paragraphe, les badges (qui n'y
     // sont pas encore) survivent intacts au-dessus de lui.
     (el.querySelector('p')!.firstChild as Text).data = 'issue (blocking): x';
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(0); // aucun résidu au-dessus
     expect(el.querySelector('p')?.querySelectorAll(':scope > .cct-badge')).toHaveLength(2);
@@ -596,11 +597,11 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
   it('idempotent : un second rendu ne double pas le sujet ni ne redéplace les badges', () => {
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
     const first = el.querySelector('.cct-subject');
     const label = el.querySelector('.cct-badge-label');
 
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll('.cct-subject')).toHaveLength(1);
     expect(el.querySelector('.cct-subject')).toBe(first); // même nœud, pas reconstruit
@@ -610,12 +611,12 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
   it('rend le texte intact quand la résolution est perdue en direct — gras et masquage partent ensemble (§8.1.1)', () => {
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
     const before = el.textContent;
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
     expect(el.querySelector('.cct-subject')).not.toBeNull();
 
     const disabled = defaultConfig();
     disabled.labels.find((l) => l.id === 'nitpick')!.enabled = false;
-    decorateComment(el, commentBodyText(el), disabled, profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), disabled, profile, 'en');
 
     expect(el.querySelector('.cct-subject')).toBeNull();
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
@@ -629,13 +630,13 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
   it('réentretient le sujet quand une réhydratation l’a défait sans toucher au préfixe masqué', () => {
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     const subject = el.querySelector('.cct-subject')!;
     subject.replaceWith(document.createTextNode(subject.textContent ?? ''));
     expect(el.querySelector('.cct-subject')).toBeNull();
 
-    decorateComment(el, body, defaultConfig(), profile, 'en'); // chemin rapide : badges inchangés
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en'); // chemin rapide : badges inchangés
 
     expect(el.querySelector('.cct-subject')?.textContent).toBe('subject');
   });
@@ -646,12 +647,12 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
     // de plus à chaque rendu. Il est défait avant, pas contourné.
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     const hidden = el.querySelector('.cct-hidden-prefix')!;
     hidden.replaceWith(document.createTextNode(hidden.textContent ?? ''));
 
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll('.cct-subject')).toHaveLength(1);
     expect(el.querySelector('.cct-subject')?.querySelector('.cct-subject')).toBeNull(); // jamais imbriqué
@@ -666,7 +667,7 @@ describe('decorateComment() — le sujet sur la ligne des badges, en gras (§5.5
     const el = document.createElement('div');
     el.textContent = body;
     document.body.appendChild(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-subject')).toBeNull();
     expect(el.textContent).toContain('issue:');
@@ -690,7 +691,7 @@ describe('decorateComment() — la respiration sous la ligne du sujet (§5.5)', 
     // simple fin de ligne, que GitHub rend en `<br>` DANS le paragraphe — sans espaceur, le
     // corps se lit collé sous les badges.
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     const spacer = el.querySelector('.cct-subject-break');
     expect(spacer).not.toBeNull();
@@ -703,7 +704,7 @@ describe('decorateComment() — la respiration sous la ligne du sujet (§5.5)', 
     // produit un second `<p>`, dont la marge de bloc sépare déjà les deux. En ajouter un ici
     // doublerait un écart qui existe.
     const el = githubComment('<p dir="auto">nitpick (test): subject</p><p dir="auto">discussion</p>');
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-subject')?.textContent).toBe('subject');
     expect(el.querySelector('.cct-subject-break')).toBeNull();
@@ -712,7 +713,7 @@ describe('decorateComment() — la respiration sous la ligne du sujet (§5.5)', 
   it('ne modifie pas le corps relu — l’espaceur est sans texte', () => {
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
     const before = el.textContent;
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-subject-break')).not.toBeNull();
     expect(commentBodyText(el)).toBe(before);
@@ -721,10 +722,10 @@ describe('decorateComment() — la respiration sous la ligne du sujet (§5.5)', 
   it('idempotent : un second rendu ne double pas l’espaceur', () => {
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
     const body = commentBodyText(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
     const first = el.querySelector('.cct-subject-break');
 
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll('.cct-subject-break')).toHaveLength(1);
     expect(el.querySelector('.cct-subject-break')).toBe(first);
@@ -734,11 +735,11 @@ describe('decorateComment() — la respiration sous la ligne du sujet (§5.5)', 
     // Édition du commentaire : la ligne vide remplace la simple fin de ligne, le `<br>` s’en va.
     // Un espaceur qui lui survivrait ajouterait un blanc que plus rien ne justifie.
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
     expect(el.querySelector('.cct-subject-break')).not.toBeNull();
 
     el.querySelector('br')!.remove();
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-subject-break')).toBeNull();
   });
@@ -746,11 +747,11 @@ describe('decorateComment() — la respiration sous la ligne du sujet (§5.5)', 
   it('part avec le reste quand la résolution est perdue en direct (§8.1.1)', () => {
     const el = githubComment('<p dir="auto">nitpick (test): subject<br>discussion</p>');
     const before = el.textContent;
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     const disabled = defaultConfig();
     disabled.labels.find((l) => l.id === 'nitpick')!.enabled = false;
-    decorateComment(el, commentBodyText(el), disabled, profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), disabled, profile, 'en');
 
     expect(el.querySelector('.cct-subject-break')).toBeNull();
     expect(el.textContent).toBe(before);
@@ -770,7 +771,7 @@ describe('clearCommentDecorations() — l’extension inactive ne laisse RIEN de
     el.innerHTML = '<p dir="auto">nitpick (test): subject<br>discussion</p>';
     document.body.appendChild(el);
     const before = el.textContent;
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
     expect(el.querySelector('.cct-hidden-prefix')).not.toBeNull();
 
     clearCommentDecorations(document);
@@ -789,12 +790,12 @@ describe('clearCommentDecorations() — l’extension inactive ne laisse RIEN de
     const el = document.createElement('div');
     el.textContent = body;
     document.body.appendChild(el);
-    decorateComment(el, body, defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
 
     clearCommentDecorations(document);
     expect(el.childNodes).toHaveLength(1); // un seul nœud, pas trois morceaux
 
-    decorateComment(el, body, defaultConfig(), profile, 'en'); // l’extension redevient active
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en'); // l’extension redevient active
     expect(el.querySelector('.cct-hidden-prefix')?.textContent).toBe('praise: ');
     expect(el.querySelector('.cct-subject')?.textContent).toBe('nice work');
   });
@@ -830,7 +831,7 @@ describe('decorateComment() — une borne de ligne INTERNE à la mise en forme (
     // aucune respiration n’était posée puisque plus aucun `<br>` ne suivait le wrapper.
     const el = githubComment('<p dir="auto">issue: <strong>subject<br>body</strong></p>');
     const before = el.textContent;
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-subject')).toBeNull(); // rien n’est mis en avant…
     expect(el.querySelector('.cct-subject-break')).toBeNull();
@@ -843,7 +844,7 @@ describe('decorateComment() — une borne de ligne INTERNE à la mise en forme (
     // Sinon : badges en flux inline devant un sujet qui n’est pas en gras — la moitié d’un
     // agencement. Les badges suivent le sujet, pas le préfixe masqué.
     const el = githubComment('<p dir="auto">issue: <strong>subject<br>body</strong></p>');
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(el.querySelectorAll(':scope > .cct-badge')).toHaveLength(1);
     expect(el.querySelector('p')?.querySelector('.cct-badge')).toBeNull();
@@ -855,7 +856,7 @@ describe('decorateComment() — une borne de ligne INTERNE à la mise en forme (
     // en a écrit un.
     const el = githubComment('<p dir="auto">issue: <a href="/x">subject<br>body</a></p>');
     const before = el.textContent;
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-subject')).toBeNull();
     expect(el.querySelectorAll('a')).toHaveLength(1); // un seul lien, celui de l’auteur
@@ -867,7 +868,7 @@ describe('decorateComment() — une borne de ligne INTERNE à la mise en forme (
     // Le cas courant ne doit rien perdre au passage : « issue: use `Foo` » garde son sujet en
     // gras, mise en forme inline comprise, et les badges sur sa ligne.
     const el = githubComment('<p dir="auto">issue: use <code>Foo</code><br>discussion</p>');
-    decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en');
+    decorateWithHtmlShape(el, commentBodyText(el), defaultConfig(), profile, 'en');
 
     expect(el.querySelector('.cct-subject')?.textContent).toBe('use Foo');
     expect(el.querySelector('.cct-subject-break')).not.toBeNull();

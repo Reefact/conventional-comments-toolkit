@@ -43,8 +43,9 @@ const bundled = await build({
   stdin: {
     contents: `
       import { decorateComment } from './packages/extension/src/ui/badges.ts';
+      import { MARKDOWN_HTML_BODY_SHAPE } from '@cct/adapter-shared';
       import { defaultConfig } from '@cct/core';
-      globalThis.cct = { decorateComment, defaultConfig };
+      globalThis.cct = { decorateComment, defaultConfig, MARKDOWN_HTML_BODY_SHAPE };
     `,
     resolveDir: root,
     loader: 'ts',
@@ -90,21 +91,28 @@ await page.addScriptTag({ content: bundled.outputFiles[0].text });
 const measured = await page.evaluate(() => {
   const profile = { id: 'github', suggestionInfoString: 'suggestion' };
   const config = globalThis.cct.defaultConfig();
+  // La forme du corps rendu (§5.5) est un ARGUMENT EXIGÉ depuis que son défaut a été retiré de
+  // `decorateComment()` (revue Reefact, PR #66) — et ce garde est ce qui l'a montré : il appelait
+  // la fonction livrée avec cinq arguments, hors de portée d'un grep sur les `.ts`, et le
+  // paramètre manquant l'a fait tomber au premier lancement. C'est exactement ce que le retrait
+  // du défaut achète : une omission qui parle. Le fixture est celui de github.com — préfixe et
+  // sujet dans un `<p>`, le retour à la ligne en `<br>` —, donc la forme Markdown, nommée.
+  const SHAPE = globalThis.cct.MARKDOWN_HTML_BODY_SHAPE;
 
   // Rendu livré.
   const after = document.getElementById('after');
-  globalThis.cct.decorateComment(after, after.textContent, config, profile, 'en');
+  globalThis.cct.decorateComment(after, after.textContent, config, profile, 'en', SHAPE);
 
   const spaced = document.getElementById('spaced');
-  globalThis.cct.decorateComment(spaced, spaced.textContent, config, profile, 'en');
+  globalThis.cct.decorateComment(spaced, spaced.textContent, config, profile, 'en', SHAPE);
 
   const long = document.getElementById('long');
-  globalThis.cct.decorateComment(long, long.textContent, config, profile, 'en');
+  globalThis.cct.decorateComment(long, long.textContent, config, profile, 'en', SHAPE);
 
   // Sonde des deux techniques ÉCARTÉES pour la respiration, rejouées ici plutôt que rappelées
   // de mémoire : le jour où l'une d'elles marcherait, ce commentaire doit devenir faux bruyamment.
   const probe = document.getElementById('probe');
-  globalThis.cct.decorateComment(probe, probe.textContent, config, profile, 'en');
+  globalThis.cct.decorateComment(probe, probe.textContent, config, profile, 'en', SHAPE);
   probe.querySelector('.cct-subject-break').remove(); // on retire la solution retenue…
 
   // Agencement d'AVANT, reconstitué à la main sur le même corps : les mêmes badges, mais

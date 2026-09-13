@@ -61,6 +61,14 @@ const bundled = await build({
 });
 
 const css = readFileSync(resolve(root, 'packages/extension/src/styles.css'), 'utf8');
+// La feuille de GITHUB, et le marqueur qui l'active plus bas. Les trois longueurs mesurées ici
+// — retrait du cadre, gouttière du texte, écart de la pastille — sont des chiffres de github.com
+// et ont quitté la feuille partagée, qui les imposait à toutes les plateformes (revue Reefact,
+// PR #66) ; c'est désormais la couche GitHub qui les déclare. Ce garde assemble donc ce que le
+// navigateur reçoit vraiment sur cette plateforme, au lieu du seul socle commun. Sans le
+// marqueur, il mesurerait un composeur sans aucun retrait — et le dirait, ce qui est le
+// comportement voulu : une question posée par un `var()` sans repli doit trouver sa réponse.
+const cssGithub = readFileSync(resolve(root, 'packages/adapters/github/src/platform.css'), 'utf8');
 const BARRE = '<div class="cct-toolbar"><div class="cct-toolbar-row"><button class="cct-label-button">issue</button></div></div>';
 const PASTILLE = '<div class="cct-feedback"><span class="cct-pastille">✅ Compliant</span></div>';
 
@@ -73,6 +81,7 @@ await page.setContent(`
     .gaine { display: inline-flex; overflow: hidden; width: 100%; border-radius: 6px; }
     .gaine textarea { width: 100%; border: 0; padding: 8px; box-sizing: border-box; }
     ${css}
+    ${cssGithub}
   </style>
 
   <!-- Vue héritée : le cadre est le parent direct du champ (MESURÉ : .CommentBox-container). -->
@@ -92,6 +101,15 @@ await page.setContent(`
     </div>
   </div>
 `);
+// Le marqueur de plateforme, posé comme le script de contenu le pose (content-internal.ts) :
+// sur `documentElement`, et non dans le HTML du fixture. Écrit en `<!doctype html><html …>`, il
+// ferait aussi basculer la page en mode STANDARDS — `setContent()` sans doctype rend en mode
+// quirks —, et les quatre longueurs mesurées ici se déplaceraient pour une raison qui n'a rien
+// à voir avec la plateforme. Ce que ce garde mesure ne doit changer que quand la mise en page
+// change.
+await page.evaluate(() => {
+  document.documentElement.dataset['cctPlatform'] = 'github';
+});
 await page.addScriptTag({ content: bundled.outputFiles[0].text });
 
 const m = await page.evaluate(() => {

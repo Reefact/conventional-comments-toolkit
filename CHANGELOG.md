@@ -34,9 +34,13 @@ and what a reader needs from them is the behaviour, not the thirteen.
   own comment container. Every platform inherited one platform's proportions. The rules stay
   where they are and now read `--cct-*` roles; each platform declares what those roles are worth
   in its own sheet, scoped so it cannot reach a page it does not serve. Azure DevOps renders
-  exactly as before, measured property by property in a real browser; its sheet is deliberately
-  empty, because nothing in this repository has ever observed its theme tokens and guessing them
-  would be the very fault being corrected.
+  exactly as before, measured property by property in a real browser. Its sheet declares no theme
+  token, because nothing in this repository has ever observed one and guessing would be the very
+  fault being corrected; the three composer lengths it does declare are GitHub's numbers, written
+  down as an explicit compatibility fallback. Those three spent a round sitting in the shared
+  sheet "as defaults", which kept every platform inheriting one platform's proportions from the
+  common base — the same fault, one storey down. What a platform receives is now a choice made in
+  its own file, which is the whole of what the split buys.
 
 - **The subject boundary no longer assumes GitHub's markup** (§5.5). The paragraph container and
   the line-break marker were written in place, measured on github.com and applied everywhere. On
@@ -65,7 +69,12 @@ and what a reader needs from them is the behaviour, not the thirteen.
   `check:github-theme-vars` reads only GitHub's own sheet, and the permanent invariants of
   `check:style-isolation` compare the shared sheet to itself, which measures scoping rather than
   where a token came from. The criterion is unchanged, only applied in the other language: a
-  variable that is not `--cct-*` and appears in a platform sheet belongs to that platform.
+  variable that is not `--cct-*` and appears in a platform sheet belongs to that platform. Its
+  corollary is enforced too, since moving a value out of the shared sheet can only be safe if
+  someone else supplies it: `var(--cct-x)` without a fallback is a question put to the platform,
+  `var(--cct-x, …)` a value the shared sheet is willing to supply itself, and every platform
+  sheet must answer every question of the first kind. Left unanswered, the declaration turns
+  invalid and the property falls back to its initial value — a layout loss nothing reports.
 
 - **A named composer chrome that matches nothing is now recorded, instead of passing silently.**
   Where the adapter names the container it decorates and no longer finds it, that failure joins

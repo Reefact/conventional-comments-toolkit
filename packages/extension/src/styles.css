@@ -71,15 +71,20 @@
   --cct-radius-md: 6px;
   --cct-radius-sm: 2px;
 
-  /* Longueurs du composeur. Les trois viennent de mesures faites sur github.com — le retrait
-     égale la marge propre du conteneur GitHub, la gouttière et l'écart de la pastille ont été
-     tranchés à l'œil sur cette page-là. Elles sont donc ici À TITRE DE DÉFAUT, pas de vérité :
-     une plateforme qui mesure les siennes les redéclare dans sa propre feuille. Les laisser en
-     dur dans ce fichier revenait à imposer à toutes les plateformes les proportions d'une
-     seule. */
-  --cct-frame-padding: 8px;
-  --cct-inner-gutter: 8px;
-  --cct-pastille-gap: 4px;
+  /* Les longueurs du composeur — `--cct-frame-padding`, `--cct-inner-gutter`,
+     `--cct-pastille-gap` — ne sont PAS déclarées ici, et cette absence est la règle, pas un
+     oubli.
+
+     Elles y ont vécu « à titre de défaut ». Mais un défaut est une VALEUR, et ces trois-là sont
+     trois mesures faites sur github.com : la feuille que toutes les plateformes reçoivent
+     imposait donc à chacune les proportions d'une seule, et Azure DevOps — qui ne surchargeait
+     rien — en héritait depuis le socle commun (revue Reefact, PR #66). Une mesure de plateforme
+     vit dans le paquet de sa plateforme, y compris quand elle est commode.
+
+     Ce fichier les CONSOMME donc sans repli, et c'est ce qui distingue les deux écritures :
+     `var(--cct-x)` est une QUESTION posée à la plateforme, `var(--cct-x, …)` est une valeur que
+     la feuille partagée consent à fournir elle-même. `check:platform-isolation` exige qu'à
+     chaque question de la première forme, toute feuille de plateforme réponde. */
 }
 
 /* Retrait intérieur de la boîte de commentaire : plus rien ne touche la bordure.
@@ -107,8 +112,8 @@
    pastille gardent leur place, jugée bonne sur le rendu. C'est un arbitrage tranché à l'œil
    sur la page réelle, pas une règle déduite — d'où la variable, pour le régler d'un endroit. */
 .cct-host .cct-editor {
-  padding-left: var(--cct-inner-gutter, 8px);
-  padding-right: var(--cct-inner-gutter, 8px);
+  padding-left: var(--cct-inner-gutter);
+  padding-right: var(--cct-inner-gutter);
 }
 
 /* La barre EMPILE ses rangées, elle ne les fait pas couler : les boutons de label d'abord,
@@ -234,7 +239,7 @@
    comme la gouttière plus haut, et nommée pour la même raison. */
 .cct-feedback {
   min-height: 1.6em; /* pas de layout shift (§5.3) */
-  margin-top: var(--cct-pastille-gap, 4px);
+  margin-top: var(--cct-pastille-gap);
   font-size: 12px;
 }
 

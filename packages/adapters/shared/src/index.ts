@@ -103,7 +103,13 @@ export const NEUTRAL_EDITOR_CHROME: EditorChrome = Object.freeze({
 export interface RenderedBodyShape {
   /** Les conteneurs de PREMIER NIVEAU qui enveloppent une ligne de Markdown ordinaire sans
    * avoir consommé de syntaxe de tête. Tout le reste — bloc de code, citation, liste, titre,
-   * tableau — fait renoncer le masquage, ce qui est toujours l'issue sûre (§9.4, CA-11). */
+   * tableau — fait renoncer le masquage : c'est le REPLI DE RENDU du §5.5, afficher moins
+   * plutôt qu'afficher faux, et rien ne s'y journalise.
+   *
+   * Ce n'est pas la dégradation du §9.4, que cette ligne a pourtant citée le temps de deux
+   * revues (revue Reefact, PR #66). Le §9.4 trace un ÉCHEC DE DÉTECTION ; ici la forme est
+   * connue et répond, et c'est le corps RENCONTRÉ qui n'est pas un paragraphe ordinaire — le
+   * cas nominal d'un commentaire qui commence par un bloc de code. */
   readonly paragraphTags: readonly string[];
   /** Ce qui MATÉRIALISE une fin de ligne simple dans ce corps rendu. */
   readonly lineBreakTag: string;

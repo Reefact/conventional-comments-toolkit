@@ -17,7 +17,7 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { defaultConfig } from '@cct/core';
 import { buildToolbar } from '../src/ui/toolbar.js';
-import { decorateComment } from '../src/ui/badges.js';
+import { decorateWithHtmlShape } from './helpers/decorate.js';
 
 const profile = { id: 'github', suggestionInfoString: 'suggestion' };
 
@@ -81,7 +81,7 @@ describe('icônes de label — le bouton s’en passe, le badge la garde', () =>
     const el = document.createElement('div');
     el.textContent = body;
     document.body.appendChild(el);
-    decorateComment(el, body, defaultConfig(), profile, 'fr');
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'fr');
 
     expect(el.querySelector('.cct-badge-label')?.textContent).toBe(`${ISSUE_ICON} issue`);
   });

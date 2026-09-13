@@ -280,7 +280,8 @@ function stripCssComments(css) {
   return css.replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
-const cssVocabularies = new Map(); // plateforme -> Set(noms de variables)
+const cssVocabularies = new Map(); // plateforme -> Set(noms de variables de la plateforme)
+const cssRoles = new Map(); // plateforme -> Set(rôles --cct-* que sa feuille DÉCLARE)
 for (const platform of readdirSync(ADAPTERS)) {
   if (platform === 'shared') continue;
   const sheet = join(ADAPTERS, platform, 'src', 'platform.css');
@@ -294,6 +295,11 @@ for (const platform of readdirSync(ADAPTERS)) {
     [...css.matchAll(/--[A-Za-z0-9_-]+/g)].map((m) => m[0]).filter((n) => !n.startsWith('--cct-'))
   );
   if (names.size > 0) cssVocabularies.set(platform, names);
+  // Le deux-points sépare une DÉCLARATION d'un usage : `--cct-x:` déclare, `var(--cct-x)` et
+  // `var(--cct-x, …)` consomment. Enregistré pour TOUTE feuille existante, vocabulaire propre ou
+  // non — une feuille qui ne déclare aucun jeton de thème (azdo) reste une plateforme à qui les
+  // questions de la feuille partagée sont posées.
+  cssRoles.set(platform, new Set([...css.matchAll(/(--cct-[A-Za-z0-9_-]+)\s*:/g)].map((m) => m[1])));
 }
 
 const cssFindings = [];
@@ -308,6 +314,39 @@ const cssFindings = [];
   }
 }
 
+// ————— UNE QUESTION POSÉE SANS REPLI DOIT TROUVER SA RÉPONSE —————
+//
+// Le corollaire du critère ci-dessus, et il est né du même correctif. Sortir de la feuille
+// partagée trois longueurs mesurées sur github.com (revue Reefact, PR #66) laisse ce fichier
+// les CONSOMMER sans les déclarer : `padding: var(--cct-frame-padding)`. Une feuille de
+// plateforme qui oublierait d'y répondre ne casserait rien de visible à la lecture — le
+// `var()` deviendrait invalide, la propriété reprendrait sa valeur initiale, et le composeur
+// perdrait ses retraits SANS un mot. Le déplacement aurait échangé une fuite bruyante contre
+// une perte muette.
+//
+// Les deux écritures de `var()` séparent donc deux intentions, et c'est le critère :
+//   `var(--cct-x)`      — une QUESTION posée à la plateforme, à laquelle chacune doit répondre ;
+//   `var(--cct-x, …)`   — une valeur que la feuille partagée consent à fournir elle-même.
+// Aucune liste : les questions sont dérivées du fichier, les réponses des feuilles présentes.
+// Une feuille GitLab qui arrive demain est interrogée sans qu'on touche à ce script.
+//
+// CE QUE CETTE SECTION NE VOIT PAS, et qui doit rester écrit : elle ne dit pas si une valeur
+// DEVAIT quitter la feuille partagée. Remettre `--cct-frame-padding: 8px` dans son `:root`
+// éteint la question au lieu d'y répondre, et le garde se tait — parce que rien ne distingue
+// mécaniquement une valeur neutre (`Highlight`, un rayon de 6 px) d'une mesure faite sur une
+// plateforme. Ce tri-là est un jugement, et il se fait en revue.
+const roleQuestions = [];
+{
+  const shared = stripCssComments(readFileSync(join(root, SHARED_SHEET), 'utf8'));
+  const declared = new Set([...shared.matchAll(/(--cct-[A-Za-z0-9_-]+)\s*:/g)].map((m) => m[1]));
+  const asked = new Set([...shared.matchAll(/var\(\s*(--cct-[A-Za-z0-9_-]+)\s*\)/g)].map((m) => m[1]));
+  for (const role of [...asked].sort()) if (!declared.has(role)) roleQuestions.push(role);
+}
+const unanswered = [];
+for (const [platform, roles] of cssRoles) {
+  for (const role of roleQuestions) if (!roles.has(role)) unanswered.push({ platform, role });
+}
+
 /** Le contrat lui-même ne doit nommer aucune plateforme : un port exposant
  * `isGitHubChangesView()` obligerait le code partagé à savoir de qui il parle, et le
  * conditionnel que le polymorphisme supprime reviendrait sous un autre nom. */
@@ -320,7 +359,13 @@ for (const m of contractCode.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?=[(:<])/g)) {
   if (platformNames.some((p) => id.toLowerCase().includes(p))) contractLeaks.push(id);
 }
 
-if (findings.length === 0 && contractLeaks.length === 0 && scattered.length === 0 && cssFindings.length === 0) {
+if (
+  findings.length === 0 &&
+  contractLeaks.length === 0 &&
+  scattered.length === 0 &&
+  cssFindings.length === 0 &&
+  unanswered.length === 0
+) {
   const total = [...vocabularies.values()].reduce((a, s) => a + s.size, 0);
   const detail = [...vocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ');
   console.log(`✓ isolation des plateformes : ${total} mots dérivés — ${detail} — absents du code partagé.`);
@@ -328,6 +373,13 @@ if (findings.length === 0 && contractLeaks.length === 0 && scattered.length === 
   const cssTotal = [...cssVocabularies.values()].reduce((a, s) => a + s.size, 0);
   const cssDetail = [...cssVocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ') || 'aucune feuille renseignée';
   console.log(`✓ styles : ${cssTotal} jeton(s) de plateforme — ${cssDetail} — absents de la feuille partagée.`);
+  const asked = roleQuestions.length;
+  console.log(
+    asked === 0
+      ? `✓ rôles : la feuille partagée ne pose aucune question sans repli.`
+      : `✓ rôles : ${asked} question(s) sans repli — ${roleQuestions.join(', ')} — auxquelles les ` +
+          `${cssRoles.size} feuille(s) de plateforme répondent.`
+  );
   process.exit(0);
 }
 
@@ -348,6 +400,17 @@ if (cssFindings.length > 0) {
       "\n\nUne mesure faite sur une plateforme ne se déclare pas dans la feuille commune : elle y devient\n" +
       'une constante que les autres subissent. Déclarez un rôle `--cct-*` ici, et donnez-lui sa valeur\n' +
       'dans la feuille de la plateforme concernée, sous son propre marqueur.'
+  );
+}
+if (unanswered.length > 0) {
+  console.error(
+    `\n${unanswered.length} rôle(s) que ${SHARED_SHEET} demande sans repli et qu'une feuille de\n` +
+      'plateforme ne déclare pas :\n' +
+      unanswered.map((u) => `  - ${u.platform} : «${u.role}»`).join('\n') +
+      "\n\nUn `var()` sans repli est une QUESTION posée à la plateforme ; sans réponse, la déclaration\n" +
+      "devient invalide et la propriété reprend sa valeur initiale — une perte de mise en page que\n" +
+      "rien ne signale. Déclarez le rôle sous le marqueur de cette plateforme, ou, si la feuille\n" +
+      'partagée doit fournir la valeur, écrivez-la en repli : `var(--cct-x, …)`.'
   );
 }
 if (scattered.length > 0) {

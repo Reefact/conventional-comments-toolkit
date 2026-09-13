@@ -18,16 +18,22 @@ import {
   closestChain,
   commentBodyText,
   hostMatchesAny,
+  matchesChain,
   queryChain,
   queryChainAll,
   writeToTextField,
+  MARKDOWN_HTML_BODY_SHAPE,
+  NEUTRAL_EDITOR_CHROME,
   SelectorLog,
+  type EditorChrome,
+  type RenderedBodyShape,
   type EditorContext,
   type EditorHandle,
   type PlatformAdapter,
   type SubmitControl,
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
+import { ALL_EDITORS, SURFACES, type GithubSurface } from './surfaces.js';
 
 export interface GithubClientOptions {
   /** Hôtes autorisés par l'utilisateur ou la politique (§2, §A.4) — github.com n'est que
@@ -95,6 +101,10 @@ export class GithubClientAdapter implements PlatformAdapter {
   #readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
   readonly log: SelectorLog;
   #editorSeq = 0;
+  // QUELLE SURFACE a ramené ce champ. Sert à une seule question, celle que `getEditorChrome`
+  // ne pouvait pas poser : un châssis absent est-il le cas nominal ou une rupture ? Sans cette
+  // attribution, les deux se ressemblent — c'est le défaut relevé en revue (Reefact, PR #65).
+  #surfaceOf = new WeakMap<Element, GithubSurface>();
 
   constructor(opts: GithubClientOptions = {}) {
     this.#hosts = ['github.com', ...(opts.extraHosts ?? [])];
@@ -284,7 +294,24 @@ export class GithubClientAdapter implements PlatformAdapter {
   observeEditors(cb: (editor: EditorHandle) => void): Disposable {
     const seen = new WeakSet<Element>();
     const scan = () => {
-      const found = queryChainAll(this.#doc, selectors.editors);
+      // L'UNION des surfaces, et non une chaîne unique : `/pull/N/changes` affiche des fils
+      // hérités à côté de son propre composeur React, et une chaîne rend les éléments du
+      // PREMIER candidat qui matche — l'autre composeur devenait invisible (surfaces.ts).
+      // À l'INTÉRIEUR de chaque surface, la chaîne garde sa sémantique de repli : c'est la
+      // dérive dans le temps, qu'elle modélise correctement.
+      //
+      // Dédoublonné, parce qu'un même champ répond souvent à plusieurs candidats de SA
+      // surface — le composeur mesuré de la vue des fichiers modifiés en satisfait trois — et
+      // qu'une union naïve poserait autant de barres d'outils sur un seul champ. `Set` plutôt
+      // qu'un filtre : l'ordre du document est préservé par surface, et le coût reste linéaire.
+      const perSurface = SURFACES.map((surface) => ({ surface, elements: queryChainAll(this.#doc, surface.editors) }));
+      const found = [...new Set(perSurface.flatMap((x) => x.elements))];
+      // L'attribution suit exactement l'ordre du dédoublonnage : la PREMIÈRE surface qui ramène
+      // un champ le revendique. Elle est écrite ici et nulle part ailleurs, parce qu'ici seulement
+      // on SAIT quelle chaîne l'a ramené — le reconstituer plus tard reviendrait à deviner.
+      for (const { surface, elements } of perSurface) {
+        for (const el of elements) if (!this.#surfaceOf.has(el)) this.#surfaceOf.set(el, surface);
+      }
       const inconnues = queryChainAll(this.#doc, selectors.editingSurfaces).filter((s) => !found.includes(s));
       // Une surface de saisie que la chaîne n'a PAS ramenée : elle a pourri, en tout ou en
       // partie. C'est ce qu'a fait la nouvelle vue des fichiers modifiés (`/pull/N/changes`,
@@ -301,7 +328,7 @@ export class GithubClientAdapter implements PlatformAdapter {
       // voisin, champ masqué) vaut une entrée de journal à tort. Une seule, le journal
       // dédupliquant par chaîne — contre une extension muette dans le cas inverse.
       if (inconnues.length > 0) {
-        this.log.degraded(selectors.editors);
+        this.log.degraded(ALL_EDITORS);
       }
       for (const el of found) {
         if (seen.has(el)) continue;
@@ -341,6 +368,59 @@ export class GithubClientAdapter implements PlatformAdapter {
         this.#doc.removeEventListener('turbo:frame-load', turboHandler);
       },
     };
+  }
+
+  /** Le châssis de cet éditeur (§5.1, §5.3, §9.4). Ces deux voies vivaient dans le contrôleur
+   * PARTAGÉ, en littéraux — un `closest('[data-testid*="comment-composer"]')` puis un
+   * `className.includes('CommentBox')` —, donc évaluées aussi sur une page Azure DevOps. Elles
+   * n'y matchaient rien, mais le §9.4 veut les sélecteurs DOM « centralisés dans un fichier
+   * unique par adaptateur », et un renommage de GitHub se serait corrigé dans un fichier que
+   * les deux plateformes exécutent. Les voici chez elles.
+   *
+   * L'ORDRE compte et il est celui d'avant : le conteneur nommé d'abord — c'est un ancêtre
+   * possiblement éloigné —, le parent direct du champ marqué ensuite. Puis on ne se prononce
+   * plus : sur le DOM hérité et sur toute vue non mesurée, la règle géométrique du code
+   * partagé retrouve le cadre sans le nommer, et rend là l'élément que ces deux voies
+   * désignaient déjà. Ne rien affirmer y est le comportement JUSTE, pas un renoncement. */
+  getEditorChrome(editor: EditorHandle): EditorChrome {
+    // La PREMIÈRE surface qui reconnaît ce champ répond, et l'ordre de `SURFACES` reproduit
+    // exactement la cascade qui vivait dans le contrôleur partagé.
+    //
+    // La reconnaissance se fait sur les marques de CHÂSSIS, jamais sur la chaîne `editors` de
+    // la surface, et l'écart est délibéré : `[class*="CommentBox"]` reconnaît un champ que
+    // `textarea[aria-label*="omment"][class*="CommentBox"]` refuserait faute d'`aria-label`.
+    // Exiger la chaîne d'éditeurs resserrerait la reconnaissance et changerait le rendu d'un
+    // composeur qui marche aujourd'hui — un refactoring ne se paie pas d'une régression.
+    for (const surface of SURFACES) {
+      if (surface.composerFrame) {
+        const framed = closestChain(editor.element, surface.composerFrame);
+        if (framed.element) return { framedContainer: framed.element };
+      }
+      if (surface.composerFrameOnField && matchesChain(editor.element, surface.composerFrameOnField).element) {
+        return { framedContainer: editor.element.parentElement };
+      }
+    }
+    // AUCUN châssis n'a répondu, et ce silence recouvrait DEUX états que rien ne distinguait
+    // (revue Reefact, PR #65) : la surface ne nomme pas de châssis — `legacy`, `changes`, où la
+    // règle géométrique du code partagé est la bonne réponse —, ou bien elle en nomme un qui ne
+    // matche plus. Le second est une rupture GitHub, et le §9.4 exige qu'elle soit tracée
+    // (`CA-11`). Elle passait muette.
+    //
+    // La question est posée à la SURFACE QUI A RAMENÉ CE CHAMP, jamais à un sélecteur qu'on
+    // réévaluerait ici : c'est `observeEditors` qui sait, et lui seul. Un champ dont on ignore
+    // la provenance — construit par un test, ou observé avant cette version — ne journalise
+    // rien : ne pas savoir n'est pas une dégradation.
+    const surface = this.#surfaceOf.get(editor.element);
+    for (const chain of [surface?.composerFrame, surface?.composerFrameOnField]) {
+      if (chain) this.log.degraded(chain);
+    }
+    return NEUTRAL_EDITOR_CHROME;
+  }
+
+  /** §5.5 — MESURÉ à plusieurs reprises sur github.com : le corps rendu enveloppe une ligne de
+   * Markdown ordinaire dans un `<p>`, et matérialise une fin de ligne simple par un `<br>`. */
+  renderedBodyShape(): RenderedBodyShape {
+    return MARKDOWN_HTML_BODY_SHAPE;
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {

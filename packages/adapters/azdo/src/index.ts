@@ -26,7 +26,10 @@ import {
   queryChain,
   queryChainAll,
   writeToTextField,
+  NEUTRAL_EDITOR_CHROME,
   SelectorLog,
+  type EditorChrome,
+  type RenderedBodyShape,
   type EditorContext,
   type EditorHandle,
   type PlatformAdapter,
@@ -159,6 +162,46 @@ export class AzdoClientAdapter implements PlatformAdapter {
     const observer = new MutationObserver(() => scan());
     observer.observe(this.#doc.documentElement, { childList: true, subtree: true });
     return { dispose: () => observer.disconnect() };
+  }
+
+  /** Le châssis de cet éditeur (§5.1, §5.3). **On ne se prononce pas, et c'est une réponse,
+   * pas un trou** : la boîte de commentaire d'Azure DevOps n'a jamais été mesurée dans ce
+   * dépôt, et le seul cadre dont on connaisse la forme est celui de GitHub. Nommer ici un
+   * conteneur, ou reprendre les chiffres relevés sur github.com, serait affirmer sur cette
+   * plateforme ce qu'on n'a pas regardé — exactement le défaut que l'élargissement du contrat
+   * corrige.
+   *
+   * Le code partagé applique donc sa règle géométrique, qui n'interroge que le moteur de style
+   * et vaut partout. Le jour où quelqu'un mesure un vrai tenant (A-FAIRE-fr.md, point 9), c'est
+   * ICI que le résultat se pose, et nulle part ailleurs. */
+  getEditorChrome(_editor: EditorHandle): EditorChrome {
+    return NEUTRAL_EDITOR_CHROME;
+  }
+
+  /** §5.5 — **`null` : la forme du corps rendu d'Azure DevOps n'a pas été mesurée.**
+   *
+   * Rendre `MARKDOWN_HTML_BODY_SHAPE` ici aurait été confortable et faux : c'est le couple
+   * `<p>`/`<br>` RELEVÉ SUR GITHUB, et déplacer une hypothèse dans l'adaptateur ne la rend pas
+   * vraie (revue Reefact, PR #66). Le commentaire d'à côté disait d'ailleurs qu'on n'avait rien
+   * mesuré, pendant que le code affirmait le contraire.
+   *
+   * Ce que ça coûte, écrit franchement : sur Azure DevOps, le préfixe n'est plus masqué et le
+   * sujet n'est plus mis en avant. Les badges, eux, restent posés — ils ne dépendent d'aucune
+   * de ces deux balises. Le corps s'affiche entier, jamais tronqué ni réordonné.
+   *
+   * Ce que ça évite : une mauvaise valeur de `lineBreakTag` ne borne pas le sujet là où il faut,
+   * et fait passer une partie de la discussion en gras dans le sujet. Un rendu incomplet se
+   * corrige ; un rendu faux se remarque après coup.
+   *
+   * Ce que ça n'est PAS : une dégradation de sélecteur. Rien n'est journalisé ici, et ce serait
+   * une faute de le faire — le §9.4 trace un ÉCHEC DE DÉTECTION, alors que cette plateforme
+   * RÉPOND, et répond qu'elle ne sait pas. La tenir pour dégradée la mettrait en échec permanent
+   * et écrirait une entrée par commentaire rendu (revue Reefact, PR #65).
+   *
+   * Pour l'activer : mesurer un corps de commentaire rendu sur un vrai tenant (A-FAIRE-fr.md,
+   * point 9), et déclarer ici les deux balises observées. Rien d'autre à toucher. */
+  renderedBodyShape(): RenderedBodyShape | null {
+    return null;
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {

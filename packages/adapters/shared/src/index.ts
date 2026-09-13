@@ -36,6 +36,112 @@ export interface SubmitControl {
   kind: 'submit' | 'submit-and-resolve' | 'complete-pr';
 }
 
+/** Ce que seule la PLATEFORME sait du châssis qui entoure une zone de saisie — la boîte de
+ * commentaire, ses onglets, son en-tête — et dont l'extension a besoin pour s'y loger sans
+ * décaler quoi que ce soit (§5.1, §5.3).
+ *
+ * Cette méthode existe parce que son absence était un DÉFAUT DE CONFORMITÉ, pas parce qu'une
+ * abstraction manquait à l'élégance. Le §9.4 exige que « les sélecteurs DOM soient centralisés
+ * dans un fichier unique PAR ADAPTATEUR » ; or le contrôleur partagé cherchait ce conteneur
+ * avec deux littéraux GitHub (`[data-testid*="comment-composer"]`, puis la classe `CommentBox`),
+ * ce que le §9.4 interdit. Il n'avait pourtant aucun moyen d'obéir : aucune méthode du contrat
+ * ne lui permettait de DEMANDER ce conteneur à l'adaptateur. Élargir le port, c'est rendre
+ * l'obéissance possible.
+ *
+ * **Chaque champ vaut `null` pour dire « je ne me prononce pas »**, et le code partagé applique
+ * alors sa règle géométrique — celle qui n'interroge que le moteur de style et ne nomme personne
+ * (`framedAncestor`, `stackingMountFor`, `ringIsClipped` d'ui/stacking.ts). Un adaptateur qui
+ * rend `NEUTRAL_EDITOR_CHROME` obtient donc EXACTEMENT le comportement d'avant. C'est ce qui
+ * rend cet élargissement sans risque pour une plateforme qu'on n'a pas mesurée : ne rien
+ * affirmer, plutôt qu'affirmer sur elle les chiffres d'une autre.
+ *
+ * Ce châssis porte des ÉLÉMENTS, jamais des longueurs ni des couleurs. La frontière n'est pas
+ * cosmétique : le TypeScript dit quel élément joue quel rôle, la feuille de style de la
+ * plateforme dit combien il mesure (`--cct-frame-padding`, `--cct-text-gutter`). Sans cette
+ * règle, une mesure faite sur une plateforme redeviendrait une constante partagée par toutes,
+ * ce qui est exactement le défaut qu'on corrige : le retrait de 8 px du conteneur était la
+ * marge propre de `.CommentBox-container` sur GitHub, appliquée telle quelle à Azure DevOps.
+ *
+ * Ce type ne nomme AUCUNE plateforme, et c'est une règle : un port dont une signature mentionne
+ * GitHub ou Azure DevOps a échoué, puisqu'il obligerait le code partagé à savoir de qui il parle.
+ * `scripts/check-platform-isolation.mjs` le vérifie. */
+export interface EditorChrome {
+  /** Le conteneur qui encadre ENSEMBLE l'en-tête natif de la boîte, ses onglets, le champ et
+   * ce que l'extension injecte — celui à qui donner le retrait intérieur, pour que rien ne
+   * touche la bordure. `null` : le code partagé le cherche par la géométrie, en remontant au
+   * premier ancêtre qui DESSINE le cadre. */
+  framedContainer: Element | null;
+}
+
+/** « Je ne me prononce sur rien » — la réponse juste pour une plateforme dont la boîte de
+ * commentaire n'a pas été mesurée, et le comportement exact du code partagé avant que le port
+ * ne s'élargisse. Gelé : c'est une valeur partagée par tous les appelants, et un consommateur
+ * distrait qui y écrirait contaminerait les autres. */
+export const NEUTRAL_EDITOR_CHROME: EditorChrome = Object.freeze({
+  framedContainer: null,
+});
+
+/** La FORME du HTML qu'une plateforme produit en rendant un corps de commentaire Markdown.
+ *
+ * Deux faits, et deux seulement, parce que ce sont les deux que le masquage de préfixe et la
+ * mise en avant du sujet (§5.5) interrogent. Ils vivaient en dur dans `extension/src/ui/badges.ts`
+ * — `tagName !== 'P'` et trois comparaisons à `'BR'` — sous la forme d'affirmations vraies de
+ * GitHub, mesurées sur github.com, et appliquées à toute plateforme.
+ *
+ * C'est la fuite dont l'absence coûte le plus cher : les autres RENONCENT proprement quand
+ * elles ne reconnaissent rien, celle-ci se trompe. Sur un corps rendu où la fin de ligne n'est
+ * pas un `<br>`, la borne du sujet ne se déclenche jamais et un frère entier passe dans le
+ * sujet — donc en gras, avec tout ce qui le suit.
+ *
+ * Le déplacement a d'abord été présenté ici comme « à comportement rigoureusement nul, les deux
+ * adaptateurs répondant la même chose ». Ce n'est plus vrai, et l'écrire encore serait la même
+ * faute que celle qu'on corrige : Azure DevOps rend `null` — personne n'a jamais mesuré comment
+ * il rend un corps de commentaire —, et y renonce donc au masquage du préfixe et à la mise en
+ * avant du sujet. La valeur cesse d'être une supposition tacite du code partagé pour devenir une
+ * réponse que chaque plateforme donne, y compris la réponse « je ne sais pas » (revue Reefact,
+ * PR #66). */
+export interface RenderedBodyShape {
+  /** Les conteneurs de PREMIER NIVEAU qui enveloppent une ligne de Markdown ordinaire sans
+   * avoir consommé de syntaxe de tête. Tout le reste — bloc de code, citation, liste, titre,
+   * tableau — fait renoncer le masquage : c'est le REPLI DE RENDU du §5.5, afficher moins
+   * plutôt qu'afficher faux, et rien ne s'y journalise.
+   *
+   * Ce n'est pas la dégradation du §9.4, que cette ligne a pourtant citée le temps de deux
+   * revues (revue Reefact, PR #66). Le §9.4 trace un ÉCHEC DE DÉTECTION ; ici la forme est
+   * connue et répond, et c'est le corps RENCONTRÉ qui n'est pas un paragraphe ordinaire — le
+   * cas nominal d'un commentaire qui commence par un bloc de code. */
+  readonly paragraphTags: readonly string[];
+  /** Ce qui MATÉRIALISE une fin de ligne simple dans ce corps rendu. */
+  readonly lineBreakTag: string;
+}
+
+/** La forme d'un rendu Markdown → HTML ordinaire. Nommée plutôt qu'écrite en dur : une valeur
+ * par défaut qui porte un nom est une affirmation qu'on peut relire et contredire ; la même
+ * valeur dispersée en quatre littéraux est une supposition qu'on ne voit plus. */
+export const MARKDOWN_HTML_BODY_SHAPE: RenderedBodyShape = Object.freeze({
+  paragraphTags: Object.freeze(['P']),
+  lineBreakTag: 'BR',
+});
+
+/** La CASSE des noms de balises, tranchée UNE FOIS pour toutes.
+ *
+ * Le code partagé compare ces valeurs à `Element.tagName`, qui rend `P` et `BR` en HTML. Un
+ * adaptateur qui décrit son balisage en écrivant `'p'` et `'br'` — la façon naturelle de nommer
+ * une balise — produisait alors une forme conforme en apparence et inerte en pratique : le
+ * masquage renonçait, la borne du sujet ne se déclenchait jamais, et rien ne le disait (revue
+ * Reefact, PR #65).
+ *
+ * Deux façons de fermer ça : imposer la casse dans le contrat, ou l'y rendre indifférente. La
+ * seconde est la seule qui ne se paie pas d'un piège — une règle qu'un adaptateur peut enfreindre
+ * sans diagnostic est une règle qui sera enfreinte. Le contrat accepte donc les deux écritures et
+ * le code partagé normalise à l'entrée, en un seul endroit. */
+export function normalizeBodyShape(shape: RenderedBodyShape): RenderedBodyShape {
+  return Object.freeze({
+    paragraphTags: Object.freeze(shape.paragraphTags.map((tag) => tag.toUpperCase())),
+    lineBreakTag: shape.lineBreakTag.toUpperCase(),
+  });
+}
+
 export interface PlatformAdapter {
   matches(url: URL): boolean;
   platformProfile(): PlatformProfile;
@@ -43,6 +149,33 @@ export interface PlatformAdapter {
   getOrgConfig(url: string | null): Promise<ConfigRead>;
   observeEditors(cb: (editor: EditorHandle) => void): Disposable;
   getSubmitControls(editor: EditorHandle): SubmitControl[];
+  /** §5.1, §5.3, §9.4 — le châssis de CET éditeur. Obligatoire, et c'est délibéré : une
+   * méthode optionnelle laisserait une plateforme nouvelle compiler sans jamais répondre, et
+   * son extension se logerait alors au jugé sur un DOM que personne n'a regardé. Le compilateur
+   * doit poser la question ; `NEUTRAL_EDITOR_CHROME` permet d'y répondre « rien de spécial »
+   * en un mot. */
+  getEditorChrome(editor: EditorHandle): EditorChrome;
+  /** §5.5 — la forme du HTML que cette plateforme produit en rendant un corps de commentaire,
+   * ou `null` si elle n'a pas été MESURÉE.
+   *
+   * Obligatoire pour la même raison que `getEditorChrome` : c'est une question qu'une plateforme
+   * nouvelle doit se voir poser. Mais contrairement au châssis, il n'y a pas de repli
+   * géométrique ici — rien ne permet de DEVINER quelle balise matérialise une fin de ligne.
+   * `null` fait donc RENONCER le masquage du préfixe et la mise en avant du sujet ; les badges
+   * restent posés, et le corps s'affiche entier. C'est le REPLI DE RENDU du §5.5, et le seul
+   * repli honnête : une valeur plausible mais non vérifiée peut faire glisser une partie de la
+   * discussion dans le sujet mis en avant (revue Reefact, PR #66).
+   *
+   * Ce n'est PAS une dégradation de sélecteur, et rien ne se journalise ici. Le §9.4 trace un
+   * ÉCHEC DE DÉTECTION — un sélecteur qu'on croyait bon ne ramène plus rien —, alors qu'ici la
+   * plateforme RÉPOND, et répond qu'elle n'a pas mesuré. Les confondre mettrait une plateforme
+   * entière en échec permanent et écrirait une entrée de journal par commentaire rendu. Ce
+   * commentaire a dit le contraire le temps d'une revue, et c'était l'endroit le plus coûteux
+   * pour se tromper : le contrat est ce qu'un adaptateur tiers lit d'abord.
+   *
+   * Rendre `MARKDOWN_HTML_BODY_SHAPE` est donc une AFFIRMATION — « j'ai mesuré, c'est bien
+   * `<p>`/`<br>` » — et non un défaut commode. */
+  renderedBodyShape(): RenderedBodyShape | null;
   readValue(editor: EditorHandle): string;
   writeValue(editor: EditorHandle, text: string, caret?: number): void;
   getThreads(): Promise<ThreadInfo[]>;
@@ -195,12 +328,25 @@ export function queryChainAll(root: ParentNode, chain: SelectorChain): Element[]
 }
 
 /** Les DEUX seuls emplacements où `decorateComment` pose ses badges, jamais un troisième :
- * enfant direct du corps de commentaire, ou enfant direct de son premier `<p>` — c'est là
- * qu'ils vont quand le préfixe a pu être masqué, pour partager la ligne du sujet plutôt que
- * de former un bandeau au-dessus de lui (§5.5). `:scope > p >`, et non un descendant
- * quelconque : un `.cct-badge` plus profond (citation, bloc de code d'un autre commentaire
- * cité) est du texte normal, pas notre propre badge, et le retirer amputerait le corps relu. */
-export const OWN_BADGES = ':scope > .cct-badge, :scope > p > .cct-badge';
+ * enfant direct du corps de commentaire, ou enfant direct de l'élément qu'il a lui-même MARQUÉ
+ * en y écrivant.
+ *
+ * **Plus aucun nom de balise.** Ce sélecteur a dit `:scope > p > .cct-badge`, c'est-à-dire
+ * « les paragraphes de cette plateforme sont des `<p>` » — un fait de plateforme dans le socle
+ * partagé, et surtout un fait que `renderedBodyShape()` autorise désormais chaque plateforme à
+ * démentir. Une plateforme déclarant un autre conteneur voyait `decorateComment` y poser ses
+ * badges pendant que `commentBodyText()` continuait de chercher sous un `<p>` : les badges
+ * n'étaient plus retirés à la relecture, leur texte pouvait passer pour le corps, et les
+ * anciens s'accumulaient au rendu suivant (revue Reefact, PR #66).
+ *
+ * Faire poser la marque par CELUI QUI ÉCRIT rend la divergence impossible, au lieu de la rendre
+ * seulement détectable : les deux fonctions ne peuvent plus parler d'ensembles différents,
+ * puisqu'elles parlent du même attribut.
+ *
+ * `:scope > …`, et non un descendant quelconque : un `.cct-badge` plus profond (citation, bloc
+ * de code d'un autre commentaire cité) est du texte normal, pas notre propre badge, et le
+ * retirer amputerait le corps relu. */
+export const OWN_BADGES = ':scope > .cct-badge, :scope > .cct-badge-host > .cct-badge';
 
 /** Texte d'un corps de commentaire, badges de l'extension EXCLUS (§5.5) : `decorateComment`
  * (extension/src/ui/badges.ts) insère un badge de label, suivi d'un badge par décoration
@@ -226,6 +372,18 @@ export function closestChain(el: Element, chain: SelectorChain): SelectorOutcome
   for (const candidate of chain.candidates) {
     const element = el.closest(candidate);
     if (element) return { element, matched: candidate };
+  }
+  return { element: null, matched: null };
+}
+
+/** L'élément LUI-MÊME répond-il à l'un des candidats ? Distinct de `closestChain`, et la
+ * distinction n'est pas un détail : `Element.closest()` commence par l'élément puis REMONTE,
+ * si bien qu'il répondrait aussi pour un ancêtre portant le motif — réponse fausse quand la
+ * question posée est « ce champ-ci porte-t-il cette marque, auquel cas son cadre est son
+ * parent direct ? ». */
+export function matchesChain(el: Element, chain: SelectorChain): SelectorOutcome {
+  for (const candidate of chain.candidates) {
+    if (el.matches(candidate)) return { element: el, matched: candidate };
   }
   return { element: null, matched: null };
 }

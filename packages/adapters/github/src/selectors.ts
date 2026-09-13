@@ -9,58 +9,55 @@
 import type { SelectorChain } from '@cct/adapter-shared';
 
 export const selectors = {
-  /** Zone de saisie d'un commentaire — les deux générations encapsulent un <textarea> (§A.2).
+  /** Zones de saisie de la génération REACT — jamais observée en direct dans ce dépôt,
+   * conservée parce que rien ne prouve qu'elle ne décrive aucune vue.
    *
-   * MESURÉ sur `https://github.com/Reefact/conventional-comments-toolkit/pull/45/changes`
-   * (session ouverte, composeur de ligne ouvert, 2026-09-04). La page `…/changes` est la
-   * nouvelle vue des fichiers modifiés, et le composeur y est le SEUL <textarea> du
-   * document :
-   *
-   *   <textarea aria-label="Markdown value" placeholder="Leave a comment"
-   *             class="prc-Textarea-TextArea-snlco" id="_r_qm_">
-   *
-   * Aucun des six candidats d'avant n'y matchait — ni les quatre hérités, ni les deux
-   * candidats React, écrits de mémoire et jamais observés nulle part. L'extension ne posait
-   * donc aucune barre d'outils sur la zone que le §4.1 appelle « cœur de la revue », et le
-   * silence était complet : `observeEditors` ne journalisait pas cet échec (§9.4).
-   *
-   * Deux attributs du champ sont inutilisables : `-snlco` est un hachage de build de Primer,
-   * `_r_qm_` un identifiant `useId` de React. Restent trois prises, de la plus spécifique à
-   * la plus large, chacune suffisante à elle seule :
-   *
-   *   - `aria-label="Markdown value"` — nom accessible que Primer donne au champ de son
-   *     éditeur Markdown. Il ne contient pas « comment », ce sur quoi tombait l'ancien
-   *     premier candidat ;
-   *   - `placeholder="Leave a comment"` — texte visible, donc localisable, mais sans
-   *     ambiguïté sur la nature du champ ;
-   *   - `class*="prc-Textarea-TextArea"` — le composant Primer, hachage retiré : le filet le
-   *     plus large, et le seul qui survive à une réécriture des deux précédents.
-   *
-   * CES TROIS PRISES SONT EN DERNIER, et l'ordre est le point délicat : `queryChainAll`
-   * s'arrête au premier candidat qui ramène un élément, et ne rend QUE les siens — un
-   * candidat placé trop haut masque donc tous les suivants. Or `placeholder` et la classe
-   * Primer sont larges : en tête de chaîne, sur une page servie par la génération héritée —
-   * celle où l'extension fonctionne aujourd'hui —, ils pourraient n'attraper qu'une partie
-   * des éditeurs (le composeur principal sans les réponses de fil) et faire DISPARAÎTRE le
-   * reste. Placé en fin de chaîne, l'ajout est strictement additif : il ne peut que changer
-   * « aucun éditeur » en « des éditeurs », jamais défaire une détection qui marche. Le prix
-   * est connu et assumé : sur une page hypothétique qui mélangerait les deux générations,
-   * la nouvelle resterait invisible — un cas non mesuré, et le journal le dira désormais.
-   *
-   * Les deux candidats React d'origine ne sont pas retirés pour autant : ils ne matchent
-   * rien de mesuré, mais rien ne prouve qu'ils ne décrivent aucune vue. */
-  editors: {
+   * Les trois chaînes de composeur qui suivent sont assemblées en SURFACES par `surfaces.ts` :
+   * `/pull/N` et `/pull/N/changes` coexistent, et une chaîne unique rendait invisible le
+   * composeur de la seconde (une chaîne rend les éléments du premier candidat qui matche).
+   * Les sélecteurs restent ici — le §9.4 les veut « centralisés dans un fichier unique par
+   * adaptateur », et un second fichier de sélecteurs enfreindrait la règle que cette
+   * modélisation sert à honorer. `surfaces.ts` ne porte que la STRUCTURE. */
+  editorsReact: {
     name: 'editors',
     candidates: [
-      // Génération React — jamais observée, laissée telle quelle.
       'textarea[aria-label*="omment"][class*="CommentBox"]',
       'div[data-testid*="comment-composer"] textarea',
-      // Génération héritée.
+    ],
+  } satisfies SelectorChain,
+
+  /** Zones de saisie de la génération HÉRITÉE. */
+  editorsLegacy: {
+    name: 'editors',
+    candidates: [
       'textarea[name="comment[body]"]',
       'textarea[name="pull_request_review_comment[body]"]',
       'textarea[name="pull_request_review[body]"]',
       'textarea.js-comment-field',
-      // Nouvelle vue des fichiers modifiés (`/pull/N/changes`) — MESURÉ, voir ci-dessus.
+    ],
+  } satisfies SelectorChain,
+
+  /** Zones de saisie de la NOUVELLE VUE DES FICHIERS MODIFIÉS (`/pull/N/changes`).
+   *
+   * MESURÉ en console sur `/pull/45/changes`, composeur de ligne ouvert (2026-09-04) — voir
+   * extension/test/changes-view-composer.test.ts, qui reproduit le relevé. Deux attributs du
+   * champ y sont inutilisables : `-snlco` est un hachage de build de Primer, `_r_qm_` un
+   * identifiant `useId` de React. Restent trois prises, de la plus spécifique à la plus large :
+   *
+   *   - `aria-label="Markdown value"` — nom accessible que Primer donne au champ de son éditeur
+   *     Markdown. Il ne contient pas « comment », ce sur quoi tombait l'ancien premier candidat ;
+   *   - `placeholder="Leave a comment"` — texte visible, donc localisable, mais sans ambiguïté
+   *     sur la nature du champ ;
+   *   - `class*="prc-Textarea-TextArea"` — le composant Primer, hachage retiré : le filet le plus
+   *     large, et le seul qui survive à une réécriture des deux précédents.
+   *
+   * L'ordre va du plus spécifique au plus large parce qu'une prise large en tête pourrait
+   * n'attraper qu'une partie des éditeurs de cette surface et faire disparaître le reste. Ce que
+   * la modélisation en surfaces change, c'est que ce risque est borné à UNE surface au lieu de
+   * traverser les trois. */
+  editorsChanges: {
+    name: 'editors',
+    candidates: [
       'textarea[aria-label="Markdown value"]',
       'textarea[placeholder="Leave a comment"]',
       'textarea[class*="prc-Textarea-TextArea"]',
@@ -78,6 +75,29 @@ export const selectors = {
   editingSurfaces: {
     name: 'editing-surfaces',
     candidates: ['textarea', '[contenteditable="true"]'],
+  } satisfies SelectorChain,
+
+  /** Le CHÂSSIS du composeur React — le conteneur qui encadre ENSEMBLE l'en-tête natif, les
+   * onglets, le champ et ce que l'extension injecte. Sélecteur d'ANCÊTRE, possiblement
+   * éloigné : son homologue dans `editorsReact` est un sélecteur descendant, le champ peut donc
+   * être niché sous un wrapper intermédiaire.
+   *
+   * Ces deux candidats ont vécu EN DUR DANS LE CONTRÔLEUR PARTAGÉ, donc évalués aussi sur une
+   * page Azure DevOps, où ils ne matchent rien. `surfaces.ts` les rattache à la surface qui les
+   * emploie ; ils sont définis ici, comme tous les sélecteurs de cet adaptateur (§9.4). */
+  composerFrame: {
+    name: 'composer-frame',
+    candidates: ['[data-testid*="comment-composer"]'],
+  } satisfies SelectorChain,
+
+  /** Génération React sans `data-testid` : la marque est portée par la ZONE DE SAISIE
+   * elle-même, et son châssis est alors son parent direct. Chaîne distincte de la précédente
+   * parce que la question posée n'est pas la même — ici on interroge le champ (`matches`), là on
+   * remonte ses ancêtres (`closest`). Les confondre ferait remonter au premier ancêtre portant
+   * la marque, qui n'est pas le parent direct. */
+  composerFrameOnField: {
+    name: 'composer-frame-on-field',
+    candidates: ['[class*="CommentBox"]'],
   } satisfies SelectorChain,
 
   /** **Description de la PR — hors périmètre** (§4.1, dernière ligne du tableau : format non

@@ -1,0 +1,432 @@
+// Garde du repo : AUCUN identifiant propre à une plateforme ne vit hors du paquet de cette
+// plateforme.
+//
+// C'est la mécanisation d'une règle que le §9.4 énonce depuis toujours — « les sélecteurs DOM
+// sont centralisés dans un fichier unique par adaptateur » — et que rien ne vérifiait. Deux
+// littéraux GitHub ont donc vécu dans le contrôleur PARTAGÉ, exécutés sur chaque page Azure
+// DevOps : `[data-testid*="comment-composer"]` et la classe `CommentBox`. Ils n'y matchaient
+// rien, si bien qu'aucun test ne pouvait les voir ; mais un renommage chez GitHub se serait
+// corrigé dans un fichier que les deux plateformes exécutent, et huit correctifs de mise en
+// page motivés par GitHub seul ont atterri de la même façon dans du code partagé.
+//
+// LE VOCABULAIRE INTERDIT N'EST PAS UNE LISTE ÉCRITE ICI, et c'est le point de conception
+// central. Une liste de noms vieillit : ce dépôt en a déjà corrigé plusieurs qui affirmaient
+// faussement, et sa règle est qu'un critère se maintient là où une énumération se périme. Le
+// vocabulaire est donc DÉRIVÉ des fichiers de sélecteurs des adaptateurs. Le jour où un
+// adaptateur GitLab arrive avec ses propres noms, ce garde les couvre sans qu'on l'ait touché.
+//
+// Ce qu'il ne peut PAS voir, et qui doit rester écrit :
+//   - un nom de plateforme qu'aucun sélecteur ne mentionne (une constante inventée dans du
+//     code partagé, sans jumeau dans un adaptateur) lui échappe. Il attrape la DUPLICATION
+//     d'un vocabulaire d'adaptateur, qui est la forme qu'a prise chacune des fuites réelles ;
+//   - il lit le CODE, jamais les commentaires. Un commentaire français qui explique pourquoi
+//     `CommentBox` fut un problème est légitime et doit le rester — c'est la mémoire du
+//     défaut. Le tri est fait par esbuild, un vrai parseur, et non par une expression
+//     régulière qui confondrait une URL avec un commentaire.
+
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, relative, resolve } from 'node:path';
+import { transformSync } from 'esbuild';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** Les paquets qui ne doivent connaître AUCUNE plateforme. `core/` s'en interdit déjà par
+ * contrat (§9.1 : « aucune dépendance DOM ni plateforme »), `adapters/shared` est le socle
+ * commun, et `extension/` orchestre sans savoir qui il décore — à l'exception de sa couche de
+ * routage d'hôtes, qui doit nommer les plateformes pour choisir un adaptateur. */
+const NEUTRAL_ROOTS = [
+  'packages/core/src',
+  'packages/adapters/shared/src',
+  'packages/extension/src',
+];
+
+/** Le composition root, et lui seul, a le droit de nommer les plateformes : quelqu'un doit
+ * choisir l'implémentation à construire. C'est l'unique `if` de plateforme que l'architecture
+ * admet, et il est ici plutôt que dispersé — c'est précisément ce que le port permet.
+ *
+ * Chaque exemption est un fichier ENTIER et doit le rester lisible : allonger cette liste est
+ * un choix d'architecture, pas une commodité. */
+const COMPOSITION_ROOT = [
+  'packages/extension/src/host-platform.ts', // quelle plateforme sert cet hôte (§2)
+  'packages/extension/src/background.ts', // répartition des hôtes accordés, relais de config
+  'packages/extension/src/content-internal.ts', // construit l'adaptateur retenu
+  'packages/extension/src/options/options.ts', // laisse la personne étiqueter un hôte
+];
+
+const ADAPTERS = join(root, 'packages/adapters');
+
+function walk(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (p.endsWith('.ts') && !p.endsWith('.d.ts')) out.push(p);
+  }
+  return out;
+}
+
+/** Les mots DISTINCTIFS d'un fichier de sélecteurs : noms de classes, identifiants en dièse,
+ * valeurs de `data-testid`, de `name=`, d'`id=`, et noms de modules Primer. Volontairement PAS les noms de balises ni les
+ * attributs standard (`textarea`, `aria-label`, `placeholder`…) : ceux-là appartiennent à HTML,
+ * pas à une plateforme, et les interdire au code partagé n'aurait aucun sens. */
+function vocabularyOf(css) {
+  const words = new Set();
+  const push = (w) => {
+    if (w.length < 5) return;
+    // Un mot ne distingue une plateforme que s'il a une MAJUSCULE INTERNE (`CommentBox`) ou un
+    // SÉPARATEUR (`comment-composer`). Sans ce filtre, `.Label` de GitHub interdisait `Label`,
+    // qui est un mot de NOTRE domaine — la première exécution de ce garde a signalé
+    // `LabelConfig` dans neuf fichiers de `core/`. Un mot capitalisé isolé appartient à la
+    // langue commune ; c'est la composition qui trahit une plateforme.
+    if (!/[a-z][A-Z]/.test(w) && !/[-_]/.test(w)) return;
+    words.add(w);
+  };
+  // .maClasse  /  [class*="maClasse"]  /  [data-testid*="mon-composeur"]  /  [name="x[y]"]
+  for (const m of css.matchAll(/\[(?:class|data-testid|name|id)[^\]]*?["']([^"']+)["']\]/g)) push(m[1]);
+  for (const m of css.matchAll(/\.([A-Za-z][\w-]*)/g)) push(m[1]);
+  // …et les sélecteurs d'ID en DIÈSE, que l'extraction ignorait : `#new_comment_form` chez
+  // GitHub, `#pull-request-complete-button` chez Azure DevOps étaient absents du vocabulaire
+  // « dérivé », si bien que recopier l'un ou l'autre dans du TypeScript partagé laissait ce
+  // garde au vert (Codex, PR #66). Un identifiant d'élément est aussi propre à une plateforme
+  // qu'un nom de classe.
+  for (const m of css.matchAll(/#([A-Za-z][\w-]*)/g)) push(m[1]);
+  return words;
+}
+
+
+/** Les tableaux `candidates: [ … ]` d'un source transformé, découpés en ÉQUILIBRANT les
+ * crochets — un sélecteur en contient (`textarea[aria-label*="omment"][class*="CommentBox"]`),
+ * et une capture non gloutonne s'arrêtait au premier, ne rendant qu'un fragment du premier
+ * candidat. Le vocabulaire GitHub tombait alors à six mots et ce garde passait AVEC ET SANS la
+ * fuite qu'il interdit. */
+function candidateBlocks(code) {
+  const blocks = [];
+  // `candidates` doit être une CLÉ DE PROPRIÉTÉ (`candidates: [`), jamais un accès membre
+  // (`selectors.x.candidates`). Deux défauts corrigés d'un coup : le contrôle du fichier unique
+  // comptait `index.ts` comme définissant des sélecteurs alors qu'il ne fait que les LIRE ; et
+  // la dérivation du vocabulaire, elle, cherchait « le prochain crochet » depuis cet accès —
+  // n'importe où plus loin dans le fichier — et pouvait donc avaler un bloc sans aucun rapport.
+  const KEY = /(^|[^.\w$])candidates\s*:\s*\[/g;
+  for (const m of code.matchAll(KEY)) {
+    const open = code.indexOf('[', m.index);
+    let depth = 0;
+    let quote = null;
+    let j = open;
+    for (; j < code.length; j++) {
+      const ch = code[j];
+      if (quote) {
+        if (ch === '\\') j++;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+      else if (ch === '[') depth++;
+      else if (ch === ']' && --depth === 0) break;
+    }
+    blocks.push(code.slice(open, j));
+  }
+  return blocks;
+}
+
+const scattered = [];
+
+const vocabularies = new Map(); // plateforme -> Set(mots)
+for (const platform of readdirSync(ADAPTERS)) {
+  if (platform === 'shared') continue;
+  // TOUT le paquet de la plateforme, jamais un fichier nommé. Ce garde a lu
+  // `src/selectors.ts` pendant exactement un chantier : le jour où les candidats de composeur
+  // sont partis dans `src/surfaces.ts`, le vocabulaire GitHub est tombé de 60 mots à 54, le
+  // garde est resté AU VERT, et il ne rattrapait plus la fuite pour laquelle il avait été
+  // écrit. Trouvé en réintroduisant la fuite après le déplacement, jamais en relisant.
+  //
+  // Un nom de fichier est une liste d'un seul élément, et il vieillit comme les autres : la
+  // leçon que ce garde applique déjà aux noms de plateforme vaut aussi pour l'endroit où il
+  // va les chercher. Le critère juste est le PAQUET — tout ce qu'écrit un paquet de
+  // plateforme est, par construction, du vocabulaire de cette plateforme.
+  const dir = join(ADAPTERS, platform, 'src');
+  let files;
+  try {
+    files = walk(dir);
+  } catch {
+    continue; // un adaptateur sans sources : rien à dériver
+  }
+  // Transformé FICHIER PAR FICHIER, puis concaténé — jamais l'inverse. Concaténer d'abord fait
+  // partager un même scope de premier niveau à des modules sans rapport : `surfaces.ts` importe
+  // `selectors`, que `selectors.ts` déclare, et esbuild refuse alors le symbole dupliqué.
+  //
+  // Cette revue mérite d'être racontée exactement (Codex, PR #66). L'avertissement a été émis
+  // quand la concaténation passait encore — mesuré aux deux adaptateurs, `transformSync`
+  // l'acceptait, le garde rendait 0, la CI était verte —, et le SYMPTÔME étant absent la
+  // conclusion fut que la trouvaille était fausse. Elle ne l'était pas : elle décrivait un
+  // MÉCANISME, que le correctif suivant a déclenché en une ligne. Vérifier qu'un symptôme est
+  // absent aujourd'hui ne réfute pas un mécanisme.
+  // Les chaînes du fichier de sélecteurs, commentaires exclus — un commentaire y cite parfois
+  // un sélecteur en exemple, ce qui n'en fait pas un candidat.
+  // `minifyWhitespace` et non le transform nu : esbuild CONSERVE les commentaires attachés aux
+  // membres de classe, et un commentaire qui cite un sélecteur entre backticks ressemblerait à
+  // un littéral. Mesuré, pas supposé. Les identifiants, eux, ne sont pas renommés.
+  const perFile = files.map((f) => ({
+    file: relative(root, f).replaceAll('\\', '/'),
+    code: transformSync(readFileSync(f, 'utf8'), { loader: 'ts', format: 'esm', minifyWhitespace: true }).code,
+  }));
+  const code = perFile.map((x) => x.code).join('\n');
+  // TOUTES les chaînes du fichier, MOINS les noms de chaînes de sélecteurs. Découper sur
+  // `candidates: [ … ]` paraissait plus précis et ne l'était pas : un sélecteur contient
+  // lui-même des crochets (`textarea[aria-label*="omment"][class*="CommentBox"]`), si bien que
+  // la capture s'arrêtait au premier `]` et n'emportait qu'un fragment du premier candidat.
+  // Le vocabulaire GitHub tombait ainsi à six mots dont ni `CommentBox` ni `comment-composer`,
+  // et ce garde passait AVEC ET SANS la fuite qu'il est censé interdire — donc ne prouvait
+  // rien. Trouvé en réintroduisant la fuite, jamais en relisant.
+  //
+  // `name:` porte l'étiquette de journalisation d'une chaîne (`merge-button`, `editors`), pas
+  // un nom de la plateforme : l'interdire au code partagé n'aurait aucun sens.
+  // Les TABLEAUX DE CANDIDATS, où qu'ils vivent dans le paquet — c'est le seul texte d'un
+  // adaptateur qui soit un sélecteur DOM. Élargir à toutes les chaînes du paquet paraissait
+  // plus sûr et ne l'était pas : les chemins d'API et le nom de notre propre fichier de
+  // configuration (`.conventional-comments.json`) entraient au vocabulaire, et le garde
+  // interdisait au code partagé des mots qui sont les siens.
+  //
+  // Le découpage est fait en ÉQUILIBRANT les crochets, pas par une expression régulière : un
+  // sélecteur en contient (`textarea[aria-label*="omment"][class*="CommentBox"]`), et une
+  // capture non gloutonne s'arrêtait au premier — le vocabulaire GitHub tombait alors à six
+  // mots et le garde passait avec ET sans la fuite. C'est le même défaut qui a coûté deux
+  // corrections à ce fichier ; il est ici traité à la source.
+  const candidates = candidateBlocks(code);
+  const literals = candidates.flatMap((block) =>
+    [...block.matchAll(/(['"`])((?:(?!\1)[^\\]|\\.)*)\1/g)].map((m) => m[2])
+  );
+  vocabularies.set(platform, vocabularyOf(literals.join('\n')));
+
+  // §9.4 — « les sélecteurs DOM sont centralisés dans un fichier UNIQUE par adaptateur ».
+  //
+  // Ce garde est présenté dans conformance.yml comme mécanisant cette règle, et il ne la
+  // vérifiait pas : il interdisait le vocabulaire d'une plateforme au code partagé, ce qui est
+  // une autre question. Remettre demain un sélecteur dans `surfaces.ts` — exactement ce que la
+  // première version de cette PR avait fait — le laissait vert (revue Reefact, PR #66).
+  //
+  // Le fichier central n'est PAS nommé ici, et c'est délibéré : un nom de fichier est une liste
+  // d'un seul élément, et ce garde a déjà payé cette leçon une fois. Le §9.4 dit « un fichier
+  // unique », pas « le fichier `selectors.ts` ». On vérifie donc la propriété telle qu'elle est
+  // écrite : combien de fichiers de ce paquet DÉFINISSENT des candidats ? Un seul est conforme,
+  // quel que soit son nom ; deux ne le sont pas, quels que soient les leurs.
+  const definingFiles = perFile.filter((x) => candidateBlocks(x.code).length > 0).map((x) => x.file);
+  if (definingFiles.length > 1) {
+    scattered.push({ platform, files: definingFiles });
+  }
+}
+
+if (vocabularies.size === 0) {
+  // Le message ne nomme AUCUN fichier, pour la même raison que la dérivation n'en nomme aucun :
+  // il a nommé `src/selectors.ts` le temps d'une revue, alors que le garde lisait déjà tout le
+  // paquet — un diagnostic qui envoie regarder au mauvais endroit coûte plus qu'il ne rend.
+  console.error(
+    'Aucun tableau de candidats trouvé sous packages/adapters/*/src.\n' +
+      "Ce garde DÉRIVE de là le vocabulaire qu'il interdit ailleurs : sans source, il ne vérifie\n" +
+      'rien tout en passant au vert. Corrigez la dérivation plutôt que de la contourner.'
+  );
+  process.exit(1);
+}
+
+const findings = [];
+for (const rel of NEUTRAL_ROOTS) {
+  for (const file of walk(join(root, rel))) {
+    const relPath = relative(root, file).replaceAll('\\', '/');
+    if (COMPOSITION_ROOT.includes(relPath)) continue;
+    // Le CODE seul : esbuild retire les commentaires avec un vrai parseur. Une regex les
+    // confondrait avec le `//` d'une URL, et ce garde refuserait alors des commentaires
+    // légitimes — ceux qui gardent la mémoire des défauts, précisément ce qu'il faut préserver.
+    const code = transformSync(readFileSync(file, 'utf8'), {
+      loader: 'ts',
+      format: 'esm',
+      minifyWhitespace: true,
+    }).code;
+    // On ne cherche QUE dans les chaînes de caractères, et c'est la forme exacte qu'ont prise
+    // les deux fuites réelles : `closest('[data-testid*="comment-composer"]')` et
+    // `includes('CommentBox')`. Un sélecteur de plateforme est toujours une chaîne — jamais un
+    // identifiant. Chercher dans tout le code confondait `LabelConfig` avec la classe `.Label`
+    // de GitHub, et aurait rendu ce garde inutilisable donc désactivé.
+    const strings = [...code.matchAll(/(['"`])((?:(?!\1)[^\\]|\\.)*)\1/g)].map((m) => m[2]);
+    for (const [platform, words] of vocabularies) {
+      for (const word of words) {
+        if (!strings.some((lit) => lit.includes(word))) continue;
+        findings.push({ relPath, platform, word });
+      }
+    }
+  }
+}
+
+// ————— LE MÊME CRITÈRE, DANS L'AUTRE LANGAGE —————
+//
+// Tout ce qui précède ne lit que du TypeScript (`walk()` filtre sur `.ts`). Or la scission des
+// styles vit dans des `.css`, et ce garde ne la couvrait pas : remettre `var(--fgColor-default,
+// currentColor)` dans `packages/extension/src/styles.css` — un jeton Primer dans la feuille que
+// TOUTES les plateformes reçoivent — laissait `npm run checks` ET `check:style-isolation` au
+// vert (revue Reefact, PR #66). Mesuré en le faisant, pas déduit.
+//
+// Les deux autres gardes ne rattrapaient rien : `check:github-theme-vars` ne lit que la feuille
+// de plateforme de GitHub, et les invariants permanents de `check:style-isolation` comparent la
+// feuille partagée courante à elle-même — ils mesurent le SCOPE, pas la provenance d'un jeton.
+//
+// Le critère est celui d'au-dessus, mot pour mot : ce qu'écrit une feuille de plateforme
+// appartient à cette plateforme. Une variable non préfixée `--cct-` référencée dans un
+// `platform.css` est donc un jeton de cette plateforme, et n'a rien à faire dans la feuille
+// partagée. Les `--cct-*`, eux, sont NOTRE vocabulaire : c'est précisément l'indirection que
+// cette PR installe, et la feuille partagée doit continuer de les employer.
+const SHARED_SHEET = 'packages/extension/src/styles.css';
+
+/** Le CSS sans ses commentaires. Même raison que côté TypeScript : un commentaire cite parfois
+ * le jeton qu'il explique, et l'interdire ferait disparaître la mémoire des défauts. */
+function stripCssComments(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+}
+
+const cssVocabularies = new Map(); // plateforme -> Set(noms de variables de la plateforme)
+const cssRoles = new Map(); // plateforme -> Set(rôles --cct-* que sa feuille DÉCLARE)
+for (const platform of readdirSync(ADAPTERS)) {
+  if (platform === 'shared') continue;
+  const sheet = join(ADAPTERS, platform, 'src', 'platform.css');
+  let css;
+  try {
+    css = stripCssComments(readFileSync(sheet, 'utf8'));
+  } catch {
+    continue; // pas de feuille pour cette plateforme : rien à dériver
+  }
+  const names = new Set(
+    [...css.matchAll(/--[A-Za-z0-9_-]+/g)].map((m) => m[0]).filter((n) => !n.startsWith('--cct-'))
+  );
+  if (names.size > 0) cssVocabularies.set(platform, names);
+  // Le deux-points sépare une DÉCLARATION d'un usage : `--cct-x:` déclare, `var(--cct-x)` et
+  // `var(--cct-x, …)` consomment. Enregistré pour TOUTE feuille existante, vocabulaire propre ou
+  // non — une feuille qui ne déclare aucun jeton de thème (azdo) reste une plateforme à qui les
+  // questions de la feuille partagée sont posées.
+  cssRoles.set(platform, new Set([...css.matchAll(/(--cct-[A-Za-z0-9_-]+)\s*:/g)].map((m) => m[1])));
+}
+
+const cssFindings = [];
+{
+  const shared = stripCssComments(readFileSync(join(root, SHARED_SHEET), 'utf8'));
+  for (const [platform, names] of cssVocabularies) {
+    for (const name of names) {
+      // Borné à droite : `--fgColor-default` ne doit pas matcher via `--fgColor-defaultXyz`.
+      if (!new RegExp(`${name}(?![A-Za-z0-9_-])`).test(shared)) continue;
+      cssFindings.push({ platform, name });
+    }
+  }
+}
+
+// ————— UNE QUESTION POSÉE SANS REPLI DOIT TROUVER SA RÉPONSE —————
+//
+// Le corollaire du critère ci-dessus, et il est né du même correctif. Sortir de la feuille
+// partagée trois longueurs mesurées sur github.com (revue Reefact, PR #66) laisse ce fichier
+// les CONSOMMER sans les déclarer : `padding: var(--cct-frame-padding)`. Une feuille de
+// plateforme qui oublierait d'y répondre ne casserait rien de visible à la lecture — le
+// `var()` deviendrait invalide, la propriété reprendrait sa valeur initiale, et le composeur
+// perdrait ses retraits SANS un mot. Le déplacement aurait échangé une fuite bruyante contre
+// une perte muette.
+//
+// Les deux écritures de `var()` séparent donc deux intentions, et c'est le critère :
+//   `var(--cct-x)`      — une QUESTION posée à la plateforme, à laquelle chacune doit répondre ;
+//   `var(--cct-x, …)`   — une valeur que la feuille partagée consent à fournir elle-même.
+// Aucune liste : les questions sont dérivées du fichier, les réponses des feuilles présentes.
+// Une feuille GitLab qui arrive demain est interrogée sans qu'on touche à ce script.
+//
+// CE QUE CETTE SECTION NE VOIT PAS, et qui doit rester écrit : elle ne dit pas si une valeur
+// DEVAIT quitter la feuille partagée. Remettre `--cct-frame-padding: 8px` dans son `:root`
+// éteint la question au lieu d'y répondre, et le garde se tait — parce que rien ne distingue
+// mécaniquement une valeur neutre (`Highlight`, un rayon de 6 px) d'une mesure faite sur une
+// plateforme. Ce tri-là est un jugement, et il se fait en revue.
+const roleQuestions = [];
+{
+  const shared = stripCssComments(readFileSync(join(root, SHARED_SHEET), 'utf8'));
+  const declared = new Set([...shared.matchAll(/(--cct-[A-Za-z0-9_-]+)\s*:/g)].map((m) => m[1]));
+  const asked = new Set([...shared.matchAll(/var\(\s*(--cct-[A-Za-z0-9_-]+)\s*\)/g)].map((m) => m[1]));
+  for (const role of [...asked].sort()) if (!declared.has(role)) roleQuestions.push(role);
+}
+const unanswered = [];
+for (const [platform, roles] of cssRoles) {
+  for (const role of roleQuestions) if (!roles.has(role)) unanswered.push({ platform, role });
+}
+
+/** Le contrat lui-même ne doit nommer aucune plateforme : un port exposant
+ * `isGitHubChangesView()` obligerait le code partagé à savoir de qui il parle, et le
+ * conditionnel que le polymorphisme supprime reviendrait sous un autre nom. */
+const contract = readFileSync(join(root, 'packages/adapters/shared/src/index.ts'), 'utf8');
+const contractCode = transformSync(contract, { loader: 'ts', format: 'esm', minifyWhitespace: true }).code;
+const platformNames = [...vocabularies.keys(), 'github', 'gitlab', 'azdo', 'azure', 'bitbucket'];
+const contractLeaks = [];
+for (const m of contractCode.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?=[(:<])/g)) {
+  const id = m[1];
+  if (platformNames.some((p) => id.toLowerCase().includes(p))) contractLeaks.push(id);
+}
+
+if (
+  findings.length === 0 &&
+  contractLeaks.length === 0 &&
+  scattered.length === 0 &&
+  cssFindings.length === 0 &&
+  unanswered.length === 0
+) {
+  const total = [...vocabularies.values()].reduce((a, s) => a + s.size, 0);
+  const detail = [...vocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ');
+  console.log(`✓ isolation des plateformes : ${total} mots dérivés — ${detail} — absents du code partagé.`);
+  console.log('✓ §9.4 : chaque adaptateur définit ses sélecteurs dans un fichier unique.');
+  const cssTotal = [...cssVocabularies.values()].reduce((a, s) => a + s.size, 0);
+  const cssDetail = [...cssVocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ') || 'aucune feuille renseignée';
+  console.log(`✓ styles : ${cssTotal} jeton(s) de plateforme — ${cssDetail} — absents de la feuille partagée.`);
+  const asked = roleQuestions.length;
+  console.log(
+    asked === 0
+      ? `✓ rôles : la feuille partagée ne pose aucune question sans repli.`
+      : `✓ rôles : ${asked} question(s) sans repli — ${roleQuestions.join(', ')} — auxquelles les ` +
+          `${cssRoles.size} feuille(s) de plateforme répondent.`
+  );
+  process.exit(0);
+}
+
+if (findings.length > 0) {
+  console.error(
+    `${findings.length} identifiant(s) de plateforme dans du code qui ne doit connaître aucune plateforme :\n` +
+      findings.map((f) => `  - ${f.relPath}  «${f.word}»  (vocabulaire ${f.platform})`).join('\n') +
+      '\n\nCe mot est un candidat de sélecteur d\'un adaptateur. Sa place est dans ce paquet : exposez ce\n' +
+      "dont le code partagé a besoin par une méthode du contrat (§9.2.3), qui rend une DONNÉE et\n" +
+      'ne nomme aucune plateforme — voir `getEditorChrome()`. Le code partagé s\'exécute sur\n' +
+      'TOUTES les plateformes : ce qui est écrit ici est exécuté par toutes.'
+  );
+}
+if (cssFindings.length > 0) {
+  console.error(
+    `\n${cssFindings.length} jeton(s) de plateforme dans ${SHARED_SHEET}, que TOUTES les plateformes reçoivent :\n` +
+      cssFindings.map((f) => `  - «${f.name}»  (feuille ${f.platform})`).join('\n') +
+      "\n\nUne mesure faite sur une plateforme ne se déclare pas dans la feuille commune : elle y devient\n" +
+      'une constante que les autres subissent. Déclarez un rôle `--cct-*` ici, et donnez-lui sa valeur\n' +
+      'dans la feuille de la plateforme concernée, sous son propre marqueur.'
+  );
+}
+if (unanswered.length > 0) {
+  console.error(
+    `\n${unanswered.length} rôle(s) que ${SHARED_SHEET} demande sans repli et qu'une feuille de\n` +
+      'plateforme ne déclare pas :\n' +
+      unanswered.map((u) => `  - ${u.platform} : «${u.role}»`).join('\n') +
+      "\n\nUn `var()` sans repli est une QUESTION posée à la plateforme ; sans réponse, la déclaration\n" +
+      "devient invalide et la propriété reprend sa valeur initiale — une perte de mise en page que\n" +
+      "rien ne signale. Déclarez le rôle sous le marqueur de cette plateforme, ou, si la feuille\n" +
+      'partagée doit fournir la valeur, écrivez-la en repli : `var(--cct-x, …)`.'
+  );
+}
+if (scattered.length > 0) {
+  console.error(
+    `\n${scattered.length} adaptateur(s) définissent des sélecteurs dans PLUSIEURS fichiers, ` +
+      'contre le §9.4\n(« centralisés dans un fichier unique par adaptateur ») :\n' +
+      scattered.map((x) => `  - ${x.platform} : ${x.files.join(', ')}`).join('\n') +
+      "\n\nUn seul fichier par adaptateur DÉFINIT des candidats ; les autres peuvent les référencer.\n" +
+      'Son nom est libre — la règle porte sur leur nombre, pas sur leur nom.'
+  );
+}
+if (contractLeaks.length > 0) {
+  console.error(
+    `\nLe contrat partagé nomme une plateforme : ${[...new Set(contractLeaks)].join(', ')}.\n` +
+      "Un port dont une signature mentionne une plateforme a échoué : le code partagé devrait\n" +
+      'alors savoir de qui il parle. Nommez le RÔLE, jamais la plateforme qui le tient.'
+  );
+}
+process.exit(1);

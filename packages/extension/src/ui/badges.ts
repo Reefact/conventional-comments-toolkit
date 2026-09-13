@@ -29,7 +29,11 @@ import {
   type PlatformProfile,
   type ResolvedDecoration,
 } from '@cct/core';
-import { OWN_BADGES } from '@cct/adapter-shared';
+// Ce module ne nomme plus AUCUNE forme de corps rendu : `MARKDOWN_HTML_BODY_SHAPE` n'est plus
+// importé ici. Il l'était pour deux replis — le défaut de `decorateComment()` et le bouche-trou
+// que prenait `applyPrefixVisibility()` en défaisant —, tous deux retirés. Le rendu partagé
+// reçoit désormais la forme, il ne l'invente jamais (revue Reefact, PR #66).
+import { normalizeBodyShape, OWN_BADGES, type RenderedBodyShape } from '@cct/adapter-shared';
 import { ui } from './strings.js';
 
 function labelBadge(label: { icon?: string; id: string; color?: string }, config: EffectiveConfig): HTMLElement {
@@ -257,9 +261,9 @@ const ABORT = Symbol('firstTextNode.abort');
  *
  * N'exclut PAS de renoncer aussi sur des plateformes ou des DOM légitimes qu'aucune mesure
  * n'a encore couverts (Azure DevOps, notamment — jamais vérifié en direct dans ce dépôt) : mais
- * y renoncer est TOUJOURS l'issue sûre (§9.4, CA-11 — dégradation silencieuse, jamais un
- * blocage de l'usage normal) puisque le masquage n'est qu'un affinage cosmétique du rendu
- * (§5.5) — son absence laisse le texte complet visible, jamais corrompu. Élargir cette
+ * y renoncer est TOUJOURS l'issue sûre — le repli de rendu du §5.5, et non une dégradation de
+ * sélecteur : rien n'a échoué à être détecté, c'est le masquage qui s'abstient. Il n'est qu'un
+ * affinage cosmétique du rendu, et son absence laisse le texte complet visible, jamais corrompu. Élargir cette
  * allow-list à un autre tag qu'un jour mesuré confirmerait coûte une ligne ; la resserrer après
  * l'avoir élargie à tort, une fois qu'un utilisateur a vu un texte corrompu, ne coûte jamais
  * rien de comparable.
@@ -269,18 +273,23 @@ const ABORT = Symbol('firstTextNode.abort');
  * un `<p>` de rendu Markdown — le soumettre à la même règle romprait la recherche pour CHAQUE
  * commentaire (`<td>` n'est pas `<p>`), et compterait à tort le conteneur de la plateforme
  * comme le premier niveau autorisé, privant le VRAI premier niveau du sien. */
-function firstTextNode(node: Node, isRoot = true, depth = 0): Text | typeof ABORT | null {
+function firstTextNode(
+  node: Node,
+  shape: RenderedBodyShape,
+  isRoot = true,
+  depth = 0
+): Text | typeof ABORT | null {
   if (node.nodeType === 3 /* Node.TEXT_NODE */) {
     return (node as Text).data.trim().length > 0 ? (node as Text) : null;
   }
   if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
     const element = node as Element;
     if (element.classList.contains('cct-badge')) return null;
-    if (!isRoot && (depth >= 1 || element.tagName !== 'P')) return ABORT;
+    if (!isRoot && (depth >= 1 || !shape.paragraphTags.includes(element.tagName))) return ABORT;
   }
   const nextDepth = isRoot ? depth : depth + 1;
   for (const child of node.childNodes) {
-    const found = firstTextNode(child, false, nextDepth);
+    const found = firstTextNode(child, shape, false, nextDepth);
     if (found === ABORT) return ABORT; // remonte l'abandon jusqu'à la racine, jamais un frère suivant
     if (found) return found;
   }
@@ -341,6 +350,9 @@ function isLosslessBadgeProjection(prefixLine: string, shown: ResolvedDecoration
  * d'accessibilité une emphase que l'auteur n'a pas écrite (§10). Le poids visuel se lit à l'œil,
  * l'information, elle, est déjà portée par les badges. */
 const SUBJECT_CLASS = 'cct-subject';
+/** Marque posée par `decorateComment` sur l'élément où il écrit ses badges, quand ce n'est pas
+ * le corps lui-même. C'est la moitié DOM d'`OWN_BADGES` (adapter-shared). */
+const BADGE_HOST_CLASS = 'cct-badge-host';
 
 /** Nœuds du sujet, dans l'ordre : depuis le frère qui suit le préfixe masqué jusqu'à la fin de
  * la PREMIÈRE ligne. Deux frontières, parce que le corps rendu en connaît deux : un `<br>` —
@@ -365,13 +377,14 @@ const SUBJECT_CLASS = 'cct-subject';
  * deux liens, et le §9.4 dit ce que vaut un affinage cosmétique face à ce risque. Renoncer
  * plutôt que s'arrêter AVANT ce frère, aussi : le début de la ligne passerait en gras et sa fin
  * non, sur une même ligne — une mise en avant qui désignerait un fragment au lieu du sujet. */
-function subjectNodes(hidden: Element): ChildNode[] {
+function subjectNodes(hidden: Element, shape: RenderedBodyShape): ChildNode[] {
   const nodes: ChildNode[] = [];
   for (let node = hidden.nextSibling; node !== null; node = node.nextSibling) {
     if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
       const element = node as Element;
-      if (element.tagName === 'BR') break;
-      if (element.querySelector('br') !== null) return []; // borne interne : on ne sait pas border proprement
+      if (element.tagName === shape.lineBreakTag) break;
+      // borne interne : on ne sait pas border proprement
+      if (element.querySelector(shape.lineBreakTag) !== null) return [];
     }
     if (node.nodeType === 3 /* Node.TEXT_NODE */) {
       const newline = (node as Text).data.indexOf('\n');
@@ -411,9 +424,12 @@ const SUBJECT_BREAK_CLASS = 'cct-subject-break';
  * passage : un `<br>` peut apparaître ou disparaître d'une édition à l'autre, et l'espaceur ne
  * doit jamais survivre au saut de ligne qui le justifiait. Purement décoratif, sans texte :
  * `commentBodyText()` relit le même corps avec ou sans lui. */
-function markSubjectBreak(wrapper: Element): void {
+function markSubjectBreak(wrapper: Element, shape: RenderedBodyShape): void {
   const next = wrapper.nextSibling;
-  const lineBreak = next !== null && next.nodeType === 1 && (next as Element).tagName === 'BR' ? (next as Element) : null;
+  const lineBreak =
+    next !== null && next.nodeType === 1 && (next as Element).tagName === shape.lineBreakTag
+      ? (next as Element)
+      : null;
   const existing = wrapper.parentElement?.querySelector(`:scope > .${SUBJECT_BREAK_CLASS}`) ?? null;
   if (lineBreak === null) {
     existing?.remove(); // le corps enchaîne sur un autre bloc : la plateforme espace déjà
@@ -430,19 +446,19 @@ function markSubjectBreak(wrapper: Element): void {
  * comme le masquage lui-même : une réhydratation de plateforme peut emporter ce wrapper sans
  * toucher aux badges. Un sujet VIDE (`issue:` seul, §3.5 E-EMPTY-SUBJECT) ne reçoit rien —
  * un span vide n'a rien à mettre en gras. */
-function wrapSubject(hidden: Element): void {
+function wrapSubject(hidden: Element, shape: RenderedBodyShape): void {
   const next = hidden.nextSibling;
   if (next !== null && next.nodeType === 1 && (next as Element).classList.contains(SUBJECT_CLASS)) {
-    markSubjectBreak(next as Element); // wrapper déjà là : seul l'espaceur reste à réentretenir
+    markSubjectBreak(next as Element, shape); // wrapper déjà là : seul l'espaceur reste à réentretenir
     return;
   }
-  const nodes = subjectNodes(hidden);
+  const nodes = subjectNodes(hidden, shape);
   if (nodes.length === 0) return;
   const wrapper = globalThis.document.createElement('span');
   wrapper.className = SUBJECT_CLASS;
   hidden.after(wrapper);
   for (const node of nodes) wrapper.appendChild(node);
-  markSubjectBreak(wrapper);
+  markSubjectBreak(wrapper, shape);
 }
 
 /** Rend les enfants d'un wrapper à son parent, à leur place exacte, et referme la coupure —
@@ -483,6 +499,9 @@ function unwrapSubject(commentBodyElement: Element): void {
  * défaisage doit couvrir tout ce que le rendu pose, pas seulement ce qui se voit. */
 export function clearCommentDecorations(root: ParentNode): void {
   for (const badge of [...root.querySelectorAll('.cct-badge')]) badge.remove();
+  // La marque de l'hôte part avec les badges qu'elle désignait : la laisser ferait relire comme
+  // « nôtre » un élément où plus rien n'est à nous.
+  for (const h of [...root.querySelectorAll(`.${BADGE_HOST_CLASS}`)]) h.classList.remove(BADGE_HOST_CLASS);
   for (const spacer of [...root.querySelectorAll(`.${SUBJECT_BREAK_CLASS}`)]) spacer.remove();
   // Le sujet AVANT le préfixe : les deux vivent dans le même parent, et défaire le sujet
   // d'abord laisse `revealPrefix()` recoller la ligne entière d'un seul `normalize()`.
@@ -510,9 +529,20 @@ export function clearCommentDecorations(root: ParentNode): void {
  * — résolution perdue sur un changement de configuration en direct, §8.1.1 — le texte redevient
  * un nœud ordinaire, `normalize()` referme la coupure plutôt que de laisser deux nœuds de texte
  * adjacents. */
-function applyPrefixVisibility(commentBodyElement: Element, prefixLine: string | null, bodyText: string): void {
+function applyPrefixVisibility(
+  commentBodyElement: Element,
+  /** Le masquage DEMANDÉ, ou `null` pour DÉFAIRE celui qui serait en place.
+   *
+   * Les deux données voyagent ensemble parce qu'elles ne se séparent pas : masquer exige une
+   * forme de corps rendu, défaire n'en exige aucune. Séparées, l'appelant devait en fournir
+   * une même quand il renonçait, et il y passait `MARKDOWN_HTML_BODY_SHAPE` — une hypothèse
+   * GitHub que ce corps de fonction ne lit jamais, mais que la prochaine relecture aurait
+   * prise pour un fait (revue Reefact, PR #66). Le couple la rend inexprimable. */
+  masking: { prefixLine: string; shape: RenderedBodyShape } | null,
+  bodyText: string
+): void {
   const existing = commentBodyElement.querySelector('.cct-hidden-prefix');
-  if (prefixLine === null) {
+  if (masking === null) {
     if (existing) {
       // Le sujet part avec le préfixe : sa mise en avant ne se lit qu'avec les badges, qui
       // disparaissent au même instant. Avant `replaceWith`, pour que le `normalize()` final
@@ -522,14 +552,15 @@ function applyPrefixVisibility(commentBodyElement: Element, prefixLine: string |
     }
     return;
   }
+  const { prefixLine, shape } = masking;
   if (existing) {
-    wrapSubject(existing); // réentretien, comme le masquage lui-même : gratuit si rien n'a bougé
+    wrapSubject(existing, shape); // réentretien, comme le masquage lui-même : gratuit si rien n'a bougé
     return;
   }
   // Un `.cct-subject` sans son préfixe masqué, avant de reconstruire : `wrapSubject()`
   // l'emballerait tel quel dans le nouveau wrapper, une couche de plus à chaque passage.
   unwrapSubject(commentBodyElement);
-  const first = firstTextNode(commentBodyElement);
+  const first = firstTextNode(commentBodyElement, shape);
   if (!first || first === ABORT) return;
   const span = hiddenPrefixSpan(first.data, prefixLine);
   if (span === null) return;
@@ -554,7 +585,7 @@ function applyPrefixVisibility(commentBodyElement: Element, prefixLine: string |
   hidden.className = 'cct-hidden-prefix';
   target.replaceWith(hidden);
   hidden.appendChild(target);
-  wrapSubject(hidden);
+  wrapSubject(hidden, shape);
 }
 
 export function decorateComment(
@@ -562,8 +593,25 @@ export function decorateComment(
   bodyText: string,
   config: EffectiveConfig,
   platform: PlatformProfile,
-  lang: string
+  lang: string,
+  /** La forme du HTML rendu par la plateforme (§5.5), ou `null` si elle n'a pas été MESURÉE.
+   *
+   * OBLIGATOIRE, et le défaut nommé qui vivait ici a été retiré. Il se justifiait par les
+   * appels de TEST qui ne s'intéressent pas au sujet — plus de cent —, ce qui oubliait à qui
+   * d'autre profite un défaut : un futur appel de PRODUCTION omettant de consulter
+   * l'adaptateur compilait, et recevait `<p>` / `<br>`. L'hypothèse GitHub que cette PR sort
+   * du code partagé rentrait par la porte laissée ouverte au bout du chemin (revue Reefact,
+   * PR #66). Le compilateur pose maintenant la question à l'appelant, comme le contrat la pose
+   * à l'adaptateur.
+   *
+   * Les tests qui ne portent pas sur la forme passent par `test/helpers/decorate.ts` : le
+   * raccourci existe toujours, mais il vit du côté des tests, où son coût est une ligne. */
+  rawShape: RenderedBodyShape | null
 ): void {
+  // Normalisé ICI, à l'entrée unique du module, et pas aux trois comparaisons qui l'emploient :
+  // une normalisation répartie s'oublie au quatrième site. `tagName` rend `P` en HTML, un
+  // adaptateur peut légitimement écrire `'p'` (revue Reefact, PR #65).
+  const shape = rawShape === null ? null : normalizeBodyShape(rawShape);
   const a = analyze(
     {
       body: bodyText,
@@ -593,7 +641,30 @@ export function decorateComment(
   // PR #38). Un simple retour sur signature/compte inchangés laisserait alors le préfixe
   // réapparu tel quel. Idempotent (firstTextNode ignore les `.cct-badge` déjà posés, encore
   // présents ici), donc gratuit quand rien n'a bougé.
-  applyPrefixVisibility(commentBodyElement, canHidePrefix ? a.prefixLine : null, bodyText);
+  // `shape === null` : la plateforme n'a pas MESURÉ la forme de son corps rendu (§9.2.3). Le
+  // masquage du préfixe et la mise en avant du sujet renoncent alors entièrement — c'est le seul
+  // repli honnête : deviner quelle balise borne une ligne, c'est risquer de faire glisser une
+  // partie de la discussion dans le sujet mis en avant. Les badges, eux, sont posés plus bas :
+  // ils ne dépendent d'aucune de ces deux balises, et le corps s'affiche entier.
+  //
+  // Ce renoncement n'est PAS une dégradation de sélecteur, et rien n'est journalisé ici. Le §9.4
+  // trace un ÉCHEC DE DÉTECTION — un sélecteur qu'on croyait bon ne ramène plus rien ; ici la
+  // plateforme a répondu, et sa réponse est qu'elle ne sait pas. Confondre les deux mettrait une
+  // plateforme entière en échec permanent et écrirait une entrée par commentaire rendu, à chaque
+  // mutation de la page, noyant les vraies dégradations — c'est le défaut déjà payé sur
+  // `merge-button`. Le commentaire d'ici a d'abord dit le contraire (revue Reefact, PR #65).
+  //
+  // `masking` à `null`, et un APPEL quand même — jamais un simple saut : c'est ce `null` qui
+  // DÉFAIT un masquage antérieur. Sans cet appel, une plateforme passant de « mesurée » à
+  // « inconnue » (configuration, mise à jour) laisserait en place un préfixe masqué que plus
+  // rien n'entretient.
+  //
+  // Le couple `{ prefixLine, shape }` plutôt que deux arguments : masquer exige les deux,
+  // défaire n'exige ni l'un ni l'autre. Séparés, le cas « je renonce » devait tout de même
+  // produire une forme, et il y passait la forme Markdown — inutilisée, mais écrite.
+  const masking =
+    shape !== null && canHidePrefix && a.prefixLine !== null ? { prefixLine: a.prefixLine, shape } : null;
+  applyPrefixVisibility(commentBodyElement, masking, bodyText);
   // Où poser les badges — LU dans le DOM que la ligne ci-dessus vient d'établir, jamais déduit
   // de `canHidePrefix` seul, qui dit ce qu'on VOULAIT faire, pas ce qui a été fait (les replis
   // de `applyPrefixVisibility` renoncent sans le dire à l'appelant). Préfixe masqué → l'élément
@@ -653,5 +724,10 @@ export function decorateComment(
   // prepend() insère tous les badges en une fois, dans l'ordre donné (label, puis les
   // décorations dans l'ordre d'écriture) — contrairement à insertAdjacentElement('afterbegin'),
   // répété, qui les aurait posés en ordre inverse.
+  // MARQUER l'hôte quand ce n'est pas le corps lui-même : `OWN_BADGES` (adapter-shared) s'y
+  // règle pour retrouver ces badges à la relecture. Sans cette marque il cherchait sous un
+  // `<p>`, ce qui cessait d'être vrai dès qu'une plateforme déclarait un autre conteneur de
+  // paragraphe (`renderedBodyShape()`). Retirée par `clearCommentDecorations`.
+  if (host !== commentBodyElement) host.classList.add(BADGE_HOST_CLASS);
   host.prepend(badge, ...decorationBadges(shown, hiddenDescriptive, config, lang));
 }

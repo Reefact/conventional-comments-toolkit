@@ -12,6 +12,77 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Changed
+
+- **GitHub fixes can no longer break Azure DevOps** (§9.1, §9.4). Two GitHub selectors lived
+  in the shared editor controller — a `comment-composer` composer and a `CommentBox` class —
+  and therefore ran on every Azure DevOps page. They matched nothing there, so nothing looked
+  broken; but §9.4 has always required DOM selectors to live "in a single file per adapter",
+  and a GitHub rename would have been fixed in a file both platforms execute. The rule was
+  unenforceable rather than merely unenforced: no contract method let the shared controller
+  *ask* an adapter for that container. The client contract (§9.2.3) gains `getEditorChrome()`,
+  which supplies it, and `renderedBodyShape()`, which supplies the shape of a rendered comment
+  body. Both are required, so a new platform is asked the question at compile time; both accept
+  a one-word "nothing special" — for the chassis that reproduces the previous behaviour exactly,
+  while an unmeasured body shape deliberately stands down, as the Azure DevOps entry below says.
+
+- **A platform's palette now belongs to that platform** (§9.1). The stylesheet named 33 Primer
+  tokens across 53 declarations and shipped to Azure DevOps as well as GitHub — including three
+  lengths that are GitHub measurements, among them a frame inset equal to the margin of GitHub's
+  own comment container. Every platform inherited one platform's proportions. The rules stay
+  where they are and now read `--cct-*` roles; each platform declares what those roles are worth
+  in its own sheet, scoped so it cannot reach a page it does not serve. Azure DevOps renders
+  exactly as before, measured property by property in a real browser. Its sheet declares no theme
+  token, because nothing in this repository has ever observed one and guessing would be the very
+  fault being corrected; the three composer lengths it does declare are GitHub's numbers, written
+  down as an explicit compatibility fallback. Those three spent a round sitting in the shared
+  sheet "as defaults", which kept every platform inheriting one platform's proportions from the
+  common base — the same fault, one storey down. What a platform receives is now a choice made in
+  its own file, which is the whole of what the split buys.
+
+- **The subject boundary no longer assumes GitHub's markup** (§5.5). The paragraph container and
+  the line-break marker were written in place, measured on github.com and applied everywhere. On
+  a rendered body whose line break differs, an entire sibling slid into the highlighted subject.
+  It is now a question the platform answers — and a platform may answer that it does not know.
+  **On Azure DevOps it does**, because nobody has ever measured how it renders a comment body,
+  so the prefix is no longer hidden there and the subject is no longer emphasised. Badges stay,
+  and the body renders whole: an incomplete rendering gets fixed, a wrong one gets noticed later.
+  Reinstating both takes one measurement on a real tenant, recorded as an open task.
+
+### Added
+
+- Three guards, because none of the above was visible to any test. `check:platform-isolation`
+  refuses a platform identifier in code every platform runs, and also enforces §9.4's "a single
+  file per adapter": it derives both the forbidden vocabulary and that count from the adapters'
+  own candidate arrays rather than from a list of names — a GitLab adapter will be covered
+  without touching it, and the central file's name is free. `check:style-isolation` measures the
+  stylesheet split in a real Chromium: no regression off GitHub, a value injected into the
+  GitHub layer reaching pages that carry the platform marker and none that do not, and every
+  rule bearing a token reached by an element the fixture really styles. `check:extension-css`
+  now covers every delivered sheet instead of one hardcoded path.
+
+- **The isolation guard now covers the stylesheets too, not only the TypeScript.** It walked
+  `.ts` files alone, so putting a Primer token back into the sheet every platform receives left
+  every guard green — measured by doing it, not deduced. The other two could not catch it:
+  `check:github-theme-vars` reads only GitHub's own sheet, and the permanent invariants of
+  `check:style-isolation` compare the shared sheet to itself, which measures scoping rather than
+  where a token came from. The criterion is unchanged, only applied in the other language: a
+  variable that is not `--cct-*` and appears in a platform sheet belongs to that platform. Its
+  corollary is enforced too, since moving a value out of the shared sheet can only be safe if
+  someone else supplies it: `var(--cct-x)` without a fallback is a question put to the platform,
+  `var(--cct-x, …)` a value the shared sheet is willing to supply itself, and every platform
+  sheet must answer every question of the first kind. Left unanswered, the declaration turns
+  invalid and the property falls back to its initial value — a layout loss nothing reports.
+
+- **A named composer chrome that matches nothing is now recorded, instead of passing silently.**
+  Where the adapter names the container it decorates and no longer finds it, that failure joins
+  the selector log the extension already keeps (§9.4, `CA-11`); where a surface names none — the
+  legacy generation, the changed-files view — nothing is logged, since finding no name there is
+  the normal case. The log says what was looked for and not found, and stops there: a selector
+  that matches nothing is not by itself evidence that the platform changed anything.
+
 ## [1.0.0-beta.13] - 2026-09-08
 
 ### Added

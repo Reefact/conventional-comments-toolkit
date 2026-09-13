@@ -85,3 +85,53 @@ choix de la technologie est libre ; l'existence de ce stockage ne l'est pas.
 `PlatformOperationalFacts` (dans `compliance/adapter.ts`) porte les hypothèses de
 plateforme que le spike doit établir, chacune avec son repli normatif déjà codé — voir
 `spikes/p1-prime/README-fr.md`. `githubFacts` et `azdoFacts` en donnent les valeurs connues.
+
+## Deux niveaux de séparation par plateforme
+
+**Niveau 1 — entre plateformes.** Ce qui DÉCRIT une plateforme vit dans son paquet ; ce qui
+décrit le produit est partagé et ne connaît personne. Le critère de partage n'est pas une liste
+de fichiers mais la motivation du changement : « GitHub a bougé » va dans `adapters/github/`,
+« notre produit doit se comporter autrement » va dans le code partagé.
+
+Trois choses vivent donc par plateforme, et une seule y vivait avant :
+
+| | Où | Comment le partagé y accède |
+|---|---|---|
+| Sélecteurs DOM | `adapters/<p>/src/selectors.ts` | jamais directement |
+| Placement et forme du rendu | idem, via `getEditorChrome()` / `renderedBodyShape()` (§9.2.3) | par le port, qui rend des DONNÉES |
+| Couleurs, rayons, longueurs | `adapters/<p>/src/platform.css` | par des variables `--cct-*` |
+
+Le port transporte des **données**, jamais un drapeau nommant une plateforme : une signature
+`isGitHubChangesView()` obligerait le code partagé à savoir de qui il parle, et le conditionnel
+que le polymorphisme supprime reviendrait sous un autre nom. Le seul `if` de plateforme admis est
+le composition root (`content-internal.ts`), qui choisit l'adaptateur — quelqu'un doit le faire.
+
+Le TypeScript dit **quel élément joue quel rôle** ; la feuille de la plateforme dit **combien il
+mesure**. Sans cette frontière, une mesure faite sur une plateforme redevient une constante que
+toutes subissent — le défaut d'origine, où le retrait de 8 px du composeur était la marge propre
+d'un conteneur GitHub.
+
+Trois gardes tiennent l'ensemble, parce que rien de tout cela n'était visible d'un test :
+`check:platform-isolation` (vocabulaire dérivé des adaptateurs, pas d'une liste),
+`check:style-isolation` (mesuré dans Chromium), `check:extension-css` (toutes les feuilles
+livrées).
+
+**Niveau 2 — à l'intérieur d'une plateforme.** `packages/adapters/github/src/surfaces.ts` déclare
+les trois surfaces qui coexistent — React, héritée, vue des fichiers modifiés — chacune portant SES
+zones de saisie et SON châssis. Deux mécanismes cessent d'être confondus :
+
+| Question | Mécanisme | Sémantique |
+|---|---|---|
+| Le nom a-t-il changé depuis l'an dernier ? | chaîne de sélecteurs, à l'intérieur d'une surface | premier candidat qui matche |
+| Quelles surfaces la page porte-t-elle ? | liste de surfaces | **union**, dédoublonnée |
+
+Le défaut que ça corrige n'était pas théorique : `/pull/N/changes` affiche des fils hérités à côté
+de son propre composeur React, et une chaîne unique rendait les éléments du premier candidat qui
+matche — l'autre composeur devenait invisible, sans barre d'outils ni garde d'envoi, sur la seule
+zone où un `issue:` bloque réellement (§4.1). Le commit 81e07bb avait vu le cas et n'en avait
+corrigé que le silence.
+
+Vingt et une des vingt-quatre chaînes de `selectors.ts` restent des chaînes, et c'est délibéré :
+elles répondent à une question qui n'a qu'une bonne réponse par page — quel conteneur de fil, quel
+corps rendu, quel bouton de fusion. Seul le composeur se scinde, parce que seul il a montré le
+défaut.

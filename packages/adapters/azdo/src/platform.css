@@ -1,0 +1,51 @@
+/* Ce que les rôles de rendu de l'extension valent SUR AZURE DEVOPS (§B).
+
+   **Aucun jeton de THÈME n'est déclaré ici, et ce vide est une réponse.**
+
+   Azure DevOps a ses propres jetons de thème. Les nommer ici de mémoire serait exactement la
+   faute que la scission des feuilles corrige : ce dépôt a déjà écrit trois affirmations sur le
+   navigateur qui se sont révélées fausses, et la règle qui en est sortie est qu'une
+   affirmation sur une plateforme se VÉRIFIE, elle ne se rappelle pas. Aucun jeton d'Azure
+   DevOps n'a été observé depuis ce dépôt.
+
+   Sans surcharge de thème, les valeurs neutres de la feuille partagée s'appliquent — mots-clés
+   système (`ButtonFace`, `Highlight`, `Canvas`, `currentColor`) qui suivent le thème du système
+   d'exploitation et le mode sombre. C'est EXACTEMENT ce que l'extension rendait sur Azure
+   DevOps avant la scission, puisque aucun jeton Primer n'y était défini et que seul le dernier
+   repli s'appliquait.
+
+   Ce qu'il faut faire pour l'améliorer, quand quelqu'un aura accès à un vrai tenant
+   (A-FAIRE-fr.md, point 9) : relever les jetons de thème sur une page de PR réelle, en mode
+   clair ET en mode sombre, puis les déclarer ci-dessous sur le modèle de la feuille GitHub.
+
+   Le fichier existe malgré ce vide plutôt que d'être absent : sa présence est ce qui rend la
+   question visible. Un fichier manquant se lit comme un oubli ; un fichier qui explique
+   pourquoi il est vide se lit comme une décision. */
+
+/* LES TROIS LONGUEURS DU COMPOSEUR, ET POURQUOI ELLES SONT ICI SANS AVOIR ÉTÉ MESURÉES.
+
+   Ce ne sont PAS des mesures d'Azure DevOps. Ce sont celles de github.com, et elles portent ce
+   qu'Azure DevOps recevait déjà : avant la scission, les trois vivaient en dur dans la feuille
+   partagée, donc s'appliquaient ici. Une revue a relevé qu'en les y laissant « à titre de
+   défaut », la scission continuait de faire hériter cette plateforme des proportions d'une
+   autre, depuis un socle commun où rien ne le disait (revue Reefact, PR #66).
+
+   Elles sont donc REPLI DE COMPATIBILITÉ, écrit là où on peut le lire et le contredire. La
+   valeur n'a pas changé ; ce qui a changé est qu'elle est devenue un CHOIX de cette plateforme,
+   nommé dans son fichier, au lieu d'un héritage tacite. C'est toute la différence que la
+   scission achète, et elle ne s'achète qu'en écrivant les chiffres ici.
+
+   La feuille partagée ne les déclare plus et les consomme sans repli : sans ce bloc, le
+   composeur perdrait ses trois retraits sur Azure DevOps — ce qui serait un changement de rendu
+   que personne n'a demandé. `check:platform-isolation` refuse d'ailleurs qu'une feuille de
+   plateforme laisse sans réponse une question que la feuille partagée pose sans repli.
+
+   À remplacer par de vraies mesures avec le reste (A-FAIRE-fr.md, point 9) : sur un tenant
+   réel, relever le retrait propre du conteneur de commentaire, puis juger la gouttière et
+   l'écart de la pastille sur la page. D'ici là, ces chiffres disent « ce qu'on rendait hier »,
+   jamais « ce qu'il faut rendre ». */
+:root[data-cct-platform='azdo'] {
+  --cct-frame-padding: 8px;
+  --cct-inner-gutter: 8px;
+  --cct-pastille-gap: 4px;
+}

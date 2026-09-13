@@ -68,6 +68,14 @@ jobs:
       - name: Toute clé managée lue est déclarée au schéma de politique
         run: npm run check:managed-keys
 
+      # Le §9.4 veut les sélecteurs DOM « centralisés dans un fichier unique par adaptateur »,
+      # et rien ne le vérifiait : deux littéraux GitHub ont vécu dans le contrôleur PARTAGÉ,
+      # exécutés sur chaque page Azure DevOps, où ils ne matchaient rien — donc invisibles à
+      # tout test. Le vocabulaire interdit est DÉRIVÉ des fichiers de sélecteurs, jamais écrit
+      # dans le garde : un adaptateur GitLab sera couvert sans qu'on y touche.
+      - name: Aucun identifiant de plateforme hors de son paquet (§9.1, §9.4)
+        run: npm run check:platform-isolation
+
       # `specifications-fr.md` est la référence NORMATIVE : elle ne se modifie pas pour
       # correspondre au code. Un changement délibéré de la spécification reste possible —
       # il se fait alors sur une PR qui ne touche qu'elle, et cette garde le signale.

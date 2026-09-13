@@ -11,7 +11,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
-import { writeToTextField } from '@cct/adapter-shared';
+import { writeToTextField, MARKDOWN_HTML_BODY_SHAPE, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { EditorController } from '../src/editor-controller.js';
 import {
@@ -255,6 +255,8 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     };
     const adapter: Partial<PlatformAdapter> = {
       platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
+      getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
+      renderedBodyShape: () => MARKDOWN_HTML_BODY_SHAPE,
       getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
       readValue: () => textarea.value,
       writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),
@@ -624,6 +626,12 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
         }
         getThreads() {
           return [];
+        }
+        getEditorChrome() {
+          return NEUTRAL_EDITOR_CHROME;
+        }
+        renderedBodyShape() {
+          return MARKDOWN_HTML_BODY_SHAPE;
         }
         getSubmitControls() {
           return [];

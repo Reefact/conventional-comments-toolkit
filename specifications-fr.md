@@ -692,7 +692,9 @@ Un bouton, mais pas pour tout le monde : sur GitHub, rejouer une exécution dema
 
 **Les événements ne suffisent pas : une exécution planifiée fait partie du dispositif**, livrée avec le workflow et non proposée en option. Trois choses qu'aucun événement de PR ne notifie la rendent nécessaire : la **résolution ou la dé-résolution d'un fil**, que la plateforme peut ne pas exposer comme déclencheur (§A.8) ; un **changement de configuration**, qui s'applique en direct (§8.1.3) mais ne réveille rien sur les PR déjà ouvertes — sans quoi le retour arrière du §6.3.3 ne tiendrait pas sa promesse de quelques minutes ; et la **panne qui a emporté la publication**, ci-dessus. Sans elle, un statut périmé peut décider d'un merge sans que rien ne vienne jamais le corriger, ce qui vide O3 de sa garantie.
 
-Une exécution planifiée n'évalue pas « la » PR : elle **énumère les PR ouvertes** et les réévalue toutes — c'est pourquoi le contrat du §9.2.4 ne demande pas la PR courante mais **celles que l'exécution doit évaluer**. Chacune de ces réévaluations entre dans la sérialisation de sa propre PR, ci-dessus.
+Une exécution planifiée n'évalue pas « la » PR : elle **énumère les PR ouvertes** et les réévalue toutes. Elle ne le fait pas d'un bloc pour autant, et le contrat du §9.2.4 sépare les deux étages : `pullRequestsToDispatch()` rend les PR qu'un déclencheur couvre, `currentPr()` rend l'unique PR qu'une évaluation évalue. **Une évaluation porte sur une PR et une seule** — elle publie dans le groupe de concurrence de cette PR, et en évaluer une autre depuis ce groupe rouvrirait exactement la course que le groupe ferme. Chacune entre donc dans la sérialisation de sa propre PR, ci-dessus.
+
+Une rédaction antérieure ne demandait au contrat qu'une liste, `pullRequestsToEvaluate()`, qui valait « toutes les PR ouvertes » dès que le déclencheur n'en désignait aucune. Elle datait de l'exécution planifiée d'un seul tenant : le découpage ci-dessus l'a rendue fausse **au moment même où il fermait la course**, un job de matrice qui l'aurait suivie réévaluant toutes les PR depuis un groupe qui n'en protège qu'une.
 
 Sa période est un réglage du dépôt et non une valeur de ce document : elle borne la fenêtre pendant laquelle un statut peut être périmé, et se choisit contre le coût des exécutions. **Elle ne la borne cependant que si l'énumération va jusqu'au bout.** Une énumération qu'une exécution suivante annulerait en cours de route réévaluerait indéfiniment les mêmes premières PR et jamais les dernières : la période ne dirait plus rien de l'âge maximal d'un statut, et les PR affamées seraient précisément celles que personne ne regarde. **Une exécution planifiée déjà en cours n'est donc jamais annulée par la suivante** (§A.8) ; c'est la suivante qui attend.
 
@@ -1463,11 +1465,18 @@ La même règle vaut pour toute réponse qui se dérobe : un adaptateur ne peut 
 ```ts
 interface VerifierPlatformAdapter {
   platformProfile(): PlatformProfile;                // §9.2.2 — même profil que côté client, même source
-  pullRequestsToEvaluate(): Promise<PrRef[]>;        // §6.4 — les PR que l'exécution courante évalue :
-                                       // celle que désigne le déclencheur quand il en désigne une,
-                                       // **toutes les PR ouvertes** quand il n'en désigne aucune —
-                                       // exécution planifiée, ou déclencheur qui ne porte pas la PR.
-                                       // C'est une liste, et non une PR, pour cette seule raison.
+  currentPr(): Promise<PrRef>;         // §6.4 — l'**unique** PR que cette évaluation évalue : celle
+                                       // que désigne l'événement, ou celle que la répartition
+                                       // ci-dessous lui a injectée. Une évaluation porte sur une PR
+                                       // et une seule, parce qu'elle publie dans le groupe de
+                                       // concurrence de cette PR : en évaluer une autre depuis ce
+                                       // groupe rouvrirait la course que le groupe ferme (§A.8)
+  pullRequestsToDispatch(): Promise<PrRef[]>;  // §6.4 — les PR qu'un déclencheur couvre quand il en
+                                       // couvre plusieurs : **toutes les PR ouvertes** sur une
+                                       // exécution planifiée, celles de l'exécution d'origine pour le
+                                       // workflow compagnon (§A.8). Le job qui l'appelle **ne publie
+                                       // aucun statut** — il répartit, une évaluation par PR. Un
+                                       // déclencheur qui désigne une PR ne l'appelle pas.
                                        // Il n'y a ni souscription à des webhooks, ni signature à
                                        // vérifier, ni séquence à attribuer : le vérificateur est
                                        // réveillé par l'intégration continue, pas par un message
@@ -1792,7 +1801,7 @@ La différence avec `bors` subsiste, mais elle porte sur les **arguments**, pas 
 
 **D'où vient ce numéro, exactement.** De `pull_request` ou de `issue` selon l'événement, quand celui-ci désigne une PR. Les deux déclencheurs qui n'en désignent aucune ne peuvent pas employer la même formule, et se traitent chacun à part : le workflow compagnon `workflow_run` lit les PR associées à l'exécution d'origine (`workflow_run.pull_requests`) et, **quand cette liste est vide**, retrouve la PR par la branche de tête de l'exécution d'origine — sans quoi toutes ces exécutions partageraient un même groupe et deux PR de forks différents s'annuleraient l'une l'autre. **Ce que cette liste contient pour une PR de fork est à vérifier par une mesure** : le repli par la branche de tête est écrit ici parce qu'il faut un comportement défini dans les deux cas, pas parce que le cas vide serait établi.
 
-**L'exécution planifiée se découpe, plutôt que de prendre un groupe à elle.** Évaluant **plusieurs** PR, elle ne peut pas former de `group` au niveau du workflow : l'expression n'y dispose que des contextes `github`, `inputs` et `vars`, et il n'y aurait de toute façon pas *un* numéro de PR à y mettre. Elle se compose donc de deux étages : un job qui **énumère** les PR ouvertes sans en publier aucune, puis **un job d'évaluation par PR**, qui déclare son `concurrency` au niveau du job — le seul endroit où le contexte `matrix` est disponible — avec exactement le `group` des exécutions événementielles. Chaque réévaluation planifiée entre ainsi dans la sérialisation de sa PR, et la course décrite au §6.4 est fermée pour toutes les sources à la fois. Une rédaction antérieure donnait à l'exécution planifiée un groupe qui lui était propre : elle laissait cette course ouverte, sur les PR mêmes que l'exécution planifiée existe pour rattraper.
+**L'exécution planifiée se découpe, plutôt que de prendre un groupe à elle.** Évaluant **plusieurs** PR, elle ne peut pas former de `group` au niveau du workflow : l'expression n'y dispose que des contextes `github`, `inputs` et `vars`, et il n'y aurait de toute façon pas *un* numéro de PR à y mettre. Elle se compose donc de deux étages : un job qui **énumère** les PR ouvertes sans en publier aucune, puis **un job d'évaluation par PR** (`pullRequestsToDispatch()` puis `currentPr()`, §9.2.4), qui déclare son `concurrency` au niveau du job — le seul endroit où le contexte `matrix` est disponible — avec exactement le `group` des exécutions événementielles. Chaque réévaluation planifiée entre ainsi dans la sérialisation de sa PR, et la course décrite au §6.4 est fermée pour toutes les sources à la fois. Une rédaction antérieure donnait à l'exécution planifiée un groupe qui lui était propre : elle laissait cette course ouverte, sur les PR mêmes que l'exécution planifiée existe pour rattraper.
 
 Le job d'énumération, lui, garde un groupe à lui et **ne s'annule pas en cours** — `cancel-in-progress: false`, qui est la valeur par défaut. Ce que GitHub annule alors dans ce groupe est l'exécution **en attente**, au profit de la plus récente ; celle qui tourne va au bout. C'est exactement ce qu'il faut : l'inverse réévaluerait sans fin les premières PR de l'énumération et jamais les dernières (§6.4).
 

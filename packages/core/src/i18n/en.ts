@@ -89,6 +89,13 @@ export const en: Record<string, string> = {
   'notice.grace-expired':
     'Unable to evaluate for longer than the grace period: neutral status published (§6.4).',
   'notice.unsupported-version': '{detail}',
+  // Sortie humaine du statut (§6.3.1) — sa langue suit la règle du §8.1, comme le reste
+  'output.unresolved-blocking-threads': 'Unresolved blocking threads',
+  'output.format-diagnostics': 'Format diagnostics',
+  'output.notices': 'Reported facts',
+  'output.fix': 'fix',
+  'output.doc-link': 'Convention documentation',
+  'output.empty-body': '(empty)',
   // Divers
   'and': 'and',
 };

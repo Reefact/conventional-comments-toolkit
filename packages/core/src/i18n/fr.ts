@@ -93,6 +93,13 @@ export const fr: Record<string, string> = {
   'notice.grace-expired':
     'Incapacité à évaluer au-delà du délai de grâce : statut neutre publié (§6.4).',
   'notice.unsupported-version': '{detail}',
+  // Sortie humaine du statut (§6.3.1) — sa langue suit la règle du §8.1, comme le reste
+  'output.unresolved-blocking-threads': 'Fils bloquants non résolus',
+  'output.format-diagnostics': 'Diagnostics de format',
+  'output.notices': 'Faits signalés',
+  'output.fix': 'correction',
+  'output.doc-link': 'Documentation de la convention',
+  'output.empty-body': '(vide)',
   // Divers
   'and': 'et',
 };

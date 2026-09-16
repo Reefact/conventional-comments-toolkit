@@ -11,3 +11,4 @@ export {
   type GithubVerifierOptions,
 } from './github.js';
 export { renderHumanOutput } from './render.js';
+export { runOnce, type RunOptions, type RunOutcome } from './run.js';

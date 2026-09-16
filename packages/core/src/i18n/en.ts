@@ -60,6 +60,10 @@ export const en: Record<string, string> = {
   'headline.invalid-config': 'Invalid configuration: {detail}',
   'headline.config-vanished':
     'The configuration file has disappeared from an already-evaluated repository.',
+  'headline.activation-undated':
+    'No configuration level dates this repository’s activation.',
+  'headline.read-failed':
+    'Evaluation impossible: {detail}. The check fails rather than letting a stale status decide (§6.4).',
   // Notices (§6.3.1)
   'notice.weakening-edit':
     'The root comment of blocking thread {ref} was edited to a non-blocking form{by}; the thread remains counted as blocking (§6.1).',
@@ -80,6 +84,8 @@ export const en: Record<string, string> = {
   'notice.config-warning': '{detail}',
   'notice.config-vanished':
     'The configuration file .conventional-comments.json has disappeared from an already-evaluated repository. This is treated as an incident, not a deactivation (§8.1.5).',
+  'notice.activation-undated':
+    'No configuration level resolves activation.activatedAt: the repository is dated neither by its own file, nor by the organisation’s, nor by the floor. A neutral status is published, whatever the mode (§8.1.5).',
   'notice.exemption-reset':
     'PR exemption reset: a new blocking thread appeared. The label was removed and criterion 2 applies again.',
   'notice.exemption-refused':

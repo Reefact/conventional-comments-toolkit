@@ -57,6 +57,10 @@ export type NoticeKind =
   | 'invalid-config'
   | 'config-warning'
   | 'config-vanished'
+  // §8.1.5 — aucun niveau ne résout `activation.activatedAt`. Un fait de l'état courant,
+  // là où `config-vanished` affirmait une DISPARITION, c'est-à-dire une transition entre
+  // deux états, que seul un vérificateur doté de mémoire pourrait constater.
+  | 'activation-undated'
   | 'exemption-reset'
   | 'exemption-refused'
   | 'exemption-label-restored'

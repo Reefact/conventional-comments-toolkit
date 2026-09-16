@@ -64,6 +64,10 @@ export const fr: Record<string, string> = {
   'headline.invalid-config': 'Configuration invalide : {detail}',
   'headline.config-vanished':
     'Le fichier de configuration a disparu d’un dépôt déjà évalué.',
+  'headline.activation-undated':
+    'Aucun niveau de configuration ne date l’activation de ce dépôt.',
+  'headline.read-failed':
+    'Évaluation impossible : {detail}. Le check échoue plutôt que de laisser un statut périmé décider (§6.4).',
   // Notices (§6.3.1)
   'notice.weakening-edit':
     'Le commentaire racine du fil bloquant {ref} a été édité vers une forme non bloquante{by} ; le fil reste compté comme bloquant (§6.1).',
@@ -84,6 +88,8 @@ export const fr: Record<string, string> = {
   'notice.config-warning': '{detail}',
   'notice.config-vanished':
     'Le fichier de configuration .conventional-comments.json a disparu d’un dépôt déjà évalué. C’est un incident, pas une désactivation (§8.1.5).',
+  'notice.activation-undated':
+    'Aucun niveau de configuration ne résout activation.activatedAt : le dépôt n’est daté ni par son fichier, ni par celui de l’organisation, ni par le plancher. Statut neutre publié, quel que soit le mode (§8.1.5).',
   'notice.exemption-reset':
     'Exemption de PR remise à zéro : un nouveau fil bloquant est apparu. L’étiquette a été retirée et le critère 2 s’applique de nouveau.',
   'notice.exemption-refused':

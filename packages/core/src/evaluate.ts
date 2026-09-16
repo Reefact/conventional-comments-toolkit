@@ -277,6 +277,9 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
     headlineParts.push(t(lang, 'headline.invalid-config', { detail }));
   }
   if (forceState?.because === 'config-vanished') headlineParts.push(t(lang, 'headline.config-vanished'));
+  if (forceState?.because === 'activation-undated') {
+    headlineParts.push(t(lang, 'headline.activation-undated'));
+  }
   if (ctx.isDraft) headlineParts.push(t(lang, 'headline.draft'));
   if (appliedExemption) {
     headlineParts.push(

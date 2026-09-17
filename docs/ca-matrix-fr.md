@@ -20,7 +20,7 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 | CA-07 | Réponse de fil sans label admise avec la configuration par défaut | `core/test/validator.test.ts` |
 | CA-08 | Bots de pipeline exemptés (`exemptUsers`, casse insensible) | `core/test/validator.test.ts` |
 | CA-09 | Le passage en `warn` n'empêche aucune publication | `core/test/evaluate.test.ts`, `extension/test/editor-controller.test.ts` |
-| CA-10 | Exemption journalisée avec auteur et horodatage | `server/test/admin.test.ts`, `server/test/http.test.ts` |
+| CA-10 | Exemption attribuée et datée sur la PR elle-même — étiquette, auteur, horodatage — et le statut publié les nomme | `action/test/criteria.test.ts` |
 | CA-11 | Dégradation silencieuse : aucun dialogue, aucune exception, contrôles natifs intacts, échec tracé (télémétrie opt-in) | `extension/test/degradation.test.ts`, `extension/test/replay-residuals.test.ts` (ancre de fil, commentaire édité non reconnu), `extension/test/telemetry.test.ts` (journal local écrit dans tous les cas, remontée télémétrique seulement si armée), `extension/test/changes-view-composer.test.ts` (chaîne `editors` qui ne reconnaît plus le composeur : trace au journal, rien à l'écran), `extension/test/changes-view-thread.test.ts` (corps, auteur et commentaires d'un fil devenus illisibles : trace, et repli jamais silencieux), `extension/test/selector-journal-page.test.ts` (la trace porte l'adresse de la page, relue au moment de la dégradation), `extension/test/options-journal.test.ts` (ce que la page d'options en montre, et son effacement) |
 | CA-12 | Parcours clavier : `aria-disabled` et non `disabled` natif — le bouton reste atteignable ; interception du raccourci | `extension/test/editor-controller.test.ts` |
 | CA-13 | Résolution par un tiers sans `decision` refusée avec sa cause ; avec `decision` conforme, acceptée | `core/test/evaluate.test.ts` |
@@ -35,16 +35,16 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 | CA-22 | Sévérités distinctes : `formatSeverity: warn` n'échoue pas le check ; fil `issue:` non résolu le fait échouer | `core/test/evaluate.test.ts`, `server/test/orchestrator.test.ts` |
 | CA-23 | Le serveur lit le mode : `warn` + check obligatoire → PR mergeable, statut vert informatif | `core/test/evaluate.test.ts`, `server/test/orchestrator.test.ts` |
 | CA-24 | `{"mode": "off"}` sous plancher `enforce` ignoré, fait signalé | `core/test/config.test.ts` |
-| CA-25 | Sortie exploitable : cause identifiable en un clic, dans le corps ou derrière la `targetUrl` | `server/test/http.test.ts` (targetUrl) ; corps humain : `adapters/github` `renderHumanOutput` |
+| CA-25 | Sortie exploitable : chaque fil bloquant non résolu et chaque diagnostic de format identifiables en un clic au plus, dans le corps du check run | `action/test/criteria.test.ts` |
 | CA-26 | Exemption habilitée → vert et journalisée ; non habilitée → refusée, étiquette en place ; nouveau fil bloquant → étiquette retirée, échec | `core/test/evaluate.test.ts`, `server/test/orchestrator.test.ts` |
 | CA-27 | Retour arrière : `enforce` → `warn` au niveau org débloque sans modifier la protection de branche | `core/test/pinning.test.ts`, `server/test/review-fixes-server.test.ts` (sonde §6.3.3, invalidation automatique), `server/test/http.test.ts` (invalidation manuelle) |
-| CA-28 | Ordre des événements : un événement de création reçu après l'édition qui le corrige ne réintroduit pas un statut périmé | `server/test/orchestrator.test.ts` |
+| CA-28 | Une évaluation ne s'appuie jamais sur le contenu de l'événement : un commentaire corrigé avant l'exécution produit un statut conforme | `action/test/criteria.test.ts` |
 | CA-29 | Opt-in par dépôt : jamais évalué + sans fichier → aucun statut ; contre-épreuve : fichier retiré d'un dépôt évalué → neutre `config-vanished` | `core/test/config.test.ts`, `server/test/orchestrator.test.ts` |
 | CA-30 | Épinglage : retrait d'un label ne bascule au rouge aucune PR ouverte ; une PR ouverte après applique la nouvelle configuration | `core/test/pinning.test.ts`, `server/test/orchestrator.test.ts` |
 | CA-31 | Plancher en direct : durcir `mode` prend effet sur les PR ouvertes ; contre-épreuve `activation.activatedAt` épinglé | `core/test/pinning.test.ts` |
 | CA-32 | Décalage visible : deux générations de **configuration** → écart signalé, blocage désarmé ; contre-épreuve deux `core/` même config → blocage actif | `extension/test/guard.test.ts` |
-| CA-33 | Anti-cache : label ajouté à la config d'org accepté sans attendre l'expiration du cache | `server/test/orchestrator.test.ts` |
-| CA-34 | Rapport à blanc : liste ce qui échouerait, aucun statut publié | `server/test/admin.test.ts`, `server/test/http.test.ts` |
+| CA-33 | Anti-cache sur rejet : le vérificateur n'a pas de cache et accepte le label à la première évaluation (contre-épreuve du §11). Le volet extension — bypass avant rejet, §8.1.3 règle 3 — reste à implémenter | `action/test/criteria.test.ts` |
+| CA-34 | Mesurer avant de contraindre : en `warn`, statut jamais en échec dont le corps liste ce qui échouerait sous `enforce`, avec les liens permanents | `action/test/criteria.test.ts` |
 | CA-35 | Brouillon : statut informatif jamais en échec ; sortie du brouillon → contraignant | `core/test/evaluate.test.ts`, `server/test/orchestrator.test.ts` |
 | CA-36 | Blocage monotone : `issue:` → `note:` reste bloquant, signalé avec son auteur ; contre-épreuve correction d'`E-CONFLICT` non signalée | `core/test/evaluate.test.ts`, `server/test/orchestrator.test.ts` |
 | CA-37 | Bloc de suggestion + phrase libre : conforme sans label, compté `suggestion`, ni `W-MISSING-DECORATION` ni diagnostic de sujet | `core/test/validator.test.ts` |

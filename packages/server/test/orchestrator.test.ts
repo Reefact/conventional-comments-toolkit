@@ -437,8 +437,14 @@ describe('§6.3.2 — exemption via l’étiquette (provenance exposée)', () =>
     expect(env.adapter.published[1]!.state).toBe('success');
     expect(env.adapter.published[1]!.exemption?.by.login).toBe('lead');
 
-    // Un NOUVEAU fil bloquant remet l'exemption à zéro : étiquette retirée, échec.
-    env.adapter.state.threads.push(thread(comment('todo: corriger aussi ceci\n\nd', { id: 'root-2' }), { id: 'th-2' }));
+    // Un fil bloquant POSTÉRIEUR à la pose de l'étiquette remet l'exemption à zéro :
+    // étiquette retirée, échec. La date de la racine est ce qui décide (§6.3.2) — et non
+    // plus la comparaison à un ensemble de fils déjà observés, que rien ne conserve.
+    env.adapter.state.threads.push(
+      thread(comment('todo: corriger aussi ceci\n\nd', { id: 'root-2', createdAt: '2026-10-06T00:00:00Z' }), {
+        id: 'th-2',
+      })
+    );
     env.adapter.state.headSha = 'sha-3';
     await env.orchestrator.evaluatePr(PR, nextSeq());
     const status = env.adapter.published[2]!;

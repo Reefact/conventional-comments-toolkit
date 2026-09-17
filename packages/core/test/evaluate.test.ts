@@ -407,13 +407,22 @@ describe('§6.2.4 — brouillon et §6.3.2 — exemption', () => {
     expect(refused.actions.removeLabel).toBeUndefined(); // étiquette laissée en place
   });
 
-  it('CA-26 : un nouveau fil bloquant remet l’exemption à zéro — retrait demandé, échec', () => {
+  it('CA-26 : un fil bloquant POSTÉRIEUR à la pose remet l’exemption à zéro — retrait, échec', () => {
+    // La comparaison porte sur `root.createdAt` et l'`at` de l'étiquette, deux faits de
+    // l'état courant (§6.3.2). Une rédaction antérieure comparait aux fils « déjà observés
+    // au tour précédent » : sans mémoire cet ensemble est vide, donc TOUT fil bloquant
+    // passait pour nouveau et l'exemption se remettait à zéro sur la PR même qu'elle existe
+    // pour débloquer.
     const r = evaluate(
       evalInput({
         config: config((c) => (c.mode = 'enforce')),
-        threads: [blockingThread({ id: 'th-new' })],
+        threads: [
+          blockingThread({ id: 'th-new', root: comment('issue: fuite mémoire\n\ndétail', {
+            author,
+            createdAt: '2026-10-03T00:00:00Z',
+          }) }),
+        ],
         ctx: ctx({
-          knownBlockingThreadIds: [], // le fil n'était pas observé au tour précédent
           exemption: { by: lead, at: '2026-10-02T00:00:00Z', labelPresent: true },
           isOverrideMember: isLead,
         }),
@@ -423,6 +432,31 @@ describe('§6.2.4 — brouillon et §6.3.2 — exemption', () => {
     expect(r.actions.removeLabel).toBe('cc-override');
     expect(r.notices.some((n) => n.kind === 'exemption-reset')).toBe(true);
     expect(r.exemption).toBeUndefined();
+  });
+
+  it('CA-26, contre-épreuve : un fil bloquant ANTÉRIEUR à la pose laisse l’exemption vivre', () => {
+    // C'est le cas que l'exemption existe pour couvrir : une PR déjà bloquée, qu'un membre
+    // habilité décide de laisser passer. Le faire échouer viderait le mécanisme de son sens.
+    const r = evaluate(
+      evalInput({
+        config: config((c) => (c.mode = 'enforce')),
+        threads: [
+          blockingThread({ id: 'th-old', root: comment('issue: fuite mémoire\n\ndétail', {
+            author,
+            createdAt: '2026-10-01T00:00:00Z',
+          }) }),
+        ],
+        ctx: ctx({
+          exemption: { by: lead, at: '2026-10-02T00:00:00Z', labelPresent: true },
+          isOverrideMember: isLead,
+        }),
+      })
+    );
+    expect(r.state).toBe('success');
+    expect(r.actions.removeLabel).toBeUndefined();
+    expect(r.exemption?.by.login).toBe('lead');
+    // Le compteur reste non nul : le vert vient de l'exemption, pas d'une PR propre (§6.5).
+    expect(r.counts.unresolvedThreads).toBe(1);
   });
 
   it('CA-39 : étiquette disparue d’une exemption confirmée → restauration demandée, statut vert', () => {

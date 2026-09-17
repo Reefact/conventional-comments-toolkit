@@ -215,15 +215,28 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
         at: ctx.exemption.at,
       });
     } else {
-      const newBlocking = blockingThreadIds.filter((id) => !known.has(id));
+      // §6.3.2 — l'exemption est remise à zéro par tout fil bloquant NON RÉSOLU dont le
+      // commentaire racine a été créé APRÈS la pose de l'étiquette. La comparaison porte sur
+      // `root.createdAt` et l'`at` de l'étiquette, deux faits de l'état courant.
+      //
+      // Une rédaction antérieure comparait les fils bloquants à « l'ensemble des fils déjà
+      // observés au tour précédent », ce qui demandait de les conserver. Sans mémoire, cet
+      // ensemble est vide et TOUT fil bloquant devient « nouveau » : l'exemption se remettait
+      // à zéro sur la PR même qu'elle existe pour débloquer.
+      const postedAt = Date.parse(ctx.exemption.at);
+      const newBlocking = unresolvedBlockingThreads.filter(
+        (thread) => Date.parse(thread.root.createdAt) > postedAt
+      );
       if (newBlocking.length > 0) {
-        // Remise à zéro : les deux gestes sont indissociables — retrait de l'étiquette,
-        // et suppression de l'exemption active persistée (portée par la même demande).
+        // Remise à zéro : retirer l'étiquette suffit désormais, l'exemption n'étant plus
+        // persistée nulle part — elle est lue sur la PR, à chaque évaluation (§6.3.2).
         actions.removeLabel = config.overrideLabel;
         notices.push({
           kind: 'exemption-reset',
           message: t(lang, 'notice.exemption-reset'),
-          ref: newBlocking[0],
+          // Le lien permanent, et non l'identifiant du fil : le §6.3.1 demande qu'une cause
+          // soit atteignable en un clic au plus (CA-25).
+          ref: newBlocking[0]!.root.permalink,
         });
       } else {
         appliedExemption = { by: ctx.exemption.by, at: ctx.exemption.at };

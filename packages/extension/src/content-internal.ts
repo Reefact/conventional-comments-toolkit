@@ -338,18 +338,19 @@ async function readDirectShortcuts(): Promise<Record<string, string>> {
 export async function bootstrap(doc: Document = document): Promise<() => void> {
   const url = new URL(doc.location.href);
   // Un seul produit, un adaptateur par plateforme, activé sur les hôtes autorisés (§2).
-  // Sélection par HÔTE (matchesHost), pas par matches() — qui exige en plus une URL de
-  // PR : bootstrap() ne s'exécute qu'une fois, à l'injection du script, alors que la
-  // navigation SPA vers une PR arrive presque toujours ENSUITE (liste des PR,
-  // notifications, tableau de bord). Exiger une PR ici laissait l'extension
-  // intégralement inactive — aucun adaptateur choisi, donc aucun observateur armé — tant
-  // qu'un rechargement complet ne la relançait pas directement sur l'URL de la PR.
+  // Sélection par HÔTE, jamais par la présence d'une PR dans l'URL : bootstrap() ne
+  // s'exécute qu'une fois, à l'injection du script, alors que la navigation SPA vers une PR
+  // arrive presque toujours ENSUITE (liste des PR, notifications, tableau de bord). Exiger
+  // une PR ici laissait l'extension intégralement inactive — aucun adaptateur choisi, donc
+  // aucun observateur armé — tant qu'un rechargement complet ne la relançait pas
+  // directement sur l'URL de la PR.
   const extraHosts = await readExtraHostsByPlatform();
-  // L'activation se décide sur la RÉPARTITION PUBLIÉE (`selectPlatform`), pas sur le
-  // `matchesHost()` des adaptateurs : celui-ci dit « je sais parler à cet hôte », jamais
-  // « j'ai le droit d'y être ». Les faire coïncider laissait `dev.azure.com` et
-  // `*.visualstudio.com` — défauts en dur des adaptateurs, mais bel et bien soumis à une
-  // permission optionnelle — actifs après révocation (revue Codex, PR #29).
+  // L'activation se décide sur la RÉPARTITION PUBLIÉE (`selectPlatform`), et sur elle seule.
+  // Les adaptateurs ont porté une reconnaissance d'hôte à eux (`matchesHost`), avec
+  // `dev.azure.com` et `*.visualstudio.com` en défauts codés en dur : la faire coïncider avec
+  // l'activation laissait ces hôtes — bel et bien soumis à une permission optionnelle —
+  // actifs après révocation (revue Codex, PR #29). Depuis, plus rien ne l'appelait ; le
+  // contrat ne la porte plus, et un adaptateur ne sait rien du DROIT d'être sur un hôte.
   const platform = selectPlatform(url.hostname, extraHosts);
 
   // Un seul guet pour les TROIS transitions, parce que ce sont trois cas d'une même
@@ -469,10 +470,10 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     count(event);
   });
 
-  const adapter: PlatformAdapter & { matchesHost(url: URL): boolean } =
+  const adapter: PlatformAdapter =
     platform === 'github'
-      ? new GithubClientAdapter({ documentRef: doc, extraHosts: extraHosts.github, readOrgConfig, log })
-      : new AzdoClientAdapter({ documentRef: doc, extraHosts: extraHosts.azdo, readOrgConfig, log });
+      ? new GithubClientAdapter({ documentRef: doc, readOrgConfig, log })
+      : new AzdoClientAdapter({ documentRef: doc, readOrgConfig, log });
 
   const resolver = new ClientConfigResolver(readManagedFloor);
   const currentUser = await adapter.getCurrentUser();
@@ -850,23 +851,6 @@ function watchExtraHosts(url: URL, onPublished: (next: ExtraHostsByPlatform) => 
   }
 }
 
-function currentPrOf(adapter: PlatformAdapter): PrRef | null {
-  return (adapter as GithubClientAdapter | AzdoClientAdapter).currentPr?.() ?? null;
-}
-
-/** Élément après lequel monter le bandeau (§5.5) — surface d'affichage, hors contrat
- * §9.2.3 : un adaptateur qui ne l'expose pas laisse le repli sur le haut du document. */
-function bannerMountOf(adapter: PlatformAdapter): Element | null {
-  const withMount = adapter as PlatformAdapter & { getBannerMount?: () => Element | null };
-  return withMount.getBannerMount?.() ?? null;
-}
-
-function renderedThreadsOf(adapter: PlatformAdapter): { id: string; element: Element }[] {
-  const withRenderedThreads = adapter as PlatformAdapter & {
-    getRenderedThreadElements?: () => { id: string; element: Element }[];
-  };
-  return withRenderedThreads.getRenderedThreadElements?.() ?? [];
-}
 
 export function prKeyFor(pr: PrRef | null): string | null {
   return pr ? `${pr.host}/${pr.scope.join('/')}#${pr.number}` : null;
@@ -982,39 +966,17 @@ function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boo
  * lectures ne journalise de dégradation de sélecteur, contrairement à `getCompletionControl()`. */
 function contentSignatureOf(adapter: PlatformAdapter): string {
   const published = publishedSignatureOf(adapter) ?? '';
-  const threadIds = renderedThreadsOf(adapter)
+  const threadIds = adapter.getRenderedThreadElements()
     .map((t) => t.id)
     .join(',');
-  return `${published}|${threadIds}|${renderedCommentCountOf(adapter)}`;
-}
-
-/** Nombre de corps de commentaire que la PLATEFORME rend — **jamais** le nombre de ceux que
- * nous décorons, et les deux ont cessé de coïncider le jour où la description de la PR est
- * sortie du périmètre (§4.1) : l'adaptateur GitHub la compte ici et l'écarte de
- * `getRenderedComments()`.
- *
- * Sonde le COMPTE, jamais getRenderedComments() : cette dernière calcule bodyText (clone
- * du sous-arbre dès qu'un badge est posé) pour chaque commentaire, un coût proportionnel
- * à tout le DOM des commentaires rendus, à chaque mutation, pour la durée de vie de
- * l'onglet. Repli sur getRenderedComments().length pour les adaptateurs (de test) qui
- * n'exposent pas la sonde dédiée. */
-function renderedCommentCountOf(adapter: PlatformAdapter): number {
-  const withRendered = adapter as PlatformAdapter & {
-    getRenderedCommentCount?: () => number;
-    getRenderedComments?: () => unknown[];
-  };
-  return withRendered.getRenderedCommentCount?.() ?? withRendered.getRenderedComments?.().length ?? 0;
-}
-
-/** Corps de commentaire rendus — les éléments SEULS, jamais `getRenderedComments()` : cette
- * dernière calcule aussi `bodyText`, donc un clone de sous-arbre par commentaire décoré, un
- * coût que `ownOutputSignatureOf` paierait à chaque mutation pour la durée de vie de
- * l'onglet (même raison que la sonde de COMPTE de `chromeSignatureOf`). Vide pour un
- * adaptateur qui ne l'expose pas : la surface d'affichage du §5.5 est hors du contrat
- * normatif §9.2.3, un adaptateur n'a pas à la porter pour être valide. */
-function renderedCommentElementsOf(adapter: PlatformAdapter): Element[] {
-  const withElements = adapter as PlatformAdapter & { getRenderedCommentElements?: () => Element[] };
-  return withElements.getRenderedCommentElements?.() ?? [];
+  // Le nombre de corps que la PLATEFORME rend — **jamais** le nombre de ceux que nous
+  // décorons, et les deux ont cessé de coïncider le jour où la description de la PR est
+  // sortie du périmètre (§4.1) : l'adaptateur GitHub la compte dans sa sonde d'éléments et
+  // l'écarte de `getRenderedComments()`. La sonde, jamais `getRenderedComments()` : cette
+  // dernière calcule `bodyText` (clone du sous-arbre dès qu'un badge est posé) pour chaque
+  // commentaire, un coût proportionnel à tout le DOM des commentaires rendus, à chaque
+  // mutation, pour la durée de vie de l'onglet (§9.2.3, `getRenderedCommentElements`).
+  return `${published}|${threadIds}|${adapter.getRenderedCommentElements().length}`;
 }
 
 /** Ce que NOTRE rendu écrit dans la page, et que la plateforme peut défaire : le texte des
@@ -1056,8 +1018,8 @@ function renderedCommentElementsOf(adapter: PlatformAdapter): Element[] {
  * coalescence des mutations et retarde d'autant le retrait d'un bandeau périmé. Comparée à
  * l'état laissé par le rendu précédent, seule une main EXTÉRIEURE la fait bouger. */
 function ownOutputSignatureOf(adapter: PlatformAdapter, doc: Document): string {
-  const comments = renderedCommentElementsOf(adapter);
-  const surfaces = [...renderedThreadsOf(adapter).map((t) => t.element), ...comments];
+  const comments = adapter.getRenderedCommentElements();
+  const surfaces = [...adapter.getRenderedThreadElements().map((t) => t.element), ...comments];
   return `${textDigestOf(surfaces)}|${textlessWritesMapOf(comments)}|${injectedSurfacesOf(doc)}`;
 }
 
@@ -1293,7 +1255,7 @@ export function observePrChromeNavigation(
    * encore ANCIENNE, un cycle de retard derrière le TTL réellement en vigueur. */
   const pollConfig = (): Promise<void> => {
     if (disposed) return Promise.resolve();
-    const pr = currentPrOf(adapter);
+    const pr = adapter.currentPr();
     if (!pr) return Promise.resolve(); // rien à surveiller hors PR
     // La référence n'est posée qu'APRÈS un rendu réel (voir `run()`, plus bas) — jamais ici :
     // sinon un changement survenu AVANT le tout premier réveil s'établirait lui-même comme
@@ -1329,7 +1291,7 @@ export function observePrChromeNavigation(
       missedMutation = true; // traité en une seule relance temporisée à la fin du rendu en cours
       return;
     }
-    const key = prKeyFor(currentPrOf(adapter));
+    const key = prKeyFor(adapter.currentPr());
     const nowMs = now();
     const navigated = !hasRendered || key !== lastPrKey;
     if (navigated) {
@@ -1337,7 +1299,7 @@ export function observePrChromeNavigation(
       lastPrKey = key;
       // AVANT tout rendu : c'est ici que la PR affichée change, et l'armement de la
       // télémétrie doit suivre ce changement-là, pas celui d'un éditeur.
-      onPrChange(currentPrOf(adapter), true, null);
+      onPrChange(adapter.currentPr(), true, null);
       showedSomething = false;
       lastOwnSig = null;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
@@ -1400,7 +1362,7 @@ export function observePrChromeNavigation(
     // pendant que `resolver.resolve()` ou `getThreads()` sont en vol, l'observation
     // déconnecte bien l'observateur, mais CE rendu-là aboutirait quand même et écrirait dans
     // une page dont elle ne sait plus rien (revue Codex, PR #26).
-    void renderPrChrome(adapter, resolver, doc, () => !disposed && key === prKeyFor(currentPrOf(adapter)), {
+    void renderPrChrome(adapter, resolver, doc, () => !disposed && key === prKeyFor(adapter.currentPr()), {
       get: () => selectedLabel,
       set: (label) => {
         selectedLabel = label;
@@ -1434,7 +1396,7 @@ export function observePrChromeNavigation(
         // ne détectait rien, et `onPrChange` plus bas publiait la configuration de l'ANCIENNE
         // PR pour un éditeur déjà découvert sur la NOUVELLE — ses règles de dépôt restaient
         // celles d'un autre repository jusqu'à un tout AUTRE changement visible.
-        if (key !== prKeyFor(currentPrOf(adapter))) return; // supplanté par une navigation : ce rendu ne fait plus foi
+        if (key !== prKeyFor(adapter.currentPr())) return; // supplanté par une navigation : ce rendu ne fait plus foi
         // Ce rendu a résolu la configuration effective — éventuellement une NOUVELLE, le
         // cache du résolveur ayant expiré. La télémétrie doit s'aligner sur celle-là, sans
         // désarmer : `changed: false` recalcule la cible et ne vidange que si elle diffère.
@@ -1442,7 +1404,7 @@ export function observePrChromeNavigation(
         // laisse aussi `bootstrap()` rafraîchir les éditeurs déjà attachés (revue Codex, PR
         // #39) : un éditeur ouvert avant ce rendu garde sinon la configuration figée à son
         // propre `attach()`, sans jamais apprendre qu'elle vient de changer.
-        if (!navigated) onPrChange(currentPrOf(adapter), false, resolved);
+        if (!navigated) onPrChange(adapter.currentPr(), false, resolved);
         showedSomething = showed;
         // Photo prise ICI, une fois nos badges posés et nos surfaces montées : c'est ce que
         // la page doit encore porter au prochain réveil. Toute différence constatée ensuite
@@ -1548,7 +1510,7 @@ async function renderPrChrome(
     // masqués pour rien, orphelins du filtre qui les a cachés.
     // clearLabelFilter ne touche QUE ce que ce filtre avait lui-même masqué — jamais un
     // `display` que la plateforme porte pour ses propres raisons (fil réduit, virtualisé).
-    clearLabelFilter(renderedThreadsOf(adapter));
+    clearLabelFilter(adapter.getRenderedThreadElements());
     for (const stale of doc.querySelectorAll('.cct-banner')) stale.remove();
     for (const stale of doc.querySelectorAll('.cct-thread-filter')) stale.remove();
   };
@@ -1564,7 +1526,7 @@ async function renderPrChrome(
     clearCommentDecorations(doc);
   };
 
-  const pr = currentPrOf(adapter);
+  const pr = adapter.currentPr();
   if (!pr) {
     if (isCurrent()) {
       clearStaleBanner();
@@ -1646,7 +1608,7 @@ async function renderPrChrome(
       // flux de la page. Le repli sur le haut du document ne vaut que si rien n'apparie —
       // au-dessus du chrome de la plateforme, un encart flottant se lit comme une greffe,
       // pas comme une partie de la PR.
-      const mount = bannerMountOf(adapter);
+      const mount = adapter.getBannerMount();
       if (mount?.parentNode) mount.insertAdjacentElement('afterend', banner);
       else doc.body.insertAdjacentElement('afterbegin', banner);
     }
@@ -1655,7 +1617,7 @@ async function renderPrChrome(
     // fils rendus, jamais dans le bandeau. Seuls les labels effectivement PRÉSENTS sur la
     // page sont proposés — filtrer sur un label qu'aucun fil ne porte ne masquerait que
     // tout, et treize puces pour trois fils sont un décor, pas un outil.
-    const rendered = renderedThreadsOf(adapter);
+    const rendered = adapter.getRenderedThreadElements();
     const present = new Set([...labelOfThread.values()].filter((id): id is string => id !== null));
     const filterLabelIds = enabledLabels(resolved.config)
       .map((l) => l.id)
@@ -1676,7 +1638,7 @@ async function renderPrChrome(
         selected: selectedLabel,
         onSelect: (labelId) => {
           filterState.set(labelId);
-          applyLabelFilter(renderedThreadsOf(adapter), labelOfThread, labelId);
+          applyLabelFilter(adapter.getRenderedThreadElements(), labelOfThread, labelId);
           for (const chip of filter.querySelectorAll('.cct-filter-chip')) {
             chip.setAttribute('aria-pressed', String((chip as HTMLElement).dataset['label'] === (labelId ?? '')));
           }
@@ -1695,13 +1657,8 @@ async function renderPrChrome(
   if (!isCurrent()) return { showed: hasSomethingToShow, resolved };
 
   // Badges des commentaires publiés (§5.5) — rendu visuel, contenu stocké intact.
-  const withRendered = adapter as PlatformAdapter & {
-    getRenderedComments?: () => { element: Element; bodyText: string }[];
-  };
-  if (withRendered.getRenderedComments) {
-    for (const { element, bodyText } of withRendered.getRenderedComments()) {
-      decorateComment(element, bodyText, resolved.config, profile, lang, adapter.renderedBodyShape());
-    }
+  for (const { element, bodyText } of adapter.getRenderedComments()) {
+    decorateComment(element, bodyText, resolved.config, profile, lang, adapter.renderedBodyShape());
   }
 
   applyCompletionState(adapter.getCompletionControl(), published, lang);
@@ -1725,7 +1682,7 @@ async function renderPrChrome(
   // ses badges avant un rechargement. Ce que ce booléen a toujours voulu dire est « la page
   // portait des corps de commentaire », pas « nous avons peint quelque chose » — un
   // commentaire sans préfixe était déjà compté sans recevoir le moindre badge.
-  return { showed: hasSomethingToShow || renderedCommentCountOf(adapter) > 0, resolved };
+  return { showed: hasSomethingToShow || adapter.getRenderedCommentElements().length > 0, resolved };
 }
 
 /** Porte le `title`/`aria-disabled` NATIFS du bouton (branche protégée, revue requise…)

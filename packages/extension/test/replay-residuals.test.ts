@@ -284,13 +284,11 @@ describe('résidu F — AzDO : détection d’édition sans collision, URLs hist
     const urls: string[] = [];
     const adapter = new AzdoClientAdapter({
       documentRef: document,
-      extraHosts: ['tfs.example.corp'],
       fetchImpl: (async (url: string | URL | Request) => {
         urls.push(String(url));
         return new Response('{}', { status: 200 });
       }) as typeof fetch,
     });
-    expect(adapter.matches(new URL('https://tfs.example.corp/tfs/DefaultCollection/Proj/_git/Repo/pullrequest/5'))).toBe(true);
     const pr = adapter.currentPr()!;
     expect(pr.scope).toEqual(['DefaultCollection', 'Proj', 'Repo']);
     await adapter.getRepoConfig(pr);

@@ -1,4 +1,5 @@
-import { MARKDOWN_HTML_BODY_SHAPE, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { HTML_SHAPE } from './helpers/decorate.js';
 // @vitest-environment happy-dom
 //
 // Trois défauts trouvés en revue (Reefact, PR #39) dans le rafraîchissement en direct des
@@ -44,9 +45,6 @@ function pr7(): { platform: string; createdAt: string; host: string; scope: stri
 function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: HTMLButtonElement): void {
   vi.doMock('@cct/adapter-github', () => ({
     GithubClientAdapter: class {
-      matchesHost(url: URL): boolean {
-        return url.hostname === 'github.com';
-      }
       async getCurrentUser() {
         return { id: 'login:alice', login: 'alice', isServiceAccount: false };
       }
@@ -63,6 +61,18 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
         });
         return { dispose: () => {} };
       }
+      getBannerMount() {
+        return null;
+      }
+      getRenderedThreadElements() {
+        return [];
+      }
+      getRenderedComments() {
+        return [];
+      }
+      getRenderedCommentElements() {
+        return [];
+      }
       currentPr() {
         return pr7();
       }
@@ -76,7 +86,7 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
         return NEUTRAL_EDITOR_CHROME;
       }
       renderedBodyShape() {
-        return MARKDOWN_HTML_BODY_SHAPE;
+        return HTML_SHAPE;
       }
       getSubmitControls() {
         return [{ element: submit, kind: 'submit' }];
@@ -97,9 +107,6 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
   }));
   vi.doMock('@cct/adapter-azdo', () => ({
     AzdoClientAdapter: class {
-      matchesHost(): boolean {
-        return false;
-      }
     },
   }));
 }

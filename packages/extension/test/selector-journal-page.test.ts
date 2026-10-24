@@ -83,6 +83,18 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
           observeEditors() {
             return { dispose: () => {} };
           },
+          getBannerMount() {
+            return null;
+          },
+          getRenderedThreadElements() {
+            return [];
+          },
+          getRenderedComments() {
+            return [];
+          },
+          getRenderedCommentElements() {
+            return [];
+          },
           currentPr() {
             return currentPr();
           },

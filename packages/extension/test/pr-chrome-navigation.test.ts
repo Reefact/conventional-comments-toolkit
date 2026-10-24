@@ -44,10 +44,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
-import { commentBodyText, type PlatformAdapter, type SubmitControl, MARKDOWN_HTML_BODY_SHAPE, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { commentBodyText, type PlatformAdapter, type SubmitControl, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { defaultConfig, fingerprint, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver, type ResolvedClientConfig } from '../src/config-resolver.js';
-import { decorateWithHtmlShape } from './helpers/decorate.js';
+import { decorateWithHtmlShape, HTML_SHAPE } from './helpers/decorate.js';
 import { applyLabelFilter, clearLabelFilter } from '../src/ui/thread-filter.js';
 import {
   applyCompletionState,
@@ -91,9 +91,10 @@ function summaryLine(unresolvedBlockingCount: number): string {
   return `cc/1 state=success draft=0 exempt=0 mode=assist activated=- core=1.0.0 cfg=deadbeef t=${unresolvedBlockingCount} c=0 w=0`;
 }
 
-/** Adaptateur factice : `currentPr()` — non porté par `PlatformAdapter`, lu par cast comme
- * dans content-internal.ts — reflète la PR « affichée » par la page à un instant donné, au
- * gré des mutations simulées ci-dessous. */
+/** Adaptateur factice, COMPLET au sens du contrat (§9.2.3) : `currentPr()` reflète la PR
+ * « affichée » par la page à un instant donné, au gré des mutations simulées ci-dessous ; les
+ * surfaces d'affichage qu'un test ne fournit pas répondent « rien » — liste vide, `null` —,
+ * ce qui est une réponse du contrat, et plus un repli du code partagé. */
 function makeAdapter(
   getCurrent: () => PrRef | null,
   getPublished: () => PublishedSummary | null = () => null,
@@ -102,22 +103,19 @@ function makeAdapter(
     getCompletionControl?: () => SubmitControl | null;
     getRenderedThreadElements?: () => { id: string; element: Element }[];
     getRenderedComments?: () => { element: Element; bodyText: string }[];
+    getRenderedCommentElements?: () => Element[];
     getBannerMount?: () => Element | null;
   } = {}
-): PlatformAdapter & {
-  currentPr(): PrRef | null;
-  getRenderedThreadElements?: () => { id: string; element: Element }[];
-  getRenderedComments?: () => { element: Element; bodyText: string }[];
-  getBannerMount?: () => Element | null;
-} {
+): PlatformAdapter {
+  const renderedComments = opts.getRenderedComments ?? (() => []);
   return {
-    matches: () => true,
+    currentPr: getCurrent,
     platformProfile: () => ({ id: 'github', suggestionInfoString: null }),
     getRepoConfig: async () => ({ status: 'absent' }),
     getOrgConfig: async () => ({ status: 'absent' }),
     observeEditors: () => ({ dispose: () => {} }),
     getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
-      renderedBodyShape: () => MARKDOWN_HTML_BODY_SHAPE,
+    renderedBodyShape: () => HTML_SHAPE,
     getSubmitControls: () => [],
     readValue: () => '',
     writeValue: () => {},
@@ -125,10 +123,13 @@ function makeAdapter(
     getCompletionControl: opts.getCompletionControl ?? (() => null),
     getCurrentUser: async () => ({ id: 'u', login: 'u', isServiceAccount: false }),
     readPublishedResult: getPublished,
-    currentPr: getCurrent,
-    getRenderedThreadElements: opts.getRenderedThreadElements,
-    getRenderedComments: opts.getRenderedComments,
-    getBannerMount: opts.getBannerMount,
+    getRenderedThreadElements: opts.getRenderedThreadElements ?? (() => []),
+    getRenderedComments: renderedComments,
+    // À défaut d'une sonde dédiée, les mêmes corps que la lecture décorante — l'accord que
+    // le dernier test de ce fichier vérifie sur les vrais adaptateurs.
+    getRenderedCommentElements:
+      opts.getRenderedCommentElements ?? (() => renderedComments().map((c) => c.element)),
+    getBannerMount: opts.getBannerMount ?? (() => null),
   };
 }
 
@@ -356,30 +357,6 @@ describe('D1 — bootstrap() choisit l’adaptateur par hôte, pas par présence
     document.body.innerHTML = '';
   });
 
-  it('GithubClientAdapter : matchesHost accepte une page github.com sans PR, matches() reste exigeant', () => {
-    const adapter = new GithubClientAdapter();
-    const pulls = new URL('https://github.com/acme/demo/pulls');
-    const onPr = new URL('https://github.com/acme/demo/pull/42');
-    expect(adapter.matchesHost(pulls)).toBe(true);
-    expect(adapter.matches(pulls)).toBe(false);
-    expect(adapter.matchesHost(onPr)).toBe(true);
-    expect(adapter.matches(onPr)).toBe(true);
-    expect(adapter.matchesHost(new URL('https://example.com/'))).toBe(false);
-  });
-
-  it('AzdoClientAdapter : idem, y compris sur *.visualstudio.com', () => {
-    const adapter = new AzdoClientAdapter();
-    const list = new URL('https://dev.azure.com/acme/demo/_git/repo/pullrequests');
-    const onPr = new URL('https://dev.azure.com/acme/demo/_git/repo/pullrequest/7');
-    const vs = new URL('https://acme.visualstudio.com/demo/_git/repo/pullrequests');
-    expect(adapter.matchesHost(list)).toBe(true);
-    expect(adapter.matches(list)).toBe(false);
-    expect(adapter.matchesHost(onPr)).toBe(true);
-    expect(adapter.matches(onPr)).toBe(true);
-    expect(adapter.matchesHost(vs)).toBe(true);
-    expect(adapter.matches(vs)).toBe(false);
-  });
-
   it('la barre apparaît après une navigation SPA vers une PR atteinte depuis une page non-PR, sans second appel à bootstrap()', async () => {
     vi.stubGlobal('fetch', () => Promise.reject(new Error('stubbed : pas de réseau en test')));
     Object.defineProperty(document, 'location', {
@@ -571,8 +548,12 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
     const gate = new Promise<void>((resolve) => {
       releaseSecondRender = resolve;
     });
-    const adapter: PlatformAdapter & { currentPr(): PrRef | null } = {
-      matches: () => true,
+    const adapter: PlatformAdapter = {
+      currentPr: () => current,
+      getBannerMount: () => null,
+      getRenderedThreadElements: () => [],
+      getRenderedComments: () => [],
+      getRenderedCommentElements: () => [],
       platformProfile: () => ({ id: 'github', suggestionInfoString: null }),
       getRepoConfig: async (requestedPr) => ({
         status: 'found',
@@ -581,7 +562,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
       getOrgConfig: async () => ({ status: 'absent' }),
       observeEditors: () => ({ dispose: () => {} }),
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
-      renderedBodyShape: () => MARKDOWN_HTML_BODY_SHAPE,
+      renderedBodyShape: () => HTML_SHAPE,
       getSubmitControls: () => [],
       readValue: () => '',
       writeValue: () => {},
@@ -596,7 +577,6 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
       getCompletionControl: () => null,
       getCurrentUser: async () => ({ id: 'u', login: 'u', isServiceAccount: false }),
       readPublishedResult: () => null,
-      currentPr: () => current,
     };
     const resolver = new ClientConfigResolver(async () => null);
     const calls: { pr: PrRef | null; changed: boolean; resolved: ResolvedClientConfig | null }[] = [];
@@ -1919,27 +1899,27 @@ describe('§5.5 — révocation complète et pliage remis à neuf (revue Codex r
   });
 });
 
-describe('Codex round 4 — la signature de reprise sonde le COMPTE de commentaires, jamais leur corps (§9.4)', () => {
+describe('Codex round 4 — la signature de reprise sonde les ÉLÉMENTS rendus, jamais leur corps (§9.4)', () => {
   afterEach(() => {
     document.body.innerHTML = '';
   });
 
-  it('utilise getRenderedCommentCount() quand l’adaptateur l’expose, jamais getRenderedComments()', async () => {
+  it('sonde getRenderedCommentElements(), jamais getRenderedComments()', async () => {
     const doc = document;
     const current = pr(29);
     let commentsCalls = 0;
-    let countCalls = 0;
+    let elementsCalls = 0;
     const commentEl = doc.createElement('div');
     const adapter = makeAdapter(() => current, () => publishedSummary({ state: 'success', unresolvedBlockingCount: 0 }), {
       getRenderedComments: () => {
-        commentsCalls++; // ne DOIT jamais être appelé ici : bodyText coûte un clone par commentaire
+        commentsCalls++; // ne DOIT être appelé que par le rendu : bodyText coûte un clone par commentaire
         return [{ element: commentEl, bodyText: 'issue: x' }];
       },
-    }) as PlatformAdapter & { currentPr(): PrRef | null; getRenderedCommentCount?: () => number };
-    adapter.getRenderedCommentCount = () => {
-      countCalls++;
-      return 1;
-    };
+      getRenderedCommentElements: () => {
+        elementsCalls++;
+        return [commentEl];
+      },
+    });
     const resolver = new ClientConfigResolver(async () => null);
 
     observe(adapter, resolver, doc);
@@ -1949,7 +1929,7 @@ describe('Codex round 4 — la signature de reprise sonde le COMPTE de commentai
       await flushAll();
     }
 
-    expect(countCalls).toBeGreaterThan(0);
+    expect(elementsCalls).toBeGreaterThan(0);
     // getRenderedComments() n'est appelée QUE par le rendu réel (décoration des badges,
     // renderPrChrome), jamais par la signature de reprise (chromeSignatureOf) — ici la PR
     // ne change jamais de signature après le premier rendu, donc aucun second rendu réel.
@@ -2382,12 +2362,10 @@ describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut sign
 
     const github = new GithubClientAdapter({ documentRef: document, fetchImpl });
     expect(github.getRenderedCommentElements()).toEqual(github.getRenderedComments().map((c) => c.element));
-    expect(github.getRenderedCommentElements()).toHaveLength(github.getRenderedCommentCount());
     expect(github.getRenderedCommentElements().length).toBeGreaterThan(0);
 
     const azdo = new AzdoClientAdapter({ documentRef: document });
     expect(azdo.getRenderedCommentElements()).toEqual(azdo.getRenderedComments().map((c) => c.element));
-    expect(azdo.getRenderedCommentElements()).toHaveLength(azdo.getRenderedCommentCount());
     expect(azdo.getRenderedCommentElements().length).toBeGreaterThan(0);
   });
 });

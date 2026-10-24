@@ -12,9 +12,10 @@
 // quatre-vingt-dix autres appels s'appuient sur le défaut et passeraient à l'identique.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { commentBodyText, MARKDOWN_HTML_BODY_SHAPE, type RenderedBodyShape } from '@cct/adapter-shared';
+import { commentBodyText, type RenderedBodyShape } from '@cct/adapter-shared';
 import { defaultConfig } from '@cct/core';
 import { decorateComment } from '../src/ui/badges.js';
+import { HTML_SHAPE } from './helpers/decorate.js';
 
 const profile = { id: 'github', suggestionInfoString: 'suggestion' };
 
@@ -40,7 +41,7 @@ describe('§5.5 — la forme du corps rendu vient de la plateforme, pas d’une 
 
     // Avec la forme de GitHub, ce `<div>` n'est pas un conteneur de paragraphe reconnu : le
     // masquage RENONCE, ce qui est l'issue sûre (§5.5) : afficher moins, jamais afficher faux.
-    decorateComment(el, 'issue: le nom est ambigu', defaultConfig(), profile, 'en', MARKDOWN_HTML_BODY_SHAPE);
+    decorateComment(el, 'issue: le nom est ambigu', defaultConfig(), profile, 'en', HTML_SHAPE);
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
   });
 
@@ -122,21 +123,15 @@ describe('§5.5 — la forme du corps rendu vient de la plateforme, pas d’une 
     el.innerHTML = '<p>issue: le nom est ambigu</p>';
     document.body.appendChild(el);
 
-    decorateComment(el, 'issue: le nom est ambigu', defaultConfig(), profile, 'en', MARKDOWN_HTML_BODY_SHAPE);
+    decorateComment(el, 'issue: le nom est ambigu', defaultConfig(), profile, 'en', HTML_SHAPE);
     expect(el.querySelector('.cct-hidden-prefix')).not.toBeNull();
 
     decorateComment(el, commentBodyText(el), defaultConfig(), profile, 'en', null);
     expect(el.querySelector('.cct-hidden-prefix')).toBeNull();
     expect(commentBodyText(el)).toContain('issue: le nom est ambigu');
   });
-
-  it('le défaut nommé vaut exactement ce que le code écrivait en dur', () => {
-    // Contre-épreuve du déplacement : les deux adaptateurs répondent aujourd'hui la même
-    // chose, et le refactoring devait être à comportement RIGOUREUSEMENT nul. Si ce défaut
-    // dérivait un jour, tous les autres tests de badges changeraient de sens en silence.
-    expect(MARKDOWN_HTML_BODY_SHAPE.paragraphTags).toEqual(['P']);
-    expect(MARKDOWN_HTML_BODY_SHAPE.lineBreakTag).toBe('BR');
-  });
+  // La forme MESURÉE de GitHub, elle, est fixée là où elle vit désormais :
+  // packages/adapters/github/test/body-shape.test.ts.
 });
 
 describe('§9.2.3 — la CASSE des noms de balises ne peut pas piéger un adaptateur', () => {

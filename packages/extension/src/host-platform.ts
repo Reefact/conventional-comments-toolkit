@@ -154,9 +154,10 @@ export function inferPlatform(host: string): HostPlatform | null {
 /** Quelle plateforme doit servir cet hôte, au vu de la répartition publiée — ou `null` si
  * aucune ne le doit.
  *
- * C'est ici, et pas dans `matchesHost()` des adaptateurs, que se décide l'activation :
- * l'adaptateur répond « je sais parler à cet hôte », question utile une fois qu'il est
- * choisi, mais qui ne dit rien du DROIT d'y être. Réduire les deux à un booléen
+ * C'est ici, et nulle part dans un adaptateur, que se décide l'activation. Les adaptateurs
+ * ont porté une reconnaissance d'hôte à eux (`matchesHost()`, retirée du contrat quand plus
+ * rien ne l'appelait) : elle répondait « je sais parler à cet hôte », question utile une fois
+ * l'adaptateur choisi, mais qui ne dit rien du DROIT d'y être. Réduire les deux à un booléen
  * « un adaptateur matche » perdait justement les deux informations qui comptent — par quel
  * droit, et lequel — d'où une révocation muette sur les hôtes Azure intégrés, et un
  * reclassement d'hôte qui laissait l'onglet sur l'ancien adaptateur.

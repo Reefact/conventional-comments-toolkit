@@ -255,6 +255,48 @@ for (const rel of NEUTRAL_ROOTS) {
   }
 }
 
+// ————— LE CONTRAT SE RESPECTE PAR LE TYPE, JAMAIS PAR UN CAST —————
+//
+// content-internal.ts a lu six méthodes « hors contrat » par conversion de type —
+// `as PlatformAdapter & { getBannerMount?: … }`, `as GithubClientAdapter | AzdoClientAdapter` —
+// avec un repli silencieux pour chacune : une plateforme qui ne les portait pas compilait, et
+// n'affichait ni bandeau, ni badges, ni filtre, et tenait la page pour « hors PR ». Le contrat
+// (§9.2.3) les porte désormais, obligatoires ; un cast est la forme exacte qu'a prise cette
+// fuite, et un import de classe concrète hors du point de composition en est l'autre forme.
+//
+// Les casts se cherchent dans la SOURCE, pas dans le code transformé : esbuild retire les
+// annotations de type, et `as X` avec elles. Les commentaires en sont retirés par une règle
+// simple — `/* … */`, puis `//` jusqu'à la fin de ligne quand il n'est pas précédé de `:` (une
+// URL) —, suffisante ici parce que ce qu'on cherche n'apparaît jamais dans une chaîne de
+// caractères. Les imports se lisent dans la même source : un `import type` d'un paquet de
+// plateforme est une dépendance comme une autre, et esbuild l'aurait effacé.
+function stripTsComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+}
+const CAST_PATTERNS = [
+  { re: /\bas\s+PlatformAdapter\s*&/, what: 'as PlatformAdapter & {…}' },
+  { re: /\bas\s+\w+ClientAdapter\b/, what: 'as <Plateforme>ClientAdapter' },
+  { re: /\b\w+ClientAdapter\s*\|\s*\w+ClientAdapter\b/, what: '<A>ClientAdapter | <B>ClientAdapter' },
+];
+// Les plateformes sont les DOSSIERS de packages/adapters, hors `shared` — jamais une liste.
+const adapterIds = readdirSync(ADAPTERS).filter((name) => name !== 'shared');
+const castFindings = [];
+for (const rel of NEUTRAL_ROOTS) {
+  for (const file of walk(join(root, rel))) {
+    const relPath = relative(root, file).replaceAll('\\', '/');
+    if (COMPOSITION_ROOT.includes(relPath)) continue;
+    const source = stripTsComments(readFileSync(file, 'utf8'));
+    for (const { re, what } of CAST_PATTERNS) {
+      if (re.test(source)) castFindings.push({ relPath, what });
+    }
+    for (const id of adapterIds) {
+      if (new RegExp(`from\\s*["']@cct/adapter-${id}["']`).test(source)) {
+        castFindings.push({ relPath, what: `import de @cct/adapter-${id}` });
+      }
+    }
+  }
+}
+
 // ————— LE MÊME CRITÈRE, DANS L'AUTRE LANGAGE —————
 //
 // Tout ce qui précède ne lit que du TypeScript (`walk()` filtre sur `.ts`). Or la scission des
@@ -361,6 +403,7 @@ for (const m of contractCode.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?=[(:<])/g)) {
 
 if (
   findings.length === 0 &&
+  castFindings.length === 0 &&
   contractLeaks.length === 0 &&
   scattered.length === 0 &&
   cssFindings.length === 0 &&
@@ -370,6 +413,9 @@ if (
   const detail = [...vocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ');
   console.log(`✓ isolation des plateformes : ${total} mots dérivés — ${detail} — absents du code partagé.`);
   console.log('✓ §9.4 : chaque adaptateur définit ses sélecteurs dans un fichier unique.');
+  console.log(
+    `✓ contrat : aucune conversion de type ni import de plateforme (${adapterIds.join(', ')}) hors du point de composition.`
+  );
   const cssTotal = [...cssVocabularies.values()].reduce((a, s) => a + s.size, 0);
   const cssDetail = [...cssVocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ') || 'aucune feuille renseignée';
   console.log(`✓ styles : ${cssTotal} jeton(s) de plateforme — ${cssDetail} — absents de la feuille partagée.`);
@@ -391,6 +437,16 @@ if (findings.length > 0) {
       "dont le code partagé a besoin par une méthode du contrat (§9.2.3), qui rend une DONNÉE et\n" +
       'ne nomme aucune plateforme — voir `getEditorChrome()`. Le code partagé s\'exécute sur\n' +
       'TOUTES les plateformes : ce qui est écrit ici est exécuté par toutes.'
+  );
+}
+if (castFindings.length > 0) {
+  console.error(
+    `\n${castFindings.length} conversion(s) de type ou import(s) de plateforme dans du code que le contrat doit suffire à typer :\n` +
+      castFindings.map((f) => `  - ${f.relPath}  «${f.what}»`).join('\n') +
+      '\n\nCe que le code partagé demande à un adaptateur est dans `PlatformAdapter` (§9.2.3), obligatoire :\n' +
+      'ajoutez le membre au contrat plutôt que de le lire par cast — un cast compile sur une plateforme\n' +
+      'qui ne répond pas, et se replie en silence. Un adaptateur concret ne se nomme que dans le point\n' +
+      'de composition (COMPOSITION_ROOT).'
   );
 }
 if (cssFindings.length > 0) {

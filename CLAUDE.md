@@ -206,10 +206,14 @@ navigateur à l'installation : une fois par machine, `npx playwright-core instal
 
 La CI rejoue ces commandes : `.github/workflows/` fait foi sur qui lance quoi, quand, et
 sur quels chemins. Trois propriétés valent d'être sues parce qu'aucune ne se lit dans une
-commande : la suite tourne sur DEUX versions de Node, une PR qui modifie
-`specifications-fr.md` en même temps que du code est refusée, et ce qui exige un vrai
-navigateur tourne aussi la nuit — un canari, pour que la pourriture d'un sélecteur se
-découvre sans PR. Les faire passer en local avant de pousser.
+commande : la suite tourne sur DEUX versions de Node, ce qui exige un vrai navigateur tourne
+aussi la nuit — un canari, pour que la pourriture d'un sélecteur se découvre sans PR —, et
+`typecheck:tests` est le seul endroit où un test est TYPÉ (vitest transpile sans vérifier :
+un `implements PlatformAdapter` dans un `.test.ts` n'est jamais contrôlé ailleurs). Les faire
+passer en local avant de pousser. Une PR PEUT modifier `specifications-fr.md` avec le code
+qui l'implémente (décision du propriétaire, 24/09/2026 ; le garde CI qui l'interdisait est
+retiré) — ce qui ne change rien à la règle du dessus : la spec ne se plie jamais à
+l'implémentation, un amendement est une décision de conception.
 
 Piège récurrent : les caractères invisibles (BOM, NBSP, U+202F, U+FE0F, ZWJ)
 s'écrivent TOUJOURS en échappements `\uXXXX` dans les sources et les tests.

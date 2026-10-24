@@ -22,12 +22,12 @@ import {
   adapterFetch,
   closestChain,
   commentBodyText,
-  hostMatchesAny,
   queryChain,
   queryChainAll,
   writeToTextField,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
+  type ClientAdapterOptions,
   type EditorChrome,
   type RenderedBodyShape,
   type EditorContext,
@@ -37,29 +37,7 @@ import {
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
 
-export interface AzdoClientOptions {
-  extraHosts?: string[];
-  fetchImpl?: typeof fetch;
-  /** Lecture du `configUrl` d'organisation par un chemin que cet adaptateur n'a pas. Dans
-   * l'extension, c'est le service worker : le script de contenu émet ses requêtes au nom de
-   * l'origine de la page et reste soumis à sa politique CORS, quelle que soit la permission
-   * d'hôte accordée (doc Chrome, « Cross-origin network requests ») ; un `configUrl` hébergé
-   * hors de la plateforme affichée n'y est donc pas lisible.
-   *
-   * **Rendre `null` signifie « lis-le toi-même »**, et cette troisième réponse est
-   * nécessaire : l'appelant est seul à savoir si l'URL est de MÊME origine que la page, cas
-   * où la lecture directe fonctionne — et où le détour par le worker échouerait, faute d'une
-   * permission d'hôte sur le domaine de plateforme que le manifeste ne déclare plus (revue
-   * Codex, PR #30). La décision est donc prise par URL, pas une fois pour toutes.
-   *
-   * Absent — usage hors extension, tests — le `fetch` direct ci-dessous s'applique de même. */
-  readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
-  documentRef?: Document;
-  log?: SelectorLog;
-}
-
 export class AzdoClientAdapter implements PlatformAdapter {
-  #hosts: string[];
   #fetch: typeof fetch;
   #doc: Document;
   #readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
@@ -70,27 +48,11 @@ export class AzdoClientAdapter implements PlatformAdapter {
    * *.visualstudio.com, '/tfs' sur un Azure DevOps Server d'installation par défaut. */
   #apiPrefix = '';
 
-  constructor(opts: AzdoClientOptions = {}) {
-    this.#hosts = ['dev.azure.com', ...(opts.extraHosts ?? [])];
+  constructor(opts: ClientAdapterOptions = {}) {
     this.#fetch = adapterFetch(opts.fetchImpl);
     this.#doc = opts.documentRef ?? document;
     this.#readOrgConfig = opts.readOrgConfig;
     this.log = opts.log ?? new SelectorLog();
-  }
-
-  /** Sélection de plateforme par hôte seul (§2) — même raison qu'en annexe A : Azure
-   * DevOps étant entièrement SPA, la navigation vers une PR depuis les vues « Pull
-   * requests » ou « Mes demandes » arrive après l'injection du script, jamais avant. */
-  matchesHost(url: URL): boolean {
-    // `hostMatchesAny` et non une égalité stricte : un hôte accordé peut être un joker
-    // (§B.6). `*.visualstudio.com` reste en dur — c'est un domaine du produit, reconnu
-    // sans qu'aucune permission optionnelle ait à le nommer.
-    const host = url.hostname;
-    return hostMatchesAny(host, this.#hosts) || host.endsWith('.visualstudio.com');
-  }
-
-  matches(url: URL): boolean {
-    return this.matchesHost(url) && /\/pullrequest\/\d+/i.test(url.pathname);
   }
 
   platformProfile(): PlatformProfile {
@@ -296,21 +258,14 @@ export class AzdoClientAdapter implements PlatformAdapter {
     }));
   }
 
-  /** Sonde bon marché du nombre de commentaires rendus — voir le même commentaire côté
-   * GithubClientAdapter (content-internal.ts, chromeSignatureOf). */
-  getRenderedCommentCount(): number {
-    return queryChainAll(this.#doc, selectors.commentBody).length;
-  }
-
-  /** Les mêmes éléments sans leur `bodyText`, pour `ownOutputSignatureOf` — voir le même
-   * commentaire côté GithubClientAdapter. */
+  /** Les corps rendus, éléments seuls, sans `bodyText` (§9.2.3) — la sonde des signatures de
+   * reprise ; voir le même commentaire côté GithubClientAdapter. */
   getRenderedCommentElements(): Element[] {
     return queryChainAll(this.#doc, selectors.commentBody);
   }
 
-  /** Élément après lequel insérer le bandeau (§5.5) — surface d'affichage, hors du contrat
-   * normatif §9.2.3. Null quand rien n'apparie : l'appelant se replie sur le haut du
-   * document plutôt que de ne rien afficher. */
+  /** Élément après lequel insérer le bandeau (§5.5, §9.2.3). Null quand rien n'apparie :
+   * l'appelant se replie sur le haut du document plutôt que de ne rien afficher. */
   getBannerMount(): Element | null {
     return queryChain(this.#doc, selectors.bannerMount).element;
   }
@@ -329,7 +284,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
     if (!loc) return null;
     const path = loc.pathname;
     // La lecture DOM ne se fait qu'à la construction d'une PrRef effective — jamais sur le
-    // chemin d'échec (page hors PR) : depuis que `matchesHost` (§2) arme les observateurs
+    // chemin d'échec (page hors PR) : depuis que l'activation par hôte (§2) arme les observateurs
     // sur tout l'hôte, `currentPr()` est appelé à chaque mutation même hors PR (listes,
     // work items, wiki), et cette route ne doit y coûter qu'un test d'expression régulière.
     const mk = (scope: [string, string, string], number: string): PrRef => {

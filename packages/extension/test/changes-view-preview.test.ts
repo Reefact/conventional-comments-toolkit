@@ -117,19 +117,17 @@ describe('§5.5 — l’aperçu d’un champ, sur la nouvelle vue des fichiers m
     ]);
   });
 
-  // Sans ce compte, le correctif de la chaîne serait resté sans effet : ouvrir l'aperçu ne
+  // Sans cette sonde, le correctif de la chaîne serait resté sans effet : ouvrir l'aperçu ne
   // change ni le résumé publié, ni les identifiants de fils, ni le nombre de corps publiés —
-  // la signature de reprise (`chromeSignatureOf`) resterait identique et `run()` ressortirait
-  // avant de rendre. Le second versant, `getRenderedCommentElements()`, porte le cas d'une
-  // SECONDE rédaction suivie d'un second aperçu : les comptes n'y bougent pas, seul le digest
-  // de texte voit que le corps n'est plus celui que nos badges décrivaient.
-  it('le compte et les éléments sondés par le rendu le voient apparaître', () => {
+  // la signature de reprise (`chromeSignatureOf`, qui compte ces éléments) resterait identique
+  // et `run()` ressortirait avant de rendre. La même sonde porte le cas d'une SECONDE
+  // rédaction suivie d'un second aperçu : le compte n'y bouge pas, seul le digest de texte
+  // (`ownOutputSignatureOf`) voit que le corps n'est plus celui que nos badges décrivaient.
+  it('les éléments sondés par le rendu le voient apparaître', () => {
     document.body.innerHTML = FIL();
-    expect(adapter().getRenderedCommentCount()).toBe(1);
     expect(adapter().getRenderedCommentElements()).toHaveLength(1);
 
     document.body.innerHTML = FIL() + COMPOSEUR();
-    expect(adapter().getRenderedCommentCount()).toBe(2);
     expect(adapter().getRenderedCommentElements()).toHaveLength(2);
   });
 
@@ -184,7 +182,7 @@ describe('§5.5 — la génération héritée garde exactement ce qu’elle avai
     expect(corpsRendus()).toEqual([
       { texte: 'issue: le nom est ambigu', classe: 'comment-body markdown-body js-preview-body' },
     ]);
-    expect(adapter().getRenderedCommentCount()).toBe(1);
+    expect(adapter().getRenderedCommentElements()).toHaveLength(1);
   });
 });
 

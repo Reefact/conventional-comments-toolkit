@@ -92,31 +92,6 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe('A — extraHosts, jusqu’ici jamais testé au niveau des adaptateurs', () => {
-  it('GithubClientAdapter reconnaît un hôte GHES/ghe.com en plus de github.com', () => {
-    const adapter = new GithubClientAdapter({ extraHosts: ['ghes.example.corp'] });
-    expect(adapter.matchesHost(new URL('https://github.com/acme/demo/pull/1'))).toBe(true);
-    expect(adapter.matchesHost(new URL('https://ghes.example.corp/acme/demo/pull/1'))).toBe(true);
-    expect(adapter.matchesHost(new URL('https://not-granted.example.com/'))).toBe(false);
-  });
-
-  it('AzdoClientAdapter reconnaît un domaine Azure DevOps Server en plus de dev.azure.com', () => {
-    const adapter = new AzdoClientAdapter({ extraHosts: ['azdo.example.corp'] });
-    expect(
-      adapter.matchesHost(new URL('https://dev.azure.com/acme/demo/_git/repo/pullrequest/1'))
-    ).toBe(true);
-    expect(
-      adapter.matchesHost(new URL('https://azdo.example.corp/acme/demo/_git/repo/pullrequest/1'))
-    ).toBe(true);
-    expect(adapter.matchesHost(new URL('https://not-granted.example.com/'))).toBe(false);
-  });
-
-  it('sans extraHosts, seul le domaine par défaut de chaque adaptateur est reconnu (comportement antérieur préservé)', () => {
-    expect(new GithubClientAdapter().matchesHost(new URL('https://ghes.example.corp/'))).toBe(false);
-    expect(new AzdoClientAdapter().matchesHost(new URL('https://azdo.example.corp/'))).toBe(false);
-  });
-});
-
 describe('B1 — hostnameOf canonicalise des deux côtés de la comparaison', () => {
   it('extrait le nom d’hôte d’une origine chrome.permissions', () => {
     expect(hostnameOf('https://ghes.example.corp/*')).toBe('ghes.example.corp');
@@ -273,12 +248,13 @@ describe('B3 — le SCRIPT DE CONTENU lit la valeur publiée, sans jamais touche
   });
 });
 
-describe('C — bootstrap() construit LE bon adaptateur, avec les hôtes de sa plateforme', () => {
+describe('C — bootstrap() construit LE bon adaptateur, et lui seul', () => {
   // Ce bloc vérifiait auparavant que les DEUX constructeurs étaient appelés : bootstrap()
   // les instanciait tous les deux pour interroger leur `matchesHost()`. L'activation se
-  // décidant désormais sur la répartition publiée (`selectPlatform`, voir G1), un seul
-  // adaptateur est construit — celui qui sert. L'intention du test ne change pas : chaque
-  // plateforme reçoit ses hôtes, et jamais ceux de l'autre.
+  // décidant sur la répartition publiée (`selectPlatform`, voir G1), un seul adaptateur est
+  // construit — celui qui sert —, et il ne reçoit plus aucune liste d'hôtes : le DROIT d'être
+  // sur un hôte ne lui appartient pas (§2), et `matchesHost()` a quitté le contrat quand plus
+  // rien ne l'appelait.
   const split = { github: ['ghes.example.corp'], azdo: ['azdo.example.corp'] };
 
   function mockBothAdapters(githubCtorArgs: unknown[], azdoCtorArgs: unknown[]): void {
@@ -294,6 +270,18 @@ describe('C — bootstrap() construit LE bon adaptateur, avec les hôtes de sa p
       },
       observeEditors() {
         return { dispose: () => {} };
+      },
+      getBannerMount() {
+        return null;
+      },
+      getRenderedThreadElements() {
+        return [];
+      },
+      getRenderedComments() {
+        return [];
+      },
+      getRenderedCommentElements() {
+        return [];
       },
       currentPr() {
         return null;
@@ -336,8 +324,9 @@ describe('C — bootstrap() construit LE bon adaptateur, avec les hôtes de sa p
     expect(githubCtorArgs).toEqual([
       // `objectContaining` : le constructeur reçoit aussi un journal de sélecteurs et le
       // relais de configuration, sans rapport avec ce que ce test établit.
-      expect.objectContaining({ documentRef: document, extraHosts: ['ghes.example.corp'] }),
+      expect.objectContaining({ documentRef: document }),
     ]);
+    expect(githubCtorArgs[0]).not.toHaveProperty('extraHosts');
     expect(azdoCtorArgs).toEqual([]);
 
     vi.doUnmock('@cct/adapter-github');
@@ -360,7 +349,7 @@ describe('C — bootstrap() construit LE bon adaptateur, avec les hôtes de sa p
     expect(azdoCtorArgs).toEqual([
       // `objectContaining` : le constructeur reçoit aussi un journal de sélecteurs et le
       // relais de configuration, sans rapport avec ce que ce test établit.
-      expect.objectContaining({ documentRef: document, extraHosts: ['azdo.example.corp'] }),
+      expect.objectContaining({ documentRef: document }),
     ]);
     expect(githubCtorArgs).toEqual([]);
 
@@ -399,31 +388,11 @@ describe('D1 — un octroi JOKER couvre les sous-domaines concrets (§A.4, §B.6
     expect(hostnameOf('https://*.GHE.com/*')).toBe('*.ghe.com');
   });
 
-  it('GithubClientAdapter reconnaît un sous-domaine concret couvert par le joker', () => {
-    const adapter = new GithubClientAdapter({ extraHosts: ['*.ghe.com'] });
-    expect(adapter.matchesHost(new URL('https://acme.ghe.com/acme/demo/pull/1'))).toBe(true);
-    expect(adapter.matchesHost(new URL('https://autre.ghe.com/'))).toBe(true);
-  });
-
-  it('AzdoClientAdapter en fait autant pour un joker d’entreprise', () => {
-    const adapter = new AzdoClientAdapter({ extraHosts: ['*.azdo.example.corp'] });
-    expect(adapter.matchesHost(new URL('https://eu.azdo.example.corp/'))).toBe(true);
-  });
-
-  // Ce test affirmait l'INVERSE — que le joker ne couvre pas le domaine nu — en invoquant
-  // « la sémantique des motifs Chrome ». C'était faux, et le verrouiller par un test était
-  // pire que ne pas le tester : la documentation des motifs WebExtension donne
-  // explicitement `https://mozilla.org/` comme correspondant à `*://*.mozilla.org/*`.
-  // Chrome injectait donc le script sur le domaine nu, que l'adaptateur refusait ensuite.
-  it('le joker couvre AUSSI le domaine nu, comme l’octroi que Chrome accorde', () => {
-    const adapter = new GithubClientAdapter({ extraHosts: ['*.ghe.com'] });
-    expect(adapter.matchesHost(new URL('https://ghe.com/'))).toBe(true);
-  });
-
-  it('mais pas un domaine qui se termine par la même chaîne sans en être un sous-domaine', () => {
-    const adapter = new GithubClientAdapter({ extraHosts: ['*.ghe.com'] });
-    expect(adapter.matchesHost(new URL('https://evilghe.com/'))).toBe(false);
-  });
+  // Qu'un joker couvre AUSSI le domaine nu — et jamais `evilghe.com` — se vérifie sur la
+  // fonction partagée qui porte cette sémantique (`hostMatchesPattern`, F1 ci-dessous) : les
+  // adaptateurs ne reconnaissent plus d'hôtes, l'activation ne leur appartient pas (§2). Un
+  // test a affirmé ici l'INVERSE, en invoquant « la sémantique des motifs Chrome » ; c'était
+  // faux, et le verrouiller par un test était pire que ne pas le tester (revue Codex, PR #29).
 });
 
 describe('D2 — les publications concurrentes sont sérialisées (service worker)', () => {
@@ -569,18 +538,23 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
     };
     vi.doMock('@cct/adapter-github', () => ({
       GithubClientAdapter: class {
-        #hosts: string[];
-        constructor(opts: { extraHosts?: string[] } = {}) {
-          this.#hosts = ['github.com', ...(opts.extraHosts ?? [])];
-        }
-        matchesHost(url: URL): boolean {
-          return this.#hosts.includes(url.hostname);
-        }
         async getCurrentUser() {
           return { login: 'someone' };
         }
         observeEditors() {
           return { dispose: disposeEditors };
+        }
+        getBannerMount() {
+          return null;
+        }
+        getRenderedThreadElements() {
+          return [];
+        }
+        getRenderedComments() {
+          return [];
+        }
+        getRenderedCommentElements() {
+          return [];
         }
         currentPr() {
           return null;
@@ -592,9 +566,6 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
     }));
     vi.doMock('@cct/adapter-azdo', () => ({
       AzdoClientAdapter: class {
-        matchesHost(): boolean {
-          return false;
-        }
       },
     }));
 
@@ -644,18 +615,23 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
     };
     vi.doMock('@cct/adapter-github', () => ({
       GithubClientAdapter: class {
-        #hosts: string[];
-        constructor(opts: { extraHosts?: string[] } = {}) {
-          this.#hosts = ['github.com', ...(opts.extraHosts ?? [])];
-        }
-        matchesHost(url: URL): boolean {
-          return this.#hosts.includes(url.hostname);
-        }
         async getCurrentUser() {
           return { login: 'someone' };
         }
         observeEditors() {
           return { dispose: disposeEditors };
+        }
+        getBannerMount() {
+          return null;
+        }
+        getRenderedThreadElements() {
+          return [];
+        }
+        getRenderedComments() {
+          return [];
+        }
+        getRenderedCommentElements() {
+          return [];
         }
         currentPr() {
           return null;
@@ -667,9 +643,6 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
     }));
     vi.doMock('@cct/adapter-azdo', () => ({
       AzdoClientAdapter: class {
-        matchesHost(): boolean {
-          return false;
-        }
       },
     }));
 
@@ -702,13 +675,8 @@ describe('E2 — un port non standard survit jusqu’aux URL de configuration (�
       value: new URL('https://ghes.example.corp:8443/acme/demo/pull/42'),
       configurable: true,
     });
-    const pr = new GithubClientAdapter({ documentRef: doc, extraHosts: ['ghes.example.corp'] }).currentPr();
+    const pr = new GithubClientAdapter({ documentRef: doc }).currentPr();
     expect(pr?.host).toBe('ghes.example.corp:8443');
-  });
-
-  it('la reconnaissance d’hôte, elle, reste indifférente au port', () => {
-    const adapter = new GithubClientAdapter({ extraHosts: ['ghes.example.corp'] });
-    expect(adapter.matchesHost(new URL('https://ghes.example.corp:8443/acme/demo/pull/1'))).toBe(true);
   });
 
   it('un hôte sans port explicite n’en gagne pas — github.com reste github.com', () => {
@@ -756,13 +724,6 @@ describe('F1 — le joker suit la sémantique réelle des motifs WebExtension', 
 function mockGithubAdapterDeliveringOneEditor(disposeEditors: () => void): void {
   vi.doMock('@cct/adapter-github', () => ({
     GithubClientAdapter: class {
-      #hosts: string[];
-      constructor(opts: { extraHosts?: string[] } = {}) {
-        this.#hosts = ['github.com', ...(opts.extraHosts ?? [])];
-      }
-      matchesHost(url: URL): boolean {
-        return this.#hosts.includes(url.hostname);
-      }
       async getCurrentUser() {
         return { login: 'someone' };
       }
@@ -779,6 +740,18 @@ function mockGithubAdapterDeliveringOneEditor(disposeEditors: () => void): void 
         });
         return { dispose: disposeEditors };
       }
+      getBannerMount() {
+        return null;
+      }
+      getRenderedThreadElements() {
+        return [];
+      }
+      getRenderedComments() {
+        return [];
+      }
+      getRenderedCommentElements() {
+        return [];
+      }
       currentPr() {
         return null;
       }
@@ -789,9 +762,6 @@ function mockGithubAdapterDeliveringOneEditor(disposeEditors: () => void): void 
   }));
   vi.doMock('@cct/adapter-azdo', () => ({
     AzdoClientAdapter: class {
-      matchesHost(): boolean {
-        return false;
-      }
     },
   }));
 }
@@ -1036,9 +1006,6 @@ describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur'
     };
     const mkAdapter = (dispose: () => void) =>
       class {
-        matchesHost(): boolean {
-          return true;
-        }
         async getCurrentUser() {
           return { login: 'someone' };
         }
@@ -1050,6 +1017,18 @@ describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur'
         }
         observeEditors() {
           return { dispose };
+        }
+        getBannerMount() {
+          return null;
+        }
+        getRenderedThreadElements() {
+          return [];
+        }
+        getRenderedComments() {
+          return [];
+        }
+        getRenderedCommentElements() {
+          return [];
         }
         currentPr() {
           return null;
@@ -1343,6 +1322,18 @@ describe('H4 — un contrôleur dont l’éditeur a quitté le document est lib�
         observeEditors(cb: (editor: unknown) => void) {
           emit = cb;
           return { dispose: vi.fn() };
+        }
+        getBannerMount() {
+          return null;
+        }
+        getRenderedThreadElements() {
+          return [];
+        }
+        getRenderedComments() {
+          return [];
+        }
+        getRenderedCommentElements() {
+          return [];
         }
         currentPr() {
           return null;

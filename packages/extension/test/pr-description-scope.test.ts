@@ -152,13 +152,12 @@ describe('§5.5 — la description ne reçoit pas de badge', () => {
     expect(bodies.map((b) => b.bodyText)).toEqual(['issue: un vrai commentaire']);
   });
 
-  // Les deux SONDES, elles, continuent de la compter — et ce n'est pas un oubli : elles ne
-  // servent pas à décorer mais à savoir si la page a bougé. Le test suivant dit pourquoi
-  // cette divergence est nécessaire, et pas seulement tolérable.
-  it('les sondes de signature comptent toujours la description', () => {
+  // La SONDE des signatures, elle, continue de la compter — et ce n'est pas un oubli : elle ne
+  // sert pas à décorer mais à savoir si la page a bougé. Le test suivant dit pourquoi cette
+  // divergence est nécessaire, et pas seulement tolérable.
+  it('la sonde de signature compte toujours la description', () => {
     document.body.innerHTML = DESCRIPTION_BODY('note: description') + COMMENT_BODY('issue: un vrai commentaire');
     const adapter = new GithubClientAdapter({ documentRef: document });
-    expect(adapter.getRenderedCommentCount()).toBe(2);
     expect(adapter.getRenderedCommentElements()).toHaveLength(2);
   });
 });

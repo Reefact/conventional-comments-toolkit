@@ -43,9 +43,9 @@ const bundled = await build({
   stdin: {
     contents: `
       import { decorateComment } from './packages/extension/src/ui/badges.ts';
-      import { MARKDOWN_HTML_BODY_SHAPE } from '@cct/adapter-shared';
+      import { GITHUB_BODY_SHAPE } from '@cct/adapter-github';
       import { defaultConfig } from '@cct/core';
-      globalThis.cct = { decorateComment, defaultConfig, MARKDOWN_HTML_BODY_SHAPE };
+      globalThis.cct = { decorateComment, defaultConfig, GITHUB_BODY_SHAPE };
     `,
     resolveDir: root,
     loader: 'ts',
@@ -96,8 +96,9 @@ const measured = await page.evaluate(() => {
   // la fonction livrée avec cinq arguments, hors de portée d'un grep sur les `.ts`, et le
   // paramètre manquant l'a fait tomber au premier lancement. C'est exactement ce que le retrait
   // du défaut achète : une omission qui parle. Le fixture est celui de github.com — préfixe et
-  // sujet dans un `<p>`, le retour à la ligne en `<br>` —, donc la forme Markdown, nommée.
-  const SHAPE = globalThis.cct.MARKDOWN_HTML_BODY_SHAPE;
+  // sujet dans un `<p>`, le retour à la ligne en `<br>` —, donc la forme que GitHub a mesurée,
+  // sous le nom que son paquet lui donne.
+  const SHAPE = globalThis.cct.GITHUB_BODY_SHAPE;
 
   // Rendu livré.
   const after = document.getElementById('after');

@@ -1395,7 +1395,11 @@ interface RenderedBodyShape {
 }
 
 interface PlatformAdapter {
-  matches(url: URL): boolean;          // §2 — activation par domaine, `optional_host_permissions` (§A.4, §B.4)
+  currentPr(): PrRef | null;           // §2, §6.2.3 — la PR que la page AFFICHE, lue dans l'URL et le DOM ;
+                                       // `null` hors d'une page de PR. L'activation d'un hôte ne passe pas
+                                       // par l'adaptateur : elle se décide sur la répartition des hôtes
+                                       // accordés (`optional_host_permissions`, §A.4, §B.4) que le
+                                       // composant A publie, jamais sur ce qu'un adaptateur sait des hôtes
   platformProfile(): PlatformProfile;  // §9.2.2 — marqueurs propres à la plateforme, passés à `validate()`
   getRepoConfig(pr: PrRef,
                 opts?: { bypassCache: boolean }): Promise<ConfigRead>;  // §8.1.2 niveau 1 — fichier du dépôt,
@@ -1425,8 +1429,20 @@ interface PlatformAdapter {
   getCurrentUser(): Promise<UserInfo>;      // depuis le DOM ; sert au rendu et à l'exemption d'auteur de
                                             // l'étage −1 (§3.5.1), jamais à une décision d'autorisation
   readPublishedResult(): PublishedSummary | null;   // lu dans le DOM, jamais par appel d'API (§8.1.3, §10)
+  getBannerMount(): Element | null;    // §5.5 — l'élément APRÈS lequel le bandeau s'insère, « en tête de
+                                       // PR » ; `null` : le composant A se replie sur le haut du document
+  getRenderedThreadElements(): { id: string; element: Element }[];  // §5.5 — les fils rendus, pour le
+                                       // filtre local ; `id` est celui de `getThreads()`, même dérivation
+  getRenderedComments(): { element: Element; bodyText: string }[];  // §5.5 — les corps à DÉCORER (badges,
+                                       // masquage), avec leur texte lu hors des badges déjà posés
+  getRenderedCommentElements(): Element[];  // §5.5, §9.4 — les corps que la plateforme REND, éléments
+                                       // seuls : la sonde des signatures de reprise, jamais
+                                       // `getRenderedComments()`, qui clone chaque sous-arbre pour en
+                                       // lire le texte ; peut compter ce que les badges écartent (§4.1)
 }
 ```
+
+**Tout ce que le composant A demande à un adaptateur est dans ce contrat, et tout y est obligatoire.** Cinq réponses ont vécu hors de lui — la PR affichée, l'en-tête de PR, les fils rendus, les corps à décorer, les corps rendus —, lues par conversion de type dans le code partagé, chacune avec un repli silencieux : une plateforme qui ne les portait pas compilait, et n'affichait ni bandeau, ni filtre, ni badges, et tenait la page pour « hors PR », sans qu'aucun diagnostic ne le dise. La règle énoncée plus bas pour `getEditorChrome()` — une méthode optionnelle laisse une plateforme nouvelle compiler sans jamais répondre — vaut pour chaque membre : le compilateur pose la question, et `null` ou la liste vide est une réponse. Une méthode `matches(url)` a porté l'« activation par domaine » dans ce contrat sans qu'aucun code ne l'appelle, et une `matchesHost(url)` à côté d'elle, avec des hôtes par défaut codés en dur : l'activation se décide sur la répartition des hôtes accordés que le composant A publie (§2), jamais sur ce qu'un adaptateur croit savoir des hôtes, et les deux sont retirées.
 
 **`getRepoConfig()` et `getOrgConfig()` sont les seules requêtes réseau de l'extension, et elles demandent leur justification.** Sans elles, l'extension ne connaît ni les labels, ni `activatedAt`, ni les seuils : elle valide contre les défauts produit et diverge du vérificateur sur le cas le plus banal — un dépôt qui a ajouté un label. Le §8.1.5 lui prescrit d'ailleurs trois comportements de repli sur le fichier de dépôt, ce qui suppose qu'elle le lise.
 
@@ -1448,7 +1464,7 @@ Trois propriétés la rendent sûre, et chacune répond à un échec précis :
 - **Elle porte des éléments, jamais des longueurs ni des couleurs.** La frontière n'est pas cosmétique : le contrat dit *quel élément joue quel rôle*, la feuille de style de la plateforme dit *combien il mesure*. Sans cette règle, une mesure faite sur une plateforme redevient une constante que toutes les autres subissent — le défaut exact que cette méthode corrige.
 - **Aucune signature de ce contrat ne nomme une plateforme.** Un port qui exposerait `isGitHubChangesView()` aurait échoué : il obligerait le code partagé à savoir de qui il parle, et le `if` que le polymorphisme doit supprimer reviendrait sous un autre nom. Cette propriété est vérifiable mécaniquement, et elle est vérifiée.
 
-Elle est **obligatoire**, et ce choix se paie : toute doublure de test doit y répondre. Une méthode optionnelle ne coûterait rien et laisserait une plateforme nouvelle compiler sans jamais se prononcer — son extension se logerait alors au jugé sur un DOM que personne n'a regardé, silencieusement. Le compilateur doit poser la question ; répondre « rien de spécial » ne coûte qu'un mot.
+Elle est **obligatoire**, et ce choix se paie : toute doublure de test doit y répondre. Une méthode optionnelle ne coûterait rien et laisserait une plateforme nouvelle compiler sans jamais se prononcer — son extension se logerait alors au jugé sur un DOM que personne n'a regardé, silencieusement. Le compilateur doit poser la question ; répondre « rien de spécial » ne coûte qu'un mot. La règle vaut pour chaque membre de ce contrat, et elle est vérifiée dans les deux sens : un adaptateur incomplet ne compile pas, et le code partagé ne lit rien par conversion de type ni n'importe un adaptateur concret hors de son point de composition (`check:platform-isolation`).
 
 `renderedBodyShape()` répond à la même nécessité pour le §5.5, et mérite d'être distinguée de `getEditorChrome()` sur un point : c'est la seule des deux dont l'absence produisait un rendu **faux** plutôt qu'un renoncement. Les faits de forme y étaient écrits en dur — un conteneur de paragraphe, un marqueur de fin de ligne —, mesurés sur une seule plateforme et appliqués à toutes. Sur un corps rendu où la fin de ligne n'est pas ce marqueur, la borne du sujet ne se déclenche jamais et un fragment entier du corps passe dans le sujet mis en avant. Les autres fuites de ce genre renoncent proprement ; celle-là se trompe, et c'est pourquoi la donnée doit venir de la plateforme — y compris quand la plateforme n'a rien à en dire.
 

@@ -11,7 +11,8 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
-import { writeToTextField, MARKDOWN_HTML_BODY_SHAPE, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { HTML_SHAPE } from './helpers/decorate.js';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { EditorController } from '../src/editor-controller.js';
 import {
@@ -256,7 +257,7 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     const adapter: Partial<PlatformAdapter> = {
       platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
-      renderedBodyShape: () => MARKDOWN_HTML_BODY_SHAPE,
+      renderedBodyShape: () => HTML_SHAPE,
       getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
       readValue: () => textarea.value,
       writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),
@@ -618,6 +619,18 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
         observeEditors() {
           return { dispose: () => {} };
         }
+        getBannerMount() {
+          return null;
+        }
+        getRenderedThreadElements() {
+          return [];
+        }
+        getRenderedComments() {
+          return [];
+        }
+        getRenderedCommentElements() {
+          return [];
+        }
         currentPr() {
           return prFromLocation(document);
         }
@@ -631,7 +644,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
           return NEUTRAL_EDITOR_CHROME;
         }
         renderedBodyShape() {
-          return MARKDOWN_HTML_BODY_SHAPE;
+          return HTML_SHAPE;
         }
         getSubmitControls() {
           return [];
@@ -1093,6 +1106,18 @@ describe('D — dégradation de sélecteur : journal local TOUJOURS, télémétr
             },
             observeEditors() {
               return { dispose: () => {} };
+            },
+            getBannerMount() {
+              return null;
+            },
+            getRenderedThreadElements() {
+              return [];
+            },
+            getRenderedComments() {
+              return [];
+            },
+            getRenderedCommentElements() {
+              return [];
             },
             currentPr() {
               return null;

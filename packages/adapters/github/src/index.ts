@@ -17,14 +17,13 @@ import {
   adapterFetch,
   closestChain,
   commentBodyText,
-  hostMatchesAny,
   matchesChain,
   queryChain,
   queryChainAll,
   writeToTextField,
-  MARKDOWN_HTML_BODY_SHAPE,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
+  type ClientAdapterOptions,
   type EditorChrome,
   type RenderedBodyShape,
   type EditorContext,
@@ -34,33 +33,6 @@ import {
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
 import { ALL_EDITORS, SURFACES, type GithubSurface } from './surfaces.js';
-
-export interface GithubClientOptions {
-  /** Hôtes autorisés par l'utilisateur ou la politique (§2, §A.4) — github.com n'est que
-   * le domaine pré-déclarable ; GHES et ghe.com passent par optional_host_permissions. */
-  extraHosts?: string[];
-  /** Fetch à employer pour les lectures faites par cet adaptateur — substitution de test,
-   * ou contexte d'exécution qui n'a pas de `fetch` global. Ce n'est PAS le chemin vers le
-   * service worker : une fonction ne franchit pas la frontière des contextes d'une
-   * extension. Pour cela, voir `readOrgConfig` ci-dessous. */
-  fetchImpl?: typeof fetch;
-  /** Lecture du `configUrl` d'organisation par un chemin que cet adaptateur n'a pas. Dans
-   * l'extension, c'est le service worker : le script de contenu émet ses requêtes au nom de
-   * l'origine de la page et reste soumis à sa politique CORS, quelle que soit la permission
-   * d'hôte accordée (doc Chrome, « Cross-origin network requests ») ; un `configUrl` hébergé
-   * hors de la plateforme affichée n'y est donc pas lisible.
-   *
-   * **Rendre `null` signifie « lis-le toi-même »**, et cette troisième réponse est
-   * nécessaire : l'appelant est seul à savoir si l'URL est de MÊME origine que la page, cas
-   * où la lecture directe fonctionne — et où le détour par le worker échouerait, faute d'une
-   * permission d'hôte sur le domaine de plateforme que le manifeste ne déclare plus (revue
-   * Codex, PR #30). La décision est donc prise par URL, pas une fois pour toutes.
-   *
-   * Absent — usage hors extension, tests — le `fetch` direct ci-dessous s'applique de même. */
-  readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
-  documentRef?: Document;
-  log?: SelectorLog;
-}
 
 /** `credentials` d'une lecture de configuration — décidé PAR URL, et non une fois pour toutes.
  *
@@ -94,8 +66,19 @@ export function configCredentials(url: string): RequestCredentials {
     : 'include';
 }
 
+/** §5.5 — la forme du corps rendu de GITHUB, MESURÉE à plusieurs reprises sur github.com : une
+ * ligne de Markdown ordinaire dans un `<p>`, une fin de ligne simple en `<br>`.
+ *
+ * Elle a vécu dans `@cct/adapter-shared` sous le nom générique `MARKDOWN_HTML_BODY_SHAPE`,
+ * c'est-à-dire une mesure faite sur UNE plateforme, offerte à toutes comme défaut commode. Un
+ * paquet partagé n'a pas à porter de mesure : celle-ci rentre chez elle, et un adaptateur qui
+ * veut la même forme l'affirme sous son propre nom, après l'avoir regardée. */
+export const GITHUB_BODY_SHAPE: RenderedBodyShape = Object.freeze({
+  paragraphTags: Object.freeze(['P']),
+  lineBreakTag: 'BR',
+});
+
 export class GithubClientAdapter implements PlatformAdapter {
-  #hosts: string[];
   #fetch: typeof fetch;
   #doc: Document;
   #readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
@@ -106,28 +89,11 @@ export class GithubClientAdapter implements PlatformAdapter {
   // attribution, les deux se ressemblent — c'est le défaut relevé en revue (Reefact, PR #65).
   #surfaceOf = new WeakMap<Element, GithubSurface>();
 
-  constructor(opts: GithubClientOptions = {}) {
-    this.#hosts = ['github.com', ...(opts.extraHosts ?? [])];
+  constructor(opts: ClientAdapterOptions = {}) {
     this.#fetch = adapterFetch(opts.fetchImpl);
     this.#doc = opts.documentRef ?? document;
     this.#readOrgConfig = opts.readOrgConfig;
     this.log = opts.log ?? new SelectorLog();
-  }
-
-  /** Sélection de plateforme par hôte seul (§2) — `bootstrap()` choisit l'adaptateur à
-   * l'injection du script, avant même de savoir si la page courante est une PR : la
-   * navigation vers une PR arrive presque toujours ENSUITE, via un lien interne (liste des
-   * PR, notifications, tableau de bord), en SPA (§A.3). Exiger une PR ici laisserait
-   * l'extension intégralement inactive tant qu'un rechargement complet ne la relance pas
-   * directement sur l'URL de la PR. */
-  matchesHost(url: URL): boolean {
-    // `hostMatchesAny` et non une égalité stricte : un hôte accordé peut être un joker
-    // `*.ghe.com` (§A.4 — sous-domaine dédié par client, inconnu à la compilation).
-    return hostMatchesAny(url.hostname, this.#hosts);
-  }
-
-  matches(url: URL): boolean {
-    return this.matchesHost(url) && /\/pull\/\d+/.test(url.pathname);
   }
 
   platformProfile(): PlatformProfile {
@@ -417,10 +383,9 @@ export class GithubClientAdapter implements PlatformAdapter {
     return NEUTRAL_EDITOR_CHROME;
   }
 
-  /** §5.5 — MESURÉ à plusieurs reprises sur github.com : le corps rendu enveloppe une ligne de
-   * Markdown ordinaire dans un `<p>`, et matérialise une fin de ligne simple par un `<br>`. */
+  /** §5.5 — la forme mesurée de GitHub, `GITHUB_BODY_SHAPE` ci-dessus. */
   renderedBodyShape(): RenderedBodyShape {
-    return MARKDOWN_HTML_BODY_SHAPE;
+    return GITHUB_BODY_SHAPE;
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {
@@ -572,7 +537,8 @@ export class GithubClientAdapter implements PlatformAdapter {
    * que les commentaires publiés (§5.5), sur un texte qui ne l'est pas encore. Réunis aux
    * corps publiés par les trois méthodes de cette section, et par elles seules : `getThreads()`
    * ne les lit JAMAIS, un brouillon n'étant le corps d'aucun fil — c'est aussi pourquoi ils
-   * n'entrent pas dans la chaîne `comment-body`, que cette lecture-là emploie.
+   * n'entrent pas dans la chaîne `comment-body`, que cette lecture-là emploie. Réunis aux
+   * corps publiés par les DEUX méthodes de cette section, et par elles seules.
    *
    * Rend un tableau vide sur la génération héritée, où la chaîne `comment-body` attrape déjà
    * l'aperçu (voir `previewBody`, selectors.ts) : c'est ce qui fait que les badges s'y
@@ -587,47 +553,36 @@ export class GithubClientAdapter implements PlatformAdapter {
     return queryChainAll(this.#doc, selectors.previewBody);
   }
 
-  /** Sonde bon marché du nombre de commentaires rendus, pour la signature de reprise du
-   * bandeau (content-internal.ts, chromeSignatureOf) — jamais `getRenderedComments()` pour
-   * ça : cette dernière calcule `commentBodyText` (clone du sous-arbre dès qu'un badge est
-   * posé) pour CHAQUE commentaire, alors que seul le compte importe à un observateur qui
-   * tourne à chaque mutation, pour toute la durée de vie de l'onglet. Compte la description
-   * de la PR, que `getRenderedComments()` écarte — voir là-haut pourquoi les deux
-   * divergent. */
-  getRenderedCommentCount(): number {
+  /** Les corps que la plateforme REND, éléments seuls, sans `bodyText` (§9.2.3) — la sonde des
+   * deux signatures de content-internal.ts : `chromeSignatureOf` en compte la longueur,
+   * `ownOutputSignatureOf` doit remarquer qu'un corps réécrit par la plateforme (mise à jour
+   * d'un commentaire) a emporté nos badges et notre masquage de préfixe. Jamais
+   * `getRenderedComments()` pour ça : le clone qu'elle fait par commentaire décoré n'a pas à
+   * être payé à chaque mutation, pour toute la durée de vie de l'onglet. Compte la description
+   * de la PR, que `getRenderedComments()` écarte — voir là-haut pourquoi les deux divergent.
+   * Ces corps ne sont PAS un sous-ensemble de `getRenderedThreadElements()` : un commentaire
+   * de la conversation n'appartient à aucun fil de revue. */
+  getRenderedCommentElements(): Element[] {
     // L'aperçu y entre, et c'est CE compte qui réveille le rendu quand on passe sur l'onglet
     // « Preview » : un aperçu qui apparaît ne change ni le résumé publié, ni les identifiants
     // de fils, ni le nombre de corps publiés. Sans lui ici, la signature de reprise
     // (content-internal.ts, chromeSignatureOf) resterait identique, `run()` ressortirait
     // avant de rendre, et l'aperçu n'aurait jamais ses badges — le correctif de la chaîne
-    // `preview-body` serait resté sans effet.
-    return queryChainAll(this.#doc, selectors.commentBody).length + this.#previewBodies().length;
-  }
-
-  /** Les mêmes éléments, sans leur `bodyText` — pour la signature de NOTRE propre sortie
-   * (content-internal.ts, ownOutputSignatureOf), qui doit remarquer qu'un corps réécrit par
-   * la plateforme (mise à jour d'un commentaire) a emporté nos badges et notre masquage de
-   * préfixe. Même raison qu'au-dessus d'écarter `getRenderedComments()` : le clone qu'elle
-   * fait par commentaire décoré n'a pas à être payé à chaque mutation. Ces corps ne sont
-   * PAS un sous-ensemble de `getRenderedThreadElements()` : un commentaire de la
-   * conversation n'appartient à aucun fil de revue. */
-  getRenderedCommentElements(): Element[] {
-    // L'aperçu y entre pour la même raison que les corps publiés : il est re-rendu par React
-    // à chaque aller-retour Write/Preview, et une seconde rédaction suivie d'un second aperçu
-    // ne change AUCUN compte — seul le digest de texte voit que le corps n'est plus celui que
-    // nos badges décrivaient.
+    // `preview-body` serait resté sans effet. Et il est re-rendu par React à chaque
+    // aller-retour Write/Preview : une seconde rédaction suivie d'un second aperçu ne change
+    // AUCUN compte, seul le digest de texte voit que le corps n'est plus celui que nos badges
+    // décrivaient.
     return [...queryChainAll(this.#doc, selectors.commentBody), ...this.#previewBodies()];
   }
 
-  /** Élément après lequel insérer le bandeau (§5.5) — surface d'affichage, hors du contrat
-   * normatif §9.2.3. Null quand rien n'apparie : l'appelant se replie sur le haut du
-   * document plutôt que de ne rien afficher. */
+  /** Élément après lequel insérer le bandeau (§5.5, §9.2.3). Null quand rien n'apparie :
+   * l'appelant se replie sur le haut du document plutôt que de ne rien afficher. */
   getBannerMount(): Element | null {
     return queryChain(this.#doc, selectors.bannerMount).element;
   }
 
-  /** Conteneurs de fils rendus, pour le filtre local du §5.5 — même dérivation
-   * d'identifiant que getThreads(), même surface d'affichage hors contrat. */
+  /** Conteneurs de fils rendus, pour le filtre local du §5.5 (§9.2.3) — même dérivation
+   * d'identifiant que getThreads(). */
   getRenderedThreadElements(): { id: string; element: Element }[] {
     return queryChainAll(this.#doc, selectors.renderedThreads).map((el, i) => ({
       id: el.id || el.getAttribute('data-thread-id') || `dom-thread-${i}`,

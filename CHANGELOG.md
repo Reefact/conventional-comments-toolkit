@@ -16,6 +16,19 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Changed
 
+- **A platform adapter can no longer compile without answering every question the extension
+  asks** (§9.2.3). Five answers lived outside the client contract — the pull request the page
+  shows, where the banner mounts, the rendered threads, the comment bodies to decorate and the
+  bodies the platform renders — and the shared code read them through type casts, each with a
+  silent fallback: an adapter that did not provide them compiled, and showed no banner, no
+  filter, no badges, and treated the page as not being a pull request. They are now required
+  members of the contract, the casts are gone, and a fake third platform (`acme`) is
+  type-checked in CI to prove it. Two dead members leave the contract with them: `matches()`
+  had no caller, and `matchesHost()` with its `extraHosts` option had none either since
+  activation moved to the split of granted hosts. The `<p>`/`<br>` body shape, measured on
+  github.com, moves from the shared package into GitHub's own (`GITHUB_BODY_SHAPE`): a shared
+  package carries no platform measurement, not even as a default. No pixel moves.
+
 - **GitHub fixes can no longer break Azure DevOps** (§9.1, §9.4). Two GitHub selectors lived
   in the shared editor controller — a `comment-composer` composer and a `CommentBox` class —
   and therefore ran on every Azure DevOps page. They matched nothing there, so nothing looked

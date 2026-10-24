@@ -115,13 +115,11 @@ export interface RenderedBodyShape {
   readonly lineBreakTag: string;
 }
 
-/** La forme d'un rendu Markdown → HTML ordinaire. Nommée plutôt qu'écrite en dur : une valeur
- * par défaut qui porte un nom est une affirmation qu'on peut relire et contredire ; la même
- * valeur dispersée en quatre littéraux est une supposition qu'on ne voit plus. */
-export const MARKDOWN_HTML_BODY_SHAPE: RenderedBodyShape = Object.freeze({
-  paragraphTags: Object.freeze(['P']),
-  lineBreakTag: 'BR',
-});
+// Aucune FORME n'est définie ici, et c'est une règle. La seule qui l'était — `<p>`/`<br>`, sous
+// le nom générique `MARKDOWN_HTML_BODY_SHAPE` — est une MESURE faite sur github.com, et elle vit
+// désormais dans le paquet GitHub (`GITHUB_BODY_SHAPE`). Un paquet partagé n'a pas à porter une
+// mesure, fût-elle offerte « par défaut » : un défaut ne choisit pas à qui il profite, et
+// celui-ci donnait à toute plateforme la forme d'une seule.
 
 /** La CASSE des noms de balises, tranchée UNE FOIS pour toutes.
  *
@@ -142,8 +140,50 @@ export function normalizeBodyShape(shape: RenderedBodyShape): RenderedBodyShape 
   });
 }
 
+/** Options communes aux adaptateurs client — déclarées UNE fois ici. Les deux adaptateurs
+ * portaient la même forme sous deux noms, et une liste d'hôtes (`extraHosts`) y a survécu des
+ * mois après que plus rien ne la lisait : l'activation d'un hôte se décide sur la répartition
+ * publiée par le service worker (`selectPlatform`, extension/src/host-platform.ts), jamais sur
+ * ce qu'un adaptateur croit savoir des hôtes. */
+export interface ClientAdapterOptions {
+  /** Fetch à employer pour les lectures faites par l'adaptateur — substitution de test, ou
+   * contexte d'exécution qui n'a pas de `fetch` global. Ce n'est PAS le chemin vers le service
+   * worker : une fonction ne franchit pas la frontière des contextes d'une extension. Pour cela,
+   * voir `readOrgConfig` ci-dessous. */
+  fetchImpl?: typeof fetch;
+  /** Lecture du `configUrl` d'organisation par un chemin que l'adaptateur n'a pas. Dans
+   * l'extension, c'est le service worker : le script de contenu émet ses requêtes au nom de
+   * l'origine de la page et reste soumis à sa politique CORS, quelle que soit la permission
+   * d'hôte accordée (doc Chrome, « Cross-origin network requests ») ; un `configUrl` hébergé
+   * hors de la plateforme affichée n'y est donc pas lisible.
+   *
+   * **Rendre `null` signifie « lis-le toi-même »**, et cette troisième réponse est
+   * nécessaire : l'appelant est seul à savoir si l'URL est de MÊME origine que la page, cas
+   * où la lecture directe fonctionne — et où le détour par le worker échouerait, faute d'une
+   * permission d'hôte sur le domaine de plateforme que le manifeste ne déclare plus (revue
+   * Codex, PR #30). La décision est donc prise par URL, pas une fois pour toutes.
+   *
+   * Absent — usage hors extension, tests — l'adaptateur lit directement. */
+  readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
+  /** Le document à observer : celui de la page par défaut, un document détaché en test. */
+  documentRef?: Document;
+  /** Journal des dégradations de sélecteurs (§9.4), partagé avec le code qui l'exploite ; un
+   * journal neuf à défaut. */
+  log?: SelectorLog;
+}
+
 export interface PlatformAdapter {
-  matches(url: URL): boolean;
+  /** §2, §6.2.3 — la PR que la page AFFICHE à cet instant, lue dans l'URL et le DOM ; `null`
+   * hors d'une page de PR. Le code partagé décide de TOUT le chrome de PR sur cette réponse
+   * — bandeau, filtre, badges, grisage du bouton de complétion — : `null` veut dire « pas de
+   * PR », jamais « je ne sais pas ».
+   *
+   * L'ACTIVATION d'un hôte ne passe pas par ici. Elle se décide sur la répartition des hôtes
+   * accordés que le service worker publie (`selectPlatform`, extension/src/host-platform.ts),
+   * jamais sur ce que l'adaptateur croit savoir des hôtes : une méthode `matches(url)` a porté
+   * cette question dans ce contrat sans qu'aucun code ne l'appelle, et une `matchesHost(url)`
+   * à côté d'elle, avec ses hôtes par défaut codés en dur. Les deux sont retirées. */
+  currentPr(): PrRef | null;
   platformProfile(): PlatformProfile;
   getRepoConfig(pr: PrRef): Promise<ConfigRead>;
   getOrgConfig(url: string | null): Promise<ConfigRead>;
@@ -173,8 +213,8 @@ export interface PlatformAdapter {
    * commentaire a dit le contraire le temps d'une revue, et c'était l'endroit le plus coûteux
    * pour se tromper : le contrat est ce qu'un adaptateur tiers lit d'abord.
    *
-   * Rendre `MARKDOWN_HTML_BODY_SHAPE` est donc une AFFIRMATION — « j'ai mesuré, c'est bien
-   * `<p>`/`<br>` » — et non un défaut commode. */
+   * Rendre une forme est donc une AFFIRMATION — « j'ai mesuré, c'est bien `<p>`/`<br>` », ce
+   * que le paquet GitHub écrit sous le nom `GITHUB_BODY_SHAPE` — et non un défaut commode. */
   renderedBodyShape(): RenderedBodyShape | null;
   readValue(editor: EditorHandle): string;
   writeValue(editor: EditorHandle, text: string, caret?: number): void;
@@ -182,6 +222,39 @@ export interface PlatformAdapter {
   getCompletionControl(): SubmitControl | null;
   getCurrentUser(): Promise<UserInfo>;
   readPublishedResult(): PublishedSummary | null;
+
+  // ————— Surfaces d'affichage du §5.5 — OBLIGATOIRES, pour la même raison que
+  // `getEditorChrome` : une méthode optionnelle laisse une plateforme nouvelle compiler sans
+  // répondre. Ces quatre-là, et `currentPr()`, ont vécu HORS du contrat : content-internal.ts
+  // les lisait par conversion de type (`as PlatformAdapter & {…}`), avec un repli silencieux
+  // pour chacune — pas de bandeau, pas de filtre, pas de badges, et une page tenue pour
+  // « hors PR » — que rien ne signalait. Un adaptateur tiers compilait, et n'affichait rien. —————
+
+  /** §5.5 — l'élément APRÈS lequel insérer le bandeau : « en tête de PR », dans le flux de la
+   * page, sous le titre, jamais au-dessus du chrome de la plateforme. `null` quand rien
+   * n'apparie : le code partagé se replie sur le haut du document plutôt que de ne rien
+   * afficher. */
+  getBannerMount(): Element | null;
+  /** §5.5 — les conteneurs de fils rendus, pour le filtre local. Les `id` sont CEUX de
+   * `getThreads()`, même dérivation : c'est par eux que le filtre retrouve le label d'un fil, et
+   * deux dérivations qui divergeraient masqueraient les mauvais fils sans rien dire. */
+  getRenderedThreadElements(): { id: string; element: Element }[];
+  /** §5.5 — les corps de commentaire à DÉCORER (badges, masquage du préfixe), avec leur texte
+   * tel que `commentBodyText()` le lit — nos propres badges exclus, sans quoi un second rendu
+   * lirait le premier. */
+  getRenderedComments(): { element: Element; bodyText: string }[];
+  /** §5.5, §9.4 — les corps que la PLATEFORME rend, éléments seuls, sans `bodyText` : la SONDE
+   * des signatures de reprise du code partagé (`chromeSignatureOf` en compte la longueur,
+   * `ownOutputSignatureOf` en compare le texte). Jamais `getRenderedComments()` pour ça :
+   * celle-ci clone chaque sous-arbre décoré pour en lire le texte, un coût qu'un observateur
+   * paierait à chaque mutation pour la durée de vie de l'onglet.
+   *
+   * Ce n'est pas nécessairement le même ensemble que `getRenderedComments()`, et la
+   * divergence est voulue : l'adaptateur GitHub compte ici la description de la PR, qu'il
+   * écarte des badges (§4.1) — une description modifiée est un changement de page comme un
+   * autre. Une sonde de COMPTE séparée a existé ; elle rendait exactement la longueur de cette
+   * liste, et deux méthodes pour une seule liste finissent toujours par diverger. */
+  getRenderedCommentElements(): Element[];
 }
 
 // ————— Reconnaissance d'hôte (§2, §A.4, §B.4) —————

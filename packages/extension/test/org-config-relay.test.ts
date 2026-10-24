@@ -244,6 +244,18 @@ describe('C — bootstrap() met le relais entre les mains de l’adaptateur', ()
             observeEditors() {
               return { dispose: () => {} };
             },
+            getBannerMount() {
+              return null;
+            },
+            getRenderedThreadElements() {
+              return [];
+            },
+            getRenderedComments() {
+              return [];
+            },
+            getRenderedCommentElements() {
+              return [];
+            },
             currentPr() {
               return null;
             },
@@ -425,6 +437,18 @@ describe('E — le relais ne sert QUE les origines tierces (revue Codex, PR #30)
             },
             observeEditors() {
               return { dispose: () => {} };
+            },
+            getBannerMount() {
+              return null;
+            },
+            getRenderedThreadElements() {
+              return [];
+            },
+            getRenderedComments() {
+              return [];
+            },
+            getRenderedCommentElements() {
+              return [];
             },
             currentPr() {
               return null;

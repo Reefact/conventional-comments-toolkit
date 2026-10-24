@@ -11,9 +11,20 @@
 //
 // Les tests qui portent, eux, sur la forme appellent `decorateComment()` directement avec la
 // leur — c'est tout `rendered-body-shape.test.ts`, y compris le cas `null`.
-import { MARKDOWN_HTML_BODY_SHAPE } from '@cct/adapter-shared';
+import type { RenderedBodyShape } from '@cct/adapter-shared';
 import type { EffectiveConfig, PlatformProfile } from '@cct/core';
 import { decorateComment } from '../../src/ui/badges.js';
+
+/** La forme `<p>`/`<br>` d'un rendu Markdown → HTML ordinaire, pour les tests qui ont besoin
+ * d'UNE forme sans que ce soit leur sujet. C'est celle que GitHub a mesurée
+ * (`GITHUB_BODY_SHAPE`, @cct/adapter-github), redéclarée ici plutôt qu'importée : un test du
+ * noyau ne dépend d'aucun paquet de plateforme — le garde d'isolation le refuse au code livré,
+ * et un test qui passerait par là referait de GitHub la forme « par défaut » que le paquet
+ * partagé a cessé d'offrir. */
+export const HTML_SHAPE: RenderedBodyShape = Object.freeze({
+  paragraphTags: Object.freeze(['P']),
+  lineBreakTag: 'BR',
+});
 
 export function decorateWithHtmlShape(
   commentBodyElement: Element,
@@ -22,5 +33,5 @@ export function decorateWithHtmlShape(
   platform: PlatformProfile,
   lang: string
 ): void {
-  decorateComment(commentBodyElement, bodyText, config, platform, lang, MARKDOWN_HTML_BODY_SHAPE);
+  decorateComment(commentBodyElement, bodyText, config, platform, lang, HTML_SHAPE);
 }

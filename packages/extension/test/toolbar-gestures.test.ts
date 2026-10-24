@@ -20,7 +20,8 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
 import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controller.js';
 import { selectorFor, type PosedPrefix } from '../src/ui/toolbar.js';
-import { writeToTextField, MARKDOWN_HTML_BODY_SHAPE, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { HTML_SHAPE } from './helpers/decorate.js';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 
 const pr: PrRef = {
@@ -48,7 +49,7 @@ function setup(tweak: (config: ReturnType<typeof defaultConfig>) => void = () =>
   const adapter: Partial<PlatformAdapter> = {
     platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
     getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
-      renderedBodyShape: () => MARKDOWN_HTML_BODY_SHAPE,
+      renderedBodyShape: () => HTML_SHAPE,
     getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
     readValue: () => textarea.value,
     writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),

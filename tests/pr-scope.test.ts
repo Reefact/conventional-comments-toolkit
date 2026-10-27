@@ -1,7 +1,7 @@
 // La règle de périmètre d'une PR mise à l'épreuve sur des diffs fabriqués : une PR touche UNE
 // plateforme, OU le code partagé, jamais les deux (CLAUDE.md, « Règles du chantier »).
 import { describe, expect, it } from 'vitest';
-import { classifyPath, prScopeVerdict } from '../scripts/lib/pr-scope.mjs';
+import { classifyPath, platformIds, prScopeVerdict } from '../scripts/lib/pr-scope.mjs';
 
 const ids = ['azdo', 'github'];
 const files = (...paths: string[]) => paths.map((path) => ({ path, added: false }));
@@ -22,11 +22,11 @@ describe('classement des chemins', () => {
     expect(classifyPath('.github/workflows/ci.yml', ids)).toBe('tooling');
   });
 
-  it('attribue à sa plateforme un outil ou un test qui en porte le nom', () => {
-    expect(classifyPath('scripts/check-github-theme-vars.mjs', ids)).toBe('platform:github');
-    expect(classifyPath('packages/extension/test/azdo-thread.test.ts', ids)).toBe('platform:azdo');
-    // `.github/` est un dossier, pas un nom de fichier : il ne fait pas d'un workflow un outil GitHub.
-    expect(classifyPath('.github/workflows/browser-smoke.yml', ids)).toBe('tooling');
+  it('garde neutres un outil ou un test qui portent le nom d’une plateforme', () => {
+    // Revue Codex, PR #78 : rattachés à leur plateforme, ils faisaient refuser une PR partagée,
+    // et passer pour un contrat une PR Azure DevOps + partagé qui touchait ce seul script.
+    expect(classifyPath('scripts/check-github-theme-vars.mjs', ids)).toBe('tooling');
+    expect(classifyPath('packages/extension/test/azdo-thread.test.ts', ids)).toBe('test');
   });
 
   it('ne lit pas un nom de plateforme dans le code partagé', () => {
@@ -111,8 +111,43 @@ describe('verdict sur une PR', () => {
     expect(v.shared).toEqual(['packages/extension/src/ui/strings.ts']);
   });
 
+  it('ne fait pas d’une PR Azure DevOps + partagé un contrat par un script nommé GitHub', () => {
+    const v = prScopeVerdict(
+      files(
+        'packages/adapters/azdo/src/index.ts',
+        'packages/extension/src/editor-controller.ts',
+        'scripts/check-github-theme-vars.mjs'
+      ),
+      ids
+    );
+    expect(v).toMatchObject({ ok: false, kind: 'mixed', platforms: ['azdo'] });
+  });
+
+  it('admet une PR partagée qui retouche un script nommé GitHub', () => {
+    const v = prScopeVerdict(
+      files('packages/extension/src/editor-controller.ts', 'scripts/check-github-theme-vars.mjs'),
+      ids
+    );
+    expect(v).toMatchObject({ ok: true, kind: 'shared' });
+  });
+
   it('admet une PR de documentation, de tests ou d’outillage seuls', () => {
     const v = prScopeVerdict(files('docs/a-fr.md', 'tests/x.test.ts', 'package-lock.json'), ids);
     expect(v).toMatchObject({ ok: true, kind: 'neutral' });
+  });
+});
+
+describe('plateformes dérivées des deux côtés de la comparaison', () => {
+  it('garde une plateforme que la PR supprime', () => {
+    // Revue Codex, PR #78 : lue dans la seule copie de travail, la suppression d'un adaptateur
+    // effaçait sa plateforme, et ses fichiers supprimés passaient pour du code partagé.
+    const base = ['packages/adapters/azdo', 'packages/adapters/github', 'packages/adapters/shared'];
+    const head = ['packages/adapters/github', 'packages/adapters/shared'];
+    expect(platformIds(base, head)).toEqual(['azdo', 'github']);
+    const v = prScopeVerdict(
+      files('packages/adapters/azdo/src/index.ts', 'packages/extension/src/editor-controller.ts'),
+      platformIds(base, head)
+    );
+    expect(v.ok).toBe(false);
   });
 });

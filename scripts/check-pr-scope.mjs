@@ -6,29 +6,27 @@
 // quitté la base, et non ce que la base a reçu depuis, qui n'est pas l'affaire de la PR.
 //
 // Les plateformes sont DÉRIVÉES des dossiers de `packages/adapters/`, jamais écrites ici : un
-// adaptateur GitLab sera couvert sans qu'on touche au garde.
+// adaptateur GitLab sera couvert sans qu'on touche au garde. Elles sont lues dans les arbres de
+// la base ET de la tête, pas dans la copie de travail : un adaptateur supprimé reste une
+// plateforme, dont les fichiers supprimés sont classés comme tels.
 
 import { execFileSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
-import { prScopeVerdict } from './lib/pr-scope.mjs';
+import { dirname, resolve } from 'node:path';
+import { platformIds, prScopeVerdict } from './lib/pr-scope.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [base = 'origin/main', head = 'HEAD'] = process.argv.slice(2);
 
-const adapters = join(root, 'packages/adapters');
-const ids = readdirSync(adapters)
-  .filter((d) => d !== 'shared' && statSync(join(adapters, d)).isDirectory())
-  .sort();
+const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+const adapterDirs = (rev) =>
+  git('ls-tree', '-d', '--name-only', rev, 'packages/adapters/').split('\n').filter(Boolean);
+const ids = platformIds(adapterDirs(base), adapterDirs(head));
 
 // `--no-renames` : un déplacement apparaît comme une suppression et un ajout, si bien que ses
 // DEUX extrémités sont classées — déplacer un fichier partagé dans un adaptateur touche le
 // partagé.
-const out = execFileSync('git', ['diff', '--name-status', '--no-renames', `${base}...${head}`], {
-  cwd: root,
-  encoding: 'utf8',
-});
+const out = git('diff', '--name-status', '--no-renames', `${base}...${head}`);
 const files = out
   .split('\n')
   .filter(Boolean)

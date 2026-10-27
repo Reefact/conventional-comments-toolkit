@@ -31,40 +31,9 @@ import {
   type PlatformAdapter,
   type SubmitControl,
 } from '@cct/adapter-shared';
+import { configCredentials } from './descriptor.js';
 import { selectors } from './selectors.js';
 import { ALL_EDITORS, SURFACES, type GithubSurface } from './surfaces.js';
-
-/** `credentials` d'une lecture de configuration — décidé PAR URL, et non une fois pour toutes.
- *
- * La route `raw` de github.com redirige vers `raw.githubusercontent.com` dès que le fichier
- * existe, cette origine répond `Access-Control-Allow-Origin: *`, et le navigateur refuse le
- * joker quand la requête porte des cookies. `include` y échoue donc toujours.
- *
- * `'same-origin'` plutôt que `'omit'`, et la différence n'est pas cosmétique — elle est
- * MESURÉE (`npm run check:content-script-cors`) : le PREMIER saut, de même origine que la
- * page, part AVEC la session, donc GitHub autorise ; la redirection franchit une origine, le
- * navigateur cesse alors d'envoyer les cookies, et le joker est accepté. La configuration
- * d'un dépôt PRIVÉ redevient ainsi lisible, sans permission d'hôte et sans relais — ce que
- * `'omit'`, écrit d'abord ici, sacrifiait sans rien obtenir en échange (revue Codex, PR #36,
- * round 4).
- *
- * Partout ailleurs, `include` reste la règle, et l'absence de mesure est ici l'argument, pas
- * une négligence : sur un GitHub Enterprise Server accepté par `extraHosts`, nous n'avons
- * PAS observé de redirection hors origine. Le défaut se corrige là où il est démontré,
- * nulle part ailleurs. */
-export function configCredentials(url: string): RequestCredentials {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return 'include';
-  }
-  // Hôte ET chemin : sur github.com, seule la route `raw` redirige. Une autre URL du même
-  // domaine (page HTML, route d'API) n'a aucune raison de perdre sa session.
-  return parsed.hostname === 'github.com' && parsed.pathname.includes('/raw/')
-    ? 'same-origin'
-    : 'include';
-}
 
 /** §5.5 — la forme du corps rendu de GITHUB, MESURÉE à plusieurs reprises sur github.com : une
  * ligne de Markdown ordinaire dans un `<p>`, une fin de ligne simple en `<br>`.

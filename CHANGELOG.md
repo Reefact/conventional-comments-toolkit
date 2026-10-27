@@ -16,6 +16,17 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Changed
 
+- **One registry lists the platforms, and nothing else in shared code does** (§9.1). Which
+  platforms exist used to be written out in half a dozen places: the split of granted hosts,
+  the service worker's relay, the options page's menus and logos, the selector journal's page
+  mark. Each platform package now publishes a DOM-free descriptor (`@cct/adapter-<id>/descriptor`:
+  hosts, the credentials rule for reading configuration, view parameters, glyph), and the
+  extension's registry (`platforms.ts`) is the only list; everything else iterates it. The
+  service worker and options page load descriptors only, never an adapter, which a new guard,
+  `check:bundle-isolation`, checks on the bytes actually shipped. A test fails if a platform
+  package, the registry, the enterprise policy schema and both label catalogues disagree.
+  Nothing a user sees changes.
+
 - **A platform adapter can no longer compile without answering every question the extension
   asks** (§9.2.3). Five answers lived outside the client contract — the pull request the page
   shows, where the banner mounts, the rendered threads, the comment bodies to decorate and the

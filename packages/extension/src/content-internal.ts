@@ -21,6 +21,7 @@ import {
   selectPlatform,
   type ExtraHostsByPlatform,
 } from './host-platform.js';
+import { PLATFORM_IDS, emptyByPlatform } from './platforms.js';
 import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
 import {
   TELEMETRY_CONSENT_KEY,
@@ -196,11 +197,15 @@ async function readManagedFloor(): Promise<Floor | null> {
 /** Forme sûre de la valeur publiée : elle vient du stockage, donc de l'extérieur de ce
  * module — une entrée absente ou malformée vaut liste vide, jamais une exception. */
 function normalizeExtraHosts(stored: unknown): ExtraHostsByPlatform {
-  const value = stored as Partial<ExtraHostsByPlatform> | undefined;
-  return {
-    github: Array.isArray(value?.github) ? value.github : [],
-    azdo: Array.isArray(value?.azdo) ? value.azdo : [],
-  };
+  const value = (stored && typeof stored === 'object' ? stored : {}) as Record<string, unknown>;
+  // Le REGISTRE fixe les clés : une plateforme absente de la valeur publiée vaut liste vide, et
+  // une clé étrangère est ignorée.
+  const result = emptyByPlatform();
+  for (const id of PLATFORM_IDS) {
+    const hosts = value[id];
+    if (Array.isArray(hosts)) result[id] = hosts.filter((h): h is string => typeof h === 'string');
+  }
+  return result;
 }
 
 /** Hôtes accordés via `optional_host_permissions` (§2, §A.4, §B.4), déjà répartis par

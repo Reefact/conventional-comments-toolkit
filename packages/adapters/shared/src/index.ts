@@ -140,6 +140,40 @@ export function normalizeBodyShape(shape: RenderedBodyShape): RenderedBodyShape 
   });
 }
 
+/** La FICHE D'IDENTITÉ d'une plateforme : ce que l'extension doit savoir d'elle AVANT de toucher
+ * une page — dans le service worker, sur la page d'options —, là où aucun adaptateur n'est
+ * construit et où aucun DOM de revue n'existe.
+ *
+ * Chaque paquet de plateforme en publie une, SANS DOM, sous le sous-chemin
+ * `@cct/adapter-<id>/descriptor` : le service worker et la page d'options l'importent sans
+ * embarquer l'adaptateur (`check:bundle-isolation` le vérifie). Le registre de l'extension
+ * (`extension/src/platforms.ts`) est la SEULE liste qui les énumère : ajouter une plateforme,
+ * c'est ajouter son paquet et une ligne au registre, jamais un `if` ailleurs.
+ *
+ * Comme le reste du contrat, des DONNÉES et des réponses, jamais un drapeau nommant quelqu'un. */
+export interface PlatformDescriptor {
+  /** L'identifiant de la plateforme : nom du dossier `packages/adapters/<id>`, étiquette posée
+   * sur un hôte, `platform` d'une `PrRef`. */
+  readonly id: string;
+  /** Le site cloud à hôte FIXE que la page d'options propose d'un clic, ou `null`. `origin` est
+   * le motif présenté à `chrome.permissions.request()` ; `label`, un nom de produit, ne se
+   * traduit pas. */
+  readonly cloud: { readonly origin: string; readonly label: string } | null;
+  /** Ce nom d'hôte est-il un domaine de PRODUIT connu de cette plateforme ? Sert au seul
+   * pré-remplissage de la page d'options — jamais à l'activation, qui suit les étiquettes. */
+  inferHost(hostname: string): boolean;
+  /** Les `credentials` qu'exige la lecture d'un fichier de configuration à cette URL, quand la
+   * plateforme en connaît une règle MESURÉE ; `null` sinon, et la règle commune (`include`)
+   * s'applique. Interrogée par le service worker pour les lectures qu'il relaie. */
+  configCredentials(url: string): RequestCredentials | null;
+  /** Les paramètres de requête qui désignent une VUE de cette plateforme — un écran, donc un DOM
+   * — et non une préférence d'affichage (journal de sélecteurs, §9.4). */
+  readonly viewParams: readonly string[];
+  /** Le glyphe de la page d'options : un tracé SVG ou un caractère. Une DONNÉE — c'est la page
+   * qui dessine. */
+  readonly glyph: { readonly viewBox: string; readonly path: string } | { readonly text: string };
+}
+
 /** Options communes aux adaptateurs client — déclarées UNE fois ici. Les deux adaptateurs
  * portaient la même forme sous deux noms, et une liste d'hôtes (`extraHosts`) y a survécu des
  * mois après que plus rien ne la lisait : l'activation d'un hôte se décide sur la répartition

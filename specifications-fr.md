@@ -1047,6 +1047,10 @@ packages/
 
 `packages/core/` est publié comme paquet et consommé à l'identique par l'extension et par le vérificateur. **Aucune règle de validation ne doit être dupliquée.**
 
+**Ce qui est commun, et ce qui appartient à une plateforme.** Le *modèle* est commun : la grammaire, les labels, les décorations, la validation, et la mécanique de l'interface — un clic pose un préfixe, une zone de saisie porte barre d'outils et pastille, un commentaire publié porte ses badges. Ce qui touche la page d'une plateforme lui appartient : la lecture de son DOM, l'écriture dans son éditeur, la place qu'y prennent les éléments de l'extension, ses couleurs et ses longueurs. Le code commun ne nomme aucune plateforme et ne contient aucun branchement sur l'une d'elles ; il interroge l'adaptateur (§9.2.3).
+
+**Chaque plateforme publie une fiche d'identité**, sans DOM, que le service worker et la page d'options lisent sans charger l'adaptateur : son identifiant, le site cloud à hôte fixe qu'on peut autoriser d'un clic, les domaines de produit qui permettent de la reconnaître, la règle de `credentials` d'une lecture de configuration quand elle en a une de mesurée, les paramètres d'URL qui désignent une vue, son glyphe. **L'extension tient un registre de ces fiches, et c'est la seule liste qui énumère les plateformes** : en ajouter une, c'est ajouter son paquet et une entrée au registre. Le schéma de politique d'entreprise et les catalogues de libellés, qui les nomment aussi, sont vérifiés contre lui.
+
 **Il n'y a pas de paquet « serveur ».** Une rédaction antérieure en décrivait un — orchestrateur, stockage, ordonnanceur, points d'entrée HTTP, un adaptateur par plateforme. Le §6.4 dit pourquoi il a disparu : ses organes répondaient tous à des problèmes que se pose un processus **extérieur** à la plateforme, et le vérificateur ne l'est plus.
 
 ### 9.2 Interfaces d'adaptateur

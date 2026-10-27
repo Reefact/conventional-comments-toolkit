@@ -46,8 +46,8 @@ export function configCredentialsFor(
   return answers.size === 1 ? [...answers][0]! : 'include';
 }
 
-/** La table des fabriques d'adaptateurs : une par plateforme du registre, OBLIGATOIRE — une
- * plateforme ajoutée au registre sans fabrique ne compile pas. Fournie par le point d'entrée
- * du script de contenu (`content.ts`), seul fichier qui importe les adaptateurs ; le cœur
- * (`content-internal.ts`) la reçoit et ne nomme aucune plateforme. */
+/** La table des fabriques d'adaptateurs : une par plateforme du registre, OBLIGATOIRE —
+ * l'absence de fabrique pour une plateforme enregistrée provoque une erreur de compilation.
+ * Fournie par le point d'entrée du script de contenu (`content.ts`), seul fichier qui importe
+ * les adaptateurs ; le cœur (`content-internal.ts`) la reçoit et ne nomme aucune plateforme. */
 export type AdapterFactories = Record<PlatformId, (opts: ClientAdapterOptions) => PlatformAdapter>;

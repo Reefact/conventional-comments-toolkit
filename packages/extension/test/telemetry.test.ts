@@ -25,6 +25,7 @@ import {
   type TelemetryEvent,
 } from '../src/telemetry.js';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
+import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
 const ENDPOINT = 'https://collecte.example/cc';
 
@@ -597,8 +598,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     // La configuration du dépôt ne porte PLUS la télémétrie : si ce faux la portait, il
     // décrirait un monde où un dépôt peut désigner le collecteur — celui qu'on vient
     // justement de fermer.
-    vi.doMock('@cct/adapter-github', () => ({
-      GithubClientAdapter: class {
+    fakeAdapter('github', class {
         constructor(opts: { log?: typeof captured.log }) {
           captured.log = opts.log;
         }
@@ -658,8 +658,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
         decorateComment() {
           return undefined;
         }
-      },
-    }));
+      });
     return { written, listeners, calls, captured, delays, policy, resolves, consentHolder };
   }
 
@@ -668,7 +667,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
   }
 
   afterEach(() => {
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 
   // Une PR sans composeur rendu (droits de commentaire absents, composeur replié) doit
@@ -679,7 +678,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
     await settle();
 
     captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
@@ -706,7 +705,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
 
     // AVANT tout `settle()` : l'armement est encore en vol.
     captured.log!.degraded({ name: 'completion-control', candidates: ['button'] });
@@ -737,7 +736,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
 
     captured.log!.degraded({ name: 'completion-control', candidates: ['button'] });
 
@@ -760,7 +759,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
     await settle();
 
     captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
@@ -784,7 +783,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
     await settle();
 
     // Retirer VRAIMENT l'accord, puis notifier — c'est ce que fait la page d'options.
@@ -807,7 +806,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
     await settle();
 
     policy['telemetry'] = { enabled: false };
@@ -825,7 +824,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { listeners, calls } = installTab({ endpoint: `${ENDPOINT}` }, ENDPOINT);
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
     await settle();
     dispose();
 
@@ -865,7 +864,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
     await settle();
 
     // Une dégradation sur A, légitimement attribuée à A.
@@ -911,7 +910,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
     await settle();
 
     // B : sa lecture de consentement traîne.
@@ -945,7 +944,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     const { bodies } = collectPosts();
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL(PR_A), configurable: true });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
     await settle();
 
     Object.defineProperty(document, 'location', { value: new URL(PR_B), configurable: true });
@@ -1090,8 +1089,7 @@ describe('D — dégradation de sélecteur : journal local TOUJOURS, télémétr
   it('le journal local est écrit même sans opt-in — la télémétrie, elle, ne l’est pas', async () => {
     const { written } = installChrome();
     let captured: { log?: { degraded: (chain: { name: string; candidates: string[] }) => void } } = {};
-    vi.doMock('@cct/adapter-github', () => ({
-      GithubClientAdapter: class {
+    fakeAdapter('github', class {
         constructor(opts: typeof captured) {
           captured = opts;
           Object.assign(this, {
@@ -1127,14 +1125,13 @@ describe('D — dégradation de sélecteur : journal local TOUJOURS, télémétr
             },
           });
         }
-      },
-    }));
+      });
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', {
       value: new URL('https://github.com/acme/demo/pull/42'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
 
     // Le journal de sélecteurs a bien été confié à l'adaptateur — sans quoi rien de ce que
     // le §9.4 promet n'a lieu, et la page d'options resterait vide pour toujours.
@@ -1160,7 +1157,7 @@ describe('D — dégradation de sélecteur : journal local TOUJOURS, télémétr
     failures = written['selectorFailures'] as { chain: string; at: string }[] | undefined;
     expect(failures?.map((f) => f.chain)).toEqual(['editors', 'submitButtons']);
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 
   it('le consentement vit dans une clé locale, jamais dans `sync`', () => {

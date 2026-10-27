@@ -58,6 +58,7 @@ import {
   RENDER_RETRY_THROTTLE_MS,
   RENDER_RETRY_WINDOW_MS,
 } from '../src/content-internal.js';
+import { testFactories } from './helpers/factories.js';
 // CONFIG_POLL_INTERVAL_MS n'est pas importée : les tests du sondage périodique lui
 // substituent une valeur courte (voir `configPollIntervalMs`, dernier paramètre de
 // `observePrChromeNavigation`) pour ne pas attendre les cinq minutes de production.
@@ -351,20 +352,20 @@ describe('barre — ré-affichage après navigation SPA sans rechargement (§5.5
   });
 });
 
-describe('D1 — bootstrap() choisit l’adaptateur par hôte, pas par présence d’une PR (§2)', () => {
+describe('D1 — bootstrap(document, testFactories()) choisit l’adaptateur par hôte, pas par présence d’une PR (§2)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     document.body.innerHTML = '';
   });
 
-  it('la barre apparaît après une navigation SPA vers une PR atteinte depuis une page non-PR, sans second appel à bootstrap()', async () => {
+  it('la barre apparaît après une navigation SPA vers une PR atteinte depuis une page non-PR, sans second appel à bootstrap(document, testFactories())', async () => {
     vi.stubGlobal('fetch', () => Promise.reject(new Error('stubbed : pas de réseau en test')));
     Object.defineProperty(document, 'location', {
       value: new URL('https://github.com/acme/demo/pulls'),
       configurable: true,
     });
 
-    openObservations.push(await bootstrap(document));
+    openObservations.push(await bootstrap(document, testFactories()));
     await flushAll();
     // Avant ce correctif, aucun adaptateur n'était choisi ici (matches() exigeait une PR) :
     // bootstrap() sortait aussitôt, sans armer observeEditors ni observePrChromeNavigation —
@@ -1856,7 +1857,7 @@ describe('§5.5 — révocation complète et pliage remis à neuf (revue Codex r
     expect((doc.querySelector('.cct-banner') as HTMLDetailsElement).open).toBe(true);
   });
 
-  it('la révocation de bootstrap() rend AUSSI l’observation des éditeurs', async () => {
+  it('la révocation de bootstrap(document, testFactories()) rend AUSSI l’observation des éditeurs', async () => {
     // Elle n'en rendait qu'une : les éditeurs apparus ensuite recevaient encore un
     // contrôleur, et deux bootstrap() successifs en empilaient deux par éditeur.
     const doc = document;
@@ -1879,7 +1880,7 @@ describe('§5.5 — révocation complète et pliage remis à neuf (revue Codex r
       });
     const readRepoConfig = vi.spyOn(GithubClientAdapter.prototype, 'getRepoConfig');
 
-    const dispose = await bootstrap(doc);
+    const dispose = await bootstrap(doc, testFactories());
     expect(observeEditors).toHaveBeenCalled();
     expect(disposeEditors).not.toHaveBeenCalled();
 

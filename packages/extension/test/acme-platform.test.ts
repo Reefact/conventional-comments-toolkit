@@ -9,8 +9,8 @@
 //
 // Deux entrées du noyau, SANS `bootstrap()` : `EditorController.attach()` pour la zone de
 // saisie, `observePrChromeNavigation()` pour le chrome de PR — celles que les tests GitHub
-// emploient déjà. Le point de composition, lui, ne connaît que deux plateformes tant que le
-// registre n'existe pas (PR2) ; ce test n'en a pas besoin pour établir ce qu'il établit.
+// emploient déjà. `bootstrap()` n'activerait pas « acme » : il ne sert que les plateformes du
+// registre, et ce test n'en a pas besoin pour établir ce qu'il établit.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   defaultConfig,

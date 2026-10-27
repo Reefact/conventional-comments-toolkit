@@ -13,6 +13,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PrRef } from '@cct/core';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
+import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
 afterEach(() => {
   vi.resetModules();
@@ -66,8 +67,7 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
   // toujours.
   const queue = [...prs];
   const currentPr = () => (queue.length > 1 ? queue.shift()! : queue[0]!);
-  vi.doMock('@cct/adapter-github', () => ({
-    GithubClientAdapter: class {
+  fakeAdapter('github', class {
       constructor(opts: Captured) {
         captured = opts;
         Object.assign(this, {
@@ -115,11 +115,10 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
           getCompletionControl: () => null,
         });
       }
-    },
-  }));
+    });
   const { bootstrap } = await import('../src/content-internal.js');
   setLocation(url);
-  await bootstrap(document);
+  await bootstrap(document, testFactories());
   return captured;
 }
 
@@ -151,7 +150,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
       'https://github.com/acme/demo/pull/42/files?diff=split#discussion_r7'
     );
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 
   it('l’adresse est celle du moment de la dégradation, pas celle de l’injection', async () => {
@@ -167,7 +166,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     // l'URL d'injection —, et le journal accuserait la mauvaise page.
     expect(journal(written)[0]!.url).toBe('https://github.com/acme/demo/pull/99/changes');
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 
   it('après une navigation SPA, la MÊME chaîne réenregistre la nouvelle page', async () => {
@@ -203,7 +202,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     expect(journal(written)).toHaveLength(1);
     expect(journal(written)[0]!.url).toBe('https://github.com/acme/demo/pull/99');
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 
   it('après effacement, la même chaîne réenregistre sur la MÊME page', async () => {
@@ -228,7 +227,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     expect(journal(written)).toHaveLength(1);
     expect(journal(written)[0]!.url).toBe('https://github.com/acme/demo/pull/42/files');
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 
   it('l’entrée porte trois champs, et rien d’autre', async () => {
@@ -245,6 +244,6 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     expect(Object.keys(journal(written)[0]!).sort()).toEqual(['at', 'chain', 'url']);
     expect(journal(written)[0]!.url).toContain('?view=1');
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 });

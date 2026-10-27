@@ -28,6 +28,7 @@ import { HTML_SHAPE } from './helpers/decorate.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fingerprint, resolveConfig } from '@cct/core';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
+import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
 interface FakeState {
   configText: string;
@@ -43,8 +44,7 @@ function pr7(): { platform: string; createdAt: string; host: string; scope: stri
  * (contrairement à extra-hosts.test.ts, qui n'en a pas besoin) : `EditorController` réel,
  * ici jamais mocké, y insère sa barre d'outils et sa saisie rapide pour de vrai. */
 function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: HTMLButtonElement): void {
-  vi.doMock('@cct/adapter-github', () => ({
-    GithubClientAdapter: class {
+  fakeAdapter('github', class {
       async getCurrentUser() {
         return { id: 'login:alice', login: 'alice', isServiceAccount: false };
       }
@@ -103,12 +103,9 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
       writeValue(_editor: unknown, text: string) {
         element.value = text;
       }
-    },
-  }));
-  vi.doMock('@cct/adapter-azdo', () => ({
-    AzdoClientAdapter: class {
-    },
-  }));
+    });
+  fakeAdapter('azdo', class {
+    });
 }
 
 /** Empreinte réellement produite pour un texte de configuration de DÉPÔT donné — même
@@ -170,8 +167,8 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose();
-  vi.doUnmock('@cct/adapter-github');
-  vi.doUnmock('@cct/adapter-azdo');
+  clearFakeAdapters();
+  
   vi.resetModules();
   delete (globalThis as { chrome?: unknown }).chrome;
   document.body.innerHTML = '';
@@ -199,7 +196,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
     element.value = 'pas de label ici'; // diagnostic bloquant sous enforce
-    disposers.push(await bootstrap(document));
+    disposers.push(await bootstrap(document, testFactories()));
     await flushAll();
 
     expect(submit.getAttribute('aria-disabled')).toBe('true'); // bloqué : enforce, en périmètre, pas d'écart
@@ -247,7 +244,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
 
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
-    disposers.push(await bootstrap(document));
+    disposers.push(await bootstrap(document, testFactories()));
     await flushAll();
 
     expect(host.querySelector('.cct-toolbar')).not.toBeNull(); // §5.1 — barre installée
@@ -286,7 +283,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
     element.value = 'pas de label ici';
-    disposers.push(await bootstrap(document));
+    disposers.push(await bootstrap(document, testFactories()));
     await flushAll();
 
     expect(host.querySelector('.cct-toolbar')).toBeNull(); // §7 — jamais attaché, mode off
@@ -333,7 +330,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
 
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
-    disposers.push(await bootstrap(document));
+    disposers.push(await bootstrap(document, testFactories()));
     await flushAll();
 
     const issueButton = () => host.querySelector('.cct-label-button[data-label="issue"]');
@@ -411,7 +408,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
 
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
-    disposers.push(await bootstrap(document));
+    disposers.push(await bootstrap(document, testFactories()));
     await flushAll();
     expect(host.querySelector('.cct-toolbar')).not.toBeNull();
 
@@ -499,7 +496,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
     element.value = 'pas de label ici'; // diagnostic bloquant sous enforce, déjà présent
-    disposers.push(await bootstrap(document));
+    disposers.push(await bootstrap(document, testFactories()));
     await flushAll();
     expect(submit.getAttribute('aria-disabled')).toBe('true'); // bloqué : enforce, en périmètre, pas d'écart
 
@@ -584,7 +581,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
 
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
-    disposers.push(await bootstrap(document));
+    disposers.push(await bootstrap(document, testFactories()));
     await flushAll();
     expect(host.querySelector('.cct-toolbar')).not.toBeNull();
 
@@ -674,7 +671,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
     element.value = 'pas de label ici'; // diagnostic présent, mais `warn` ne bloque jamais
-    disposers.push(await bootstrap(document));
+    disposers.push(await bootstrap(document, testFactories()));
     await flushAll();
     expect(submit.hasAttribute('aria-disabled')).toBe(false); // warn : jamais de blocage
 

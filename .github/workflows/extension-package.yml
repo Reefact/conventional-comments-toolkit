@@ -39,6 +39,9 @@ jobs:
       - name: Empaqueter (esbuild → dist-ext/, variante Firefox comprise)
         run: npm run build:extension
 
+      - name: Aucun adaptateur hors du script de contenu (§9.1)
+        run: npm run check:bundle-isolation
+
       # §10 : « aucun code distant, aucune dépendance CDN ». Une URL http(s) restant dans
       # un bundle serait soit une ressource distante, soit un import oublié : la CSP de
       # MV3 la rejetterait à l'exécution, silencieusement pour l'utilisateur.

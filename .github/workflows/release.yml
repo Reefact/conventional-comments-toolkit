@@ -97,6 +97,11 @@ jobs:
         env:
           CCT_VERSION_NAME: ${{ steps.version.outputs.version }}
 
+      # Les octets distribués eux-mêmes : le service worker et la page d'options n'embarquent
+      # que les fiches des plateformes, jamais un adaptateur (§9.1).
+      - name: Aucun adaptateur hors du script de contenu
+        run: npm run check:bundle-isolation
+
       # §10 : « aucun code distant, aucune dépendance CDN ». Vérifié ici aussi : une
       # release est justement ce que personne ne relira avant de l'installer.
       - name: Aucun chargement distant dans le bundle (§10)

@@ -534,11 +534,10 @@ export class GithubClientAdapter implements PlatformAdapter {
   }
 
   /** Aperçus rendus par l'onglet « Preview » d'un champ en cours de rédaction — mêmes badges
-   * que les commentaires publiés (§5.5), sur un texte qui ne l'est pas encore. Réunis aux
-   * corps publiés par les trois méthodes de cette section, et par elles seules : `getThreads()`
-   * ne les lit JAMAIS, un brouillon n'étant le corps d'aucun fil — c'est aussi pourquoi ils
-   * n'entrent pas dans la chaîne `comment-body`, que cette lecture-là emploie. Réunis aux
-   * corps publiés par les DEUX méthodes de cette section, et par elles seules.
+   * que les commentaires publiés (§5.5), sur un texte qui ne l'est pas encore. Ils sont pris en
+   * compte par les deux méthodes de rendu de cette section, mais jamais par `getThreads()`,
+   * puisqu'un brouillon ne constitue pas un fil — c'est aussi pourquoi ils n'entrent pas dans
+   * la chaîne `comment-body`, que cette lecture-là emploie.
    *
    * Rend un tableau vide sur la génération héritée, où la chaîne `comment-body` attrape déjà
    * l'aperçu (voir `previewBody`, selectors.ts) : c'est ce qui fait que les badges s'y

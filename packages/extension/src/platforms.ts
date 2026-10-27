@@ -11,7 +11,7 @@
 // DOM, et ce module entre donc sans dommage dans le service worker et la page d'options
 // (`check:bundle-isolation` vérifie qu'aucun adaptateur ne les y suit).
 
-import type { PlatformDescriptor } from '@cct/adapter-shared';
+import type { ClientAdapterOptions, PlatformAdapter, PlatformDescriptor } from '@cct/adapter-shared';
 import { azdoDescriptor } from '@cct/adapter-azdo/descriptor';
 import { githubDescriptor } from '@cct/adapter-github/descriptor';
 
@@ -45,3 +45,9 @@ export function configCredentialsFor(
   );
   return answers.size === 1 ? [...answers][0]! : 'include';
 }
+
+/** La table des fabriques d'adaptateurs : une par plateforme du registre, OBLIGATOIRE — une
+ * plateforme ajoutée au registre sans fabrique ne compile pas. Fournie par le point d'entrée
+ * du script de contenu (`content.ts`), seul fichier qui importe les adaptateurs ; le cœur
+ * (`content-internal.ts`) la reçoit et ne nomme aucune plateforme. */
+export type AdapterFactories = Record<PlatformId, (opts: ClientAdapterOptions) => PlatformAdapter>;

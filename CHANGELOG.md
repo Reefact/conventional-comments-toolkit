@@ -16,6 +16,13 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Changed
 
+- **The extension's core no longer knows any adapter** (§9.1). It chose between the GitHub
+  and Azure DevOps adapters itself, and any other platform id would have been built as Azure
+  DevOps. The content script's entry point now hands it a table with one adapter factory per
+  registered platform, a table that does not compile if a platform lacks its factory, and the
+  core builds the one the page needs without naming it. Tests stop replacing adapter modules
+  and declare their fakes instead. Nothing a user sees changes.
+
 - **One registry lists the platforms, and nothing else in shared code does** (§9.1). Which
   platforms exist used to be written out in half a dozen places: the split of granted hosts,
   the service worker's relay, the options page's menus and logos, the selector journal's page

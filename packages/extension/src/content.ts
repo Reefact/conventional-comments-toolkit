@@ -6,7 +6,19 @@
 // "type": "module" et tolère les exports). La logique testable vit dans
 // content-internal.ts.
 
+import { AzdoClientAdapter } from '@cct/adapter-azdo';
+import { GithubClientAdapter } from '@cct/adapter-github';
 import { bootstrap } from './content-internal.js';
+import type { AdapterFactories } from './platforms.js';
+
+/** Le POINT DE COMPOSITION du script de contenu : le seul fichier qui importe les adaptateurs,
+ * et qui associe chacun à sa plateforme. Une plateforme du registre sans fabrique ne compile
+ * pas (`AdapterFactories`). Le cœur, `content-internal.ts`, reçoit cette table et ne nomme
+ * aucune plateforme. */
+const FACTORIES: AdapterFactories = {
+  github: (opts) => new GithubClientAdapter(opts),
+  azdo: (opts) => new AzdoClientAdapter(opts),
+};
 
 declare const chrome: { runtime?: unknown } | undefined;
 
@@ -30,6 +42,6 @@ if (typeof document !== 'undefined' && typeof chrome !== 'undefined' && chrome?.
   const scope = globalThis as unknown as Record<string, unknown>;
   if (!scope[MARKER]) {
     scope[MARKER] = true;
-    void bootstrap();
+    void bootstrap(document, FACTORIES);
   }
 }

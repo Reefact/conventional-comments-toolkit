@@ -11,8 +11,6 @@
 
 import type { ConfigRead, EffectiveConfig, Floor, PrRef, PublishedSummary } from '@cct/core';
 import { SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
-import { GithubClientAdapter } from '@cct/adapter-github';
-import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage, type ResolvedClientConfig } from './config-resolver.js';
 import {
@@ -21,7 +19,7 @@ import {
   selectPlatform,
   type ExtraHostsByPlatform,
 } from './host-platform.js';
-import { PLATFORM_IDS, emptyByPlatform } from './platforms.js';
+import { PLATFORM_IDS, emptyByPlatform, type AdapterFactories } from './platforms.js';
 import { DEFAULT_DIRECT_SHORTCUTS, EditorController } from './editor-controller.js';
 import {
   TELEMETRY_CONSENT_KEY,
@@ -340,7 +338,7 @@ async function readDirectShortcuts(): Promise<Record<string, string>> {
  * mais un appelant qui n'est pas un onglet doit pouvoir les rendre : deux observations sur
  * le même document se répondent l'une à l'autre, et deux `bootstrap()` successifs
  * empileraient un contrôleur par éditeur (revue Codex, PR #26). */
-export async function bootstrap(doc: Document = document): Promise<() => void> {
+export async function bootstrap(doc: Document, factories: AdapterFactories): Promise<() => void> {
   const url = new URL(doc.location.href);
   // Un seul produit, un adaptateur par plateforme, activé sur les hôtes autorisés (§2).
   // Sélection par HÔTE, jamais par la présence d'une PR dans l'URL : bootstrap() ne
@@ -372,7 +370,7 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
   const restart = () => {
     stopWatch();
     teardown();
-    void bootstrap(doc).then((dispose) => {
+    void bootstrap(doc, factories).then((dispose) => {
       replacement = dispose;
       if (!live) dispose(); // défait entre-temps : ne rien laisser derrière
     });
@@ -475,10 +473,10 @@ export async function bootstrap(doc: Document = document): Promise<() => void> {
     count(event);
   });
 
-  const adapter: PlatformAdapter =
-    platform === 'github'
-      ? new GithubClientAdapter({ documentRef: doc, readOrgConfig, log })
-      : new AzdoClientAdapter({ documentRef: doc, readOrgConfig, log });
+  // L'adaptateur vient de la table que fournit le point d'entrée (`content.ts`) : ce module ne
+  // connaît aucune plateforme, et n'a plus de branche par défaut — un identifiant hors du
+  // registre ne sort pas de `selectPlatform()`, et la table en a une entrée par plateforme.
+  const adapter: PlatformAdapter = factories[platform]({ documentRef: doc, readOrgConfig, log });
 
   const resolver = new ClientConfigResolver(readManagedFloor);
   const currentUser = await adapter.getCurrentUser();

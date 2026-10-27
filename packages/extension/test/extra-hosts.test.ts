@@ -36,6 +36,7 @@ import {
   selectPlatform,
 } from '../src/host-platform.js';
 import { readExtraHostsByPlatform } from '../src/content-internal.js';
+import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
 /** Contexte d'un SCRIPT DE CONTENU : `chrome.storage.local` seul, jamais
  * `chrome.permissions` — c'est exactement ce que Chrome expose là-bas. */
@@ -248,7 +249,7 @@ describe('B3 — le SCRIPT DE CONTENU lit la valeur publiée, sans jamais touche
   });
 });
 
-describe('C — bootstrap() construit LE bon adaptateur, et lui seul', () => {
+describe('C — bootstrap(document, testFactories()) construit LE bon adaptateur, et lui seul', () => {
   // Ce bloc vérifiait auparavant que les DEUX constructeurs étaient appelés : bootstrap()
   // les instanciait tous les deux pour interroger leur `matchesHost()`. L'activation se
   // décidant sur la répartition publiée (`selectPlatform`, voir G1), un seul adaptateur est
@@ -290,22 +291,18 @@ describe('C — bootstrap() construit LE bon adaptateur, et lui seul', () => {
         return null;
       },
     };
-    vi.doMock('@cct/adapter-github', () => ({
-      GithubClientAdapter: class {
+    fakeAdapter('github', class {
         constructor(opts: unknown) {
           githubCtorArgs.push(opts);
           Object.assign(this, inert);
         }
-      },
-    }));
-    vi.doMock('@cct/adapter-azdo', () => ({
-      AzdoClientAdapter: class {
+      });
+    fakeAdapter('azdo', class {
         constructor(opts: unknown) {
           azdoCtorArgs.push(opts);
           Object.assign(this, inert);
         }
-      },
-    }));
+      });
   }
 
   it('sur un hôte GitHub, seul GithubClientAdapter est construit, avec les hôtes github', async () => {
@@ -319,7 +316,7 @@ describe('C — bootstrap() construit LE bon adaptateur, et lui seul', () => {
       value: new URL('https://ghes.example.corp/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
 
     expect(githubCtorArgs).toEqual([
       // `objectContaining` : le constructeur reçoit aussi un journal de sélecteurs et le
@@ -329,8 +326,7 @@ describe('C — bootstrap() construit LE bon adaptateur, et lui seul', () => {
     expect(githubCtorArgs[0]).not.toHaveProperty('extraHosts');
     expect(azdoCtorArgs).toEqual([]);
 
-    vi.doUnmock('@cct/adapter-github');
-    vi.doUnmock('@cct/adapter-azdo');
+    clearFakeAdapters();
   });
 
   it('sur un hôte Azure DevOps, seul AzdoClientAdapter est construit, avec les hôtes azdo', async () => {
@@ -344,7 +340,7 @@ describe('C — bootstrap() construit LE bon adaptateur, et lui seul', () => {
       value: new URL('https://azdo.example.corp/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
 
     expect(azdoCtorArgs).toEqual([
       // `objectContaining` : le constructeur reçoit aussi un journal de sélecteurs et le
@@ -353,8 +349,7 @@ describe('C — bootstrap() construit LE bon adaptateur, et lui seul', () => {
     ]);
     expect(githubCtorArgs).toEqual([]);
 
-    vi.doUnmock('@cct/adapter-github');
-    vi.doUnmock('@cct/adapter-azdo');
+    clearFakeAdapters();
   });
 
   it('sur un hôte qu’aucune plateforme ne sert, AUCUN adaptateur n’est construit', async () => {
@@ -368,13 +363,12 @@ describe('C — bootstrap() construit LE bon adaptateur, et lui seul', () => {
       value: new URL('https://example.com/'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
 
     expect(githubCtorArgs).toEqual([]);
     expect(azdoCtorArgs).toEqual([]);
 
-    vi.doUnmock('@cct/adapter-github');
-    vi.doUnmock('@cct/adapter-azdo');
+    clearFakeAdapters();
   });
 });
 
@@ -509,7 +503,7 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
   // Désenregistrer le script de contenu n'empêche que les injections futures : celui déjà
   // en place continuerait d'observer le DOM et de poser sa barre d'outils sur un hôte qui
   // n'est plus autorisé, jusqu'au rechargement de la page.
-  it('bootstrap() se révoque lui-même quand son hôte disparaît de la répartition publiée', async () => {
+  it('bootstrap(document, testFactories()) se révoque lui-même quand son hôte disparaît de la répartition publiée', async () => {
     // `chrome.storage.onChanged` accepte PLUSIEURS écouteurs et les appelle TOUS. Un faux
     // qui n'en retient qu'un affirme le contraire, et devient faux le jour où le code en
     // enregistre un second : `bootstrap()` en pose maintenant deux — la répartition des
@@ -536,8 +530,7 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
         },
       },
     };
-    vi.doMock('@cct/adapter-github', () => ({
-      GithubClientAdapter: class {
+    fakeAdapter('github', class {
         async getCurrentUser() {
           return { login: 'someone' };
         }
@@ -562,19 +555,16 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
         readPublishedResult() {
           return null;
         }
-      },
-    }));
-    vi.doMock('@cct/adapter-azdo', () => ({
-      AzdoClientAdapter: class {
-      },
-    }));
+      });
+    fakeAdapter('azdo', class {
+      });
 
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', {
       value: new URL('https://ghes.example.corp/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
     expect(disposeEditors).not.toHaveBeenCalled();
     expect(listeners.length).toBeGreaterThan(0);
 
@@ -582,8 +572,7 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
     notify({ [EXTRA_HOSTS_KEY]: { newValue: { github: [], azdo: [] } } }, 'local');
     expect(disposeEditors).toHaveBeenCalledTimes(1);
 
-    vi.doUnmock('@cct/adapter-github');
-    vi.doUnmock('@cct/adapter-azdo');
+    clearFakeAdapters();
   });
 
   it('une republication qui CONSERVE l’hôte ne révoque rien', async () => {
@@ -613,8 +602,7 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
         },
       },
     };
-    vi.doMock('@cct/adapter-github', () => ({
-      GithubClientAdapter: class {
+    fakeAdapter('github', class {
         async getCurrentUser() {
           return { login: 'someone' };
         }
@@ -639,19 +627,16 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
         readPublishedResult() {
           return null;
         }
-      },
-    }));
-    vi.doMock('@cct/adapter-azdo', () => ({
-      AzdoClientAdapter: class {
-      },
-    }));
+      });
+    fakeAdapter('azdo', class {
+      });
 
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', {
       value: new URL('https://ghes.example.corp/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
 
     // Un autre hôte est ajouté ; celui-ci reste autorisé.
     notify(
@@ -660,8 +645,7 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
     );
     expect(disposeEditors).not.toHaveBeenCalled();
 
-    vi.doUnmock('@cct/adapter-github');
-    vi.doUnmock('@cct/adapter-azdo');
+    clearFakeAdapters();
   });
 });
 
@@ -722,8 +706,7 @@ describe('F1 — le joker suit la sémantique réelle des motifs WebExtension', 
 /** Adaptateur factice livrant UN éditeur à l'observation, pour que `bootstrap()` construise
  * réellement un contrôleur — ce que les tests E1 ne faisaient pas. */
 function mockGithubAdapterDeliveringOneEditor(disposeEditors: () => void): void {
-  vi.doMock('@cct/adapter-github', () => ({
-    GithubClientAdapter: class {
+  fakeAdapter('github', class {
       async getCurrentUser() {
         return { login: 'someone' };
       }
@@ -758,12 +741,9 @@ function mockGithubAdapterDeliveringOneEditor(disposeEditors: () => void): void 
       readPublishedResult() {
         return null;
       }
-    },
-  }));
-  vi.doMock('@cct/adapter-azdo', () => ({
-    AzdoClientAdapter: class {
-    },
-  }));
+    });
+  fakeAdapter('azdo', class {
+    });
 }
 
 describe('F2 — la révocation DÉFAIT les contrôleurs déjà attachés, pas seulement l’observation', () => {
@@ -815,7 +795,7 @@ describe('F2 — la révocation DÉFAIT les contrôleurs déjà attachés, pas s
       value: new URL('https://ghes.example.corp/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
     await new Promise((r) => setTimeout(r, 0)); // `attach()` traverse plusieurs await
     expect(controllerAttach).toHaveBeenCalledTimes(1);
     expect(controllerDispose).not.toHaveBeenCalled();
@@ -824,8 +804,7 @@ describe('F2 — la révocation DÉFAIT les contrôleurs déjà attachés, pas s
     expect(controllerDispose).toHaveBeenCalledTimes(1);
 
     vi.doUnmock('../src/editor-controller.js');
-    vi.doUnmock('@cct/adapter-github');
-    vi.doUnmock('@cct/adapter-azdo');
+    clearFakeAdapters();
   });
 });
 
@@ -834,7 +813,7 @@ describe('F3 — un hôte classé APRÈS l’ouverture de l’onglet finit par s
   // Deux chemins réels y menaient : le script de contenu s'exécute avant que le service
   // worker n'ait publié sa première répartition, ou l'hôte est classé depuis la page
   // d'options alors que l'onglet est déjà ouvert.
-  it('bootstrap() sort sans adaptateur, puis démarre à la publication qui reconnaît l’hôte', async () => {
+  it('bootstrap(document, testFactories()) sort sans adaptateur, puis démarre à la publication qui reconnaît l’hôte', async () => {
     // `chrome.storage.onChanged` accepte PLUSIEURS écouteurs et les appelle TOUS. Un faux
     // qui n'en retient qu'un affirme le contraire, et devient faux le jour où le code en
     // enregistre un second : `bootstrap()` en pose maintenant deux — la répartition des
@@ -885,7 +864,7 @@ describe('F3 — un hôte classé APRÈS l’ouverture de l’onglet finit par s
       value: new URL('https://ghes.example.corp/acme/demo'),
       configurable: true,
     });
-    const dispose = await bootstrap(document);
+    const dispose = await bootstrap(document, testFactories());
     await new Promise((r) => setTimeout(r, 0));
     expect(controllerAttach).not.toHaveBeenCalled(); // rien pour l'instant, c'est normal
     expect(listeners.length).toBeGreaterThan(0); // ...mais le guet est bien armé
@@ -903,8 +882,7 @@ describe('F3 — un hôte classé APRÈS l’ouverture de l’onglet finit par s
     expect(disposeEditors).toHaveBeenCalledTimes(1);
 
     vi.doUnmock('../src/editor-controller.js');
-    vi.doUnmock('@cct/adapter-github');
-    vi.doUnmock('@cct/adapter-azdo');
+    clearFakeAdapters();
   });
 });
 
@@ -1037,15 +1015,15 @@ describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur'
           return null;
         }
       };
-    vi.doMock('@cct/adapter-github', () => ({ GithubClientAdapter: mkAdapter(githubDispose) }));
-    vi.doMock('@cct/adapter-azdo', () => ({ AzdoClientAdapter: mkAdapter(azdoDispose) }));
+    fakeAdapter('github', mkAdapter(githubDispose));
+    fakeAdapter('azdo', mkAdapter(azdoDispose));
 
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', {
       value: new URL('https://host.example.corp/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
     expect(githubDispose).not.toHaveBeenCalled();
     expect(azdoDispose).not.toHaveBeenCalled();
 
@@ -1059,8 +1037,7 @@ describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur'
     expect(githubDispose).toHaveBeenCalledTimes(1);
     expect(azdoDispose).not.toHaveBeenCalled(); // vivant : c'est lui qui sert désormais
 
-    vi.doUnmock('@cct/adapter-github');
-    vi.doUnmock('@cct/adapter-azdo');
+    clearFakeAdapters();
   });
 });
 
@@ -1308,8 +1285,7 @@ describe('H4 — un contrôleur dont l’éditeur a quitté le document est lib�
         onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
       },
     };
-    vi.doMock('@cct/adapter-github', () => ({
-      GithubClientAdapter: class {
+    fakeAdapter('github', class {
         async getCurrentUser() {
           return { login: 'someone' };
         }
@@ -1341,9 +1317,8 @@ describe('H4 — un contrôleur dont l’éditeur a quitté le document est lib�
         readPublishedResult() {
           return null;
         }
-      },
-    }));
-    vi.doMock('@cct/adapter-azdo', () => ({ AzdoClientAdapter: class {} }));
+      });
+    fakeAdapter('azdo', class {});
     let seq = 0;
     vi.doMock('../src/editor-controller.js', () => ({
       DEFAULT_DIRECT_SHORTCUTS: {},
@@ -1359,7 +1334,7 @@ describe('H4 — un contrôleur dont l’éditeur a quitté le document est lib�
       value: new URL('https://ghes.example.corp/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
 
     const openEditor = async () => {
       const el = document.createElement('textarea');
@@ -1378,7 +1353,6 @@ describe('H4 — un contrôleur dont l’éditeur a quitté le document est lib�
     expect(disposes).toEqual([0]); // le contrôleur mort a bien été défait
 
     vi.doUnmock('../src/editor-controller.js');
-    vi.doUnmock('@cct/adapter-github');
-    vi.doUnmock('@cct/adapter-azdo');
+    clearFakeAdapters();
   });
 });

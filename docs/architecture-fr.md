@@ -111,9 +111,11 @@ politique — `platform-registry.test.ts` nomme ce qui manque.
 Le port transporte des **données**, jamais un drapeau nommant une plateforme : une signature
 `isGitHubChangesView()` obligerait le code partagé à savoir de qui il parle, et le conditionnel
 que le polymorphisme supprime reviendrait sous un autre nom. Les seuls endroits qui nomment une
-plateforme sont le registre (`platforms.ts`) et le composition root (`content-internal.ts`), qui
-construit l'adaptateur retenu — quelqu'un doit le faire. `check:platform-isolation` refuse un
-identifiant de plateforme écrit en dur partout ailleurs.
+plateforme sont le registre (`platforms.ts`) et le composition root (`content.ts`, le point
+d'entrée du script de contenu), qui associe à chaque plateforme son adaptateur — quelqu'un doit le
+faire. Le cœur (`content-internal.ts`) reçoit cette table et construit l'adaptateur retenu sans
+savoir lequel ; une plateforme du registre sans fabrique ne compile pas. `check:platform-isolation`
+refuse un identifiant de plateforme ou un import d'adaptateur partout ailleurs.
 
 Le TypeScript dit **quel élément joue quel rôle** ; la feuille de la plateforme dit **combien il
 mesure**. Sans cette frontière, une mesure faite sur une plateforme redevient une constante que

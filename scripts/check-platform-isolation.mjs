@@ -50,7 +50,7 @@ const NEUTRAL_ROOTS = [
  * un choix d'architecture, pas une commodité. */
 const COMPOSITION_ROOT = [
   'packages/extension/src/platforms.ts', // le registre : la seule liste des plateformes
-  'packages/extension/src/content-internal.ts', // construit l'adaptateur retenu
+  'packages/extension/src/content.ts', // associe à chaque plateforme son adaptateur
 ];
 // `host-platform.ts`, `background.ts` et `options/options.ts` ont figuré ici : ils nommaient les
 // plateformes pour répartir les hôtes, relayer une lecture et étiqueter un hôte. Ils itèrent

@@ -23,6 +23,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
+import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
 const ORG_URL = 'https://interne.example/cc/organisation.json';
 
@@ -223,12 +224,11 @@ describe('B — le client du relais, dans le contexte d’un SCRIPT DE CONTENU',
   });
 });
 
-describe('C — bootstrap() met le relais entre les mains de l’adaptateur', () => {
+describe('C — bootstrap(document, testFactories()) met le relais entre les mains de l’adaptateur', () => {
   const split = { github: ['ghes.example.corp'], azdo: [] };
 
   function mockGithubAdapter(ctorArgs: unknown[]): void {
-    vi.doMock('@cct/adapter-github', () => ({
-      GithubClientAdapter: class {
+    fakeAdapter('github', class {
         constructor(opts: unknown) {
           ctorArgs.push(opts);
           Object.assign(this, {
@@ -264,8 +264,7 @@ describe('C — bootstrap() met le relais entre les mains de l’adaptateur', ()
             },
           });
         }
-      },
-    }));
+      });
   }
 
   it('le constructeur reçoit un readOrgConfig qui parle bien au service worker', async () => {
@@ -293,7 +292,7 @@ describe('C — bootstrap() met le relais entre les mains de l’adaptateur', ()
       value: new URL('https://ghes.example.corp/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
 
     const opts = ctorArgs[0] as { readOrgConfig?: (url: string) => Promise<unknown> };
     expect(typeof opts.readOrgConfig).toBe('function');
@@ -301,10 +300,10 @@ describe('C — bootstrap() met le relais entre les mains de l’adaptateur', ()
     expect(await opts.readOrgConfig!(ORG_URL)).toEqual({ status: 'found', text: '{}' });
     expect(sent).toEqual([{ kind: 'cct-fetch-config', url: ORG_URL }]);
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 
-  it('hors contexte d’extension, `bootstrap()` aboutit sans rien activer', async () => {
+  it('hors contexte d’extension, `bootstrap(document, testFactories())` aboutit sans rien activer', async () => {
     const ctorArgs: unknown[] = [];
     mockGithubAdapter(ctorArgs);
     // Pas de `chrome` du tout : `bootstrap()` doit malgré tout aboutir. `chrome` étant un
@@ -315,14 +314,14 @@ describe('C — bootstrap() met le relais entre les mains de l’adaptateur', ()
       value: new URL('https://github.com/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
     // Et n'active RIEN : la répartition publiée est le seul titre d'activation, et elle
     // n'existe pas hors d'une extension. Ce test affirmait l'inverse — l'adaptateur y était
     // construit sur `github.com` seul, du temps où `content_scripts` l'injectait
     // statiquement et où `selectPlatform()` le court-circuitait pour cet hôte.
     expect(ctorArgs).toHaveLength(0);
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 
   it('en contexte d’extension SANS relais, aucun n’est imposé — la lecture directe reste possible', async () => {
@@ -344,11 +343,11 @@ describe('C — bootstrap() met le relais entre les mains de l’adaptateur', ()
       value: new URL('https://github.com/acme/demo'),
       configurable: true,
     });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
     const opts = ctorArgs[0] as { readOrgConfig?: unknown };
     expect(opts.readOrgConfig).toBeUndefined();
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 });
 
@@ -409,7 +408,7 @@ describe('E — le relais ne sert QUE les origines tierces (revue Codex, PR #30)
     expect(sent).toHaveLength(1);
   });
 
-  it('bootstrap() installe CETTE fonction-là, pas le relais nu', async () => {
+  it('bootstrap(document, testFactories()) installe CETTE fonction-là, pas le relais nu', async () => {
     const { sent } = installRelay();
     (globalThis as { chrome?: unknown }).chrome = {
       ...(globalThis as { chrome?: Record<string, unknown> }).chrome,
@@ -421,8 +420,7 @@ describe('E — le relais ne sert QUE les origines tierces (revue Codex, PR #30)
       },
     };
     const ctorArgs: unknown[] = [];
-    vi.doMock('@cct/adapter-github', () => ({
-      GithubClientAdapter: class {
+    fakeAdapter('github', class {
         constructor(opts: unknown) {
           ctorArgs.push(opts);
           Object.assign(this, {
@@ -458,11 +456,10 @@ describe('E — le relais ne sert QUE les origines tierces (revue Codex, PR #30)
             },
           });
         }
-      },
-    }));
+      });
     const { bootstrap } = await import('../src/content-internal.js');
     Object.defineProperty(document, 'location', { value: PAGE, configurable: true });
-    await bootstrap(document);
+    await bootstrap(document, testFactories());
 
     const readOrgConfig = (ctorArgs[0] as { readOrgConfig?: (u: string) => unknown })
       .readOrgConfig!;
@@ -473,7 +470,7 @@ describe('E — le relais ne sert QUE les origines tierces (revue Codex, PR #30)
     expect(readOrgConfig(ORG_URL)).not.toBeNull();
     expect(sent).toEqual([{ kind: 'cct-fetch-config', url: ORG_URL }]);
 
-    vi.doUnmock('@cct/adapter-github');
+    clearFakeAdapters();
   });
 });
 

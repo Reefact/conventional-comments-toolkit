@@ -17,7 +17,7 @@ import {
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { computePrefixInsertion, shiftSelection } from '@cct/adapter-shared';
 import { decideGuard, feedbackState, type GuardDecision } from './guard.js';
-import { framedAncestor, ringIsClipped, stackingMountFor } from './ui/stacking.js';
+import { framedAncestor, ringIsClipped, stackingMountFor, usableMount } from './ui/stacking.js';
 import { buildToolbar, type PosedPrefix, type Toolbar } from './ui/toolbar.js';
 import { attachQuickInput } from './ui/quickinput.js';
 import { FeedbackView } from './ui/feedback.js';
@@ -276,9 +276,8 @@ export class EditorController {
     // conteneur qui DESSINE le cadre, retrouvé par la géométrie (ui/stacking.ts). Elle rend,
     // sur le DOM hérité, l'élément que les voies nommées désignaient déjà — elle ne peut donc
     // pas y changer le rendu.
-    const paddedContainer =
-      this.deps.adapter.getEditorChrome(this.deps.editor).framedContainer ??
-      framedAncestor(this.deps.editor.element);
+    const chrome = this.deps.adapter.getEditorChrome(this.deps.editor);
+    const paddedContainer = chrome.framedContainer ?? framedAncestor(this.deps.editor.element);
     if (paddedContainer) {
       this.#keepClass(paddedContainer, 'cct-host');
       // La zone de saisie se donne souvent son propre retrait horizontal (sur GitHub,
@@ -291,14 +290,20 @@ export class EditorController {
 
     // §5.3 — le trait d'état rentre dans la boîte quand un conteneur le rognerait, et
     // seulement là : ailleurs il mordrait sur le texte d'un champ sans padding (ui/stacking.ts).
-    if (ringIsClipped(this.deps.editor.element)) {
+    // La plateforme qui le SAIT l'affirme (`ringInset`) ; sinon on mesure — après la pose de
+    // `cct-host` et `cct-editor`, qui déplacent les boîtes que la mesure compare.
+    if (chrome.ringInset ?? ringIsClipped(this.deps.editor.element)) {
       this.#keepClass(this.deps.editor.element, 'cct-ring-inset');
     }
 
     // §5.1 — barre d'outils au-dessus de la zone de saisie, §5.3 pastille en dessous : les
     // deux visent un conteneur qui EMPILE, que le parent direct du champ n'est pas toujours
-    // (cf. ui/stacking.ts). Le repli est le parent direct, c'est-à-dire le comportement d'avant.
-    const mount = stackingMountFor(this.deps.editor.element) ?? { container: host, anchor: this.deps.editor.element };
+    // (cf. ui/stacking.ts). La plateforme qui sait où son composeur nous reçoit le déclare
+    // (`mount`) ; sinon la règle géométrique, et en dernier recours le parent direct, c'est-à-dire
+    // le comportement d'avant.
+    const mount =
+      usableMount(chrome.mount, this.deps.editor.element) ??
+      stackingMountFor(this.deps.editor.element) ?? { container: host, anchor: this.deps.editor.element };
 
     // §5.1 — barre d'outils au-dessus de la zone de saisie.
     const toolbar = buildToolbar({

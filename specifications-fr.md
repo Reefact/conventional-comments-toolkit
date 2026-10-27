@@ -1384,6 +1384,15 @@ interface EditorChrome {
   framedContainer: Element | null;     // le conteneur qui encadre ensemble l'en-tête natif de la boîte,
                                        // ses onglets, le champ et ce que l'extension injecte — celui à
                                        // qui donner le retrait intérieur (§5.1, §5.3)
+  mount: ComposerMount | null;         // où poser la barre d'outils (§5.1, devant `anchor`) et la
+                                       // pastille (§5.3, derrière lui)
+  ringInset: boolean | null;           // le trait d'état (§5.3) se dessine-t-il à l'intérieur du champ,
+                                       // parce qu'un conteneur le rognerait ?
+}
+
+interface ComposerMount {
+  container: Element;                  // reçoit l'insertion
+  anchor: Element;                     // celui de ses enfants qui contient la zone de saisie
 }
 
 // La FORME du HTML qu'une plateforme produit en rendant un corps de commentaire Markdown — les deux
@@ -1467,6 +1476,8 @@ Trois propriétés la rendent sûre, et chacune répond à un échec précis :
 - **`null` est une réponse, pas un trou.** Un adaptateur qui ne se prononce pas obtient une règle qui ne nomme personne — le composant A remonte au conteneur qui *dessine* le cadre, question de mise en page posée au moteur de style. C'est le comportement d'avant cette méthode, et c'est la réponse **juste** pour une plateforme dont la boîte de commentaire n'a pas été mesurée : ne rien affirmer plutôt qu'affirmer sur elle ce qu'on a relevé sur une autre.
 - **Elle porte des éléments, jamais des longueurs ni des couleurs.** La frontière n'est pas cosmétique : le contrat dit *quel élément joue quel rôle*, la feuille de style de la plateforme dit *combien il mesure*. Sans cette règle, une mesure faite sur une plateforme redevient une constante que toutes les autres subissent — le défaut exact que cette méthode corrige.
 - **Aucune signature de ce contrat ne nomme une plateforme.** Un port qui exposerait `isGitHubChangesView()` aurait échoué : il obligerait le code partagé à savoir de qui il parle, et le `if` que le polymorphisme doit supprimer reviendrait sous un autre nom. Cette propriété est vérifiable mécaniquement, et elle est vérifiée.
+
+**Où l'extension se loge est un fait de plateforme, au même titre que le cadre qu'elle pare.** `mount` et `ringInset` portent les deux décisions de placement que le composant A prenait seul, par des règles géométriques mesurées sur une seule plateforme : poser la barre et la pastille dans le premier ancêtre qui *empile* ses enfants, et rentrer le trait d'état quand un ancêtre qui coupe ce qui dépasse *épouse* la boîte du champ. Ces règles restent la réponse à `null`, et elles conviennent à la plateforme sur laquelle elles ont été mesurées ; mais une plateforme dont le DOM les met en défaut n'avait aucun moyen de le dire, sinon en modifiant la règle — donc le rendu de toutes les autres. Déclarer son point d'insertion ne change que son propre composeur. Un point d'insertion **incohérent** — `anchor` qui n'est pas un enfant de `container`, ou qui ne contient pas la zone de saisie — est ignoré au profit de la règle : une déclaration fausse ne doit pas priver le composeur de sa barre d'outils.
 
 Elle est **obligatoire**, et ce choix se paie : toute doublure de test doit y répondre. Une méthode optionnelle ne coûterait rien et laisserait une plateforme nouvelle compiler sans jamais se prononcer — son extension se logerait alors au jugé sur un DOM que personne n'a regardé, silencieusement. Le compilateur doit poser la question ; répondre « rien de spécial » ne coûte qu'un mot. La règle vaut pour chaque membre de ce contrat, et elle est vérifiée dans les deux sens : un adaptateur incomplet ne compile pas, et le code partagé ne lit rien par conversion de type ni n'importe un adaptateur concret hors de son point de composition (`check:platform-isolation`).
 

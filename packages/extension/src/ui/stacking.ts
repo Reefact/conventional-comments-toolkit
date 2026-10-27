@@ -12,11 +12,23 @@
 // insère devant celui de ses enfants qui contient le champ. Sur un DOM où le parent direct
 // empile déjà, la boucle s'arrête au premier tour : la géométrie d'avant est conservée à
 // l'identique, ce que le premier test ci-contre vérifie.
-export interface StackingMount {
-  /** L'ancêtre qui empile — c'est lui qui reçoit l'insertion. */
-  container: Element;
-  /** Son enfant qui contient le champ : la barre se pose devant, la pastille derrière. */
-  anchor: Element;
+//
+// Ce n'est que la règle par DÉFAUT : une plateforme qui sait où son composeur reçoit
+// l'extension le dit (`EditorChrome.mount`, §9.2.3), et ce module n'est alors pas consulté.
+import type { ComposerMount } from '@cct/adapter-shared';
+
+/** `container` : l'ancêtre qui empile, il reçoit l'insertion. `anchor` : son enfant qui
+ * contient le champ — la barre se pose devant, la pastille derrière. */
+export type StackingMount = ComposerMount;
+
+/** Le point d'insertion qu'une plateforme déclare, s'il est utilisable : `anchor` est un enfant
+ * de `container` et contient le champ. Sinon `null`, et l'appelant retombe sur la règle
+ * géométrique — `insertBefore` sur un nœud qui n'est pas un enfant LÈVE, et une déclaration
+ * fausse ne doit pas priver le composeur de sa barre d'outils. */
+export function usableMount(mount: ComposerMount | null, editor: Element): ComposerMount | null {
+  if (!mount) return null;
+  if (mount.anchor.parentElement !== mount.container || !mount.anchor.contains(editor)) return null;
+  return mount;
 }
 
 /** Remonte au plus `limit` niveaux. Rend `null` si aucun ancêtre n'empile — l'appelant

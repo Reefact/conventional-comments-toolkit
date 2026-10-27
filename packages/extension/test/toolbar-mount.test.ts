@@ -22,7 +22,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
 import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { HTML_SHAPE } from './helpers/decorate.js';
-import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import type { EditorChrome, EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
 import { EditorController } from '../src/editor-controller.js';
 import { framedAncestor, ringIsClipped, stackingMountFor } from '../src/ui/stacking.js';
 
@@ -87,7 +87,12 @@ describe('stackingMountFor — où poser ce qui doit tomber au-dessus', () => {
   });
 });
 
-function attachOn(root: string): { toolbar: Element; feedback: Element; champ: HTMLTextAreaElement } {
+/** `chrome` : le châssis que l'adaptateur déclare, calculé APRÈS la pose du DOM — il nomme des
+ * éléments de `root`. */
+function attachOn(
+  root: string,
+  chrome: () => EditorChrome = () => NEUTRAL_EDITOR_CHROME
+): { toolbar: Element; feedback: Element; champ: HTMLTextAreaElement } {
   document.body.innerHTML = root;
   const champ = document.getElementById('champ') as HTMLTextAreaElement;
   const submit = document.createElement('button');
@@ -100,8 +105,8 @@ function attachOn(root: string): { toolbar: Element; feedback: Element; champ: H
   };
   const adapter: Partial<PlatformAdapter> = {
     platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
-    getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
-      renderedBodyShape: () => HTML_SHAPE,
+    getEditorChrome: chrome,
+    renderedBodyShape: () => HTML_SHAPE,
     getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
     readValue: () => champ.value,
     writeValue: (_e, text, caret) => writeToTextField(champ, text, caret),
@@ -256,5 +261,79 @@ describe('framedAncestor — qui dessine le cadre du champ', () => {
       </div>`);
     expect(document.getElementById('cadre')!.classList.contains('cct-host')).toBe(true);
     expect(champ.classList.contains('cct-editor')).toBe(true);
+  });
+});
+
+// §9.2.3 — le point d'insertion et le trait rentré sont des faits de PLATEFORME. La règle
+// géométrique ci-dessus a été mesurée sur GitHub ; une plateforme qui sait mieux le DÉCLARE, et
+// sa déclaration ne vaut que pour elle. Le DOM ci-dessous EMPILE à chaque niveau : la règle
+// géométrique poserait la barre dans `#milieu`, la déclaration la pose dans `#haut` — les deux
+// réponses diffèrent, sinon le test ne prouverait rien.
+const NESTED = `
+  <div id="haut" style="display:block">
+    <div id="milieu" style="display:block"><textarea id="champ"></textarea></div>
+  </div>`;
+const byId = (id: string) => document.getElementById(id)!;
+
+describe('§9.2.3 — la plateforme déclare où son composeur reçoit l’extension', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('sans déclaration, la règle géométrique : le parent qui empile', () => {
+    const { toolbar } = attachOn(NESTED);
+    expect(toolbar.parentElement!.id).toBe('milieu');
+  });
+
+  it('un point d’insertion déclaré remplace la règle géométrique', () => {
+    const { toolbar, feedback } = attachOn(NESTED, () => ({
+      ...NEUTRAL_EDITOR_CHROME,
+      mount: { container: byId('haut'), anchor: byId('milieu') },
+    }));
+    expect(toolbar.parentElement!.id).toBe('haut');
+    expect(toolbar.nextElementSibling!.id).toBe('milieu');
+    // La pastille suit le même ancrage, derrière lui.
+    expect(feedback.parentElement!.id).toBe('haut');
+    expect(feedback.previousElementSibling!.id).toBe('milieu');
+  });
+
+  it('un point d’insertion incohérent est ignoré, sans priver le composeur de sa barre', () => {
+    // `anchor` n'est pas un enfant de `container` : `insertBefore` lèverait.
+    const { toolbar } = attachOn(NESTED, () => ({
+      ...NEUTRAL_EDITOR_CHROME,
+      mount: { container: byId('haut'), anchor: byId('champ') },
+    }));
+    expect(toolbar.parentElement!.id).toBe('milieu');
+  });
+
+  it('un ancrage qui ne contient pas le champ est ignoré', () => {
+    document.body.innerHTML = '';
+    const { toolbar } = attachOn(`${NESTED}<div id="ailleurs"></div>`, () => ({
+      ...NEUTRAL_EDITOR_CHROME,
+      mount: { container: document.body, anchor: byId('ailleurs') },
+    }));
+    expect(toolbar.parentElement!.id).toBe('milieu');
+  });
+
+  // happy-dom ne calcule aucune boîte : toutes valent zéro, si bien qu'un ancêtre en
+  // `overflow: hidden` passe pour gainer le champ. La MESURE dit donc « rogné » ici, ce que le
+  // premier test constate — sans quoi le troisième ne prouverait rien.
+  const CLIPPED = `<div style="overflow:hidden"><div id="hote"><textarea id="champ"></textarea></div></div>`;
+
+  it('sans déclaration, le trait rentré suit la mesure', () => {
+    const { champ } = attachOn(CLIPPED);
+    expect(champ.classList.contains('cct-ring-inset')).toBe(true);
+    attachOn(NESTED);
+    expect(byId('champ').classList.contains('cct-ring-inset')).toBe(false);
+  });
+
+  it('`ringInset: true` rentre le trait là où la mesure ne voit rien', () => {
+    const { champ } = attachOn(NESTED, () => ({ ...NEUTRAL_EDITOR_CHROME, ringInset: true }));
+    expect(champ.classList.contains('cct-ring-inset')).toBe(true);
+  });
+
+  it('`ringInset: false` l’emporte sur la mesure', () => {
+    const { champ } = attachOn(CLIPPED, () => ({ ...NEUTRAL_EDITOR_CHROME, ringInset: false }));
+    expect(champ.classList.contains('cct-ring-inset')).toBe(false);
   });
 });

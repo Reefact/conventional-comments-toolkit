@@ -65,6 +65,28 @@ describe('§9.2.3 — getEditorChrome, adaptateur GitHub', () => {
     expect(adapter().getEditorChrome(handleFor(textarea)).framedContainer).toBe(host);
   });
 
+  it('ne déclare ni point d’insertion ni trait rentré, sur aucune voie', () => {
+    // GitHub s'en remet aux règles géométriques du code partagé, mesurées chez lui : déclarer
+    // `mount` ou `ringInset` changerait le rendu d'une interface terminée. Les trois voies —
+    // composeur nommé, champ marqué, rien de reconnu — le disent.
+    const composer = document.createElement('div');
+    composer.setAttribute('data-testid', 'comment-composer-foo');
+    const named = document.createElement('textarea');
+    composer.appendChild(named);
+    const host = document.createElement('div');
+    const marked = document.createElement('textarea');
+    marked.className = 'CommentBox-input';
+    host.appendChild(marked);
+    const bare = document.createElement('textarea');
+    document.body.append(composer, host, bare);
+
+    for (const field of [named, marked, bare]) {
+      const chrome = adapter().getEditorChrome(handleFor(field));
+      expect(chrome.mount).toBeNull();
+      expect(chrome.ringInset).toBeNull();
+    }
+  });
+
   it('ne confond pas un ANCÊTRE portant la marque avec le champ qui la porte', () => {
     // `matchesChain` et non `closestChain`, et c'est la raison d'être de ce helper :
     // `Element.closest()` commence par l'élément puis REMONTE, si bien qu'un ancêtre marqué

@@ -71,6 +71,28 @@ export interface EditorChrome {
    * touche la bordure. `null` : le code partagé le cherche par la géométrie, en remontant au
    * premier ancêtre qui DESSINE le cadre. */
   framedContainer: Element | null;
+  /** OÙ poser la barre d'outils (§5.1, devant `anchor`) et la pastille (§5.3, derrière lui).
+   * `null` : le code partagé remonte au premier ancêtre qui EMPILE ses enfants — règle mesurée
+   * sur la vue `…/changes` de GitHub, où le parent direct du champ est un `<span>` en
+   * `inline-flex`, et qui vaut tant qu'on ne sait rien de mieux.
+   *
+   * Un point d'insertion incohérent — `anchor` qui n'est pas un enfant de `container`, ou qui
+   * ne contient pas le champ — est ignoré au profit de cette même règle : insérer devant un
+   * nœud qui n'est pas un enfant lève, et un adaptateur qui se trompe de nœud ne doit pas
+   * priver le composeur de sa barre. */
+  mount: ComposerMount | null;
+  /** §5.3 — le trait d'état doit-il être dessiné À L'INTÉRIEUR du champ, parce qu'un
+   * conteneur le rognerait ? `null` : le code partagé le mesure — un ancêtre qui coupe ce qui
+   * dépasse et dont la boîte épouse celle du champ. Un booléen est une AFFIRMATION de la
+   * plateforme, et remplace la mesure. */
+  ringInset: boolean | null;
+}
+
+/** Un point d'insertion : `container` reçoit, `anchor` est celui de ses enfants qui contient
+ * le champ. */
+export interface ComposerMount {
+  container: Element;
+  anchor: Element;
 }
 
 /** « Je ne me prononce sur rien » — la réponse juste pour une plateforme dont la boîte de
@@ -79,6 +101,8 @@ export interface EditorChrome {
  * distrait qui y écrirait contaminerait les autres. */
 export const NEUTRAL_EDITOR_CHROME: EditorChrome = Object.freeze({
   framedContainer: null,
+  mount: null,
+  ringInset: null,
 });
 
 /** La FORME du HTML qu'une plateforme produit en rendant un corps de commentaire Markdown.

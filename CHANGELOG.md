@@ -16,6 +16,13 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Changed
 
+- **Each platform can say where the extension sits in its comment box** (§9.2.3). Where the
+  toolbar and the status pill are inserted, and whether the status outline is drawn inside the
+  field, were decided by layout rules measured on GitHub and applied to every platform. A
+  platform adapter can now declare both. If it declares nothing, the same rules apply as before.
+  An insertion point that does not hold the field is ignored. Neither adapter declares anything
+  yet, so nothing a user sees changes.
+
 - **The extension's core no longer knows any adapter** (§9.1). Previously, the core selected
   the GitHub or Azure DevOps adapter itself, and any unrecognized platform ID fell back to the
   Azure DevOps adapter. The content script's entry point now hands it a table with one adapter

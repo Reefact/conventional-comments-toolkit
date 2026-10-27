@@ -23,9 +23,10 @@ and what a reader needs from them is the behaviour, not the thirteen.
   silent fallback: an adapter that did not provide them compiled, and showed no banner, no
   filter, no badges, and treated the page as not being a pull request. They are now required
   members of the contract, the casts are gone, and a fake third platform (`acme`) is
-  type-checked in CI to prove it. Two dead members leave the contract with them: `matches()`
-  had no caller, and `matchesHost()` with its `extraHosts` option had none either since
-  activation moved to the split of granted hosts. The `<p>`/`<br>` body shape, measured on
+  type-checked in CI to prove it. Two unused methods were removed from the contract:
+  `matches()` had no caller, and `matchesHost()` with its `extraHosts` option had none either
+  since host activation moved to the platform-specific mapping of granted hosts. The
+  `<p>`/`<br>` body shape, measured on
   github.com, moves from the shared package into GitHub's own (`GITHUB_BODY_SHAPE`): a shared
   package carries no platform measurement, not even as a default. No pixel moves.
 

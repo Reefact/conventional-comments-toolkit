@@ -8,7 +8,7 @@
 // exécutent.
 //
 // La question est posée aux OCTETS, pas à la source : esbuild écrit, à côté de chaque bundle
-// (`dist-ext/meta/<bundle>.json`, packages/extension/build.mjs), la liste des fichiers qu'il y a
+// (`packages/extension/dist-meta/<bundle>.json`, hors du dossier livré — packages/extension/build.mjs), la liste des fichiers qu'il y a
 // réellement mis. Un import indirect — un module partagé qui, lui, importe un adaptateur — y
 // apparaît aussi, ce qu'aucune lecture des `import` d'un fichier ne verrait.
 //
@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { forbiddenAdapterInputs } from './lib/bundle-isolation.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const META = join(root, 'packages/extension/dist-ext/meta');
+const META = join(root, 'packages/extension/dist-meta');
 const ids = readdirSync(join(root, 'packages/adapters')).filter((name) => name !== 'shared');
 
 /** Les bundles qui ne doivent embarquer que des fiches. Le script de contenu, lui, construit

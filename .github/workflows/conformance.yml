@@ -57,7 +57,7 @@ jobs:
         # workspace, que `tsc -b` produit. Sans lui, esbuild échoue sur un clone frais —
         # ce qui est arrivé ici, la vérification locale ayant été faite dans un
         # environnement déjà compilé, donc dans un monde qui n'était pas celui de la CI.
-        run: npm run build && npm run build:extension && npm run check:context-apis && npm run check:content-script-io
+        run: npm run build && npm run build:extension && npm run check:context-apis && npm run check:bundle-isolation && npm run check:content-script-io
 
       # Une clé que le schéma ne déclare pas n'arrive jamais : Chrome la retire du
       # stockage managé sans rien dire, et un faux de test fabrique justement l'objet

@@ -23,18 +23,20 @@ const common = {
   logLevel: 'silent',
 };
 
-// `metafile` : la liste des sources que chaque bundle embarque, écrite à côté de lui
-// (`dist-ext/meta/`) pour `check:bundle-isolation` — le service worker et la page d'options ne
-// doivent embarquer que les FICHES des plateformes, jamais leurs adaptateurs. Le dossier n'entre
-// ni dans la variante Firefox ni dans les zips de release, qui copient une liste nommée.
-await mkdir(join(out, 'meta'), { recursive: true });
+// `metafile` : la liste des sources que chaque bundle embarque, pour `check:bundle-isolation` —
+// le service worker et la page d'options ne doivent embarquer que les FICHES des plateformes,
+// jamais leurs adaptateurs. Écrite HORS de `dist-ext/` (`dist-meta/`) : ce sont des artefacts de
+// vérification, inutiles au navigateur, et la release Chromium archive `dist-ext/` en entier
+// (revue Reefact, PR #76 — une première version les y mettait en affirmant le contraire).
+const meta = join(here, 'dist-meta');
+await mkdir(meta, { recursive: true });
 for (const [entry, file] of [
   ['src/content.ts', 'content.js'],
   ['src/background.ts', 'background.js'],
   ['src/options/options.ts', 'options.js'],
 ]) {
   const result = await build({ ...common, metafile: true, entryPoints: [join(here, entry)], outfile: join(out, file) });
-  await writeFile(join(out, 'meta', `${file}.json`), JSON.stringify(result.metafile));
+  await writeFile(join(meta, `${file}.json`), JSON.stringify(result.metafile));
 }
 
 // Une seule feuille livrée, assemblée de plusieurs : la feuille partagée, qui ne nomme aucune

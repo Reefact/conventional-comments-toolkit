@@ -102,6 +102,49 @@ describe('verdict sur une PR', () => {
     expect(v).toMatchObject({ ok: true, kind: 'new-platform', platforms: ['gitlab'] });
   });
 
+  it('admet les fichiers d’inscription dans la PR qui RETIRE une plateforme', () => {
+    // Revue Reefact, PR #78 : aucun découpage d'un retrait n'est vert, l'inscription doit
+    // partir avec l'adaptateur.
+    const v = prScopeVerdict(
+      [
+        { path: 'packages/adapters/azdo/package.json', added: false, deleted: true },
+        { path: 'packages/adapters/azdo/src/index.ts', added: false, deleted: true },
+        { path: 'packages/server/src/adapters/azdo/index.ts', added: false, deleted: true },
+        { path: 'packages/extension/src/platforms.ts', added: false },
+        { path: 'packages/extension/src/content.ts', added: false },
+        { path: 'packages/extension/package.json', added: false },
+        { path: 'packages/extension/tsconfig.json', added: false },
+        { path: 'packages/extension/src/managed-schema.json', added: false },
+        { path: 'packages/server/src/bootstrap.ts', added: false },
+        { path: 'packages/server/src/index.ts', added: false },
+      ],
+      ids
+    );
+    expect(v).toMatchObject({ ok: true, kind: 'removed-platform', platforms: ['azdo'] });
+  });
+
+  it('ne fait pas d’un retrait une licence pour le code partagé', () => {
+    const v = prScopeVerdict(
+      [
+        { path: 'packages/adapters/azdo/package.json', added: false, deleted: true },
+        { path: 'packages/extension/src/platforms.ts', added: false },
+        { path: 'packages/extension/src/editor-controller.ts', added: false },
+      ],
+      ids
+    );
+    expect(v.ok).toBe(false);
+    expect(v.shared).toEqual(['packages/extension/src/editor-controller.ts']);
+  });
+
+  it('n’annonce pas un contrat sans code partagé', () => {
+    // Revue Reefact, PR #78 : admis, mais « code partagé et toutes les plateformes » serait faux.
+    const v = prScopeVerdict(
+      files('packages/adapters/azdo/src/index.ts', 'packages/adapters/github/src/index.ts'),
+      ids
+    );
+    expect(v).toMatchObject({ ok: true, kind: 'all-platforms', shared: [] });
+  });
+
   it('compte les fichiers d’inscription comme partagés hors création', () => {
     const v = prScopeVerdict(
       files('packages/adapters/azdo/src/index.ts', 'packages/extension/src/ui/strings.ts'),

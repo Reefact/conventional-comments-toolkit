@@ -32,7 +32,7 @@ const files = out
   .filter(Boolean)
   .map((line) => {
     const [status, path] = line.split('\t');
-    return { path, added: status === 'A' };
+    return { path, added: status === 'A', deleted: status === 'D' };
   });
 
 const verdict = prScopeVerdict(files, ids);
@@ -41,7 +41,9 @@ const label = {
   shared: 'code partagé seulement',
   platform: `plateforme ${verdict.platforms.join(', ')} seulement`,
   'new-platform': `création de la plateforme ${verdict.platforms[0]}`,
+  'removed-platform': `retrait de la plateforme ${verdict.platforms[0]}`,
   contract: 'PR de contrat : code partagé et toutes les plateformes',
+  'all-platforms': 'toutes les plateformes, sans code partagé',
   mixed: `${verdict.platforms.join(', ')}${verdict.shared.length ? ' et code partagé' : ''}`,
 }[verdict.kind];
 

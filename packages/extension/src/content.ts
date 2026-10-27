@@ -12,9 +12,9 @@ import { bootstrap } from './content-internal.js';
 import type { AdapterFactories } from './platforms.js';
 
 /** Le POINT DE COMPOSITION du script de contenu : le seul fichier qui importe les adaptateurs,
- * et qui associe chacun à sa plateforme. Une plateforme du registre sans fabrique ne compile
- * pas (`AdapterFactories`). Le cœur, `content-internal.ts`, reçoit cette table et ne nomme
- * aucune plateforme. */
+ * et qui associe chacun à sa plateforme. L'absence de fabrique pour une plateforme enregistrée
+ * provoque une erreur de compilation (`AdapterFactories`). Le cœur, `content-internal.ts`,
+ * reçoit cette table et ne nomme aucune plateforme. */
 const FACTORIES: AdapterFactories = {
   github: (opts) => new GithubClientAdapter(opts),
   azdo: (opts) => new AzdoClientAdapter(opts),

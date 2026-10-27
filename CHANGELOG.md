@@ -26,9 +26,9 @@ and what a reader needs from them is the behaviour, not the thirteen.
   type-checked in CI to prove it. Two unused methods were removed from the contract:
   `matches()` had no caller, and `matchesHost()` with its `extraHosts` option had none either
   since host activation moved to the platform-specific mapping of granted hosts. The
-  `<p>`/`<br>` body shape, measured on
-  github.com, moves from the shared package into GitHub's own (`GITHUB_BODY_SHAPE`): a shared
-  package carries no platform measurement, not even as a default. No pixel moves.
+  `<p>`/`<br>` body shape, measured on github.com, moves from the shared package into GitHub's
+  own (`GITHUB_BODY_SHAPE`): a shared package carries no platform measurement, not even as a
+  default. No pixel moves.
 
 - **GitHub fixes can no longer break Azure DevOps** (§9.1, §9.4). Two GitHub selectors lived
   in the shared editor controller — a `comment-composer` composer and a `CommentBox` class —

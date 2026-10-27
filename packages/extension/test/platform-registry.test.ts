@@ -7,7 +7,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PLATFORMS, PLATFORM_IDS, configCredentialsFor } from '../src/platforms.js';
 import { inferPlatform, selectPlatform } from '../src/host-platform.js';
-import { ui } from '../src/ui/strings.js';
+import { catalogs } from '../src/ui/strings.js';
 
 const root = new URL('../../../', import.meta.url);
 
@@ -31,9 +31,11 @@ describe('§9.1 — le registre des plateformes, et lui seul', () => {
   });
 
   it('chaque plateforme a son libellé, en français ET en anglais', () => {
+    // Lu dans CHAQUE catalogue, jamais par `ui()` : son repli sur l'anglais ferait passer pour
+    // français un libellé qui n'existe qu'en anglais (revue Reefact, PR #76).
     for (const id of PLATFORM_IDS) {
       for (const lang of ['fr', 'en']) {
-        expect(ui(lang, `options.platform.${id}`), `${lang} / ${id}`).not.toBe(`options.platform.${id}`);
+        expect(catalogs[lang]?.[`options.platform.${id}`], `${lang} / ${id}`).toBeTruthy();
       }
     }
   });

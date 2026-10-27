@@ -18,6 +18,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { forbiddenAdapterInputs } from './lib/bundle-isolation.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const META = join(root, 'packages/extension/dist-ext/meta');
@@ -35,12 +36,7 @@ for (const bundle of DESCRIPTOR_ONLY) {
     process.exit(1);
   }
   const inputs = Object.keys(JSON.parse(readFileSync(file, 'utf8')).inputs);
-  for (const input of inputs) {
-    const m = /(?:^|\/)packages\/adapters\/([^/]+)\/(?:dist|src)\/([^/]+)$/.exec(input);
-    if (!m || !ids.includes(m[1])) continue;
-    if (/^descriptor\.(?:js|ts)$/.test(m[2])) continue;
-    findings.push({ bundle, input });
-  }
+  for (const input of forbiddenAdapterInputs(inputs, ids)) findings.push({ bundle, input });
 }
 
 if (findings.length > 0) {

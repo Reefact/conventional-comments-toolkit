@@ -316,7 +316,13 @@ export class GithubClientAdapter implements PlatformAdapter {
    * possiblement éloigné —, le parent direct du champ marqué ensuite. Puis on ne se prononce
    * plus : sur le DOM hérité et sur toute vue non mesurée, la règle géométrique du code
    * partagé retrouve le cadre sans le nommer, et rend là l'élément que ces deux voies
-   * désignaient déjà. Ne rien affirmer y est le comportement JUSTE, pas un renoncement. */
+   * désignaient déjà. Ne rien affirmer y est le comportement JUSTE, pas un renoncement.
+   *
+   * Le point d'insertion (`mount`) et le trait rentré (`ringInset`) restent à `null` sur toutes
+   * les surfaces : la règle géométrique du code partagé a été mesurée SUR GitHub — le `<span>`
+   * en `inline-flex` et le conteneur en `overflow: hidden` de la vue `…/changes` — et elle y
+   * donne déjà le bon rendu. Les déclarer ici reviendrait à réécrire la même réponse sous une
+   * autre forme, au prix d'un risque sur une interface terminée. */
   getEditorChrome(editor: EditorHandle): EditorChrome {
     // La PREMIÈRE surface qui reconnaît ce champ répond, et l'ordre de `SURFACES` reproduit
     // exactement la cascade qui vivait dans le contrôleur partagé.
@@ -329,10 +335,10 @@ export class GithubClientAdapter implements PlatformAdapter {
     for (const surface of SURFACES) {
       if (surface.composerFrame) {
         const framed = closestChain(editor.element, surface.composerFrame);
-        if (framed.element) return { framedContainer: framed.element };
+        if (framed.element) return { ...NEUTRAL_EDITOR_CHROME, framedContainer: framed.element };
       }
       if (surface.composerFrameOnField && matchesChain(editor.element, surface.composerFrameOnField).element) {
-        return { framedContainer: editor.element.parentElement };
+        return { ...NEUTRAL_EDITOR_CHROME, framedContainer: editor.element.parentElement };
       }
     }
     // AUCUN châssis n'a répondu, et ce silence recouvrait DEUX états que rien ne distinguait

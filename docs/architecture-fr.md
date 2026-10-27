@@ -98,7 +98,7 @@ Quatre choses vivent donc par plateforme :
 | | Où | Comment le partagé y accède |
 |---|---|---|
 | Sélecteurs DOM | `adapters/<p>/src/selectors.ts` | jamais directement |
-| Placement et forme du rendu | idem, via `getEditorChrome()` / `renderedBodyShape()` (§9.2.3) | par le port, qui rend des DONNÉES |
+| Placement et forme du rendu : cadre à parer, point d'insertion, trait rentré, forme du corps | idem, via `getEditorChrome()` / `renderedBodyShape()` (§9.2.3) ; `null` laisse la règle géométrique du partagé | par le port, qui rend des DONNÉES |
 | Couleurs, rayons, longueurs | `adapters/<p>/src/platform.css` | par des variables `--cct-*` |
 | Fiche d'identité : hôtes, `credentials`, vues, glyphe | `adapters/<p>/src/descriptor.ts`, sous-chemin `/descriptor` | par le registre `extension/src/platforms.ts` |
 

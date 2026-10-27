@@ -49,11 +49,12 @@ const NEUTRAL_ROOTS = [
  * Chaque exemption est un fichier ENTIER et doit le rester lisible : allonger cette liste est
  * un choix d'architecture, pas une commodité. */
 const COMPOSITION_ROOT = [
-  'packages/extension/src/host-platform.ts', // quelle plateforme sert cet hôte (§2)
-  'packages/extension/src/background.ts', // répartition des hôtes accordés, relais de config
+  'packages/extension/src/platforms.ts', // le registre : la seule liste des plateformes
   'packages/extension/src/content-internal.ts', // construit l'adaptateur retenu
-  'packages/extension/src/options/options.ts', // laisse la personne étiqueter un hôte
 ];
+// `host-platform.ts`, `background.ts` et `options/options.ts` ont figuré ici : ils nommaient les
+// plateformes pour répartir les hôtes, relayer une lecture et étiqueter un hôte. Ils itèrent
+// désormais le registre, et sont donc contrôlés comme le reste.
 
 const ADAPTERS = join(root, 'packages/adapters');
 
@@ -283,6 +284,31 @@ for (const rel of NEUTRAL_ROOTS) {
   }
 }
 
+// ————— UN IDENTIFIANT DE PLATEFORME NE S'ÉCRIT QU'AU REGISTRE —————
+//
+// Le vocabulaire de sélecteurs ci-dessus n'attrape pas `platform === 'github'` : l'identifiant
+// lui-même n'est pas un sélecteur. C'est pourtant la forme qu'avaient les listes de plateformes
+// dispersées dans le code partagé — répartition des hôtes, page d'options, relais. Une chaîne
+// ÉGALE à un identifiant (les dossiers de packages/adapters) est donc refusée hors du point de
+// composition ; une chaîne qui le CONTIENT (`options.platform.github`, une clé de catalogue)
+// reste permise. Cherché dans le code transformé : commentaires exclus, types effacés.
+//
+// Une seule autre exemption, et c'est une DONNÉE de test : le corpus de parité (CA-06) étiquette
+// chaque cas avec le profil de la plateforme qui l'évalue. Il n'est exécuté par aucun bundle.
+const PLATFORM_FIXTURES = ['packages/core/src/corpus/index.ts'];
+const idFindings = [];
+for (const rel of NEUTRAL_ROOTS) {
+  for (const file of walk(join(root, rel))) {
+    const relPath = relative(root, file).replaceAll('\\', '/');
+    if (COMPOSITION_ROOT.includes(relPath) || PLATFORM_FIXTURES.includes(relPath)) continue;
+    const code = transformSync(readFileSync(file, 'utf8'), { loader: 'ts', format: 'esm', minifyWhitespace: true }).code;
+    const strings = [...code.matchAll(/(['"`])((?:(?!\1)[^\\]|\\.)*)\1/g)].map((m) => m[2]);
+    for (const id of adapterIds) {
+      if (strings.includes(id)) idFindings.push({ relPath, id });
+    }
+  }
+}
+
 // ————— LE MÊME CRITÈRE, DANS L'AUTRE LANGAGE —————
 //
 // Tout ce qui précède ne lit que du TypeScript (`walk()` filtre sur `.ts`). Or la scission des
@@ -390,6 +416,7 @@ for (const m of contractCode.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?=[(:<])/g)) {
 if (
   findings.length === 0 &&
   castFindings.length === 0 &&
+  idFindings.length === 0 &&
   contractLeaks.length === 0 &&
   scattered.length === 0 &&
   cssFindings.length === 0 &&
@@ -399,6 +426,7 @@ if (
   const detail = [...vocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ');
   console.log(`✓ isolation des plateformes : ${total} mots dérivés — ${detail} — absents du code partagé.`);
   console.log('✓ §9.4 : chaque adaptateur définit ses sélecteurs dans un fichier unique.');
+  console.log(`✓ registre : aucun identifiant de plateforme (${adapterIds.join(', ')}) écrit hors du point de composition.`);
   console.log(
     `✓ contrat : aucune conversion de type vers le contrat, point de composition compris, ni import de plateforme (${adapterIds.join(', ')}) hors de lui.`
   );
@@ -433,6 +461,15 @@ if (castFindings.length > 0) {
       'ajoutez le membre au contrat plutôt que de le lire par cast — un cast compile sur une plateforme\n' +
       'qui ne répond pas, et se replie en silence. Un adaptateur concret ne se nomme que dans le point\n' +
       'de composition (COMPOSITION_ROOT).'
+  );
+}
+if (idFindings.length > 0) {
+  console.error(
+    `\n${idFindings.length} identifiant(s) de plateforme écrit(s) en dur hors du registre :\n` +
+      idFindings.map((f) => `  - ${f.relPath}  «${f.id}»`).join('\n') +
+      "\n\nLes plateformes s'énumèrent depuis le registre (`packages/extension/src/platforms.ts`), et ce\n" +
+      "qu'on sait de chacune vient de sa fiche (`PlatformDescriptor`). Itérez-le plutôt que de nommer\n" +
+      'une plateforme : un `if` de plateforme dans du code partagé est exécuté par toutes.'
   );
 }
 if (cssFindings.length > 0) {

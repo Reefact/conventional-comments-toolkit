@@ -36,6 +36,7 @@ const CONTENT_BUNDLE = new Set([
   'editor-controller.ts',
   'config-resolver.ts',
   'host-platform.ts',
+  'platforms.ts',
   'telemetry.ts',
   'guard.ts',
   'storage.ts',

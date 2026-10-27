@@ -24,7 +24,7 @@
 //     disparaît laissent l'autre répondre à sa place si l'on ne compare que des
 //     présences.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { Window } from 'happy-dom';
@@ -37,21 +37,23 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // parseur emportait la règle suivante. Vérifier la seule feuille partagée laisserait ce garde
 // AU VERT tout en ne regardant plus l'endroit où le risque a déménagé.
 //
-// La liste est celle du build (packages/extension/build.mjs), et elle est relue ici plutôt que
-// recopiée : une feuille de plateforme ajoutée au build sans l'être ici serait livrée sans
-// être vérifiée, et rien ne le dirait.
-const buildScript = readFileSync(resolve(root, 'packages/extension/build.mjs'), 'utf8');
+// La liste est celle du build (packages/extension/build.mjs), qui DÉCOUVRE les feuilles des
+// paquets de plateforme au lieu de les nommer ; ce garde fait la même découverte. Une feuille de
+// plateforme livrée sans être vérifiée serait sinon possible, et rien ne le dirait.
+const adaptersDir = resolve(root, 'packages/adapters');
 const sheetPaths = [
   resolve(root, 'packages/extension/src/styles.css'),
-  ...[...buildScript.matchAll(/'(\.\.\/adapters\/[^']+\.css)'/g)].map((m) =>
-    resolve(root, 'packages/extension', m[1])
-  ),
+  ...readdirSync(adaptersDir)
+    .filter((name) => name !== 'shared')
+    .sort()
+    .map((name) => resolve(adaptersDir, name, 'src/platform.css'))
+    .filter((path) => existsSync(path)),
 ];
 if (sheetPaths.length < 2) {
   console.error(
-    "Aucune feuille de plateforme trouvée dans packages/extension/build.mjs.\n" +
-      "Ce garde en déduit sa liste : si le build a changé de forme, il ne vérifie plus que la\n" +
-      'feuille partagée sans le dire. Corrigez l\'extraction plutôt que de la contourner.'
+    'Aucune feuille de plateforme trouvée sous packages/adapters/*/src/platform.css.\n' +
+      'Ce garde vérifierait alors la seule feuille partagée sans le dire. Corrigez la découverte\n' +
+      'plutôt que de la contourner.'
   );
   process.exit(1);
 }

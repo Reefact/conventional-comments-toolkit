@@ -23,7 +23,7 @@
     "check:ca-matrix": "node scripts/check-ca-matrix.mjs",
     "check:invisible": "node scripts/check-invisible-chars.mjs",
     "check:extension-css": "node scripts/check-extension-css.mjs",
-    "checks": "npm run check:ca-matrix && npm run check:invisible && npm run check:extension-css && npm run build && npm run typecheck:tests && npm run build:extension && npm run check:context-apis && npm run check:content-script-io && npm run check:managed-keys && npm run check:platform-isolation",
+    "checks": "npm run check:ca-matrix && npm run check:invisible && npm run check:extension-css && npm run build && npm run typecheck:tests && npm run build:extension && npm run check:context-apis && npm run check:bundle-isolation && npm run check:content-script-io && npm run check:managed-keys && npm run check:platform-isolation",
     "server": "node packages/server/dist/main.js",
     "check:context-apis": "node scripts/check-context-apis.mjs",
     "smoke:mv3": "node spikes/mv3-smoke.mjs",
@@ -37,7 +37,8 @@
     "check:composer-layout": "node spikes/composer-layout.mjs",
     "check:open-tab-injection": "node spikes/open-tab-injection.mjs",
     "check:options-tour": "node spikes/options-tour.mjs",
-    "check:style-isolation": "node spikes/platform-style-isolation.mjs"
+    "check:style-isolation": "node spikes/platform-style-isolation.mjs",
+    "check:bundle-isolation": "node scripts/check-bundle-isolation.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

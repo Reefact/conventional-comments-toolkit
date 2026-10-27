@@ -7,7 +7,7 @@
 // espace de noms browser.* — §10, Compatibilité).
 
 import { build } from 'esbuild';
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,9 +23,19 @@ const common = {
   logLevel: 'silent',
 };
 
-await build({ ...common, entryPoints: [join(here, 'src/content.ts')], outfile: join(out, 'content.js') });
-await build({ ...common, entryPoints: [join(here, 'src/background.ts')], outfile: join(out, 'background.js') });
-await build({ ...common, entryPoints: [join(here, 'src/options/options.ts')], outfile: join(out, 'options.js') });
+// `metafile` : la liste des sources que chaque bundle embarque, écrite à côté de lui
+// (`dist-ext/meta/`) pour `check:bundle-isolation` — le service worker et la page d'options ne
+// doivent embarquer que les FICHES des plateformes, jamais leurs adaptateurs. Le dossier n'entre
+// ni dans la variante Firefox ni dans les zips de release, qui copient une liste nommée.
+await mkdir(join(out, 'meta'), { recursive: true });
+for (const [entry, file] of [
+  ['src/content.ts', 'content.js'],
+  ['src/background.ts', 'background.js'],
+  ['src/options/options.ts', 'options.js'],
+]) {
+  const result = await build({ ...common, metafile: true, entryPoints: [join(here, entry)], outfile: join(out, file) });
+  await writeFile(join(out, 'meta', `${file}.json`), JSON.stringify(result.metafile));
+}
 
 // Une seule feuille livrée, assemblée de plusieurs : la feuille partagée, qui ne nomme aucune
 // plateforme, puis la feuille de CHAQUE adaptateur, qui déclare ce que les rôles valent chez
@@ -38,12 +48,23 @@ await build({ ...common, entryPoints: [join(here, 'src/options/options.ts')], ou
 // passe devant le `:root` (0,1,0) des valeurs neutres dans les deux sens. Une isolation qui
 // dépendrait de l'ordre de ce tableau serait une dépendance invisible, et le jour où
 // quelqu'un trie cette liste elle casserait sans rien dire.
-const PLATFORM_SHEETS = [
-  '../adapters/github/src/platform.css',
-  '../adapters/azdo/src/platform.css',
-];
+// Les feuilles de plateforme sont celles des PAQUETS de plateforme, découvertes, jamais
+// listées : un adaptateur ajouté sous `packages/adapters/<id>` y apporte sa feuille sans qu'on
+// touche à ce fichier. Triées, pour un fichier livré reproductible.
+const ADAPTERS = join(here, '../adapters');
+const PLATFORM_SHEETS = [];
+for (const name of (await readdir(ADAPTERS)).sort()) {
+  if (name === 'shared') continue;
+  const sheet = join(ADAPTERS, name, 'src', 'platform.css');
+  try {
+    await readFile(sheet);
+    PLATFORM_SHEETS.push(sheet);
+  } catch {
+    // pas de feuille pour cette plateforme
+  }
+}
 const sheets = [await readFile(join(here, 'src/styles.css'), 'utf8')];
-for (const rel of PLATFORM_SHEETS) sheets.push(await readFile(join(here, rel), 'utf8'));
+for (const sheet of PLATFORM_SHEETS) sheets.push(await readFile(sheet, 'utf8'));
 await writeFile(join(out, 'styles.css'), sheets.join('\n'));
 await copyFile(join(here, 'src/options/options.html'), join(out, 'options.html'));
 await copyFile(join(here, 'src/managed-schema.json'), join(out, 'managed-schema.json'));

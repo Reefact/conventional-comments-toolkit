@@ -28,6 +28,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative, resolve } from 'node:path';
 import { transformSync } from 'esbuild';
+import { findContractBypasses } from './lib/contract-bypass.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -265,35 +266,20 @@ for (const rel of NEUTRAL_ROOTS) {
 // fuite, et un import de classe concrète hors du point de composition en est l'autre forme.
 //
 // Les casts se cherchent dans la SOURCE, pas dans le code transformé : esbuild retire les
-// annotations de type, et `as X` avec elles. Les commentaires en sont retirés par une règle
-// simple — `/* … */`, puis `//` jusqu'à la fin de ligne quand il n'est pas précédé de `:` (une
-// URL) —, suffisante ici parce que ce qu'on cherche n'apparaît jamais dans une chaîne de
-// caractères. Les imports se lisent dans la même source : un `import type` d'un paquet de
-// plateforme est une dépendance comme une autre, et esbuild l'aurait effacé.
-function stripTsComments(src) {
-  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
-}
-const CAST_PATTERNS = [
-  { re: /\bas\s+PlatformAdapter\s*&/, what: 'as PlatformAdapter & {…}' },
-  { re: /\bas\s+\w+ClientAdapter\b/, what: 'as <Plateforme>ClientAdapter' },
-  { re: /\b\w+ClientAdapter\s*\|\s*\w+ClientAdapter\b/, what: '<A>ClientAdapter | <B>ClientAdapter' },
-];
+// annotations de type, et `as X` avec elles. La détection vit dans `lib/contract-bypass.mjs`,
+// testée sur des sources fabriquées ; son en-tête dit pourquoi les conversions de type sont
+// cherchées PARTOUT, point de composition compris, et les imports hors de lui seulement.
 // Les plateformes sont les DOSSIERS de packages/adapters, hors `shared` — jamais une liste.
 const adapterIds = readdirSync(ADAPTERS).filter((name) => name !== 'shared');
 const castFindings = [];
 for (const rel of NEUTRAL_ROOTS) {
   for (const file of walk(join(root, rel))) {
     const relPath = relative(root, file).replaceAll('\\', '/');
-    if (COMPOSITION_ROOT.includes(relPath)) continue;
-    const source = stripTsComments(readFileSync(file, 'utf8'));
-    for (const { re, what } of CAST_PATTERNS) {
-      if (re.test(source)) castFindings.push({ relPath, what });
-    }
-    for (const id of adapterIds) {
-      if (new RegExp(`from\\s*["']@cct/adapter-${id}["']`).test(source)) {
-        castFindings.push({ relPath, what: `import de @cct/adapter-${id}` });
-      }
-    }
+    const found = findContractBypasses(readFileSync(file, 'utf8'), {
+      adapterIds,
+      isCompositionRoot: COMPOSITION_ROOT.includes(relPath),
+    });
+    for (const what of found) castFindings.push({ relPath, what });
   }
 }
 
@@ -414,7 +400,7 @@ if (
   console.log(`✓ isolation des plateformes : ${total} mots dérivés — ${detail} — absents du code partagé.`);
   console.log('✓ §9.4 : chaque adaptateur définit ses sélecteurs dans un fichier unique.');
   console.log(
-    `✓ contrat : aucune conversion de type ni import de plateforme (${adapterIds.join(', ')}) hors du point de composition.`
+    `✓ contrat : aucune conversion de type vers le contrat, point de composition compris, ni import de plateforme (${adapterIds.join(', ')}) hors de lui.`
   );
   const cssTotal = [...cssVocabularies.values()].reduce((a, s) => a + s.size, 0);
   const cssDetail = [...cssVocabularies].map(([p, s]) => `${p} (${s.size})`).join(', ') || 'aucune feuille renseignée';

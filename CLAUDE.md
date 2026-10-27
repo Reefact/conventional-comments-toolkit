@@ -54,7 +54,7 @@
   scinde — le changement partagé d'abord, seul, puis celui de la plateforme. Une PR de
   **contrat** (code partagé ET toutes les plateformes) est admise : elle dit ce qu'elle est.
   Documentation, tests partagés et outillage hors de `packages/` sont neutres ; les fichiers
-  d'inscription d'une plateforme ne le sont que dans la PR qui la CRÉE
+  d'inscription d'une plateforme ne le sont que dans la PR qui la CRÉE ou la RETIRE
   (`scripts/lib/pr-scope.mjs` les liste). Limite à connaître : à deux plateformes, « toutes »
   est atteint dès qu'on touche les deux, si bien qu'une PR GitHub + Azure DevOps + partagé
   passe pour un contrat. Qu'elle en soit vraiment un reste une question de revue.

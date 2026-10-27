@@ -17,10 +17,10 @@
 //   - l'outillage hors de `packages/` (scripts, spikes, workflows, verrou npm) : il ne part
 //     pas dans l'extension ni dans le serveur. La règle protège le produit livré.
 //
-// L'inscription d'une plateforme NOUVELLE (registre, composition root, dépendances, schéma
-// managé, libellé de menu, amorçage du serveur) touche forcément des fichiers partagés : ces
-// fichiers sont admis avec une plateforme, mais seulement quand la PR CRÉE cette plateforme
-// (son `package.json` est ajouté). Le reste du temps, ils comptent comme partagés.
+// L'inscription d'une plateforme (registre, composition root, dépendances, schéma managé,
+// libellé de menu, amorçage du serveur) touche forcément des fichiers partagés : ces fichiers
+// sont admis avec une plateforme, mais seulement quand la PR CRÉE cette plateforme ou la RETIRE
+// (son `package.json` est ajouté ou supprimé). Le reste du temps, ils comptent comme partagés.
 
 /** Les fichiers où une plateforme s'inscrit. Une liste, donc une affirmation qui vieillit : si
  * créer une plateforme exige un fichier de plus, la PR qui la crée sera refusée et le dira —
@@ -73,8 +73,8 @@ export function classifyPath(path, ids) {
 }
 
 /**
- * Le verdict sur une PR. `files` est une liste de `{ path, added }` ; `added` dit que le fichier
- * est créé par la PR (statut `A` de `git diff --name-status`).
+ * Le verdict sur une PR. `files` est une liste de `{ path, added, deleted }` : le fichier est
+ * créé (statut `A` de `git diff --name-status`) ou supprimé (statut `D`) par la PR.
  */
 export function prScopeVerdict(files, ids) {
   const groups = {};
@@ -83,15 +83,22 @@ export function prScopeVerdict(files, ids) {
     .filter((k) => k.startsWith('platform:'))
     .map((k) => k.slice('platform:'.length))
     .sort();
-  // Une plateforme est CRÉÉE quand la PR ajoute le manifeste de son paquet d'adaptateur.
-  const created = files
-    .filter((f) => f.added)
-    .map((f) => /^packages\/adapters\/([^/]+)\/package\.json$/.exec(f.path)?.[1])
-    .filter((id) => id && ids.includes(id));
+  // Une plateforme est CRÉÉE quand la PR ajoute le manifeste de son paquet d'adaptateur, RETIRÉE
+  // quand elle le supprime. Le retrait demande l'exemption symétrique : il doit défaire
+  // l'inscription dans la même PR, faute de quoi aucun découpage n'est vert — l'adaptateur
+  // d'abord laisse des imports morts, l'inscription d'abord fait échouer
+  // `platform-registry.test.ts`, qui exige un registre égal aux dossiers (revue Reefact, PR #78).
+  const manifestOf = (f) => /^packages\/adapters\/([^/]+)\/package\.json$/.exec(f.path)?.[1];
+  const changedManifests = (flag) =>
+    files.filter((f) => f[flag]).map(manifestOf).filter((id) => id && ids.includes(id));
+  const created = changedManifests('added');
+  const removed = changedManifests('deleted');
   const shared = [...(groups.shared ?? [])];
   const registration = groups.registration ?? [];
-  const isCreation = platforms.length === 1 && created.includes(platforms[0]);
-  if (!isCreation) shared.push(...registration);
+  const only = platforms.length === 1 ? platforms[0] : null;
+  const isCreation = only !== null && created.includes(only);
+  const isRemoval = only !== null && removed.includes(only);
+  if (!isCreation && !isRemoval) shared.push(...registration);
 
   const reasons = [];
   if (platforms.length > 1 && platforms.length < ids.length) {
@@ -108,8 +115,13 @@ export function prScopeVerdict(files, ids) {
   }
   let kind = 'neutral';
   if (reasons.length) kind = 'mixed';
-  else if (platforms.length === ids.length && ids.length > 0) kind = 'contract';
-  else if (isCreation) kind = 'new-platform';
+  // Un contrat touche le code partagé ET toutes les plateformes. Toutes les plateformes SANS code
+  // partagé est admis, mais ne s'annonce pas comme un contrat : le message affirmerait un code
+  // partagé que la PR ne touche pas (revue Reefact, PR #78).
+  else if (platforms.length === ids.length && ids.length > 0) {
+    kind = shared.length > 0 ? 'contract' : 'all-platforms';
+  } else if (isCreation) kind = 'new-platform';
+  else if (isRemoval) kind = 'removed-platform';
   else if (platforms.length > 0) kind = 'platform';
   else if (shared.length > 0) kind = 'shared';
   return { ok: reasons.length === 0, kind, platforms, shared, reasons, groups };

@@ -25,12 +25,13 @@
 // n'importe rien d'ici : la normalisation appliquée au rendu vaut donc aussi pour les entrées
 // déjà écrites, et ce module ne quitte jamais le bundle de la page d'options.
 
-/** Les paramètres de requête qui désignent une VUE, et non une préférence d'affichage.
- *
- * `_a` est celui d'Azure DevOps (`?_a=files`, `?_a=overview`) — un écran par valeur, un DOM par
- * écran. La liste est courte et le restera : y ajouter un paramètre revient à dire qu'il change
- * ce que la page REND, ce qui se mesure avant de s'écrire. */
-const VIEW_PARAMS = ['_a'];
+import { PLATFORMS } from './platforms.js';
+
+/** Les paramètres de requête qui désignent une VUE, et non une préférence d'affichage — ceux que
+ * déclare la fiche de chaque plateforme (`viewParams`). Ce module en portait la liste en dur ;
+ * un paramètre propre à une plateforme vit chez elle. Triés, pour que la clé ne dépende pas de
+ * l'ordre du registre. */
+const VIEW_PARAMS: readonly string[] = [...new Set(PLATFORMS.flatMap((p) => p.viewParams))].sort();
 
 /** La page, réduite à ce qui l'identifie : origine, chemin, et la vue quand elle est en requête.
  *

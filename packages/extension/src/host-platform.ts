@@ -7,6 +7,7 @@
 // trois accessible dans les trois contextes.
 
 import { hostMatchesPattern as matchesHostPattern } from '@cct/adapter-shared';
+import { PLATFORMS, PLATFORM_IDS, emptyByPlatform, isPlatformId, type PlatformId } from './platforms.js';
 
 /** Clé `chrome.storage.local` où la page d'options associe un hôte accordé à la
  * plateforme qui le sert. */
@@ -21,14 +22,12 @@ export const EXTRA_HOSTS_KEY = 'extraHostsByPlatform';
  * mais ne doit être reconnu par AUCUN adaptateur. Une classification à part entière,
  * distincte de « non classifié » (absence de clé), pour ne pas la faire réapparaître dans
  * le rattrapage de la page d'options à chaque rafraîchissement. */
-export type HostPlatform = 'github' | 'azdo' | 'config';
+export type HostPlatform = PlatformId | 'config';
 
-export interface ExtraHostsByPlatform {
-  github: string[];
-  azdo: string[];
-}
+/** Les hôtes accordés, répartis par plateforme du registre (`platforms.ts`). */
+export type ExtraHostsByPlatform = Record<PlatformId, string[]>;
 
-export const EMPTY_EXTRA_HOSTS: ExtraHostsByPlatform = { github: [], azdo: [] };
+export const EMPTY_EXTRA_HOSTS: ExtraHostsByPlatform = emptyByPlatform();
 
 /** Hostname canonique d'une origine `chrome.permissions` (`"https://GHES.Example.Corp/*"`)
  * ou d'une saisie utilisateur — `URL` normalise la casse et l'IDN, ce que la clé stockée
@@ -127,15 +126,9 @@ export interface CloudPlatform {
  *
  * `dev.azure.com` reste ici : l'organisation y vit dans le CHEMIN, c'est donc un hôte fixe,
  * et l'autoriser est le minimum possible pour ce domaine. */
-export const CLOUD_PLATFORMS: readonly CloudPlatform[] = [
-  { id: 'github', label: 'GitHub.com', origin: 'https://github.com/*', platform: 'github' },
-  {
-    id: 'azdo',
-    label: 'Azure DevOps Services',
-    origin: 'https://dev.azure.com/*',
-    platform: 'azdo',
-  },
-];
+export const CLOUD_PLATFORMS: readonly CloudPlatform[] = PLATFORMS.flatMap((p) =>
+  p.cloud ? [{ id: p.id, label: p.cloud.label, origin: p.cloud.origin, platform: p.id }] : []
+);
 
 /** Plateforme évidente pour un domaine de PRODUIT connu — pré-remplissage de la page
  * d'options, jamais une décision prise à la place de la personne : le menu reste
@@ -146,9 +139,8 @@ export const CLOUD_PLATFORMS: readonly CloudPlatform[] = [
  * parce que `options.ts` touche `chrome` au chargement du module, donc ne s'importe pas
  * hors du contexte d'une page d'extension. */
 export function inferPlatform(host: string): HostPlatform | null {
-  if (host === 'dev.azure.com' || host.endsWith('.visualstudio.com')) return 'azdo';
-  if (host === 'github.com' || host === 'ghe.com' || host.endsWith('.ghe.com')) return 'github';
-  return null;
+  // Les suffixes vivent dans la fiche de chaque plateforme (`inferHost`), plus ici.
+  return PLATFORMS.find((p) => p.inferHost(host))?.id ?? null;
 }
 
 /** Quelle plateforme doit servir cet hôte, au vu de la répartition publiée — ou `null` si
@@ -166,14 +158,23 @@ export function inferPlatform(host: string): HostPlatform | null {
  * répartition comme n'importe quel autre. C'est ce qui met son activation sous le contrôle
  * du même octroi que les autres — donc retirable depuis la page d'options, et suivie par
  * `permissions.onRemoved`. */
-export function selectPlatform(
-  hostname: string,
-  extra: ExtraHostsByPlatform
-): 'github' | 'azdo' | null {
-  const github = matchScore(hostname, extra.github);
-  const azdo = matchScore(hostname, extra.azdo);
-  if (github === azdo) return null; // aucun des deux, ou égalité : voir ci-dessous
-  return github > azdo ? 'github' : 'azdo';
+export function selectPlatform(hostname: string, extra: ExtraHostsByPlatform): PlatformId | null {
+  // Le REGISTRE est parcouru, jamais les clés de `extra` : une clé étrangère venue du stockage
+  // ne doit pas pouvoir devenir une plateforme.
+  let best: PlatformId | null = null;
+  let bestScore = 0;
+  let tie = false;
+  for (const id of PLATFORM_IDS) {
+    const score = matchScore(hostname, extra[id] ?? []);
+    if (score > bestScore) {
+      best = id;
+      bestScore = score;
+      tie = false;
+    } else if (score === bestScore && score > 0) {
+      tie = true;
+    }
+  }
+  return tie ? null : best; // aucune, ou égalité au sommet : voir ci-dessous
 }
 
 /** Force de la meilleure correspondance de `hostname` dans `patterns` ; `0` si aucune.
@@ -236,7 +237,7 @@ export function parseManagedHostTags(raw: unknown): Record<string, HostPlatform>
     if (!entry || typeof entry !== 'object') continue;
     const { host: rawHost, platform } = entry as { host?: unknown; platform?: unknown };
     const host = typeof rawHost === 'string' ? hostnameOf(rawHost) : null;
-    if (host && (platform === 'github' || platform === 'azdo' || platform === 'config')) {
+    if (host && (isPlatformId(platform) || platform === 'config')) {
       tags[host] = platform;
     }
   }

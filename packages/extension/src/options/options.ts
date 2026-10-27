@@ -28,6 +28,7 @@ import {
   parseManagedHostTags,
   type HostPlatform,
 } from '../host-platform.js';
+import { PLATFORMS, PLATFORM_IDS } from '../platforms.js';
 
 interface ChromePermissions {
   request: (perms: { origins: string[] }, cb: (granted: boolean) => void) => void;
@@ -69,17 +70,23 @@ declare const chrome: {
  * pour que rien n'affiche une clé brute si un rendu partait trop tôt. */
 let lang = 'en';
 
-/** Une FONCTION et non plus une table figée : les libellés se lisent maintenant dans le
- * catalogue, donc au moment du rendu — une table constante aurait gelé la langue à l'import
- * du module, avant que `lang` ne soit résolue. */
-const PLATFORM_LABEL_KEYS: Record<HostPlatform, string> = {
-  github: 'options.platform.github',
-  azdo: 'options.platform.azdo',
-  config: 'options.platform.config',
-};
+/** Les étiquettes qu'on peut poser sur un hôte : chaque plateforme du registre, puis `config`
+ * (hôte de configuration d'organisation, servi par aucun adaptateur). Dérivées du registre —
+ * aucune liste ici. */
+const HOST_TAGS: readonly HostPlatform[] = [...PLATFORM_IDS, 'config'];
 
+/** Le libellé d'une étiquette, lu dans le catalogue au moment du rendu — une table constante
+ * aurait gelé la langue à l'import du module, avant que `lang` ne soit résolue. */
 function platformLabel(platform: HostPlatform): string {
-  return ui(lang, PLATFORM_LABEL_KEYS[platform] ?? platform);
+  return ui(lang, `options.platform.${platform}`);
+}
+
+/** Le libellé d'une étiquette dans le menu de saisie (zone 2), quand il diffère de celui des
+ * listes : une variante `.option` du catalogue, s'il en existe une. */
+function platformOptionLabel(platform: HostPlatform): string {
+  const key = `options.platform.${platform}.option`;
+  const label = ui(lang, key);
+  return label === key ? platformLabel(platform) : label;
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -103,20 +110,14 @@ function svg(viewBox: string, ...paths: { d: string; stroke?: boolean }[]): SVGE
   return el;
 }
 
-/** Marque GitHub — tracé d'Octicons (`mark-github`), la forme officielle. Les autres
- * plateformes n'ont pas leur logo ici : un glyphe approximatif dessiné de mémoire aurait
- * l'air faux là où un symbole neutre est simplement neutre. `∞` pour Azure DevOps
- * n'est d'ailleurs pas un pis-aller — leur propre marque EST un infini stylisé. */
+/** Le glyphe d'une étiquette : celui que la fiche de la plateforme déclare (tracé ou
+ * caractère), un document pour `config`, `?` pour un hôte non classé. */
 function platformGlyph(platform: HostPlatform | null): Node {
-  if (platform === 'github') {
-    return svg(
-      '0 0 16 16',
-      {
-        d: 'M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z',
-      }
-    );
+  const descriptor = PLATFORMS.find((p) => p.id === platform);
+  if (descriptor) {
+    const glyph = descriptor.glyph;
+    return 'text' in glyph ? document.createTextNode(glyph.text) : svg(glyph.viewBox, { d: glyph.path });
   }
-  if (platform === 'azdo') return document.createTextNode('∞');
   if (platform === 'config') {
     return svg('0 0 24 24', { d: 'M6 3h8l4 4v14H6z', stroke: true }, { d: 'M9 12h6', stroke: true }, { d: 'M9 16h6', stroke: true });
   }
@@ -309,7 +310,7 @@ function makeUnconfiguredRow(origin: string, host: string): HTMLLIElement {
   placeholder.selected = true;
   placeholder.textContent = ui(lang, 'options.other.platform.none');
   select.appendChild(placeholder);
-  for (const value of Object.keys(PLATFORM_LABEL_KEYS) as HostPlatform[]) {
+  for (const value of HOST_TAGS) {
     const opt = document.createElement('option');
     opt.value = value;
     opt.textContent = platformLabel(value);
@@ -424,6 +425,19 @@ async function refreshHosts(): Promise<void> {
 
 const hostInput = document.getElementById('host-input') as HTMLInputElement | null;
 const platformSelect = document.getElementById('host-platform') as HTMLSelectElement | null;
+
+/** Le menu de la zone 2 se remplit depuis le registre : la page HTML ne porte que l'invite.
+ * Appelé au démarrage, APRÈS la résolution de la langue — les libellés sont du texte. Une
+ * option déjà présente n'est pas doublée. */
+function fillPlatformSelect(): void {
+  for (const value of HOST_TAGS) {
+    if (!platformSelect || platformSelect.querySelector(`option[value="${value}"]`)) continue;
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = platformOptionLabel(value);
+    platformSelect.appendChild(opt);
+  }
+}
 const addState = document.getElementById('host-add-state');
 
 // Dernière valeur POSÉE PAR L'INFÉRENCE, pour la distinguer d'un choix humain. Sans cette
@@ -746,6 +760,7 @@ function renderSelectorClear(): HTMLElement {
 async function boot(): Promise<void> {
   lang = await currentLanguage();
   applyStaticStrings(document, lang);
+  fillPlatformSelect();
   // TOUT rendu qui écrit du texte part d'ici, et pas d'un effet de bord d'import. Un test
   // de télémétrie a trouvé ce défaut dans la première version de ce démarrage : la ligne du
   // point de collecte se rendait depuis un rappel de `storage.managed` déclenché à

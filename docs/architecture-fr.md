@@ -93,28 +93,39 @@ décrit le produit est partagé et ne connaît personne. Le critère de partage 
 de fichiers mais la motivation du changement : « GitHub a bougé » va dans `adapters/github/`,
 « notre produit doit se comporter autrement » va dans le code partagé.
 
-Trois choses vivent donc par plateforme, et une seule y vivait avant :
+Quatre choses vivent donc par plateforme :
 
 | | Où | Comment le partagé y accède |
 |---|---|---|
 | Sélecteurs DOM | `adapters/<p>/src/selectors.ts` | jamais directement |
 | Placement et forme du rendu | idem, via `getEditorChrome()` / `renderedBodyShape()` (§9.2.3) | par le port, qui rend des DONNÉES |
 | Couleurs, rayons, longueurs | `adapters/<p>/src/platform.css` | par des variables `--cct-*` |
+| Fiche d'identité : hôtes, `credentials`, vues, glyphe | `adapters/<p>/src/descriptor.ts`, sous-chemin `/descriptor` | par le registre `extension/src/platforms.ts` |
+
+Le registre est la seule liste du code qui énumère les plateformes. Le service worker, la page
+d'options et le routage des hôtes l'itèrent ; ils n'importent que les fiches, jamais un
+adaptateur (`check:bundle-isolation`, sur les octets livrés). Ajouter une plateforme : son
+paquet, une ligne au registre, son libellé dans les deux catalogues, sa valeur au schéma de
+politique — `platform-registry.test.ts` nomme ce qui manque.
 
 Le port transporte des **données**, jamais un drapeau nommant une plateforme : une signature
 `isGitHubChangesView()` obligerait le code partagé à savoir de qui il parle, et le conditionnel
-que le polymorphisme supprime reviendrait sous un autre nom. Le seul `if` de plateforme admis est
-le composition root (`content-internal.ts`), qui choisit l'adaptateur — quelqu'un doit le faire.
+que le polymorphisme supprime reviendrait sous un autre nom. Les seuls endroits qui nomment une
+plateforme sont le registre (`platforms.ts`) et le composition root (`content-internal.ts`), qui
+construit l'adaptateur retenu — quelqu'un doit le faire. `check:platform-isolation` refuse un
+identifiant de plateforme écrit en dur partout ailleurs.
 
 Le TypeScript dit **quel élément joue quel rôle** ; la feuille de la plateforme dit **combien il
 mesure**. Sans cette frontière, une mesure faite sur une plateforme redevient une constante que
 toutes subissent — le défaut d'origine, où le retrait de 8 px du composeur était la marge propre
 d'un conteneur GitHub.
 
-Trois gardes tiennent l'ensemble, parce que rien de tout cela n'était visible d'un test :
-`check:platform-isolation` (vocabulaire dérivé des adaptateurs, pas d'une liste),
+Quatre gardes tiennent l'ensemble, parce que rien de tout cela n'était visible d'un test :
+`check:platform-isolation` (vocabulaire dérivé des adaptateurs, pas d'une liste ; ni cast vers le
+contrat, ni identifiant de plateforme hors du registre), `check:bundle-isolation` (aucun
+adaptateur dans le service worker ni la page d'options, lu dans les octets livrés),
 `check:style-isolation` (mesuré dans Chromium), `check:extension-css` (toutes les feuilles
-livrées).
+livrées, découvertes comme le build les découvre).
 
 **Niveau 2 — à l'intérieur d'une plateforme.** `packages/adapters/github/src/surfaces.ts` déclare
 les trois surfaces qui coexistent — React, héritée, vue des fichiers modifiés — chacune portant SES

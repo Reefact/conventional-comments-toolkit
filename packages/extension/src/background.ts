@@ -24,7 +24,7 @@
 // bien ici que dans la page d'options et le script de contenu.
 
 import { vetFloor, vettedConfigUrl, type Floor } from '@cct/core';
-import { configCredentials } from '@cct/adapter-github';
+import { configCredentialsFor, emptyByPlatform, isPlatformId } from './platforms.js';
 import {
   EMPTY_EXTRA_HOSTS,
   EXTRA_HOSTS_KEY,
@@ -168,7 +168,8 @@ chrome?.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       // route `raw` de github.com est donc anonyme — et l'enchaînement manuel qui sauverait le
       // cas n'existe pas : mesuré, `redirect: 'manual'` rend une réponse `opaqueredirect` dont
       // `Location` est `null`, impossible à suivre soi-même (revue Codex, PR #36, round 5).
-      const credentials = configCredentials(vetted);
+      // La règle vient des FICHES de plateforme (`configCredentialsFor`, platforms.ts).
+      const credentials = configCredentialsFor(vetted);
       const res = await fetch(vetted, { credentials });
       if (res.status === 404) {
         // Conséquence : sur un dépôt PRIVÉ, ce 404 est le masque de GitHub, pas un fichier
@@ -287,7 +288,7 @@ const SCRIPT_ID_PREFIX = 'cct-';
  * encore leur empreinte, et donc leur enregistrement. Il n'y a plus de nom à dériver. */
 const SCRIPT_ID = `${SCRIPT_ID_PREFIX}hosts`;
 
-/** Les origines réellement SERVIES : accordées **et** classées `github`/`azdo`.
+/** Les origines réellement SERVIES : accordées **et** classées sur une plateforme du registre.
  *
  * L'enregistrement suivait jusqu'ici la seule permission, alors que l'activation, elle,
  * suit la classification (`selectPlatform`). L'écart n'était pas théorique : un octroi
@@ -301,7 +302,7 @@ const SCRIPT_ID = `${SCRIPT_ID_PREFIX}hosts`;
 function servedOrigins(origins: string[], tags: Record<string, HostPlatform>): string[] {
   return origins.filter((origin) => {
     const host = hostnameOf(origin);
-    return host !== null && (tags[host] === 'github' || tags[host] === 'azdo');
+    return host !== null && isPlatformId(tags[host]);
   });
 }
 
@@ -517,7 +518,7 @@ async function readPlatformTags(): Promise<Record<string, HostPlatform>> {
  * contenu le rejetterait alors jusqu'au prochain événement ou redémarrage du worker
  * (revue Codex, PR #29). */
 async function computeAndStoreExtraHosts(): Promise<ExtraHostsByPlatform> {
-  const result: ExtraHostsByPlatform = { github: [], azdo: [] };
+  const result: ExtraHostsByPlatform = emptyByPlatform();
   if (!chrome?.permissions || !chrome?.storage?.local) return result;
   const [origins, tags] = await Promise.all([grantedOrigins(), readPlatformTags()]);
   for (const origin of origins) {
@@ -526,8 +527,8 @@ async function computeAndStoreExtraHosts(): Promise<ExtraHostsByPlatform> {
     // `config` est une classification à part entière : l'hôte est accordé pour lire un
     // configUrl, et ne doit être reconnu par AUCUN adaptateur. Un hôte SANS étiquette
     // n'est pas deviné non plus — la page d'options invite à le classer.
-    if (tags[host] === 'github') result.github.push(host);
-    else if (tags[host] === 'azdo') result.azdo.push(host);
+    const tag = tags[host];
+    if (isPlatformId(tag)) result[tag].push(host);
   }
   await new Promise<void>((resolve) => {
     chrome!.storage!.local!.set({ [EXTRA_HOSTS_KEY]: result }, () => resolve());

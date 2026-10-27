@@ -15,7 +15,7 @@ export interface CorpusCase {
   zone: Zone;
   canCarryBlockingState: boolean;
   /** Plateforme dont le profil s'applique (étage 0, commandes slash). */
-  platform: 'github' | 'azdo';
+  platform: string;
   /** Document de configuration de dépôt à appliquer aux défauts produit (chemin nominal). */
   configDoc?: Record<string, unknown>;
   /** Login de l'auteur, pour les cas d'exemption d'auteur. */

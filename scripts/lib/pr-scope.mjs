@@ -36,11 +36,22 @@ export const REGISTRATION_FILES = [
   'packages/server/src/index.ts',
 ];
 
-/** Les identifiants dont le nom de fichier est porteur, découpé sur `-`, `_` et `.` :
- * `check-github-theme-vars.mjs` → `github`. */
-function idsInName(path, ids) {
-  const name = path.slice(path.lastIndexOf('/') + 1);
-  return ids.filter((id) => name.split(/[-_.]/).includes(id));
+/**
+ * Les plateformes : les dossiers de `packages/adapters/` hors `shared`, pris des DEUX côtés de la
+ * comparaison. Lues dans la seule copie de travail, une PR qui supprime un adaptateur entier
+ * effaçait la plateforme avant que ses fichiers soient classés : ils tombaient dans le partagé,
+ * et « supprimer Azure DevOps + retoucher le contrôleur commun » passait pour une PR partagée
+ * (revue Codex, PR #78). `listings` : une liste de chemins de dossiers par côté.
+ */
+export function platformIds(...listings) {
+  const ids = new Set();
+  for (const dirs of listings) {
+    for (const dir of dirs) {
+      const id = /^packages\/adapters\/([^/]+)\/?$/.exec(dir)?.[1];
+      if (id && id !== 'shared') ids.add(id);
+    }
+  }
+  return [...ids].sort();
 }
 
 /**
@@ -51,14 +62,12 @@ export function classifyPath(path, ids) {
   if (path.endsWith('.md') || path.startsWith('docs/')) return 'docs';
   const own = /^packages\/(?:adapters|server\/src\/adapters)\/([^/]+)\//.exec(path);
   if (own && ids.includes(own[1])) return `platform:${own[1]}`;
-  const named = idsInName(path, ids);
-  const isTest = path.startsWith('tests/') || /^packages\/[^/]+(?:\/[^/]+)?\/test\//.test(path);
-  if (isTest || !path.startsWith('packages/')) {
-    // Un test ou un outil qui porte le nom d'une plateforme lui appartient : c'est une
-    // information, pas une contrainte, puisque ces classes sont neutres de toute façon.
-    if (named.length === 1) return `platform:${named[0]}`;
-    return isTest ? 'test' : 'tooling';
-  }
+  // Un test ou un outil reste neutre MÊME s'il porte le nom d'une plateforme. L'y rattacher
+  // (`check-github-theme-vars.mjs` → github) en faisait une plateforme touchée : une PR partagée
+  // qui le modifiait était refusée, et une PR Azure DevOps + partagé passait pour un contrat
+  // en touchant ce seul script (revue Codex, PR #78).
+  if (path.startsWith('tests/') || /^packages\/[^/]+(?:\/[^/]+)?\/test\//.test(path)) return 'test';
+  if (!path.startsWith('packages/')) return 'tooling';
   if (REGISTRATION_FILES.includes(path)) return 'registration';
   return 'shared';
 }

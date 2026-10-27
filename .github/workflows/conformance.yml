@@ -2,7 +2,7 @@
 # repository lui-même, et qu'aucun test unitaire ne peut constater.
 #   - la matrice des CA reste vraie (chaque critère du §11 cité par un test réel) ;
 #   - aucun caractère invisible littéral dans les sources ni les tests ;
-#   - la spécification normative n'est jamais modifiée pour suivre l'implémentation.
+#   - une PR touche UNE plateforme, OU le code partagé — jamais les deux.
 name: Conformité
 
 on:
@@ -76,3 +76,13 @@ jobs:
       - name: Aucun identifiant de plateforme hors de son paquet (§9.1, §9.4)
         run: npm run check:platform-isolation
 
+      # L'interface GitHub est terminée : une correction Azure DevOps ou la création de GitLab
+      # ne doit pas pouvoir la casser. Le paquet d'un adaptateur ne s'exécute que sur sa
+      # plateforme ; le code partagé s'exécute sur toutes. Une PR qui touche les deux modifie
+      # donc les autres plateformes sans le dire. Seules les PR ont une base à comparer.
+      - name: Une PR touche une plateforme OU le code partagé
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npm run check:pr-scope -- "$BASE_SHA" "$HEAD_SHA"

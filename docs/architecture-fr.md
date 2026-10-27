@@ -122,12 +122,14 @@ mesure**. Sans cette frontière, une mesure faite sur une plateforme redevient u
 toutes subissent — le défaut d'origine, où le retrait de 8 px du composeur était la marge propre
 d'un conteneur GitHub.
 
-Quatre gardes tiennent l'ensemble, parce que rien de tout cela n'était visible d'un test :
+Cinq gardes tiennent l'ensemble, parce que rien de tout cela n'était visible d'un test :
 `check:platform-isolation` (vocabulaire dérivé des adaptateurs, pas d'une liste ; ni cast vers le
 contrat, ni identifiant de plateforme hors du registre), `check:bundle-isolation` (aucun
 adaptateur dans le service worker ni la page d'options, lu dans les octets livrés),
 `check:style-isolation` (mesuré dans Chromium), `check:extension-css` (toutes les feuilles
-livrées, découvertes comme le build les découvre).
+livrées, découvertes comme le build les découvre), `check:pr-scope` (une PR touche UNE plateforme,
+OU le code partagé : une correction Azure DevOps qui retouche le contrôleur commun modifie GitHub
+sans le dire, et doit se présenter pour ce qu'elle est).
 
 **Niveau 2 — à l'intérieur d'une plateforme.** `packages/adapters/github/src/surfaces.ts` déclare
 les trois surfaces qui coexistent — React, héritée, vue des fichiers modifiés — chacune portant SES

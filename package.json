@@ -38,7 +38,8 @@
     "check:open-tab-injection": "node spikes/open-tab-injection.mjs",
     "check:options-tour": "node spikes/options-tour.mjs",
     "check:style-isolation": "node spikes/platform-style-isolation.mjs",
-    "check:bundle-isolation": "node scripts/check-bundle-isolation.mjs"
+    "check:bundle-isolation": "node scripts/check-bundle-isolation.mjs",
+    "check:pr-scope": "node scripts/check-pr-scope.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

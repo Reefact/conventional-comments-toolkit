@@ -46,6 +46,18 @@
 - Les choix purement techniques appartiennent à l'agent ; l'absence d'une
   décision technique dans la spec est un espace de conception, pas une
   ambiguïté à remonter.
+- **Une PR touche UNE plateforme, OU le code partagé — jamais les deux**
+  (`npm run check:pr-scope`, lancé par la CI sur chaque PR). L'interface GitHub est terminée ;
+  une correction Azure DevOps ou la création de GitLab ne doit pas pouvoir la casser. Le paquet
+  d'un adaptateur ne s'exécute que sur sa plateforme, le code partagé sur toutes : une PR
+  « Azure DevOps » qui retouche aussi le contrôleur commun modifie GitHub sans le dire. Elle se
+  scinde — le changement partagé d'abord, seul, puis celui de la plateforme. Une PR de
+  **contrat** (code partagé ET toutes les plateformes) est admise : elle dit ce qu'elle est.
+  Documentation, tests partagés et outillage hors de `packages/` sont neutres ; les fichiers
+  d'inscription d'une plateforme ne le sont que dans la PR qui la CRÉE
+  (`scripts/lib/pr-scope.mjs` les liste). Limite à connaître : à deux plateformes, « toutes »
+  est atteint dès qu'on touche les deux, si bien qu'une PR GitHub + Azure DevOps + partagé
+  passe pour un contrat. Qu'elle en soit vraiment un reste une question de revue.
 - Tout critère d'acceptation (`CA-NN`, §11) raisonnablement automatisable est
   couvert par un test qui cite son identifiant ; la correspondance vit dans
   `docs/ca-matrix-fr.md`.
@@ -193,6 +205,7 @@ npm run check:github-theme-vars # variables Primer de styles.css toujours prése
 npm run check:beacon            # un POST no-cors cross-origin part et arrive, sans referer ni cookie
 npm run check:content-script-cors # ce qu'un script de contenu a le droit de LIRE (redirections, cookies)
 npm run check:relay-cors        # la même question pour le service worker du relais
+npm run check:pr-scope          # la PR touche une plateforme OU le partagé (défaut : origin/main...HEAD)
 npm run check:subject-line      # badges et sujet sur UNE seule ligne, mesuré (§5.5)
 npm run check:composer-layout   # trait d'état, gouttière du texte, pastille — mesurés (§5.1, §5.3)
 ```

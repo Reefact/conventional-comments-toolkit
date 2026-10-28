@@ -182,11 +182,17 @@ export interface EvaluationInput {
 export type Mode = 'off' | 'assist' | 'warn' | 'enforce';
 export type Severity = 'off' | 'warn' | 'error';
 
+/** Type d'un label (§3.2, `labels[].kind`) : `remark` OUVRE un point, `reply` n'en ouvre
+ * aucun — il répond à un point ou referme l'échange. Ne change aucun verdict : il range le
+ * bouton dans sa zone de la barre (§5.1) et sépare les indicateurs (§12). */
+export type LabelKind = 'remark' | 'reply';
+
 export interface LabelConfig {
   id: string;
   enabled: boolean;
   blockingByDefault: boolean;
   alwaysNonBlocking: boolean;
+  kind: LabelKind;
   icon?: string;
   color?: string;
   aliases: string[];

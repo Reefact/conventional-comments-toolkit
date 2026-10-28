@@ -17,6 +17,7 @@ export function mergeLevel(base: EffectiveConfig, values: Record<string, unknown
             if (entry.enabled !== undefined) existing.enabled = entry.enabled;
             if (entry.blockingByDefault !== undefined) existing.blockingByDefault = entry.blockingByDefault;
             if (entry.alwaysNonBlocking !== undefined) existing.alwaysNonBlocking = entry.alwaysNonBlocking;
+            if (entry.kind !== undefined) existing.kind = entry.kind;
             if (entry.icon !== undefined) existing.icon = entry.icon;
             if (entry.color !== undefined) existing.color = entry.color;
             if (entry.aliases !== undefined) existing.aliases = [...entry.aliases];
@@ -26,6 +27,8 @@ export function mergeLevel(base: EffectiveConfig, values: Record<string, unknown
               enabled: entry.enabled ?? true,
               blockingByDefault: entry.blockingByDefault ?? false,
               alwaysNonBlocking: entry.alwaysNonBlocking ?? false,
+              // Un label que le produit ne livre pas ouvre un point, sauf s'il dit le contraire.
+              kind: entry.kind ?? 'remark',
               ...(entry.icon !== undefined ? { icon: entry.icon } : {}),
               ...(entry.color !== undefined ? { color: entry.color } : {}),
               aliases: entry.aliases ? [...entry.aliases] : [],

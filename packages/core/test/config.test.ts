@@ -11,18 +11,12 @@ const found = (o: object): ConfigRead => ({ status: 'found', text: JSON.stringif
 const foundText = (t: string): ConfigRead => ({ status: 'found', text: t });
 
 describe('§8.2 — valeurs par défaut du produit', () => {
-  it('seize labels — dix actifs, trois optionnels et trois labels de réponse désactivés — et les décorations du §3.3', () => {
+  it('dix-sept labels — dix de Conventional Comments, trois optionnels désactivés, quatre labels de réponse actifs — et les décorations du §3.3', () => {
     const c = defaultConfig();
-    expect(c.labels).toHaveLength(16);
-    expect(c.labels.filter((l) => l.enabled)).toHaveLength(10);
-    expect(c.labels.filter((l) => !l.enabled).map((l) => l.id).sort()).toEqual([
-      'ack',
-      'disagree',
-      'done',
-      'polish',
-      'quibble',
-      'typo',
-    ]);
+    expect(c.labels).toHaveLength(17);
+    expect(c.labels.filter((l) => l.enabled)).toHaveLength(14);
+    expect(c.labels.filter((l) => !l.enabled).map((l) => l.id).sort()).toEqual(['polish', 'quibble', 'typo']);
+    expect(c.labels.filter((l) => l.kind === 'reply').map((l) => l.id)).toEqual(['ack', 'done', 'disagree', 'reviewed']);
     expect(c.labels.filter((l) => l.blockingByDefault).map((l) => l.id).sort()).toEqual([
       'chore',
       'issue',
@@ -35,6 +29,7 @@ describe('§8.2 — valeurs par défaut du produit', () => {
       'done',
       'nitpick',
       'note',
+      'reviewed',
       'thought',
     ]);
     expect(c.mode).toBe('assist');

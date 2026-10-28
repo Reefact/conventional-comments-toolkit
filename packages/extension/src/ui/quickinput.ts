@@ -45,7 +45,7 @@ function labelPosedBy(value: string, expansion: string, config: EffectiveConfig)
 }
 
 /** Une abréviation LIVRÉE ne se déplie que vers un label actif (§5.2, `CA-47`). Sans cette
- * garde, `?do` puis Tab, famille de réponse éteinte, composait `done: ` — un préfixe que le
+ * garde, `?do` puis Tab, avec `done` désactivé par le dépôt, composait `done: ` — un préfixe que le
  * validateur rejette en `E-UNKNOWN-LABEL` au caractère suivant : l'outil faisait écrire la
  * faute qu'il signale. Le défaut précédait cette famille : `?ty`, `?po` et `?qui` étaient déjà
  * livrées pour trois labels désactivés, pendant que la liste de complétion, elle, ne montre

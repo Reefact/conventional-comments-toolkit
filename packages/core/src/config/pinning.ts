@@ -140,6 +140,7 @@ function mixLabels(pinned: LabelConfig[], live: LabelConfig[]): LabelConfig[] {
       enabled: p.enabled || l.enabled, // enabled: false restrictif
       blockingByDefault: p.blockingByDefault && l.blockingByDefault, // false→true restrictif
       alwaysNonBlocking: p.alwaysNonBlocking || l.alwaysNonBlocking, // true→false restrictif
+      kind: l.kind, // ne change aucun verdict : la valeur en direct
       aliases: union(p.aliases, l.aliases), // retrait d'un alias restrictif
       // Clause de fermeture (§8.1.3) : `labels[].color` est énuméré en direct ;
       // `labels[].icon` ne l'est pas → épinglé, comme toute clé non classée.

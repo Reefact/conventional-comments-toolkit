@@ -115,13 +115,14 @@ export const corpus: CorpusCase[] = [
   { id: 'severity-off', body: 'suggestion: extraire une méthode\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', configDoc: { severities: { 'W-MISSING-DECORATION': 'off' } }, expected: [] },
   { id: 'severity-raised', body: 'note: abc', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', configDoc: { severities: { 'W-SUBJECT-TOO-SHORT': 'error' } }, expected: [['W-SUBJECT-TOO-SHORT', 'error']] },
 
-  // ————— Labels de réponse (§3.2) — livrés désactivés, activés par `labels[].enabled` —————
-  // Éteints, ils sont un mot inconnu comme un autre (CA-41) ; dans une réponse de fil, l'étage −2
-  // écarte la zone avant que le label ne compte, éteints comme allumés (CA-43).
-  { id: 'response-label-off', body: 'done: rebasé sur main', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-UNKNOWN-LABEL', 'error']] },
-  { id: 'response-label-on', body: 'done: rebasé sur main', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', configDoc: { labels: [{ id: 'done', enabled: true }] }, expected: [] },
-  { id: 'response-label-alias', body: 'fixed: rebasé sur main', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', configDoc: { labels: [{ id: 'done', enabled: true }] }, expected: [] },
-  { id: 'response-label-conflict', body: 'done (blocking): rebasé sur main', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', configDoc: { labels: [{ id: 'done', enabled: true }] }, expected: [['E-CONFLICT', 'error']] },
-  { id: 'response-label-reply-off', body: 'done: rebasé sur main', zone: 'reply', canCarryBlockingState: false, platform: 'github', expected: [] },
-  { id: 'response-label-reply-on', body: 'ack: ok', zone: 'reply', canCarryBlockingState: false, platform: 'github', configDoc: { labels: [{ id: 'ack', enabled: true }] }, expected: [] },
+  // ————— Labels de réponse (§3.2) — livrés activés, désactivés par `labels[].enabled` —————
+  // Désactivés, ils sont un mot inconnu comme un autre (CA-41) ; dans une réponse de fil, l'étage −2
+  // écarte la zone avant que le label ne compte, actifs comme désactivés (CA-43).
+  { id: 'response-label-off', body: 'done: rebasé sur main', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', configDoc: { labels: [{ id: 'done', enabled: false }] }, expected: [['E-UNKNOWN-LABEL', 'error']] },
+  { id: 'response-label-on', body: 'done: rebasé sur main', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
+  { id: 'response-label-alias', body: 'fixed: rebasé sur main', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
+  { id: 'response-label-conflict', body: 'done (blocking): rebasé sur main', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-CONFLICT', 'error']] },
+  { id: 'response-label-reply-off', body: 'done: rebasé sur main', zone: 'reply', canCarryBlockingState: false, platform: 'github', configDoc: { labels: [{ id: 'done', enabled: false }] }, expected: [] },
+  { id: 'response-label-reply-on', body: 'ack: ok', zone: 'reply', canCarryBlockingState: false, platform: 'github', expected: [] },
+  { id: 'response-label-reviewed', body: 'reviewed: corrections vérifiées, rien à ajouter', zone: 'review-body', canCarryBlockingState: false, platform: 'github', expected: [] },
 ];

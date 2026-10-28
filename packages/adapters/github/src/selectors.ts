@@ -520,10 +520,46 @@ export const selectors = {
     candidates: ['meta[name="user-login"]'],
   } satisfies SelectorChain,
 
-  /** Date de création de la PR — lisible dans la page (§6.2.3). */
+  /** Date de création de la PR — lisible dans la page (§6.2.3), et décisive : c'est elle qui
+   * range une PR avant ou après `activatedAt`, donc hors ou dans le périmètre où l'extension
+   * bloque.
+   *
+   * MESURÉ le 2026-10-28 (`test/fixtures/pages/`, #84) : la chaîne d'avant finissait par
+   * `relative-time` tout court, et c'est lui seul qui répondait, partout — la PREMIÈRE date du
+   * document. L'en-tête de la page n'en porte pas sur une PR ouverte (capture 01), et sur une PR
+   * fusionnée il porte la date de FUSION (« Reefact merged 9 commits… », captures 02 à 07) : la
+   * même PR #331 se lisait 07:18 sur une page, 09:17 sur les autres. Le repli générique est
+   * retiré : il trouvait toujours quelque chose, si bien qu'aucune rupture ne pouvait atteindre
+   * le journal (§9.4). Mieux vaut une date inconnue — l'extension ne bloque alors jamais
+   * (`resolveInScope`) — qu'une date fausse.
+   *
+   * L'horodatage de la DESCRIPTION de la PR est sa date de création : elle est publiée à
+   * l'ouverture, et une modification ne le change pas. Mesuré sur deux PR où une seconde source
+   * permettait de le vérifier (`pullRequestsLayoutRoute.pullRequest.createdTime`, voir
+   * `prEmbeddedData`) : 07:18:01Z pour #331, 12:15:37Z pour #292, identiques. Sur la vue des
+   * fichiers modifiés, aucun élément de la page ne porte cette date : c'est `prEmbeddedData`
+   * qui prend le relais. Les deux candidats d'en-tête sont gardés pour une page encore servie
+   * dans l'ancienne génération ; ils ne matchent rien sur les captures. */
   prCreatedAt: {
     name: 'pr-created-at',
-    candidates: ['.gh-header-meta relative-time', '[data-testid="pr-header"] relative-time', 'relative-time'],
+    candidates: [
+      '[id^="pullrequest-"] relative-time',
+      '.gh-header-meta relative-time',
+      '[data-testid="pr-header"] relative-time',
+    ],
+  } satisfies SelectorChain,
+
+  /** Les données que la vue React embarque dans la page, en JSON — la seule source de la date
+   * de création sur la vue des fichiers modifiés (`payload.pullRequestsLayoutRoute.pullRequest
+   * .createdTime`, MESURÉ le 2026-10-28, captures 02 et 04 à 07). C'est du DOM, pas une API
+   * (§10) : un `<script>` de la page, lu tel quel.
+   *
+   * Ces données peuvent appartenir à une AUTRE page : sur la capture 03 (PR #294), elles
+   * décrivent la liste des PR du dépôt, restées d'une navigation précédente. Elles ne sont donc
+   * lues que si le numéro qu'elles portent est celui de l'URL. */
+  prEmbeddedData: {
+    name: 'pr-embedded-data',
+    candidates: ['script[type="application/json"][data-target="react-app.embeddedData"]'],
   } satisfies SelectorChain,
 
   /** Élément après lequel insérer le bandeau du §5.5 : « en tête de PR » — dans le flux de

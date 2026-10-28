@@ -124,6 +124,16 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
+- **GitHub: the pull request's creation date is read from the pull request itself** (§6.2.3).
+  That date decides whether a pull request predates `activatedAt`, which settles whether the
+  extension may block on it. The extension used to read the first date on the page. On a
+  merged pull request that was the merge date, and the same pull request could read two dates
+  depending on the tab. The date is now taken from the pull request's description on the
+  *Conversation* tab. On *Files changed*, it comes from the data the page embeds, but only when
+  that data names the same pull request as the address. When neither is available, the date is
+  left unknown and the extension does not block, as it already did for an unreadable date. The
+  selector log records that case.
+
 - **GitHub's *Files changed* view: the extension finds the comment box's buttons again** (§4.1,
   §4.3, §5.4). Pages captured on github.com on 2026-10-28 no longer carry the CSS class names
   that several GitHub selectors relied on. On *Files changed*, the extension:

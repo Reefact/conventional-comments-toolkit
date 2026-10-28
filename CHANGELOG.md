@@ -122,6 +122,23 @@ and what a reader needs from them is the behaviour, not the thirteen.
   the normal case. The log says what was looked for and not found, and stops there: a selector
   that matches nothing is not by itself evidence that the platform changed anything.
 
+### Fixed
+
+- **GitHub's *Files changed* view: the extension finds the comment box's buttons again** (§4.1,
+  §4.3, §5.4). Pages captured on github.com on 2026-10-28 no longer carry the CSS class names
+  that several GitHub selectors relied on. On *Files changed*, the extension:
+  - found no button that publishes a comment, so under `enforce` a non-conforming comment could
+    still be published there;
+  - treated editing a comment as writing a new one;
+  - treated the review summary as a line comment that can block the pull request;
+  - did not read the bodies of threads, so they got no badges.
+
+  On the *Conversation* tab, editing a published comment was also treated as a line comment
+  that can block the pull request.
+
+  Each new selector is checked against these captured pages. *Cancel* is still never
+  intercepted.
+
 ## [1.0.0-beta.13] - 2026-09-08
 
 ### Added

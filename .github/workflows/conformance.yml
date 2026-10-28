@@ -38,6 +38,11 @@ jobs:
       - name: Caractères invisibles écrits en échappements
         run: npm run check:invisible
 
+      # Une page capturée sur une plateforme porte la session de qui l'a prise : jetons CSRF,
+      # nonces, canaux signés. Elle ne se commite que masquée.
+      - name: Pages capturées sans secret de session
+        run: npm run check:captured-pages
+
       # Une règle CSS peut être écrite dans styles.css et perdue par le parseur du
       # navigateur (commentaire fermé trop tôt) : le fichier se lit correctement, mais la
       # règle n'existe pas en production. C'est arrivé à `.cct-toolbar`.

@@ -16,6 +16,12 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const SCANNED = ['packages', 'tests', 'spikes', 'scripts'];
 const SKIPPED_DIRS = new Set(['node_modules', 'dist', 'dist-ext', '.git', 'coverage']);
 const SCANNED_EXT = ['.ts', '.tsx', '.mjs', '.js', '.json', '.html'];
+/** Pages CAPTURÉES sur une plateforme (`packages/adapters/<id>/test/fixtures/pages/`) : ce
+ * n'est pas du code qu'on écrit, c'est ce que la plateforme a servi, octet pour octet. GitHub
+ * y met des NBSP et des sélecteurs de variante d'emoji ; les réécrire en échappements ferait
+ * de la capture autre chose qu'une capture — et dans un `<script>` ou un attribut, un
+ * échappement HTML n'est même pas équivalent. La règle vise ce qu'on rédige. */
+const CAPTURED_PAGES = /\/test\/fixtures\/pages\//;
 
 /** Les points de code visés, nommés — le message doit dire lequel et où. */
 const FORBIDDEN = new Map([
@@ -37,7 +43,7 @@ function* walk(dir) {
     if (SKIPPED_DIRS.has(entry)) continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) yield* walk(full);
-    else if (SCANNED_EXT.some((e) => entry.endsWith(e))) yield full;
+    else if (SCANNED_EXT.some((e) => entry.endsWith(e)) && !CAPTURED_PAGES.test(full)) yield full;
   }
 }
 

@@ -54,13 +54,13 @@ describe('parcours de la visite', () => {
     // Cette zone est une ANOMALIE : la présenter quand elle est vide reviendrait à décrire
     // à quelqu'un un problème qu'il n'a pas.
     const tour = startTour(document, 'fr');
-    expect(tour?.length).toBe(7);
+    expect(tour?.length).toBe(8);
   });
 
   it('l’inclut dès qu’elle est visible', () => {
     document.getElementById('unconfigured-panel')?.removeAttribute('hidden');
     const tour = startTour(document, 'fr');
-    expect(tour?.length).toBe(8);
+    expect(tour?.length).toBe(9);
   });
 
   it('avance, recule, et ne déborde à aucun bout', () => {

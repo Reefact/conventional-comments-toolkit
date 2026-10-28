@@ -14,7 +14,13 @@ import { RESPONSE_LABELS } from '@cct/core';
  * recommande. Construit depuis la définition livrée, jamais recopié : un label ajouté à la
  * famille y apparaît sans que cette page ait à le savoir. */
 export function responseLabelsSnippet(): string {
-  return JSON.stringify({ labels: RESPONSE_LABELS.map((l) => ({ id: l.id, enabled: true })) }, null, 2);
+  // Une entrée par ligne, comme dans le README, plutôt que `JSON.stringify(…, null, 2)` qui
+  // en met une PROPRIÉTÉ par ligne : seize lignes pour trois labels. Le bloc était alors assez
+  // haut pour que la fiche de la visite guidée ne tienne ni dessous ni dessus, et sortait de la
+  // fenêtre — mesuré par `spikes/options-tour.mjs`. Le texte reste du JSON valide, et le test
+  // le relit comme tel.
+  const entries = RESPONSE_LABELS.map((l) => `    { "id": ${JSON.stringify(l.id)}, "enabled": true }`);
+  return `{\n  "labels": [\n${entries.join(',\n')}\n  ]\n}`;
 }
 
 /** Ce qui s'est RÉELLEMENT passé, pour que la page le dise tel quel : `copied` quand le

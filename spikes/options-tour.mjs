@@ -119,7 +119,7 @@ try {
   );
   assert(
     'la zone d’anomalie est vide, donc hors du parcours',
-    skipsAnomaly && /sur 7|of 7/.test(first?.counter ?? ''),
+    skipsAnomaly && /sur 8|of 8/.test(first?.counter ?? ''),
     first?.counter
   );
 
@@ -159,7 +159,7 @@ try {
   );
   assert(
     'le parcours va jusqu’au bout et se referme',
-    walked.length === 7 && (await opened.evaluate(() => document.getElementById('tour') === null)),
+    walked.length === 8 && (await opened.evaluate(() => document.getElementById('tour') === null)),
     `${walked.length} étapes : ${walked.map((s) => s.title).join(' → ')}`
   );
 

@@ -1,0 +1,44 @@
+// La page d'options donne le bloc qui active les labels de réponse (§3.2, §8.2). Elle ne peut
+// pas les activer elle-même : elle n'écrit pas le fichier d'un dépôt. Ce qui compte donc,
+// c'est que le bloc COLLÉ fasse ce qu'il annonce, et que le message dise ce qui s'est
+// réellement passé au moment de la copie.
+
+import { describe, expect, it, vi } from 'vitest';
+import { enabledLabels, resolveConfig, RESPONSE_LABELS } from '@cct/core';
+import { copySnippet, responseLabelsSnippet } from '../src/options/response-labels.js';
+
+describe('page d’options — le bloc des labels de réponse', () => {
+  it('collé tel quel dans `.conventional-comments.json`, il active les trois labels et rien d’autre', () => {
+    const repo = { status: 'found' as const, text: responseLabelsSnippet() };
+    const { config, notices } = resolveConfig(null, { status: 'absent' }, repo, null, false);
+    const active = enabledLabels(config).map((l) => l.id);
+    for (const r of RESPONSE_LABELS) expect(active, r.id).toContain(r.id);
+    // Rien d'autre ne change : dix labels de base, plus la famille.
+    expect(active).toHaveLength(10 + RESPONSE_LABELS.length);
+    expect(notices).toEqual([]);
+  });
+
+  it('il est construit depuis la définition livrée, pas recopié', () => {
+    const ids = (JSON.parse(responseLabelsSnippet()) as { labels: { id: string }[] }).labels.map((l) => l.id);
+    expect(ids).toEqual(RESPONSE_LABELS.map((l) => l.id));
+  });
+
+  it('le message dit « copié » seulement quand le presse-papiers a accepté', async () => {
+    const select = vi.fn();
+    const writeText = vi.fn(async () => {});
+    expect(await copySnippet('x', { writeText }, select)).toBe('copied');
+    expect(writeText).toHaveBeenCalledWith('x');
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it('presse-papiers refusé ou absent : le bloc est sélectionné pour une copie manuelle', async () => {
+    const refused = { writeText: async () => Promise.reject(new DOMException('denied', 'NotAllowedError')) };
+    const select1 = vi.fn();
+    expect(await copySnippet('x', refused, select1)).toBe('manual');
+    expect(select1).toHaveBeenCalledOnce();
+
+    const select2 = vi.fn();
+    expect(await copySnippet('x', undefined, select2)).toBe('manual');
+    expect(select2).toHaveBeenCalledOnce();
+  });
+});

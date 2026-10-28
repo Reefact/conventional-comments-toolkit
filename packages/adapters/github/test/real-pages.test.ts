@@ -245,3 +245,33 @@ describe('§4.1, §5.4 — Files changed : panneau de revue (capture 07)', () =>
     expect(controls[0]!.element.textContent).toMatch(/^Submit review/);
   });
 });
+
+describe('§6.2.3 — la date de création de la PR, sur chaque capture (#84)', () => {
+  // La première date de la page n'est PAS la création : l'en-tête d'une PR fusionnée porte la
+  // date de FUSION, et la même PR #331 se lisait 07:18 ou 09:17 selon la page.
+  const CASES: [string, string, string][] = [
+    ['01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/331', '2026-10-28T07:18:01Z'],
+    ['02-conversation-reponse-fil.html', '/Reefact/just-dummies/pull/331', '2026-10-28T07:18:01Z'],
+    ['03-pr-fusionnee-commentaires-prefixes.html', '/Reefact/just-dummies/pull/294', '2026-10-27T13:28:00Z'],
+    ['04-files-commentaire-ligne.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
+    ['05-files-reponse-fil-ligne.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
+    ['06-conversation-modification-commentaire.html', '/Reefact/just-dummies/pull/292', '2026-10-27T12:15:37Z'],
+    ['06-files-modification-commentaire.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
+    ['07-review-changes.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
+  ];
+
+  it.each(CASES)('%s : la date de la description, ou à défaut celle des données embarquées', (file, path, expected) => {
+    const page = load(file, path);
+    expect(page.adapter.currentPr()?.createdAt).toBe(expected);
+    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('pr-created-at');
+  }, T);
+
+  it("ignore des données embarquées qui décrivent une AUTRE PR : date inconnue, et journalisée", () => {
+    // La capture 04 est la #331 ; chargée à l'adresse d'une autre PR, ses données ne la décrivent
+    // plus. Une date inconnue fait renoncer au blocage (`resolveInScope`) — jamais une date fausse.
+    const page = load('04-files-commentaire-ligne.html', '/Reefact/just-dummies/pull/999/changes');
+    expect(page.adapter.currentPr()?.createdAt).toBe('');
+    expect(page.adapter.log.failures.map((f) => f.chain)).toContain('pr-created-at');
+  }, T);
+});
+

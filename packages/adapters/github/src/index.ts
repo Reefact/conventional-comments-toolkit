@@ -57,6 +57,9 @@ export class GithubClientAdapter implements PlatformAdapter {
   // ne pouvait pas poser : un châssis absent est-il le cas nominal ou une rupture ? Sans cette
   // attribution, les deux se ressemblent — c'est le défaut relevé en revue (Reefact, PR #65).
   #surfaceOf = new WeakMap<Element, GithubSurface>();
+  // `currentPr()` est appelé à chaque balayage, et le JSON embarqué pèse plusieurs centaines de
+  // kilo-octets : lu une fois par élément `<script>` — une navigation en pose un nouveau.
+  #embeddedPr = new WeakMap<Element, { number?: unknown; createdTime?: unknown } | null>();
 
   constructor(opts: ClientAdapterOptions = {}) {
     this.#fetch = adapterFetch(opts.fetchImpl);
@@ -569,11 +572,10 @@ export class GithubClientAdapter implements PlatformAdapter {
     const loc = this.#doc.location;
     const m = /^\/([^/]+)\/([^/]+)\/pull\/(\d+)/.exec(loc?.pathname ?? '');
     if (!m) return null;
-    const { element } = queryChain(this.#doc, selectors.prCreatedAt);
-    const createdAt = element?.getAttribute('datetime') ?? '';
+    const number = Number(m[3]);
     return {
       platform: 'github',
-      createdAt,
+      createdAt: this.#createdAt(number),
       // `host` et non `hostname` : il PORTE LE PORT quand il est non standard. `pr.host`
       // sert à bâtir les URL de lecture de configuration (`https://${pr.host}/…`) ; une
       // instance GHES servie sur `ghes.corp:8443` verrait sinon sa configuration demandée
@@ -582,8 +584,42 @@ export class GithubClientAdapter implements PlatformAdapter {
       // de correspondance de Chrome ignorent le port.
       host: loc!.host,
       scope: [m[1]!, m[2]!],
-      number: Number(m[3]),
+      number,
     };
+  }
+
+  /** La date de création de la PR, ou `''` quand la page ne la porte pas — l'extension ne
+   * bloque alors jamais (`resolveInScope`, §6.2.3) : une date inconnue vaut mieux qu'une date
+   * fausse, qui rangerait la PR du mauvais côté d'`activatedAt` (#84, `selectors.prCreatedAt`).
+   *
+   * Le DOM d'abord, les données embarquées ensuite, et seulement si leur numéro est celui de
+   * l'URL. Rien des deux : la chaîne est journalisée (§9.4) — c'est ce que le repli générique
+   * d'avant empêchait, en trouvant toujours une date. */
+  #createdAt(number: number): string {
+    const fromDom = queryChain(this.#doc, selectors.prCreatedAt).element?.getAttribute('datetime');
+    if (fromDom) return fromDom;
+    for (const script of queryChainAll(this.#doc, selectors.prEmbeddedData)) {
+      const fromData = this.#embeddedCreatedAt(script, number);
+      if (fromData) return fromData;
+    }
+    this.log.degraded(selectors.prCreatedAt);
+    return '';
+  }
+
+  #embeddedCreatedAt(script: Element, number: number): string {
+    if (!this.#embeddedPr.has(script)) {
+      let pr: { number?: unknown; createdTime?: unknown } | null = null;
+      try {
+        pr = JSON.parse(script.textContent ?? '')?.payload?.pullRequestsLayoutRoute?.pullRequest ?? null;
+      } catch {
+        pr = null; // JSON illisible : comme absent
+      }
+      this.#embeddedPr.set(script, pr);
+    }
+    const pr = this.#embeddedPr.get(script);
+    if (!pr || pr.number !== number || typeof pr.createdTime !== 'string') return '';
+    const time = Date.parse(pr.createdTime);
+    return Number.isNaN(time) ? '' : new Date(time).toISOString();
   }
 
   /** L'identifiant que la page ne met pas sur ses conteneurs, lu dans le PERMALIEN.

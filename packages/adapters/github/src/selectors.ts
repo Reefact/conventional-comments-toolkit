@@ -173,7 +173,17 @@ export const selectors = {
   /** Zone de conversation générale (issue comment) — zone `conversation` (§4.1). */
   conversationForm: {
     name: 'conversation-form',
-    candidates: ['#new_comment_form', 'form.js-new-comment-form'],
+    candidates: [
+      '#new_comment_form',
+      'form.js-new-comment-form',
+      // L'ÉDITION d'un commentaire général, MESURÉE le 2026-10-28
+      // (`test/fixtures/pages/06-conversation-modification-commentaire.html`) : son champ est
+      // dans le commentaire publié, pas dans le formulaire de nouveau commentaire. Sans ce
+      // candidat, elle tombait dans le repli de `#contextOf()` et se lisait `thread-root` —
+      // réputée porter un état bloquant, sans `W-NOT-BLOCKABLE` (§4.1). L'identifiant
+      // `issuecomment-` la distingue d'un corps de revue, qui s'écrit `pullrequestreview-`.
+      '.timeline-comment-group[id^="issuecomment-"]',
+    ],
   } satisfies SelectorChain,
 
   /** Corps d'une revue soumise en lot — zone `review-body` (§4.1, §A.7). */
@@ -195,6 +205,11 @@ export const selectors = {
       // `W-NOT-BLOCKABLE` — alors que personne ne peut résoudre un corps de revue (§4.1).
       '[class*="ReviewMenuContent-module__"]',
       '[class*="ReviewMenu-module__"]',
+      // MESURÉ le 2026-10-28 (`test/fixtures/pages/07-review-changes.html`) : les deux
+      // candidats précédents n'y matchent plus rien — voir « Les classes de modules CSS ont
+      // perdu leur préfixe », plus bas. Le champ du panneau de revue est le seul de la page
+      // sous ce conteneur.
+      '[class*="AnchoredReviewBody__"]',
     ],
   } satisfies SelectorChain,
 
@@ -230,6 +245,13 @@ export const selectors = {
       // où *Reply* est `default` comme *Cancel* — une prise par vue vaut mieux qu'une prise
       // qui ne tient qu'à moitié.
       '[class*="ReviewMenuFooter-module__Submit"]',
+      // Les deux mêmes prises, MESURÉES le 2026-10-28 sous leurs noms actuels
+      // (`test/fixtures/pages/04` à `07`). Structure inchangée : *Cancel* est toujours un
+      // `<button>` nu, premier enfant du groupe, et chaque bouton qui publie — *Comment*,
+      // *Start a review*, *Reply*, *Update* — est enveloppé d'un `<div>`. Le bouton de revue
+      // a changé de NOM, pas seulement de préfixe : `SubmitReviewButton__…`.
+      '[class*="childrenStyling__"] > div:not(:first-child) button',
+      '[class*="SubmitReviewButton__"]',
     ],
   } satisfies SelectorChain,
 
@@ -288,7 +310,25 @@ export const selectors = {
    * d'attribut `id`, si bien que `threadId`/`commentId` y sont vides et que `getThreads()`
    * retombe sur ses identifiants synthétiques. Le permalien, lui, PORTE cet identifiant dans
    * son fragment (`#r3932637709`) — le jour où ces champs devront être renseignés, c'est là
-   * qu'ils se lisent, et non dans un attribut du DOM. */
+   * qu'ils se lisent, et non dans un attribut du DOM.
+   *
+   * ————— Les classes de modules CSS ont perdu leur préfixe (relevé du 2026-10-28) —————
+   *
+   * Huit pages capturées par l'utilisateur, extension désactivée, sont dans
+   * `test/fixtures/pages/`. La chaîne `-module__` n'apparaît dans AUCUNE : là où le relevé du
+   * 2026-09-04 lisait `ReviewThreadComment-module__SafeHTMLBox__…`, la page porte
+   * `SafeHTMLBox__…`. Nous ne savons pas depuis quand : c'est ce que montrent ces pages, rien
+   * de plus. Tout candidat qui en dépendait y matche zéro élément, et les candidats ajoutés le
+   * même jour en sont les successeurs, chacun vérifié sur la capture qu'il cite. Le relevé
+   * structurel ci-dessus reste juste, aux noms de classes près.
+   *
+   * Le préfixe portait le nom du COMPOSANT, et c'est lui qui rendait deux noms distincts :
+   * `ReviewThread-module__ReviewThreadContainer` (le fil) et
+   * `ReviewThreadComment-module__ReviewThreadContainer` (un commentaire) s'écrivent
+   * désormais tous deux `ReviewThreadContainer__…`. Un successeur n'est donc pas toujours le
+   * nom sans préfixe : `editForm` et `renderedComment` ont dû trouver une autre prise. Les
+   * anciens candidats restent en tête de leurs chaînes : ils ne coûtent rien, et une chaîne
+   * est faite pour qu'un nom d'hier côtoie celui d'aujourd'hui (§9.4). */
 
   /** Fils rendus sur la page — pour les ancres du bandeau (§5.5). */
   renderedThreads: {
@@ -312,6 +352,7 @@ export const selectors = {
       // C'est une prise accidentelle rendue délibérée — elle cesse de dépendre du fait
       // qu'aucun autre lien à fragment n'apparaisse plus haut dans le fil.
       '[class*="ActivityHeader-module__HeaderLink"]',
+      '[class*="HeaderLink__"]', // MESURÉ le 2026-10-28, `test/fixtures/pages/05`
       'a[href*="#"]',
     ],
   } satisfies SelectorChain,
@@ -334,6 +375,14 @@ export const selectors = {
       // `getSubmitControls()` de retenir le premier conteneur qui porte des BOUTONS, et non le
       // premier qui matche.
       '[class*="prc-Overlay-Overlay"]',
+      // MESURÉ le 2026-10-28 (`test/fixtures/pages/04` à `06`) : le candidat
+      // `MarkdownEditor-module__container` ne matche plus. Son successeur s'appelle
+      // `container__…`, nom que porte AUSSI l'enveloppe immédiate du champ, qui ne contient
+      // aucun bouton — `getSubmitControls()` ne retenant qu'un ancêtre par candidat, il
+      // s'arrêterait sur elle. Le `<fieldset>` du composeur est le premier ancêtre sans
+      // homonyme qui porte le pied et ses boutons. Placé APRÈS l'overlay : dans le panneau de
+      // revue, il existe aussi, mais sans les boutons, qui vivent dans l'overlay.
+      'fieldset',
     ],
   } satisfies SelectorChain,
 
@@ -359,6 +408,18 @@ export const selectors = {
       // édition d'une composition est la POSITION du champ — dans le commentaire édité,
       // là où les champs de réponse et de nouveau commentaire sont ailleurs.
       '[class*="ReviewThreadComment-module__ReviewThreadContainer"]',
+      // MESURÉ le 2026-10-28 (`test/fixtures/pages/06-files-modification-commentaire.html`) :
+      // le successeur du candidat précédent, `ReviewThreadContainer__…`, n'est plus
+      // discriminant — le conteneur du FIL et l'en-tête du fil portent le même nom, avec un
+      // autre hachage, et le champ de réponse vit sous le premier. Ce qui ne désigne qu'un
+      // commentaire est l'attribut que GitHub pose sur chacun, et sur lui seul.
+      '[data-first-thread-comment]',
+      // L'édition d'un commentaire de la CONVERSATION, MESURÉE le même jour
+      // (`test/fixtures/pages/06-conversation-modification-commentaire.html`) : le formulaire
+      // s'appelle `form.js-comment-update`, et `.js-comment-edit-form` n'existe plus sur la
+      // page. La description de la PR porte la même classe, mais elle est écartée avant toute
+      // classification (`observeEditors`, `prDescription`).
+      'form.js-comment-update',
     ],
   } satisfies SelectorChain,
 
@@ -371,6 +432,7 @@ export const selectors = {
       '.review-comment',
       '.js-comment',
       '[class*="ReviewThreadComment-module__ReviewThreadContainer"]', // MESURÉ
+      '[data-first-thread-comment]', // MESURÉ le 2026-10-28 — voir `editForm`
     ],
   } satisfies SelectorChain,
 
@@ -381,6 +443,7 @@ export const selectors = {
       '[data-testid="comment-body"]',
       '.comment-body',
       '[class*="ReviewThreadComment-module__SafeHTMLBox"]', // MESURÉ — porte aussi `.markdown-body`
+      '[class*="SafeHTMLBox__"]', // MESURÉ le 2026-10-28, `test/fixtures/pages/05`
     ],
   } satisfies SelectorChain,
 

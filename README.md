@@ -70,6 +70,56 @@ they apply different rules on GitHub while still reporting that they agree. The 
 requiring a `core/` version across an organization is `coreMinVersion` (§8.2), not the
 fingerprint.
 
+### Response labels (optional, off by default)
+
+Conventional Comments gives review **feedback** a vocabulary and says nothing about **replying**
+to it. The toolkit adds three response labels of its own. They are **not part of Conventional
+Comments**: an optional extension of this tool, shipped disabled (§3.1, §3.2).
+
+| Label | Meaning | Also accepted |
+|---|---|---|
+| `ack` | Received and accepted; the code has not changed. | `acknowledged` |
+| `done` | The code changed because of the remark. | `fixed` |
+| `disagree` | Declines the remark, and the subject says why. Carries no authority, resolves nothing. | |
+
+```text
+issue (blocking): platform CSS tokens leak into the shared stylesheet
+done: removed the platform-specific token
+```
+
+They are enabled like any optional label, one entry each — there is no separate switch (§8.2):
+
+```json
+{ "labels": [ { "id": "ack", "enabled": true },
+              { "id": "done", "enabled": true },
+              { "id": "disagree", "enabled": true } ] }
+```
+
+Enabling them changes **which labels exist**, nothing else. It does not require replies to carry
+a label: that is `scope.validateReplies`, still `false` by default, so a reply is not validated
+at all unless you turn it on (§4.1). It does not change the mode, and none of the three can make
+a thread blocking. `decision` is unchanged and remains the only reply that can close a blocking
+thread on someone else's behalf (§6.1.1); `disagree` is an opinion and resolves nothing.
+
+If you point `docUrl` at your own documentation, this is the moment to: its default,
+conventionalcomments.org, documents none of these labels.
+
+**Upgrading with a label already called `ack`, `done` or `disagree`.** Your entry now merges
+into the shipped one (§8.1.4) and changes in two ways. It inherits `alwaysNonBlocking: true`, so
+`done (blocking):` becomes `E-CONFLICT`. And if your declaration never wrote `enabled`, it now
+inherits `"enabled": false` — your `done:` comments become `E-UNKNOWN-LABEL`. Restore your
+label with **both** properties:
+
+```json
+{ "labels": [ { "id": "done", "enabled": true, "alwaysNonBlocking": false } ] }
+```
+
+A label of your own called `fixed` or `acknowledged` keeps working. Since this version, two
+active labels may not share a name: an alias that repeats another active label's id is removed
+from its carrier, so if you also enable `done`, it is the shipped alias `fixed` that goes and
+your label that stays. An alias carried by two labels is removed from both. Each removal is
+reported as a configuration warning (§8.2).
+
 ## Modes and adoption (§7)
 
 `assist` (default) → `warn` → `enforce`. Operational procedures — rollback, the

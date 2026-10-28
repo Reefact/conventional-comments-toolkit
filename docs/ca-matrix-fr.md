@@ -51,6 +51,13 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 | CA-38 | Préfixe mal formé : motif exact, jamais `E-NO-LABEL` ; `Attention :` reste `E-NO-LABEL` | `core/test/validator.test.ts` |
 | CA-39 | Cohérence de l'exemption sur le chemin de repli : pose ratée → aucune exemption ; étiquette retirée d'une exemption confirmée → restaurée, vert | `core/test/evaluate.test.ts`, `server/test/orchestrator.test.ts`, `server/test/admin.test.ts` |
 | CA-40 | Commande adressée à un outil exemptée via `toolCommands` (§4.2, §8.2), vide par défaut : sentinel `/*` pour le slash générique, handle exact (insensible à la casse) pour une mention — une interpellation de personne, un handle absent de la liste, ou une liste non configurée restent des remarques de revue | `core/test/validator.test.ts`, `core/test/corpus.test.ts` (parité A/B sur les deux formes) |
+| CA-41 | Vocabulaire de réponse éteint : empreinte par défaut littérale `becd76df`, labels actifs inchangés, mot inconnu ; contre-épreuve — un `done` d'équipe éteint garde une empreinte distincte ; la liste d'omission est la famille du §3.2 | `core/test/response-labels.test.ts`, `core/test/corpus.test.ts` (cas `response-label-*`, parité LF/CRLF) |
+| CA-42 | Vocabulaire allumé : mêmes diagnostics que tout label, aucun code nouveau, alias reconnu sans diagnostic, jamais bloquant, mode inchangé | `core/test/response-labels.test.ts`, `core/test/corpus.test.ts` |
+| CA-43 | Orthogonalité avec `scope.validateReplies` : réponse de fil non validée, vocabulaire éteint ou allumé ; le barreau de l'étage −2 reste `decision` seul | `core/test/response-labels.test.ts`, `core/test/corpus.test.ts` |
+| CA-44 | Le plancher force `enabled` sans rendre bloquant un label livré toujours non bloquant ; contre-épreuves — `issue` planché non désarmable par `alwaysNonBlocking: true`, `decision` planché non bloquant | `core/test/response-labels.test.ts` |
+| CA-45 | Le dépôt garde la maîtrise : un seul label, désactivation contre l'organisation, surcharge partielle ; ombrage — l'identifiant l'emporte sur l'alias, l'ordre ne décide d'aucun verdict, un alias ne masque pas un `issue` planché, un label éteint ne retire rien ; migration d'un `done` préexistant | `core/test/response-labels.test.ts` |
+| CA-46 | Activation et extinction en direct : `E-UNKNOWN-LABEL` en zone validée, rien dans une réponse non validée ; aucun label de réponse ne peut rendre une racine bloquante | `core/test/response-labels.test.ts` |
+| CA-47 | Une abréviation livrée ne se déplie que vers un label actif (`?do`, et le défaut antérieur `?ty`/`?po`/`?qui`) ; une abréviation écrite par une configuration n'est pas concernée | `extension/test/quickinput-response-labels.test.ts` |
 
 ## Critères vérifiés partiellement de façon non automatisée
 

@@ -18,6 +18,7 @@
     "typecheck": "tsc -b --force packages/core packages/adapters/shared packages/adapters/github packages/adapters/azdo packages/server packages/extension",
     "typecheck:tests": "tsc -p packages/extension/tsconfig.test.json",
     "spike": "node spikes/p1-prime/run.mjs",
+    "check:github-selectors-live": "node scripts/check-github-selectors-live.mjs",
     "check:github-theme-vars": "node scripts/check-github-theme-vars.mjs",
     "build:extension": "node packages/extension/build.mjs",
     "check:ca-matrix": "node scripts/check-ca-matrix.mjs",

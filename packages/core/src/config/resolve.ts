@@ -2,7 +2,7 @@
 // `resolveConfig()` porte la règle — précédence, fusion, bornes, mélange épinglé — mais
 // aucune entrée-sortie : l'épinglage est lu et écrit par le composant B (§9.2.2).
 
-import type { ConfigRead, EffectiveConfig, Floor, Notice } from '../types.js';
+import type { ConfigRead, EffectiveConfig, Floor, LabelConfig, Notice } from '../types.js';
 import { defaultConfig } from './defaults.js';
 import { parseConfigDocument } from './schema.js';
 import { mergeLevel } from './merge.js';
@@ -88,6 +88,10 @@ export function resolveConfig(
     notices.push(...floored.notices);
   }
 
+  // Aucun ombrage entre labels et alias (§8.2) — sur la liste résolue, plancher compris :
+  // c'est l'état des labels ACTIFS qui décide des conflits, et le plancher en active.
+  config.labels = withoutShadowing(config.labels, notices);
+
   // Replis de version (§8.1.5, dernière ligne ; §8.1.1 pour le plancher).
   if (vetted.unsupported) {
     // Plancher illisible : repli en mode assist — le plancher précédemment connu, s'il est
@@ -120,15 +124,95 @@ export function resolveConfig(
   return { config, notices };
 }
 
+/**
+ * Aucun ombrage entre labels et alias (§8.2). La résolution compare, label par label DANS
+ * L'ORDRE, l'`id` puis les alias : deux labels actifs partageant un nom laissent donc l'ordre
+ * de la liste décider du verdict. La règle retire le nom en trop et le signale.
+ *
+ * Elle ne regarde jamais l'ordre, et ne retire jamais un label entier pour un alias :
+ *  - un IDENTIFIANT l'emporte sur un alias : l'alias qui reprend l'`id` d'un autre label actif
+ *    est retiré de son porteur. L'identité d'un label est son `id` ; un alias n'est qu'une
+ *    orthographe admise en plus. C'est ce qui ferme le contournement du plancher sans règle à
+ *    part : sous `{"minimum": ["issue"]}`, un label non bloquant portant `issue` en alias perd
+ *    cet alias, et `issue:` reste le `issue` planché, bloquant (revue Codex, PR #88). Une équipe
+ *    qui veut changer le sens de `note:` redéclare `note`, par son `id` — la fusion est faite
+ *    pour ça (§8.1.4) ;
+ *  - un alias porté par DEUX labels n'appartient à aucun : il est retiré des deux. Ni l'un ni
+ *    l'autre n'a de titre à le garder, et en laisser un l'attribuerait selon l'ordre ;
+ *  - deux `id` qui ne diffèrent que par la casse — la fusion compare au caractère près, la
+ *    résolution sans égard à la casse — ne peuvent pas se départager ainsi : le second dans la
+ *    liste est écarté. C'est le seul cas où l'ordre décide, il est signalé, et il suppose une
+ *    configuration qui écrit deux fois le même label.
+ *
+ * Seuls les labels ACTIFS entrent en conflit : un label désactivé est écarté par la résolution
+ * avant ses alias, il ne décide d'aucun verdict. Compter les labels inertes ferait qu'une
+ * entrée éteinte retire un alias à un label actif, ou signale tout dépôt possédant son propre
+ * label `fixed` alors que le `done` livré, qui porte cet alias, est désactivé.
+ *
+ * Le nom retiré quitte la configuration effective, donc le domaine de `fingerprint()` : les
+ * deux composants voient la même liste, quel que soit celui qui applique la règle.
+ */
+function withoutShadowing(labels: LabelConfig[], notices: Notice[]): LabelConfig[] {
+  const lower = (n: string) => n.toLowerCase();
+  const warn = (ref: string, message: string) =>
+    notices.push({ kind: 'config-warning', message: `${message} (§8.2)`, ref });
+
+  // Deux `id` égaux à la casse près : le second cède.
+  const out: LabelConfig[] = [];
+  const seenIds = new Map<string, string>();
+  for (const l of labels) {
+    const prior = l.enabled ? seenIds.get(lower(l.id)) : undefined;
+    if (prior !== undefined) {
+      warn(`labels.${l.id}`, `label "${l.id}" ignored: its id differs from label "${prior}" only by case`);
+      continue;
+    }
+    if (l.enabled) seenIds.set(lower(l.id), l.id);
+    out.push({ ...l, aliases: [...l.aliases] });
+  }
+
+  const active = out.filter((l) => l.enabled);
+  const ids = new Map(active.map((l) => [lower(l.id), l.id]));
+  const carriers = new Map<string, LabelConfig[]>();
+  for (const l of active) {
+    for (const a of new Set(l.aliases.map(lower))) carriers.set(a, [...(carriers.get(a) ?? []), l]);
+  }
+  for (const [alias, owners] of carriers) {
+    const asId = ids.get(alias);
+    // Un alias qui reprend son PROPRE `id` ne masque rien.
+    const losers = asId !== undefined ? owners.filter((o) => lower(o.id) !== alias) : owners.length > 1 ? owners : [];
+    for (const o of losers) {
+      o.aliases = o.aliases.filter((a) => lower(a) !== alias);
+      warn(
+        `labels.${o.id}.aliases`,
+        asId !== undefined
+          ? `alias "${alias}" removed from label "${o.id}": it is the id of label "${asId}"`
+          : `alias "${alias}" removed from label "${o.id}": it is also an alias of ${owners
+              .filter((x) => x !== o)
+              .map((x) => `"${x.id}"`)
+              .join(', ')}`
+      );
+    }
+  }
+  return out;
+}
+
 function recordWrites(values: Record<string, unknown>, written: Set<string>): void {
   for (const [key, value] of Object.entries(values)) {
     written.add(key);
     if (key === 'severities') {
       for (const code of Object.keys(value as Record<string, unknown>)) written.add(`severities.${code}`);
     } else if (key === 'labels') {
-      for (const entry of value as { id: string; enabled?: boolean; blockingByDefault?: boolean }[]) {
+      for (const entry of value as {
+        id: string;
+        enabled?: boolean;
+        blockingByDefault?: boolean;
+        alwaysNonBlocking?: boolean;
+      }[]) {
         if (entry.enabled === false) written.add(`labels.${entry.id}.enabled`);
         if (entry.blockingByDefault === false) written.add(`labels.${entry.id}.blockingByDefault`);
+        // §8.1.1 : `alwaysNonBlocking` est plancher-able à son tour — l'écrire à `true` sous
+        // un plancher qui l'interdit est un assouplissement à signaler.
+        if (entry.alwaysNonBlocking === true) written.add(`labels.${entry.id}.alwaysNonBlocking`);
       }
     } else if (key === 'rules') {
       for (const k of Object.keys(value as Record<string, unknown>)) written.add(`rules.${k}`);

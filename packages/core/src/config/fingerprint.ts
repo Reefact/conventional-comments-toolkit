@@ -2,7 +2,35 @@
 // gouvernent le verdict ET que les deux composants résolvent. Toute autre clé est exclue,
 // sans exception — une clé hors liste ne doit jamais faire diverger l'empreinte.
 
-import type { EffectiveConfig } from '../types.js';
+import type { EffectiveConfig, LabelConfig } from '../types.js';
+import { RESPONSE_LABELS } from './defaults.js';
+
+/**
+ * Vrai si l'entrée est un label de réponse du §3.2 resté EXACTEMENT tel que le produit le
+ * livre : désactivé, non bloquant par défaut, toujours non bloquant, avec le jeu d'alias livré.
+ *
+ * C'est la condition de la règle d'omission du §9.2.2, et ses deux bornes y sont écrites :
+ *  - elle ne s'étend PAS à tout label désactivé — `typo`, `polish` et `quibble` sont projetés
+ *    depuis toujours, et les omettre déplacerait l'empreinte par défaut de `becd76df` à
+ *    `79808959`, sur tout le parc ;
+ *  - elle exige une entrée INTACTE, et pas seulement « de la famille et désactivée » : une
+ *    équipe qui possédait son propre `done` et l'a éteint en le déclarant bloquant
+ *    (`ed34d791` avant la famille) verrait sinon sa déclaration effacée et s'effondrerait sur
+ *    l'empreinte d'un dépôt vierge — deux règles différentes, une même empreinte. Intacte, elle
+ *    mesure `cc22fc9c`.
+ *
+ * Elle est juste, et pas seulement commode : un label désactivé est indiscernable d'un label
+ * absent pour tout verdict — `resolveLabel()` l'écarte avant même de parcourir ses alias. */
+function isPristineResponseLabel(l: LabelConfig): boolean {
+  const shipped = RESPONSE_LABELS.find((r) => r.id === l.id);
+  if (shipped === undefined) return false;
+  return (
+    l.enabled === shipped.enabled &&
+    l.blockingByDefault === shipped.blockingByDefault &&
+    l.alwaysNonBlocking === shipped.alwaysNonBlocking &&
+    [...l.aliases].sort().join('\n') === [...shipped.aliases].sort().join('\n')
+  );
+}
 
 interface FingerprintDomain {
   mode: string;
@@ -36,7 +64,14 @@ export function fingerprintDomain(config: EffectiveConfig): FingerprintDomain {
     severities: Object.entries(config.severities)
       .filter(([code, sev]) => sev !== (code.startsWith('E-') ? 'error' : 'warn'))
       .sort(([a], [b]) => (a < b ? -1 : 1)),
-    labels: [...config.labels]
+    // OMIS QUAND IL EST INTACT, label de réponse par label de réponse (§9.2.2) — même
+    // condition de compatibilité que `toolCommands` plus bas, appliquée à des ENTRÉES d'une
+    // clé déjà dans le domaine plutôt qu'à une clé nouvelle. Sans elle, la seule livraison des
+    // trois labels désactivés déplaçait l'empreinte de TOUT dépôt — mesuré : `5aa9ab2e` contre
+    // `becd76df` — et la règle 2 du §8.1.3 désarmait le blocage d'envoi sur tout le parc
+    // pendant la fenêtre de décalage, pour une fonctionnalité que personne n'avait activée.
+    labels: config.labels
+      .filter((l) => !isPristineResponseLabel(l))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map((l) => ({
         id: l.id,

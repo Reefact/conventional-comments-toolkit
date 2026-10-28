@@ -1,5 +1,5 @@
 // Valeurs par défaut du produit (§8.2). Ce ne sont PAS celles du bloc d'exemple de la
-// spécification, qui n'illustre que la forme des clés : ici les treize labels du §3.2,
+// spécification, qui n'illustre que la forme des clés : ici tous les labels du §3.2,
 // les décorations du §3.3 et les sévérités du tableau §3.5.2.
 //
 // `icon`/`color` par label (issue #18) : sans eux, `defaultConfig()` ne fournissait jamais
@@ -27,7 +27,7 @@
 // thème sombre (jusqu'à 1,23:1 pour `decision`), l'écart entre « luminosité qui semble
 // correcte à l'œil » et un ratio mesuré est resté invisible tant que personne n'avait fait le
 // calcul. L'état PRESSÉ de `.cct-label-button` (fond `--bgColor-accent-emphasis`, un bleu
-// d'emphase) n'est délibérément pas couvert par ce seuil : aucune palette de treize teintes
+// d'emphase) n'est délibérément pas couvert par ce seuil : aucune palette d'autant de teintes
 // distinctes ne peut satisfaire 3:1 contre ce fond précis sans s'effondrer vers une poignée de
 // couleurs quasi identiques — l'état pressé se distingue déjà par son fond et son texte
 // inversés (§5.1), la bordure y est un simple rappel, pas le seul signal.
@@ -40,8 +40,33 @@ const label = (
   color: string,
   blockingByDefault: boolean,
   alwaysNonBlocking: boolean,
-  enabled = true
-): LabelConfig => ({ id, enabled, blockingByDefault, alwaysNonBlocking, icon, color, aliases: [] });
+  enabled = true,
+  aliases: string[] = []
+): LabelConfig => ({ id, enabled, blockingByDefault, alwaysNonBlocking, icon, color, aliases: [...aliases] });
+
+/**
+ * Les labels de réponse du §3.2, tels que le produit les LIVRE — désactivés, toujours non
+ * bloquants, avec leurs alias. Une seule définition, lue à trois endroits qui doivent dire la
+ * même chose : `defaultConfig()` ci-dessous, la règle d'omission de `fingerprint()` (§9.2.2),
+ * qui reconnaît une entrée « intacte » en la comparant à CETTE valeur, et le test qui affirme
+ * que l'ensemble est celui que le §3.2 déclare. Une copie ailleurs vieillirait sans bruit : un
+ * alias ajouté ici et pas là ferait projeter une entrée pourtant intacte, et désarmerait le
+ * blocage d'envoi sur tout le parc (§8.1.3, règle 2).
+ *
+ * Couleurs mesurées, comme toutes les autres, contre les neuf fonds Primer de github.com
+ * (`config.test.ts`) : #6A7FDB 3,48:1, #6B8E23 3,44:1, #8A7B6E 3,21:1 au pire. La contrainte de
+ * contraste enferme la luminance dans une bande étroite, si bien que la teinte seule distingue
+ * un label d'un autre : `done` en olive (vers 80°, entre `suggestion` et `praise`), `ack` en
+ * indigo (vers 230°, entre `question` et `thought`), `disagree` en taupe — désaturé, donc
+ * neutre comme le §5.5 l'exige, mais CHAUD là où le neutre existant, `nitpick` (#76818E), est
+ * froid. Les deux sont à luminance quasi égale (écart 0,008) : seule la teinte les sépare, ce
+ * que le garde de contraste ne vérifie pas — il n'écarte que les doublons exacts.
+ */
+export const RESPONSE_LABELS: readonly LabelConfig[] = [
+  label('ack', '\u{1F44C}', '#6A7FDB', false, true, false, ['acknowledged']),
+  label('done', '\u{2705}', '#6B8E23', false, true, false, ['fixed']),
+  label('disagree', '\u{270B}', '#8A7B6E', false, true, false),
+];
 
 export function defaultConfig(): EffectiveConfig {
   return {
@@ -68,6 +93,10 @@ export function defaultConfig(): EffectiveConfig {
       label('typo', '\u{1F524}', '#CC549C', false, false, false),
       label('polish', '\u{2728}', '#0C8E9A', false, false, false),
       label('quibble', '\u{1FAB6}', '#61896C', false, false, false),
+      // Labels de réponse (§3.2) — une extension propre à cette boîte à outils, absente de
+      // Conventional Comments (§3.1), livrée désactivée. Copiés à chaque appel : la
+      // configuration rendue est mutée par la fusion, la définition livrée ne doit jamais l'être.
+      ...RESPONSE_LABELS.map((l) => structuredClone(l)),
     ],
     decorations: {
       allowFree: true,
@@ -96,6 +125,12 @@ export function defaultConfig(): EffectiveConfig {
       // deux pour nitpick/note, todo/thought, praise/polish ; trois pour question/quibble.
       abbreviations: {
         '?i': 'issue: ',
+        // Labels de réponse (§3.2, §5.2) : `?de` reste `decision`, le seul label porteur d'un
+        // effet opposable. Livrées pour trois labels désactivés, elles ne se déplient que
+        // lorsque leur label est actif (§5.2, `CA-47`) — c'est `quickinput.ts` qui garde.
+        '?a': 'ack: ',
+        '?do': 'done: ',
+        '?di': 'disagree: ',
         '?ib': 'issue (blocking): ',
         '?su': 'suggestion: ',
         '?ni': 'nitpick: ',

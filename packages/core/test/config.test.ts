@@ -11,17 +11,28 @@ const found = (o: object): ConfigRead => ({ status: 'found', text: JSON.stringif
 const foundText = (t: string): ConfigRead => ({ status: 'found', text: t });
 
 describe('§8.2 — valeurs par défaut du produit', () => {
-  it('treize labels, trois optionnels désactivés, décorations du §3.3', () => {
+  it('seize labels — dix actifs, trois optionnels et trois labels de réponse désactivés — et les décorations du §3.3', () => {
     const c = defaultConfig();
-    expect(c.labels).toHaveLength(13);
+    expect(c.labels).toHaveLength(16);
     expect(c.labels.filter((l) => l.enabled)).toHaveLength(10);
+    expect(c.labels.filter((l) => !l.enabled).map((l) => l.id).sort()).toEqual([
+      'ack',
+      'disagree',
+      'done',
+      'polish',
+      'quibble',
+      'typo',
+    ]);
     expect(c.labels.filter((l) => l.blockingByDefault).map((l) => l.id).sort()).toEqual([
       'chore',
       'issue',
       'todo',
     ]);
     expect(c.labels.filter((l) => l.alwaysNonBlocking).map((l) => l.id).sort()).toEqual([
+      'ack',
       'decision',
+      'disagree',
+      'done',
       'nitpick',
       'note',
       'thought',
@@ -68,7 +79,7 @@ describe('§8.2 — valeurs par défaut du produit', () => {
   // n'a pas de fond propre et prend celui du conteneur de commentaire qui le porte. Ces 9
   // fonds sont ceux de l'état NON pressé de `.cct-label-button` et de `.cct-badge` — l'état
   // pressé (fond `--bgColor-accent-emphasis`, un bleu d'emphase) n'y satisfait aucune teinte
-  // possible en nombre suffisant pour rester une palette de treize couleurs distinctes, et
+  // possible en nombre suffisant pour rester une palette d'autant de couleurs distinctes, et
   // n'est donc délibérément pas gardé ici (cf. commentaire de defaults.ts).
   const GITHUB_PRIMER_BACKGROUNDS: Record<string, string> = {
     'light/canvas': '#ffffff',
@@ -126,14 +137,14 @@ describe('§8.1.2 / §8.1.4 — précédence et fusion', () => {
     );
     expect(config.labels.find((l) => l.id === 'issue')!.color).toBe('#222222');
     expect(config.labels.find((l) => l.id === 'perf-note')).toBeDefined();
-    expect(config.labels).toHaveLength(14); // jamais de suppression
+    expect(config.labels).toHaveLength(defaultConfig().labels.length + 1); // jamais de suppression
     expect(config.rules.minSubjectLength).toBe(3);
   });
 
   it('retirer un label passe par enabled:false, jamais par suppression (§8.1.4)', () => {
     const { config } = resolveConfig(null, absent, found({ labels: [{ id: 'chore', enabled: false }] }), null, false);
     expect(config.labels.find((l) => l.id === 'chore')!.enabled).toBe(false);
-    expect(config.labels).toHaveLength(13);
+    expect(config.labels).toHaveLength(defaultConfig().labels.length);
   });
 
   it('severities fusionne par code ; exemptUsers par union', () => {

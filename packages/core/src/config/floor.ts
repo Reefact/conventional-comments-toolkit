@@ -4,6 +4,7 @@
 
 import type { EffectiveConfig, Floor, Mode, Notice, Severity } from '../types.js';
 import { SUPPORTED_FLOOR_VERSION } from '../version.js';
+import { defaultConfig } from './defaults.js';
 import { filterAllowlistPatterns, filterToolCommands, MODES, SEVERITIES } from './schema.js';
 
 export const MODE_SCALE: Record<Mode, number> = { off: 0, assist: 1, warn: 2, enforce: 3 };
@@ -380,19 +381,38 @@ export function applyFloor(
     }
   }
 
-  // labels — ids dont ni enabled ni blockingByDefault ne peuvent passer à false en
-  // dessous du plancher (§8.1.1). La contrainte porte sur la VALEUR EFFECTIVE, comme
-  // pour toutes les autres clés du plancher — c'est la clé par laquelle un dépôt éteint
-  // la contrainte le plus complètement, et une lecture limitée aux seules écritures
-  // laisserait passer une valeur héritée. Le plancher n'invente pas de label : il
-  // protège ceux que la configuration connaît.
+  // labels — ids dont AUCUN des trois drapeaux ne peut être assoupli en dessous du plancher
+  // (§8.1.1) : ni `enabled` ni `blockingByDefault` ne passent à false, et `alwaysNonBlocking`
+  // ne passe pas à true. La contrainte porte sur la VALEUR EFFECTIVE, comme pour toutes les
+  // autres clés du plancher — c'est la clé par laquelle un dépôt éteint la contrainte le plus
+  // complètement, et une lecture limitée aux seules écritures laisserait passer une valeur
+  // héritée. Le plancher n'invente pas de label : il protège ceux que la configuration connaît.
+  //
+  // Le plancher ne relève `blockingByDefault` que sur un label que le produit LIVRE
+  // `alwaysNonBlocking: false`. Forcer les deux drapeaux ensemble donnait la paire
+  // incohérente `alwaysNonBlocking: true` + `blockingByDefault: true` sur `decision` et sur
+  // les labels de réponse : `done:` nu bloquait (§3.3, règle 5) pendant que `done (blocking):`
+  // était refusé (règle 1). La valeur LIVRÉE, et jamais l'effective : sur l'effective, un
+  // dépôt sous `{"minimum": ["issue"]}` écrivait `alwaysNonBlocking: true` sur `issue`,
+  // l'exception se déclenchait sur le drapeau qu'il venait de poser, et `issue:` cessait de
+  // bloquer — plancher `enforce` compris. C'est aussi pourquoi `alwaysNonBlocking` est
+  // ramené à false sur un label livré ainsi : sans ce second verrou, la paire incohérente
+  // revenait par l'autre côté. Un label que le produit ne livre pas compte comme livré
+  // `alwaysNonBlocking: false` — l'organisation qui le plancher le veut bloquant.
   if (floor.labels?.minimum) {
+    const shipped = defaultConfig().labels;
     for (const id of floor.labels.minimum) {
       const label = out.labels.find((l) => l.id === id);
       if (!label) continue;
       if (!label.enabled) {
         label.enabled = true;
         overridden(`labels.${id}.enabled`);
+      }
+      const shippedNonBlocking = shipped.find((l) => l.id === id)?.alwaysNonBlocking ?? false;
+      if (shippedNonBlocking) continue;
+      if (label.alwaysNonBlocking) {
+        label.alwaysNonBlocking = false;
+        overridden(`labels.${id}.alwaysNonBlocking`);
       }
       if (!label.blockingByDefault) {
         label.blockingByDefault = true;

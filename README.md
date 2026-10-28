@@ -87,7 +87,7 @@ issue (blocking): platform CSS tokens leak into the shared stylesheet
 done: removed the platform-specific token
 ```
 
-They are enabled like any optional label, one entry each — there is no separate switch (§8.2):
+They are enabled like any optional label, one entry each — there is no separate switch (§8.2). The extension's options page shows this block and copies it for you:
 
 ```json
 { "labels": [ { "id": "ack", "enabled": true },

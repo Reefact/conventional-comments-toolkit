@@ -20,6 +20,7 @@ import { pageKey, pageMark } from '../page-mark.js';
 import { ui } from '../ui/strings.js';
 import { applyStaticStrings, currentLanguage } from './i18n.js';
 import { maybeStartTour, startTour } from './tour.js';
+import { copySnippet, responseLabelsSnippet } from './response-labels.js';
 import {
   CLOUD_PLATFORMS,
   HOST_PLATFORMS_KEY,
@@ -551,6 +552,24 @@ document.getElementById('direct-shortcuts-save')?.addEventListener('click', () =
         ? ui(lang, 'options.shortcuts.saved')
         : ui(lang, 'options.shortcuts.saved.partial', { rejected: rejected.join(' ; ') });
   }
+});
+
+// Labels de réponse (§3.2, §8.2) — la page ne les active pas, elle donne le bloc à coller
+// dans le fichier du dépôt. Le message dit ce qui s'est réellement passé : « copié » si le
+// presse-papiers a accepté, sinon le bloc est sélectionné pour une copie manuelle.
+const snippetArea = document.getElementById('response-labels-snippet') as HTMLTextAreaElement | null;
+const snippetState = document.getElementById('response-labels-state');
+if (snippetArea) snippetArea.value = responseLabelsSnippet();
+document.getElementById('response-labels-copy')?.addEventListener('click', () => {
+  if (!snippetArea) return;
+  void copySnippet(snippetArea.value, navigator.clipboard, () => {
+    snippetArea.focus();
+    snippetArea.select();
+  }).then((outcome) => {
+    if (snippetState) {
+      snippetState.textContent = ui(lang, outcome === 'copied' ? 'options.responses.copied' : 'options.responses.manual');
+    }
+  });
 });
 
 // Télémétrie (§10) — le troisième verrou décrit en tête de `telemetry.ts` : le consentement

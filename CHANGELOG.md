@@ -116,6 +116,11 @@ and what a reader needs from them is the behaviour, not the thirteen.
   for `done`, `acknowledged` for `ack`. They are ordinary labels — same parser, same
   diagnostics, never blocking — and enabling them does not make replies require a label, which
   remains `scope.validateReplies`. See the README for the configuration and the upgrade note.
+- **The options page presents the response labels and copies their configuration** (§8.2).
+  The page cannot enable them, since the configuration lives in the repository, so it shows
+  the block to paste into `.conventional-comments.json` and copies it to the clipboard. If the
+  clipboard refuses, the block is selected for a manual copy, and the page says so rather than
+  claiming it copied.
 
 - Three guards, because none of the above was visible to any test. `check:platform-isolation`
   refuses a platform identifier in code every platform runs, and also enforces §9.4's "a single

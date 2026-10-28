@@ -59,7 +59,7 @@ export {
 } from './validator.js';
 
 // §8 — configuration
-export { defaultConfig, completeStoredConfig } from './config/defaults.js';
+export { defaultConfig, completeStoredConfig, RESPONSE_LABELS } from './config/defaults.js';
 export {
   parseConfigDocument,
   filterAllowlistPatterns,

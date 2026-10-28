@@ -268,6 +268,7 @@
       .field select:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
       .field-hint { font-size: 0.78rem; color: var(--fg-faint); margin: 0; }
       .field-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.6rem; }
+      .config-snippet { width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: 0.82rem; resize: vertical; margin: 0 0 0.6rem; }
       .field-state { font-size: 0.8rem; color: var(--fg-muted); }
 
       .checkbox-row { display: flex; align-items: center; gap: 0.55rem; font-size: 0.88rem; }
@@ -497,6 +498,24 @@
               <span id="direct-shortcuts-state" class="field-state" aria-live="polite"></span>
               <button id="direct-shortcuts-save" class="btn btn-p" type="button" data-i18n="options.shortcuts.save">Enregistrer</button>
             </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="group" id="group-response-labels">
+        <h2 data-i18n="options.responses.heading">Labels de réponse</h2>
+        <p class="group-sub" data-i18n="options.responses.sub">
+          Trois labels optionnels pour répondre à une remarque : ack, done et disagree. Ils ne
+          font pas partie de Conventional Comments et sont désactivés par défaut. Cette page ne
+          peut pas les activer : collez ce bloc dans le fichier .conventional-comments.json du dépôt.
+        </p>
+        <section class="panel">
+          <textarea id="response-labels-snippet" class="config-snippet" rows="8" readonly
+            spellcheck="false" data-i18n-aria-label="options.responses.snippet"
+            aria-label="Configuration des labels de réponse"></textarea>
+          <div class="field-actions">
+            <span id="response-labels-state" class="field-state" aria-live="polite"></span>
+            <button id="response-labels-copy" class="btn btn-p" type="button" data-i18n="options.responses.copy">Copier la configuration</button>
           </div>
         </section>
       </section>

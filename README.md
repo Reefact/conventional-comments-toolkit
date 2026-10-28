@@ -70,60 +70,74 @@ they apply different rules on GitHub while still reporting that they agree. The 
 requiring a `core/` version across an organization is `coreMinVersion` (§8.2), not the
 fingerprint.
 
-### Response labels (optional, off by default)
+### Response labels (on by default, not part of Conventional Comments)
 
 Conventional Comments gives review **feedback** a vocabulary and says nothing about **replying**
-to it. The toolkit adds three response labels of its own. They are **not part of Conventional
-Comments**: an optional extension of this tool, shipped disabled (§3.1, §3.2).
+to it. The toolkit adds four response labels of its own. They are **not part of Conventional
+Comments**: an extension of this tool, shipped enabled, that a repository can turn off (§3.1,
+§3.2).
 
 | Label | Meaning | Also accepted |
 |---|---|---|
 | `ack` | Received and accepted; the code has not changed. | `acknowledged` |
 | `done` | The code changed because of the remark. | `fixed` |
 | `disagree` | Declines the remark, and the subject says why. Carries no authority, resolves nothing. | |
+| `reviewed` | Closes your own review: you have finished reading. Approves nothing. | |
 
 ```text
 issue (blocking): platform CSS tokens leak into the shared stylesheet
 done: removed the platform-specific token
 ```
 
-They are enabled like any optional label, one entry each — there is no separate switch (§8.2). The extension's options page shows this block and copies it for you:
+`reviewed` is the label people used to fake with `praise: review done`. It says you are done
+reading; approval stays with the platform's own control.
+
+Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` does not. The
+toolbar shows the remark labels first, then a thin line, then the reply labels. A label you
+declare is `"remark"` unless you write `"kind": "reply"`. The kind changes no verdict.
+
+**To stick to Conventional Comments**, disable them, one entry each — there is no separate
+switch (§8.2). The extension's options page shows this block and copies it for you:
 
 ```json
-{ "labels": [ { "id": "ack", "enabled": true },
-              { "id": "done", "enabled": true },
-              { "id": "disagree", "enabled": true } ] }
+{ "labels": [ { "id": "ack", "enabled": false },
+              { "id": "done", "enabled": false },
+              { "id": "disagree", "enabled": false },
+              { "id": "reviewed", "enabled": false } ] }
 ```
 
 With no existing `.conventional-comments.json`, this block can be the whole file. Otherwise, add
-the three entries to its existing `labels` array, or create that property, without replacing the
+the four entries to its existing `labels` array, or create that property, without replacing the
 other keys: pasting the block into an existing file makes it invalid JSON, and replacing the file
 drops your other settings.
 
-Enabling them changes **which labels exist**, nothing else. It does not require replies to carry
-a label: that is `scope.validateReplies`, still `false` by default, so a reply is not validated
-at all unless you turn it on (§4.1). It does not change the mode, and none of the three can make
-a thread blocking. `decision` is unchanged and remains the only reply that can close a blocking
+The labels change **which labels exist**, nothing else. They do not require replies to carry a
+label: that is `scope.validateReplies`, still `false` by default, so a reply is not validated at
+all unless you turn it on (§4.1). They do not change the mode, and none of the four can make a
+thread blocking. `decision` is unchanged and remains the only reply that can close a blocking
 thread on someone else's behalf (§6.1.1); `disagree` is an opinion and resolves nothing.
 
-If you point `docUrl` at your own documentation, this is the moment to: its default,
+If you point `docUrl` at your own documentation, it is worth doing: its default,
 conventionalcomments.org, documents none of these labels.
 
-**Upgrading with a label already called `ack`, `done` or `disagree`.** Your entry now merges
-into the shipped one (§8.1.4) and changes in two ways. It inherits `alwaysNonBlocking: true`, so
-`done (blocking):` becomes `E-CONFLICT`. And if your declaration never wrote `enabled`, it now
-inherits `"enabled": false` — your `done:` comments become `E-UNKNOWN-LABEL`. Restore your
-label with **both** properties:
+**Upgrading with a label already called `ack`, `done`, `disagree` or `reviewed`.** Your entry
+now merges into the shipped one (§8.1.4) and inherits `alwaysNonBlocking: true`, so
+`done (blocking):` becomes `E-CONFLICT`. Restore your label with:
 
 ```json
-{ "labels": [ { "id": "done", "enabled": true, "alwaysNonBlocking": false } ] }
+{ "labels": [ { "id": "done", "alwaysNonBlocking": false } ] }
 ```
 
-A label of your own called `fixed` or `acknowledged` keeps working. Since this version, two
-active labels may not share a name: an alias that repeats another active label's id is removed
-from its carrier, so if you also enable `done`, it is the shipped alias `fixed` that goes and
-your label that stays. An alias carried by two labels is removed from both. Each removal is
-reported as a configuration warning (§8.2).
+A label of your own called `fixed` or `acknowledged` is a different case. Two active labels may
+not share a name: an alias that repeats another active label's id is removed from its carrier.
+Since `done` is enabled by default, it is the shipped alias `fixed` that goes and your label
+that stays. An alias carried by two labels is removed from both. Each removal is reported as a
+configuration warning (§8.2).
+
+**Upgrading the extension and the verifier.** Because these labels are on by default, the
+configuration fingerprint of a repository with no configuration changes (§9.2.2). While the two
+run different versions, the extension reports the mismatch and stops blocking the send. Update
+them together.
 
 ## Modes and adoption (§7)
 

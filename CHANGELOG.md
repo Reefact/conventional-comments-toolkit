@@ -16,6 +16,23 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Changed
 
+- **A label you already named `ack`, `done` or `disagree` needs two properties to keep
+  working** (§8.2). It now merges into the shipped definition: it becomes always non-blocking,
+  and if it never set `enabled`, it becomes disabled and its comments turn into
+  `E-UNKNOWN-LABEL`. Restore it with `"enabled": true` and `"alwaysNonBlocking": false`.
+- **Two active labels can no longer share a name** (§8.2). An alias that repeats another active
+  label's id is removed from its carrier, an alias carried by two labels is removed from both,
+  and each removal is reported. Before, the order of the label list decided which one a
+  comment meant.
+- **An enterprise floor no longer makes `decision` blocking** (§8.1.1). Listing a label the
+  product ships as always non-blocking under `labels.minimum` used to force it blocking too,
+  so a bare `decision:` opened a blocking thread while `decision (blocking):` was refused. It
+  now only forces `enabled`. A floor also stops a repository from declaring a floored label
+  always non-blocking, which would have stopped it from blocking.
+- **A shipped abbreviation only expands to an enabled label** (§5.2). `?ty`, `?po` and `?qui`
+  used to insert a prefix for a disabled label, which validation then rejected. An
+  abbreviation a repository writes itself is unaffected.
+
 - **Each platform can say where the extension sits in its comment box** (§9.2.3). Where the
   toolbar and the status pill are inserted, and whether the status outline is drawn inside the
   field, were decided by layout rules measured on GitHub and applied to every platform. A
@@ -91,6 +108,14 @@ and what a reader needs from them is the behaviour, not the thirteen.
   Reinstating both takes one measurement on a real tenant, recorded as an open task.
 
 ### Added
+
+- **Three optional response labels: `ack`, `done`, `disagree`** (§3.2). Conventional Comments
+  has a vocabulary for review feedback and none for replying to it. These labels are the
+  toolkit's own addition, not part of Conventional Comments, and ship **disabled**: nothing
+  changes until a repository enables them with one `labels[]` entry each. `fixed` is accepted
+  for `done`, `acknowledged` for `ack`. They are ordinary labels — same parser, same
+  diagnostics, never blocking — and enabling them does not make replies require a label, which
+  remains `scope.validateReplies`. See the README for the configuration and the upgrade note.
 
 - Three guards, because none of the above was visible to any test. `check:platform-isolation`
   refuses a platform identifier in code every platform runs, and also enforces §9.4's "a single

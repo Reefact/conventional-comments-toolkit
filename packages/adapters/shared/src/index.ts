@@ -49,8 +49,9 @@ export interface SubmitControl {
  * l'obéissance possible.
  *
  * **Chaque champ vaut `null` pour dire « je ne me prononce pas »**, et le code partagé applique
- * alors sa règle géométrique — celle qui n'interroge que le moteur de style et ne nomme personne
- * (`framedAncestor`, `stackingMountFor`, `ringIsClipped` d'ui/stacking.ts). Un adaptateur qui
+ * alors sa règle géométrique — celle qui exploite les styles calculés et, pour le rognage, la
+ * géométrie des éléments, et ne nomme personne (`framedAncestor`, `stackingMountFor`,
+ * `ringIsClipped` d'ui/stacking.ts). Un adaptateur qui
  * rend `NEUTRAL_EDITOR_CHROME` obtient donc EXACTEMENT le comportement d'avant. C'est ce qui
  * rend cet élargissement sans risque pour une plateforme qu'on n'a pas mesurée : ne rien
  * affirmer, plutôt qu'affirmer sur elle les chiffres d'une autre.

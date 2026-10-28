@@ -16,10 +16,15 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Changed
 
-- **A label you already named `ack`, `done` or `disagree` needs two properties to keep
-  working** (§8.2). It now merges into the shipped definition: it becomes always non-blocking,
-  and if it never set `enabled`, it becomes disabled and its comments turn into
-  `E-UNKNOWN-LABEL`. Restore it with `"enabled": true` and `"alwaysNonBlocking": false`.
+- **A label you already named `ack`, `done`, `disagree` or `reviewed` needs one property to
+  keep working as before** (§8.2). It now merges into the shipped definition and inherits
+  `alwaysNonBlocking: true`, so `done (blocking):` turns into `E-CONFLICT`. Restore it with
+  `"alwaysNonBlocking": false`.
+- **The configuration fingerprint of a repository with no configuration changes** (§9.2.2),
+  because the response labels are enabled by default: `done:` is a label for this version and
+  an unknown word for the previous one. While the extension and the verifier run different
+  versions, the extension reports the mismatch and stops blocking the send. Update both together.
+- **New icons:** `praise` is now 👏, `decision` is ⚖️, and 🎉 goes to `reviewed`.
 - **Two active labels can no longer share a name** (§8.2). An alias that repeats another active
   label's id is removed from its carrier, an alias carried by two labels is removed from both,
   and each removal is reported. Before, the order of the label list decided which one a
@@ -109,18 +114,27 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Added
 
-- **Three optional response labels: `ack`, `done`, `disagree`** (§3.2). Conventional Comments
-  has a vocabulary for review feedback and none for replying to it. These labels are the
-  toolkit's own addition, not part of Conventional Comments, and ship **disabled**: nothing
-  changes until a repository enables them with one `labels[]` entry each. `fixed` is accepted
-  for `done`, `acknowledged` for `ack`. They are ordinary labels — same parser, same
-  diagnostics, never blocking — and enabling them does not make replies require a label, which
-  remains `scope.validateReplies`. See the README for the configuration and the upgrade note.
-- **The options page presents the response labels and copies their configuration** (§8.2).
-  The page cannot enable them, since the configuration lives in the repository, so it shows
-  the block to paste into `.conventional-comments.json` and copies it to the clipboard. If the
-  clipboard refuses, the block is selected for a manual copy, and the page says so rather than
-  claiming it copied.
+- **Four response labels: `ack`, `done`, `disagree`, `reviewed`** (§3.2). Conventional
+  Comments has a vocabulary for review feedback and none for replying to it. These labels are
+  the toolkit's own addition, not part of Conventional Comments, and ship **enabled**: a
+  repository that wants to stick to Conventional Comments disables them with one `labels[]`
+  entry each. `reviewed` closes your own review — the label people reached for when they wrote
+  `praise: review done` — and approves nothing. `fixed` is accepted for `done`, `acknowledged`
+  for `ack`. They are ordinary labels — same parser, same diagnostics, never blocking — and
+  they do not make replies require a label, which remains `scope.validateReplies`. `?r` expands
+  to `reviewed: `. See the README for the configuration and the upgrade note.
+- **The toolbar puts the response labels in a zone of their own** (§5.1). Labels that raise a
+  point come first, then a thin line, then the labels that answer one. The response labels
+  wrap to the next line together, never one by one, and the line only shows when both zones
+  share a line. Nothing else about the toolbar changes.
+- **A label can say which zone it belongs to: `labels[].kind`** (§3.2, §8.2). `"remark"` raises
+  a point, `"reply"` does not. A label you declare is `"remark"` unless you say otherwise.
+  It changes no verdict.
+- **The options page presents the response labels and copies the block that disables them**
+  (§8.2). The page cannot disable them, since the configuration lives in the repository, so it
+  shows the block to paste into `.conventional-comments.json` and copies it to the clipboard.
+  If the clipboard refuses, the block is selected for a manual copy, and the page says so
+  rather than claiming it copied.
 
 - Three guards, because none of the above was visible to any test. `check:platform-isolation`
   refuses a platform identifier in code every platform runs, and also enforces §9.4's "a single

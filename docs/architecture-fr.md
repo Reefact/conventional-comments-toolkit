@@ -93,12 +93,13 @@ décrit le produit est partagé et ne connaît personne. Le critère de partage 
 de fichiers mais la motivation du changement : « GitHub a bougé » va dans `adapters/github/`,
 « notre produit doit se comporter autrement » va dans le code partagé.
 
-Quatre choses vivent donc par plateforme :
+Cinq choses vivent donc par plateforme :
 
 | | Où | Comment le partagé y accède |
 |---|---|---|
 | Sélecteurs DOM | `adapters/<p>/src/selectors.ts` | jamais directement |
-| Placement et forme du rendu : cadre à parer, point d'insertion, trait rentré, forme du corps | idem, via `getEditorChrome()` / `renderedBodyShape()` (§9.2.3) ; `null` laisse la règle géométrique du partagé | par le port, qui rend des DONNÉES |
+| Placement : cadre à parer, point d'insertion, trait rentré | idem, via `getEditorChrome()` (§9.2.3) ; `null` laisse la règle géométrique du partagé | par le port, qui rend des DONNÉES |
+| Forme du corps rendu | idem, via `renderedBodyShape()` (§9.2.3) ; `null` fait RENONCER le masquage du préfixe et la mise en avant du sujet — aucune règle ne prend le relais | idem |
 | Couleurs, rayons, longueurs | `adapters/<p>/src/platform.css` | par des variables `--cct-*` |
 | Fiche d'identité : hôtes, `credentials`, vues, glyphe | `adapters/<p>/src/descriptor.ts`, sous-chemin `/descriptor` | par le registre `extension/src/platforms.ts` |
 

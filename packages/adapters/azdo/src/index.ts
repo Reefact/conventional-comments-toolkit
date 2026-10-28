@@ -133,9 +133,10 @@ export class AzdoClientAdapter implements PlatformAdapter {
    * plateforme ce qu'on n'a pas regardé — exactement le défaut que l'élargissement du contrat
    * corrige.
    *
-   * Le code partagé applique donc ses règles géométriques, qui n'interrogent que le moteur de
-   * style : pour le cadre à parer, pour le point d'insertion de la barre et de la pastille
-   * (`mount`), pour le trait d'état rentré (`ringInset`). Le jour où quelqu'un mesure un vrai
+   * Le code partagé applique donc ses règles géométriques, qui exploitent les styles calculés
+   * et, pour le rognage, la géométrie des éléments (`getBoundingClientRect`) : pour le cadre à
+   * parer, pour le point d'insertion de la barre et de la pastille (`mount`), pour le trait
+   * d'état rentré (`ringInset`). Le jour où quelqu'un mesure un vrai
    * tenant (A-FAIRE-fr.md, point 9), c'est ICI que le résultat se pose — un `mount` déclaré
    * remplace la règle pour Azure DevOps seul —, et nulle part ailleurs. */
   getEditorChrome(_editor: EditorHandle): EditorChrome {

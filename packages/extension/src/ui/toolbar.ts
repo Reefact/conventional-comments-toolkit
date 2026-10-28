@@ -152,7 +152,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
    *
    * La séparation est STRUCTURELLE, pas seulement affaire de largeur : retirer les icônes
    * des boutons (ci-dessous) recule le seuil de casse sans le supprimer, et une fenêtre
-   * étroite ou une configuration à treize labels le rencontre toujours. Chaque rangée garde
+   * étroite ou une configuration qui active les labels optionnels ou de réponse le rencontre toujours. Chaque rangée garde
    * son propre `flex-wrap` : ce qui déborde d'une rangée passe à la ligne DANS cette rangée,
    * jamais dans l'autre.
    *
@@ -178,7 +178,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   // Les deux surfaces n'ont pas la même contrainte de place. Un badge est SEUL en tête de son
   // commentaire : l'icône y est un repère qui ne coûte rien, et c'est ce que montre le mockup
   // de référence (docs/badges-decoration-mockup.html). Les boutons, eux, sont une RANGÉE — dix
-  // dans la configuration par défaut, treize si les labels optionnels sont activés (§3.2) —
+  // dans la configuration par défaut, jusqu'à seize si les labels optionnels et les labels de réponse sont activés (§3.2) —
   // posée au-dessus du sélecteur de décoration, et ce qu'un bouton prend en largeur, il le
   // prend à tous les autres. Sur la largeur d'une boîte de commentaire GitHub, ces icônes
   // suffisaient à renvoyer le dernier label à la ligne suivante, où il se mêlait alors aux

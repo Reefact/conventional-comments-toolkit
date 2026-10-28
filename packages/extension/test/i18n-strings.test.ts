@@ -4,6 +4,7 @@
 // dans la langue qu'on ne relit pas ferait voir.
 
 import { describe, expect, it } from 'vitest';
+import { defaultConfig } from '@cct/core';
 import { catalogs, ui } from '../src/ui/strings.js';
 
 describe('§10 — catalogues d’interface de l’extension', () => {
@@ -24,7 +25,11 @@ describe('§10 — catalogues d’interface de l’extension', () => {
     // « les identifiants de labels restent en anglais ; seules descriptions et infobulles
     // sont traduites » — un `example.issue` francisé en « probleme: … » ferait insérer par
     // la barre d'outils un préfixe que la validation rejetterait aussitôt.
-    const ids = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'decision', 'typo', 'polish', 'quibble'];
+    // Tous les labels que le produit LIVRE, actifs ou non — lus dans `defaultConfig()` et
+    // non recopiés : la liste écrite ici à la main en comptait treize, et n'aurait pas vu un
+    // label livré sans description ni exemple (les labels de réponse du §3.2, d'abord).
+    const ids = defaultConfig().labels.map((l) => l.id);
+    expect(ids.length).toBeGreaterThan(0);
     for (const id of ids) {
       // L'exemple OUVRE sur l'identifiant, suivi du deux-points ou de sa décoration — la
       // grammaire du §3.1, jamais une simple présence du mot quelque part dans la phrase.

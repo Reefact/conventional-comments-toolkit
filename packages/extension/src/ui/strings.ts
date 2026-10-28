@@ -38,6 +38,11 @@ const fr: Record<string, string> = {
   'label.typo': 'Faute de frappe.',
   'label.polish': 'Amélioration de finition.',
   'label.quibble': 'Point de détail discutable.',
+  // Labels de réponse (§3.2) — extension propre à cette boîte à outils, absente de
+  // Conventional Comments (§3.1). `ack` est du jargon : la description l'ENSEIGNE (§10).
+  'label.ack': "Accusé de réception (« ack », de l'anglais acknowledged) : reçu et accepté ; le code n'a pas changé.",
+  'label.done': 'Le code a changé à la suite de la remarque — le diff est à relire.',
+  'label.disagree': "Refuse la remarque, et le sujet dit pourquoi. N'a aucune autorité et ne résout rien.",
   'label.example': 'Exemple : « {example} »',
   'example.praise': 'praise: gestion d’erreur très lisible',
   'example.nitpick': 'nitpick: virgule finale',
@@ -52,6 +57,11 @@ const fr: Record<string, string> = {
   'example.typo': 'typo: « recieve » → « receive »',
   'example.polish': 'polish: aligner les imports',
   'example.quibble': 'quibble: nom un peu long',
+  // Un accusé de réception PUR, jamais un refus poli : « juste, mais je laisse tel quel »
+  // relève de `disagree`, et enseignerait la mauvaise frontière dès la première infobulle (§3.2).
+  'example.ack': 'ack: bien noté, je garde ça pour le module suivant',
+  'example.done': 'done: jeton propre à la plateforme retiré',
+  'example.disagree': 'disagree: la correspondance est volontairement indépendante de la plateforme',
   'filter.aria': 'Filtrer les fils par label',
   'filter.all': 'tous',
   'badge.decoration.overflow': '{count} décoration(s) supplémentaire(s), non affichée(s)',
@@ -204,6 +214,9 @@ const en: Record<string, string> = {
   'label.typo': 'Typo.',
   'label.polish': 'Finishing touch.',
   'label.quibble': 'Debatable detail.',
+  'label.ack': 'Acknowledged: received and accepted; the code has not changed.',
+  'label.done': 'The code changed because of the remark — re-read the diff.',
+  'label.disagree': 'Declines the remark, and the subject says why. Carries no authority and resolves nothing.',
   'label.example': 'Example: "{example}"',
   'example.praise': 'praise: very readable error handling',
   'example.nitpick': 'nitpick: trailing comma',
@@ -218,6 +231,9 @@ const en: Record<string, string> = {
   'example.typo': 'typo: "recieve" → "receive"',
   'example.polish': 'polish: align the imports',
   'example.quibble': 'quibble: slightly long name',
+  'example.ack': "ack: understood, I'll keep it in mind for the next module",
+  'example.done': 'done: removed the platform-specific token',
+  'example.disagree': 'disagree: the mapping is intentionally platform-independent',
   'filter.aria': 'Filter threads by label',
   'filter.all': 'all',
   'badge.decoration.overflow': '{count} more decoration(s), not shown',

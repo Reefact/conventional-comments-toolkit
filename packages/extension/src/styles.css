@@ -123,7 +123,7 @@
    commandes là où la largeur l'oblige, sans savoir qu'un bouton de label et un segment de
    décoration sont deux gestes de natures différentes. Retirer les icônes des boutons
    (toolbar.ts) recule ce seuil sans le supprimer — une fenêtre étroite, un panneau latéral
-   ou une configuration à treize labels le rencontrent encore.
+   ou une configuration qui active les labels optionnels ou de réponse le rencontrent encore.
 
    `flex-direction: column` est la moitié CSS d'une règle dont l'autre moitié est le DOM
    (deux `.cct-toolbar-row`, toolbar.ts) : l'une sans l'autre ne sépare rien — les deux

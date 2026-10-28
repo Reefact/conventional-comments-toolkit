@@ -3,7 +3,7 @@
 // extensibles par Tab depuis `shortcuts.abbreviations` — l'unicité normative est celle
 // de l'abréviation au moment où Tab est pressée (§5.2).
 
-import { enabledLabels, matchPrefix, splitBody, type EffectiveConfig } from '@cct/core';
+import { defaultConfig, enabledLabels, matchPrefix, resolveLabel, splitBody, type EffectiveConfig } from '@cct/core';
 import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
 
 export interface QuickInputOptions {
@@ -42,6 +42,25 @@ function labelPosedBy(value: string, expansion: string, config: EffectiveConfig)
   // compterait un label déjà présent à chaque abréviation frappée ailleurs dans le texte.
   if (posed !== expanded) return null;
   return enabledLabels(config).some((l) => l.id === posed) ? posed : null;
+}
+
+/** Une abréviation LIVRÉE ne se déplie que vers un label actif (§5.2, `CA-47`). Sans cette
+ * garde, `?do` puis Tab, famille de réponse éteinte, composait `done: ` — un préfixe que le
+ * validateur rejette en `E-UNKNOWN-LABEL` au caractère suivant : l'outil faisait écrire la
+ * faute qu'il signale. Le défaut précédait cette famille : `?ty`, `?po` et `?qui` étaient déjà
+ * livrées pour trois labels désactivés, pendant que la liste de complétion, elle, ne montre
+ * que les labels actifs.
+ *
+ * Une abréviation est « livrée » quand le produit fournit la même, au caractère près. Une
+ * abréviation qu'une configuration écrit n'est pas concernée — ce qu'une équipe déclare lui
+ * appartient —, et la seule qu'on ne sache pas distinguer est celle qu'une configuration
+ * recopierait à l'identique : elle se comporte alors comme la livrée, ce qui est sans
+ * conséquence puisqu'elle dit la même chose. */
+function shippedForDisabledLabel(token: string, expansion: string, config: EffectiveConfig): boolean {
+  const shipped = defaultConfig().shortcuts.abbreviations;
+  if (!Object.hasOwn(shipped, token) || shipped[token] !== expansion) return false;
+  const label = matchPrefix(expansion.trim())?.label;
+  return label !== undefined && resolveLabel(label, config) === null;
 }
 
 export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void } {
@@ -109,7 +128,11 @@ export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void
       // toString… hérités du prototype.
       const abbreviations = opts.config.shortcuts.abbreviations;
       const expansion =
-        token !== undefined && Object.hasOwn(abbreviations, token) ? abbreviations[token] : undefined;
+        token !== undefined &&
+        Object.hasOwn(abbreviations, token) &&
+        !shippedForDisabledLabel(token, abbreviations[token]!, opts.config)
+          ? abbreviations[token]
+          : undefined;
       if (token !== undefined && expansion !== undefined) {
         ke.preventDefault();
         const next = element.value.slice(0, caret - token.length) + expansion + element.value.slice(caret);

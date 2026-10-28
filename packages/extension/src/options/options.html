@@ -506,8 +506,10 @@
         <h2 data-i18n="options.responses.heading">Labels de réponse</h2>
         <p class="group-sub" data-i18n="options.responses.sub">
           Trois labels optionnels pour répondre à une remarque : ack, done et disagree. Ils ne
-          font pas partie de Conventional Comments et sont désactivés par défaut. Cette page ne
-          peut pas les activer : collez ce bloc dans le fichier .conventional-comments.json du dépôt.
+          font pas partie de Conventional Comments et sont désactivés par défaut. Ils ne
+          s'activent pas ici : la configuration vit dans le dépôt, commune à toute l'équipe et
+          au vérificateur. Collez ce bloc dans son fichier .conventional-comments.json, sur la
+          branche par défaut.
         </p>
         <section class="panel">
           <textarea id="response-labels-snippet" class="config-snippet" rows="8" readonly

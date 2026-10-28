@@ -6,10 +6,10 @@
 # la barre d'outils comme la saisie rapide (§5.1, §5.2) deviendraient des boutons inertes.
 # Ce workflow rejoue donc le spike P1' dans un Chromium à jour, tous les jours.
 #
-# Le smoke test de sélecteurs du §9.4 contre les plateformes RÉELLES (github.com, GHE
-# Server, Azure DevOps) demande des sessions authentifiées : il n'est pas exécutable ici.
-# `smoke.mjs` en porte la forme et s'arrête proprement tant qu'aucune capture DOM n'est
-# fournie — il ne donne jamais une assurance qu'il n'a pas.
+# Le smoke test de sélecteurs du §9.4 tourne sur les pages CAPTURÉES de chaque plateforme
+# (`packages/adapters/<id>/test/fixtures/pages/`) : il vérifie que happy-dom, où tournent les
+# tests sur pages réelles, trouve exactement ce que trouve Chromium. Contre les plateformes
+# EN LIGNE, seul ce qui se lit sans session est vérifié (`github-selectors-canary.yml`).
 name: Canari navigateur
 
 on:
@@ -24,6 +24,7 @@ on:
       # une PR qui ne touche que packages/extension/ passerait sans jamais voir un vrai
       # navigateur — précisément le trou par lequel la PR #29 a livré quatre défauts.
       - 'packages/extension/**'
+      - 'scripts/check-captured-selectors.mjs'
       - '.github/workflows/browser-smoke.yml'
   workflow_dispatch:
 
@@ -131,5 +132,9 @@ jobs:
       - name: Isolation des styles par plateforme (§9.1, §9.4)
         run: npm run check:style-isolation
 
-      - name: Smoke test de sélecteurs (§9.4)
-        run: node spikes/p1-prime/smoke.mjs
+      # Les tests sur pages capturées tournent dans happy-dom, qui n'évalue pas tout comme un
+      # navigateur — mesuré : `:enabled`, `:any-link`, `:placeholder-shown` n'y trouvent rien,
+      # `:empty` y trouve cent fois trop. Un candidat de ce genre ferait passer un test sur un
+      # monde qui n'existe pas ; ce garde compte chaque candidat dans les deux et refuse l'écart.
+      - name: Smoke test de sélecteurs — happy-dom concorde avec Chromium sur les pages capturées (§9.4)
+        run: npm run check:captured-selectors

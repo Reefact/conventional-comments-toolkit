@@ -209,6 +209,7 @@ npm run check:pr-scope          # la PR touche une plateforme OU le partagé (d�
 npm run check:subject-line      # badges et sujet sur UNE seule ligne, mesuré (§5.5)
 npm run check:composer-layout   # trait d'état, gouttière du texte, pastille — mesurés (§5.1, §5.3)
 npm run check:captured-pages    # aucune page capturée ne garde un secret de session (--redact : masquer)
+npm run check:captured-selectors # happy-dom trouve, sur les pages capturées, exactement ce que trouve Chromium
 npm run check:github-selectors-live # les chaînes de selectors.ts trouvent encore sur github.com (sans session)
 ```
 

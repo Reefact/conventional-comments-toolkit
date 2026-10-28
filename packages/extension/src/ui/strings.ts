@@ -162,6 +162,9 @@ const fr: Record<string, string> = {
   'tour.shortcuts.title': 'Raccourcis directs',
   'tour.shortcuts.body':
     'Une combinaison de touches insère directement un label dans le commentaire en cours de rédaction. Une ligne par raccourci ; une ligne sans label désactive celui d’origine.',
+  'tour.responses.title': 'Labels de réponse',
+  'tour.responses.body':
+    'Trois labels optionnels pour répondre à une remarque : ack, done et disagree. Ils ne s’activent pas ici, mais dans le fichier .conventional-comments.json du dépôt : ce bloc est à y coller, et le bouton le copie.',
   'tour.telemetry.title': 'Télémétrie',
   'tour.telemetry.body':
     'Désactivée par défaut, et sans effet tant que votre organisation n’a pas déclaré de point de collecte. Elle n’émet que des compteurs — jamais le texte d’un commentaire, d’un code ou d’un diff, ni l’adresse de la page.',
@@ -339,6 +342,9 @@ const en: Record<string, string> = {
   'tour.shortcuts.title': 'Direct shortcuts',
   'tour.shortcuts.body':
     'A key combination inserts a label straight into the comment being written. One shortcut per line; a line with no label disables the original one.',
+  'tour.responses.title': 'Response labels',
+  'tour.responses.body':
+    'Three optional labels for replying to a remark: ack, done and disagree. They are not enabled here but in the repository’s .conventional-comments.json file: this block goes there, and the button copies it.',
   'tour.telemetry.title': 'Telemetry',
   'tour.telemetry.body':
     'Off by default, and inert until your organisation declares a collection endpoint. It only emits counters — never the text of a comment, of code or of a diff, nor the page address.',

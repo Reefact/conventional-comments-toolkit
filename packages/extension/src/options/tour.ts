@@ -58,6 +58,15 @@ const STEPS: Step[] = [
     body: 'tour.shortcuts.body',
   },
   {
+    // Le PANNEAU (bloc et bouton), pas toute la section : avec son titre et son texte, la
+    // section mesure 320 px dans une fenêtre de 720, et une fiche de 206 px n'y tenait ni
+    // dessous ni dessus — elle sortait de 20 px (mesuré, `spikes/options-tour.mjs`). C'est
+    // d'ailleurs du bloc et du bouton que parle l'étape.
+    targets: ['#panel-response-labels'],
+    title: 'tour.responses.title',
+    body: 'tour.responses.body',
+  },
+  {
     targets: ['#group-telemetry'],
     title: 'tour.telemetry.title',
     body: 'tour.telemetry.body',

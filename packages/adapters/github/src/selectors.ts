@@ -538,15 +538,17 @@ export const selectors = {
    * permettait de le vérifier (`pullRequestsLayoutRoute.pullRequest.createdTime`, voir
    * `prEmbeddedData`) : 07:18:01Z pour #331, 12:15:37Z pour #292, identiques. Sur la vue des
    * fichiers modifiés, aucun élément de la page ne porte cette date : c'est `prEmbeddedData`
-   * qui prend le relais. Les deux candidats d'en-tête sont gardés pour une page encore servie
-   * dans l'ancienne génération ; ils ne matchent rien sur les captures. */
+   * qui prend le relais.
+   *
+   * UN SEUL candidat, et c'est voulu. Les deux d'en-tête qui suivaient
+   * (`.gh-header-meta relative-time`, `[data-testid="pr-header"] relative-time`) ne matchent rien
+   * sur les captures ; mais sur une page où ils matcheraient, rien ne dit qu'ils portent la
+   * création plutôt que la FUSION — c'est précisément ce que porte l'en-tête mesuré —, et ils
+   * passaient avant les données embarquées sans rien journaliser (revue Reefact, PR #86). Un
+   * candidat n'entre ici que s'il désigne une date identifiable comme celle de la création. */
   prCreatedAt: {
     name: 'pr-created-at',
-    candidates: [
-      '[id^="pullrequest-"] relative-time',
-      '.gh-header-meta relative-time',
-      '[data-testid="pr-header"] relative-time',
-    ],
+    candidates: ['[id^="pullrequest-"] relative-time'],
   } satisfies SelectorChain,
 
   /** Les données que la vue React embarque dans la page, en JSON — la seule source de la date
@@ -556,7 +558,9 @@ export const selectors = {
    *
    * Ces données peuvent appartenir à une AUTRE page : sur la capture 03 (PR #294), elles
    * décrivent la liste des PR du dépôt, restées d'une navigation précédente. Elles ne sont donc
-   * lues que si le numéro qu'elles portent est celui de l'URL. */
+   * lues que si elles désignent la PR de l'URL — son NUMÉRO et son DÉPÔT
+   * (`pullRequestsLayoutRoute.repository.ownerLogin` et `.name`, présents sur toutes les
+   * captures) : deux dépôts ont chacun leur PR #331 (revue Reefact, PR #86). */
   prEmbeddedData: {
     name: 'pr-embedded-data',
     candidates: ['script[type="application/json"][data-target="react-app.embeddedData"]'],

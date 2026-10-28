@@ -273,5 +273,35 @@ describe('§6.2.3 — la date de création de la PR, sur chaque capture (#84)', 
     expect(page.adapter.currentPr()?.createdAt).toBe('');
     expect(page.adapter.log.failures.map((f) => f.chain)).toContain('pr-created-at');
   }, T);
+
+  it("ignore des données embarquées d'un AUTRE dépôt, même au même numéro de PR (revue, PR #86)", () => {
+    const page = load('04-files-commentaire-ligne.html', '/acme/other-repo/pull/331/changes');
+    expect(page.adapter.currentPr()?.createdAt).toBe('');
+    expect(page.adapter.log.failures.map((f) => f.chain)).toContain('pr-created-at');
+  }, T);
+
+  it('reconnaît le dépôt sans tenir compte de la casse, comme GitHub sert la page', () => {
+    const page = load('04-files-commentaire-ligne.html', '/reefact/JUST-DUMMIES/pull/331/changes');
+    expect(page.adapter.currentPr()?.createdAt).toBe('2026-10-28T07:18:01.000Z');
+  }, T);
+
+  it("ne prend jamais la date d'un en-tête, qui peut être celle de la FUSION (revue, PR #86)", () => {
+    // Deux dispositions d'en-tête que la chaîne acceptait encore, chacune portant une date de
+    // fusion, sans description de PR ni données embarquées : la date reste inconnue, et
+    // journalisée — jamais celle de l'en-tête.
+    for (const header of [
+      '<div class="gh-header-meta">Reefact merged 9 commits <relative-time datetime="2026-10-28T09:17:04Z"></relative-time></div>',
+      '<div data-testid="pr-header">Reefact merged 9 commits <relative-time datetime="2026-10-28T09:17:04Z"></relative-time></div>',
+    ]) {
+      const doc = new DOMParser().parseFromString(`<html><body>${header}</body></html>`, 'text/html');
+      Object.defineProperty(doc, 'location', {
+        value: new URL('https://github.com/Reefact/just-dummies/pull/331'),
+        configurable: true,
+      });
+      const adapter = new GithubClientAdapter({ documentRef: doc });
+      expect(adapter.currentPr()?.createdAt).toBe('');
+      expect(adapter.log.failures.map((f) => f.chain)).toContain('pr-created-at');
+    }
+  });
 });
 

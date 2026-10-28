@@ -227,13 +227,15 @@ const PIED = `
 
 // La date de création de la PR conditionne le périmètre d'activation (§6.2.3) : sans elle, la
 // garde reste désarmée et le test passerait sans rien prouver. Elle est donnée là où la vue
-// `/changes` la porte RÉELLEMENT — les données embarquées de la page, au numéro de la PR
-// (github/src/selectors.ts, `prEmbeddedData`, mesuré le 2026-10-28). Un `<relative-time>` posé
+// `/changes` la porte RÉELLEMENT — les données embarquées de la page, au dépôt et au numéro de
+// la PR de l'URL (github/src/selectors.ts, `prEmbeddedData`, mesuré le 2026-10-28). Un `<relative-time>` posé
 // en tête la donnait jusqu'ici, par le repli générique qui prenait la première date venue ; ce
 // repli lisait une date de FUSION sur les vraies pages, et il est retiré (#84).
 const DATE_DE_CREATION = `
   <script type="application/json" data-target="react-app.embeddedData">
-    {"payload":{"pullRequestsLayoutRoute":{"pullRequest":{"number":48,"createdTime":"2026-10-01T00:00:00Z"}}}}
+    {"payload":{"pullRequestsLayoutRoute":{
+      "repository":{"ownerLogin":"Reefact","name":"conventional-comments-toolkit"},
+      "pullRequest":{"number":48,"createdTime":"2026-10-01T00:00:00Z"}}}}
   </script>`;
 
 const COMPOSEUR_COMPLET = `

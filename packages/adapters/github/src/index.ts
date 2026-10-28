@@ -47,6 +47,15 @@ export const GITHUB_BODY_SHAPE: RenderedBodyShape = Object.freeze({
   lineBreakTag: 'BR',
 });
 
+/** Ce que la vue React embarque d'une PR, réduit à ce qui sert à dater et à identifier — tout
+ * est `unknown` jusqu'à vérification : c'est du JSON servi par la page. */
+interface EmbeddedPr {
+  number: unknown;
+  createdTime: unknown;
+  owner: unknown;
+  repo: unknown;
+}
+
 export class GithubClientAdapter implements PlatformAdapter {
   #fetch: typeof fetch;
   #doc: Document;
@@ -59,7 +68,7 @@ export class GithubClientAdapter implements PlatformAdapter {
   #surfaceOf = new WeakMap<Element, GithubSurface>();
   // `currentPr()` est appelé à chaque balayage, et le JSON embarqué pèse plusieurs centaines de
   // kilo-octets : lu une fois par élément `<script>` — une navigation en pose un nouveau.
-  #embeddedPr = new WeakMap<Element, { number?: unknown; createdTime?: unknown } | null>();
+  #embeddedPr = new WeakMap<Element, EmbeddedPr | null>();
 
   constructor(opts: ClientAdapterOptions = {}) {
     this.#fetch = adapterFetch(opts.fetchImpl);
@@ -573,9 +582,10 @@ export class GithubClientAdapter implements PlatformAdapter {
     const m = /^\/([^/]+)\/([^/]+)\/pull\/(\d+)/.exec(loc?.pathname ?? '');
     if (!m) return null;
     const number = Number(m[3]);
+    const scope: [string, string] = [m[1]!, m[2]!];
     return {
       platform: 'github',
-      createdAt: this.#createdAt(number),
+      createdAt: this.#createdAt(scope, number),
       // `host` et non `hostname` : il PORTE LE PORT quand il est non standard. `pr.host`
       // sert à bâtir les URL de lecture de configuration (`https://${pr.host}/…`) ; une
       // instance GHES servie sur `ghes.corp:8443` verrait sinon sa configuration demandée
@@ -583,7 +593,7 @@ export class GithubClientAdapter implements PlatformAdapter {
       // Codex, PR #29). La reconnaissance d'hôte, elle, reste sur `hostname` : les motifs
       // de correspondance de Chrome ignorent le port.
       host: loc!.host,
-      scope: [m[1]!, m[2]!],
+      scope,
       number,
     };
   }
@@ -592,32 +602,44 @@ export class GithubClientAdapter implements PlatformAdapter {
    * bloque alors jamais (`resolveInScope`, §6.2.3) : une date inconnue vaut mieux qu'une date
    * fausse, qui rangerait la PR du mauvais côté d'`activatedAt` (#84, `selectors.prCreatedAt`).
    *
-   * Le DOM d'abord, les données embarquées ensuite, et seulement si leur numéro est celui de
-   * l'URL. Rien des deux : la chaîne est journalisée (§9.4) — c'est ce que le repli générique
-   * d'avant empêchait, en trouvant toujours une date. */
-  #createdAt(number: number): string {
+   * Le DOM d'abord, les données embarquées ensuite, et seulement si elles désignent la PR de
+   * l'URL — dépôt ET numéro. Rien des deux : la chaîne est journalisée (§9.4) — c'est ce que le
+   * repli générique d'avant empêchait, en trouvant toujours une date. */
+  #createdAt(scope: [string, string], number: number): string {
     const fromDom = queryChain(this.#doc, selectors.prCreatedAt).element?.getAttribute('datetime');
     if (fromDom) return fromDom;
     for (const script of queryChainAll(this.#doc, selectors.prEmbeddedData)) {
-      const fromData = this.#embeddedCreatedAt(script, number);
+      const fromData = this.#embeddedCreatedAt(script, scope, number);
       if (fromData) return fromData;
     }
     this.log.degraded(selectors.prCreatedAt);
     return '';
   }
 
-  #embeddedCreatedAt(script: Element, number: number): string {
+  #embeddedCreatedAt(script: Element, scope: [string, string], number: number): string {
     if (!this.#embeddedPr.has(script)) {
-      let pr: { number?: unknown; createdTime?: unknown } | null = null;
+      let pr: EmbeddedPr | null = null;
       try {
-        pr = JSON.parse(script.textContent ?? '')?.payload?.pullRequestsLayoutRoute?.pullRequest ?? null;
+        const route = JSON.parse(script.textContent ?? '')?.payload?.pullRequestsLayoutRoute;
+        pr = route?.pullRequest
+          ? {
+              number: route.pullRequest.number,
+              createdTime: route.pullRequest.createdTime,
+              owner: route.repository?.ownerLogin,
+              repo: route.repository?.name,
+            }
+          : null;
       } catch {
         pr = null; // JSON illisible : comme absent
       }
       this.#embeddedPr.set(script, pr);
     }
     const pr = this.#embeddedPr.get(script);
-    if (!pr || pr.number !== number || typeof pr.createdTime !== 'string') return '';
+    // Le dépôt comparé sans la casse : GitHub sert la même PR à `/reefact/JUST-DUMMIES/…`. Un
+    // dépôt absent des données ne se présume pas — l'appartenance doit être démontrée.
+    const same = (a: unknown, b: string) => typeof a === 'string' && a.toLowerCase() === b.toLowerCase();
+    if (!pr || pr.number !== number || !same(pr.owner, scope[0]) || !same(pr.repo, scope[1])) return '';
+    if (typeof pr.createdTime !== 'string') return '';
     const time = Date.parse(pr.createdTime);
     return Number.isNaN(time) ? '' : new Date(time).toISOString();
   }

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // CA-47 — une abréviation LIVRÉE ne se déplie que vers un label actif (§5.2). La table livre
-// `?a`, `?do` et `?di` pour trois labels de réponse désactivés (§3.2) : sans garde, `?do` puis
-// Tab composait `done: `, que le validateur rejette au caractère suivant. Le défaut précédait la
+// `?a`, `?do`, `?di` et `?r` pour les labels de réponse, qu'un dépôt peut désactiver (§3.2) : sans
+// garde, `?do` puis Tab composait `done: `, que le validateur rejette au caractère suivant. Le défaut précédait la
 // famille — `?ty`, `?po`, `?qui` étaient déjà livrées pour trois labels désactivés —, pendant
 // que la liste de complétion, elle, ne montre que les labels actifs.
 
@@ -38,33 +38,34 @@ function tabAfter(typed: string, config: EffectiveConfig): { value: string; cons
   return { value: textarea.value, consumed: event.defaultPrevented };
 }
 
-const enabling = (doc: object) =>
+const resolving = (doc: object) =>
   resolveConfig(null, { status: 'absent' }, { status: 'found', text: JSON.stringify(doc) }, null, false).config;
 
 describe('CA-47 — une abréviation livrée ne se déplie que vers un label actif', () => {
-  it('famille éteinte : `?do` ne compose pas `done: `, et Tab garde son rôle', () => {
-    for (const abbr of ['?a', '?do', '?di']) {
-      const r = tabAfter(abbr, defaultConfig());
+  it('famille désactivée : `?do` ne compose pas `done: `, et Tab garde son rôle', () => {
+    const off = resolving({ labels: ['ack', 'done', 'disagree', 'reviewed'].map((id) => ({ id, enabled: false })) });
+    for (const abbr of ['?a', '?do', '?di', '?r']) {
+      const r = tabAfter(abbr, off);
       expect(r, abbr).toEqual({ value: abbr, consumed: false });
     }
   });
 
-  it('famille allumée : les trois se déplient', () => {
-    const on = enabling({ labels: [{ id: 'ack', enabled: true }, { id: 'done', enabled: true }, { id: 'disagree', enabled: true }] });
-    expect(tabAfter('?a', on).value).toBe('ack: ');
-    expect(tabAfter('?do', on).value).toBe('done: ');
-    expect(tabAfter('?di', on).value).toBe('disagree: ');
+  it('famille active — le défaut : les quatre se déplient', () => {
+    expect(tabAfter('?a', defaultConfig()).value).toBe('ack: ');
+    expect(tabAfter('?do', defaultConfig()).value).toBe('done: ');
+    expect(tabAfter('?di', defaultConfig()).value).toBe('disagree: ');
+    expect(tabAfter('?r', defaultConfig()).value).toBe('reviewed: ');
   });
 
   it('contre-épreuve sur le défaut antérieur : `?ty`, `?po`, `?qui` livrées pour des labels éteints', () => {
     for (const abbr of ['?ty', '?po', '?qui']) expect(tabAfter(abbr, defaultConfig()).value, abbr).toBe(abbr);
-    expect(tabAfter('?ty', enabling({ labels: [{ id: 'typo', enabled: true }] })).value).toBe('typo: ');
+    expect(tabAfter('?ty', resolving({ labels: [{ id: 'typo', enabled: true }] })).value).toBe('typo: ');
   });
 
   it('une abréviation écrite par une configuration n’est pas concernée', () => {
     // Une équipe qui déclare sa propre abréviation l'obtient, même vers un label éteint : ce
     // qu'elle écrit lui appartient. Seule la table LIVRÉE est gardée.
-    const team = enabling({ shortcuts: { abbreviations: { '?fx': 'done: ' } } });
+    const team = resolving({ shortcuts: { abbreviations: { '?fx': 'done: ' } } });
     expect(tabAfter('?fx', team).value).toBe('done: ');
   });
 

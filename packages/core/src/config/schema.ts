@@ -152,6 +152,12 @@ export function parseConfigDocument(
               } else label[s] = e[s];
             }
           }
+          if ('kind' in e) {
+            if (e['kind'] !== 'remark' && e['kind'] !== 'reply') {
+              bad(key, `"kind" of label "${e['id']}" must be "remark" or "reply"`);
+              ok = false;
+            } else label['kind'] = e['kind'];
+          }
           if ('aliases' in e) {
             if (!Array.isArray(e['aliases']) || !(e['aliases'] as unknown[]).every((a) => typeof a === 'string')) {
               bad(key, `"aliases" of label "${e['id']}" must be an array of strings`);
@@ -159,7 +165,7 @@ export function parseConfigDocument(
             } else label['aliases'] = e['aliases'];
           }
           for (const k of Object.keys(e)) {
-            if (!['id', 'enabled', 'blockingByDefault', 'alwaysNonBlocking', 'icon', 'color', 'aliases'].includes(k)) {
+            if (!['id', 'enabled', 'blockingByDefault', 'alwaysNonBlocking', 'kind', 'icon', 'color', 'aliases'].includes(k)) {
               notices.push(warning(`unknown key "labels[].${k}" ignored`, `labels[].${k}`));
             }
           }

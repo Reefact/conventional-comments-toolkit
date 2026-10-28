@@ -32,7 +32,7 @@
 // couleurs quasi identiques — l'état pressé se distingue déjà par son fond et son texte
 // inversés (§5.1), la bordure y est un simple rappel, pas le seul signal.
 
-import type { EffectiveConfig, LabelConfig } from '../types.js';
+import type { EffectiveConfig, LabelConfig, LabelKind } from '../types.js';
 
 const label = (
   id: string,
@@ -41,31 +41,32 @@ const label = (
   blockingByDefault: boolean,
   alwaysNonBlocking: boolean,
   enabled = true,
-  aliases: string[] = []
-): LabelConfig => ({ id, enabled, blockingByDefault, alwaysNonBlocking, icon, color, aliases: [...aliases] });
+  aliases: string[] = [],
+  kind: LabelKind = 'remark'
+): LabelConfig => ({ id, enabled, blockingByDefault, alwaysNonBlocking, kind, icon, color, aliases: [...aliases] });
 
 /**
- * Les labels de réponse du §3.2, tels que le produit les LIVRE — désactivés, toujours non
- * bloquants, avec leurs alias. Une seule définition, lue à trois endroits qui doivent dire la
- * même chose : `defaultConfig()` ci-dessous, la règle d'omission de `fingerprint()` (§9.2.2),
- * qui reconnaît une entrée « intacte » en la comparant à CETTE valeur, et le test qui affirme
- * que l'ensemble est celui que le §3.2 déclare. Une copie ailleurs vieillirait sans bruit : un
- * alias ajouté ici et pas là ferait projeter une entrée pourtant intacte, et désarmerait le
- * blocage d'envoi sur tout le parc (§8.1.3, règle 2).
+ * Les labels de réponse du §3.2, tels que le produit les LIVRE — ACTIVÉS, de type `reply`,
+ * toujours non bloquants, avec leurs alias. Une seule définition, lue par `defaultConfig()`
+ * ci-dessous, par le test qui affirme que l'ensemble est celui que le §3.2 déclare, et par la
+ * page d'options de l'extension, qui en tire le bloc qui les DÉSACTIVE.
  *
  * Couleurs mesurées, comme toutes les autres, contre les neuf fonds Primer de github.com
- * (`config.test.ts`) : #6A7FDB 3,48:1, #6B8E23 3,44:1, #8A7B6E 3,21:1 au pire. La contrainte de
- * contraste enferme la luminance dans une bande étroite, si bien que la teinte seule distingue
- * un label d'un autre : `done` en olive (vers 80°, entre `suggestion` et `praise`), `ack` en
- * indigo (vers 230°, entre `question` et `thought`), `disagree` en taupe — désaturé, donc
- * neutre comme le §5.5 l'exige, mais CHAUD là où le neutre existant, `nitpick` (#76818E), est
- * froid. Les deux sont à luminance quasi égale (écart 0,008) : seule la teinte les sépare, ce
- * que le garde de contraste ne vérifie pas — il n'écarte que les doublons exacts.
+ * (`config.test.ts`) : #6A7FDB 3,48:1, #6B8E23 3,44:1, #8A7B6E 3,21:1, #D04A7A 3,08:1 au pire. La
+ * contrainte de contraste enferme la luminance dans une bande étroite, si bien que la teinte
+ * seule distingue un label d'un autre : `done` en olive (vers 80°, entre `suggestion` et
+ * `praise`), `ack` en indigo (vers 230°, entre `question` et `thought`), `disagree` en taupe —
+ * désaturé, donc neutre comme le §5.5 l'exige, mais CHAUD là où le neutre existant, `nitpick`
+ * (#76818E), est froid —, `reviewed` en framboise (vers 340°, entre `typo` et `issue` ; à 15° de
+ * `typo`, que le produit livre désactivé). `disagree` et `nitpick` sont à luminance quasi égale (écart
+ * 0,008) : seule la teinte les sépare, ce que le garde de contraste ne vérifie pas — il
+ * n'écarte que les doublons exacts.
  */
 export const RESPONSE_LABELS: readonly LabelConfig[] = [
-  label('ack', '\u{1F44C}', '#6A7FDB', false, true, false, ['acknowledged']),
-  label('done', '\u{2705}', '#6B8E23', false, true, false, ['fixed']),
-  label('disagree', '\u{270B}', '#8A7B6E', false, true, false),
+  label('ack', '\u{1F44C}', '#6A7FDB', false, true, true, ['acknowledged'], 'reply'),
+  label('done', '\u{2705}', '#6B8E23', false, true, true, ['fixed'], 'reply'),
+  label('disagree', '\u{270B}', '#8A7B6E', false, true, true, [], 'reply'),
+  label('reviewed', '\u{1F389}', '#D04A7A', false, true, true, [], 'reply'),
 ];
 
 export function defaultConfig(): EffectiveConfig {
@@ -73,7 +74,7 @@ export function defaultConfig(): EffectiveConfig {
     version: 1,
     mode: 'assist',
     labels: [
-      label('praise', '\u{1F389}', '#36933B', false, false),
+      label('praise', '\u{1F44F}', '#36933B', false, false),
       label('nitpick', '\u{1F50D}', '#76818E', false, true),
       label('suggestion', '\u{1F4A1}', '#B07600', false, false),
       // Icône identique à celle de l'exemple normatif (.conventional-comments.example.json,
@@ -86,7 +87,7 @@ export function defaultConfig(): EffectiveConfig {
       label('thought', '\u{1F4AD}', '#9368E3', false, true),
       label('chore', '\u{1F9F9}', '#A97735', true, false),
       label('note', '\u{1F4DD}', '#1F8E96', false, true),
-      label('decision', '\u{1F3C1}', '#936DD4', false, true),
+      label('decision', '\u{2696}\u{FE0F}', '#936DD4', false, true),
       // Labels optionnels, livrés désactivés (§3.2, §8.1.4) — icône et couleur assignées
       // quand même : (re)activer un label ne doit pas exiger de configurer aussi son
       // apparence pour sortir du rendu monochrome que #18 décrit.
@@ -94,7 +95,8 @@ export function defaultConfig(): EffectiveConfig {
       label('polish', '\u{2728}', '#0C8E9A', false, false, false),
       label('quibble', '\u{1FAB6}', '#61896C', false, false, false),
       // Labels de réponse (§3.2) — une extension propre à cette boîte à outils, absente de
-      // Conventional Comments (§3.1), livrée désactivée. Copiés à chaque appel : la
+      // Conventional Comments (§3.1), livrée activée ; un dépôt qui veut s'en tenir à la liste
+      // de l'amont les désactive. Copiés à chaque appel : la
       // configuration rendue est mutée par la fusion, la définition livrée ne doit jamais l'être.
       ...RESPONSE_LABELS.map((l) => structuredClone(l)),
     ],
@@ -131,6 +133,7 @@ export function defaultConfig(): EffectiveConfig {
         '?a': 'ack: ',
         '?do': 'done: ',
         '?di': 'disagree: ',
+        '?r': 'reviewed: ',
         '?ib': 'issue (blocking): ',
         '?su': 'suggestion: ',
         '?ni': 'nitpick: ',

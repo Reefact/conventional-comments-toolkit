@@ -186,6 +186,121 @@ assert('le texte garde sa gouttière (≥ 5px)', m.gouttiereHerite >= 5, `${m.go
 assert('la barre n’a aucun retrait horizontal', m.barreRetrait === 0, `${m.barreRetrait}px`);
 assert('la pastille est 2 à 5 px sous le champ', m.ecartPastille >= 2 && m.ecartPastille <= 5, `${m.ecartPastille}px`);
 
+// ————— CA-48 — les deux zones de la rangée des labels (§5.1) —————
+//
+// La barre est ici la VRAIE (`buildToolbar`, configuration par défaut résolue), pas une copie :
+// ce qui se mesure est sur quelle ligne tombe chaque bouton, et seul un moteur de rendu le sait.
+// Elle est montée à plusieurs largeurs, parce que la règle a deux branches — trait affiché quand
+// la zone `reply` partage sa ligne avec un label `remark`, absent quand elle commence une
+// ligne — et qu'une seule largeur n'en exercerait qu'une : le balayage doit rencontrer les
+// deux, sinon le garde ne prouve rien.
+const toolbarBundle = await build({
+  stdin: {
+    contents: `
+      import { buildToolbar } from './packages/extension/src/ui/toolbar.ts';
+      import { defaultConfig, resolveConfig } from '@cct/core';
+      const prefix = () => ({ hasPrefix: false, label: null, writtenLabel: null, decorations: [], malformedDecorations: false });
+      globalThis.cctBar = (doc) => {
+        const config = doc
+          ? resolveConfig(null, { status: 'absent' }, { status: 'found', text: JSON.stringify(doc) }, null, false).config
+          : defaultConfig();
+        return buildToolbar({ config, lang: 'fr', onLabel() {}, onFreeDecoration() {}, currentPrefix: prefix }).element;
+      };
+    `,
+    resolveDir: root,
+    loader: 'ts',
+  },
+  bundle: true,
+  format: 'iife',
+  write: false,
+  logLevel: 'silent',
+});
+const zonesPage = await browser.newPage();
+await zonesPage.setContent(`<style>
+  body { font: 14px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; margin: 0; }
+  ${css}
+  ${cssGithub}
+</style><div id="hote"></div>`);
+await zonesPage.evaluate(() => {
+  document.documentElement.dataset['cctPlatform'] = 'github';
+});
+await zonesPage.addScriptTag({ content: toolbarBundle.outputFiles[0].text });
+
+const LARGEURS = [240, 360, 480, 600, 700, 800, 900, 1000, 1100, 1200, 1400];
+const mesures = [];
+for (const largeur of LARGEURS) {
+  mesures.push(
+    await zonesPage.evaluate(async (largeur) => {
+      const hote = document.getElementById('hote');
+      hote.innerHTML = '';
+      hote.style.width = `${largeur}px`;
+      hote.appendChild(globalThis.cctBar());
+      // L'observateur de taille rappelle `placeSeparator` après la mise en page.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const top = (e) => Math.round(e.getBoundingClientRect().top);
+      const zone = hote.querySelector('.cct-reply-zone');
+      const trait = zone.querySelector('.cct-zone-separator');
+      const remarks = [...zone.parentElement.querySelectorAll(':scope > .cct-label-button')];
+      const replies = [...zone.querySelectorAll('.cct-label-button')];
+      const dernier = remarks.at(-1).getBoundingClientRect();
+      const premier = replies[0].getBoundingClientRect();
+      const t = trait.getBoundingClientRect();
+      return {
+        largeur,
+        traitVisible: getComputedStyle(trait).display !== 'none' && t.width > 0,
+        partageLigne: top(replies[0]) === top(remarks.at(-1)),
+        zoneTient: zone.scrollWidth <= zone.parentElement.clientWidth && zone.getBoundingClientRect().width < hote.clientWidth,
+        lignesReply: new Set(replies.map(top)).size,
+        traitEntre: t.left >= dernier.right && t.right <= premier.left && t.top < premier.bottom && t.bottom > premier.top,
+      };
+    }, largeur)
+  );
+}
+
+console.log('\nDeux zones dans la rangée des labels (CA-48) — mesurées dans Chromium\n');
+for (const x of mesures) {
+  const detail = `${x.largeur}px : ${x.partageLigne ? 'même ligne' : 'zone en tête de ligne'}, trait ${x.traitVisible ? 'affiché' : 'absent'}`;
+  assert(`${x.largeur}px — trait affiché si et seulement si la zone partage sa ligne`, x.traitVisible === x.partageLigne, detail);
+  if (x.traitVisible) assert(`${x.largeur}px — le trait est ENTRE les deux zones`, x.traitEntre);
+  if (x.zoneTient) assert(`${x.largeur}px — la zone \`reply\` n'est pas coupée`, x.lignesReply === 1, `${x.lignesReply} ligne(s)`);
+}
+assert(
+  'le balayage rencontre les deux branches — trait affiché ET absent',
+  mesures.some((x) => x.traitVisible) && mesures.some((x) => !x.traitVisible),
+  mesures.map((x) => `${x.largeur}:${x.traitVisible ? '|' : '-'}`).join(' ')
+);
+assert(
+  'il rencontre aussi une zone qui partage sa ligne APRÈS un passage à la ligne des labels `remark`',
+  await zonesPage.evaluate(async () => {
+    // La branche que la première version du calcul ratait : comparée au PREMIER bouton de la
+    // rangée plutôt qu'au dernier label `remark`, la zone semblait commencer une ligne.
+    for (let w = 300; w <= 1400; w += 20) {
+      const hote = document.getElementById('hote');
+      hote.innerHTML = '';
+      hote.style.width = `${w}px`;
+      hote.appendChild(globalThis.cctBar());
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const zone = hote.querySelector('.cct-reply-zone');
+      const remarks = [...zone.parentElement.querySelectorAll(':scope > .cct-label-button')];
+      const top = (e) => Math.round(e.getBoundingClientRect().top);
+      const plusieursLignes = top(remarks[0]) !== top(remarks.at(-1));
+      const partage = top(zone.querySelector('.cct-label-button')) === top(remarks.at(-1));
+      const trait = getComputedStyle(zone.querySelector('.cct-zone-separator')).display !== 'none';
+      if (plusieursLignes && partage) return trait;
+    }
+    return false;
+  })
+);
+assert(
+  'sans label `reply` actif, ni zone ni trait',
+  await zonesPage.evaluate(() => {
+    const hote = document.getElementById('hote');
+    hote.innerHTML = '';
+    hote.appendChild(globalThis.cctBar({ labels: ['ack', 'done', 'disagree', 'reviewed'].map((id) => ({ id, enabled: false })) }));
+    return hote.querySelector('.cct-reply-zone') === null && hote.querySelector('.cct-zone-separator') === null;
+  })
+);
+
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} assertions vérifiées.`);

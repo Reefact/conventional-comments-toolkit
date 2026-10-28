@@ -22,7 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultConfig } from '@cct/core';
+import { defaultConfig, resolveConfig } from '@cct/core';
 import { buildToolbar } from '../src/ui/toolbar.js';
 
 const css = readFileSync(resolve(process.cwd(), 'packages/extension/src/styles.css'), 'utf8').replace(
@@ -107,5 +107,53 @@ describe('§5.1 — la barre d’outils empile ses rangées', () => {
     // Et la rangée, elle, se replie sur elle-même : tous les labels sur une fenêtre étroite
     // passent à la ligne DANS leur rangée, sans jamais rejoindre celle des décorations.
     expect(ruleBody('.cct-toolbar-row')).toMatch(/flex-wrap\s*:\s*wrap/);
+  });
+});
+
+// CA-48 — la STRUCTURE des deux zones (§5.1). Ce que happy-dom ne sait pas dire — sur quelle
+// ligne tombe un bouton, donc si le trait est affiché — est mesuré dans un vrai navigateur par
+// `npm run check:composer-layout`.
+describe('CA-48 — deux zones dans la rangée des labels', () => {
+  const resolved = (doc: object) =>
+    resolveConfig(null, { status: 'absent' }, { status: 'found', text: JSON.stringify(doc) }, null, false).config;
+  const labelsIn = (root: Element) =>
+    [...root.querySelectorAll('.cct-label-button')].map((b) => (b as HTMLElement).dataset['label']);
+
+  it('les labels `remark` d’abord, puis la zone `reply` précédée de son trait, dans la même rangée', () => {
+    const bar = toolbar();
+    const zone = bar.querySelector('.cct-reply-zone')!;
+    expect(zone).not.toBeNull();
+    expect(rowOf(zone)).toBe(rowOf(bar.querySelector('.cct-label-button')));
+    expect(zone.firstElementChild!.classList.contains('cct-zone-separator')).toBe(true);
+    expect(zone.firstElementChild!.getAttribute('aria-hidden')).toBe('true');
+    expect(labelsIn(zone)).toEqual(['ack', 'done', 'disagree', 'reviewed']);
+    expect(labelsIn(bar)).toEqual([
+      'praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'decision',
+      'ack', 'done', 'disagree', 'reviewed',
+    ]);
+    // La zone est le DERNIER élément de la rangée : aucun bouton `remark` après elle.
+    expect(zone.nextElementSibling).toBeNull();
+  });
+
+  it('le type range le bouton, pas son identifiant', () => {
+    const bar = toolbar(resolved({ labels: [{ id: 'merci', kind: 'reply' }, { id: 'done', kind: 'remark' }] }));
+    const zone = bar.querySelector('.cct-reply-zone')!;
+    expect(labelsIn(zone)).toEqual(['ack', 'disagree', 'reviewed', 'merci']);
+    expect(zone.parentElement!.querySelector(':scope > [data-label="done"]')).not.toBeNull();
+  });
+
+  it('sans label `reply` actif, ni zone ni trait : la rangée est celle d’avant', () => {
+    const bar = toolbar(resolved({ labels: ['ack', 'done', 'disagree', 'reviewed'].map((id) => ({ id, enabled: false })) }));
+    expect(bar.querySelector('.cct-reply-zone')).toBeNull();
+    expect(bar.querySelector('.cct-zone-separator')).toBeNull();
+  });
+
+  it('la zone passe à la ligne d’un bloc : une seule boîte, sans retour à la ligne entre ses boutons tant qu’elle tient', () => {
+    // Moitié CSS de la règle, lue dans le texte : la zone est UN élément de la rangée, et elle
+    // ne se replie sur elle-même que bornée à la largeur de la rangée.
+    const zone = ruleBody('.cct-reply-zone');
+    expect(zone).toMatch(/display:\s*inline-flex/);
+    expect(zone).toMatch(/max-width:\s*100%/);
+    expect(css).toMatch(/\.cct-zone-separator\[hidden\]\s*\{\s*display:\s*none/);
   });
 });

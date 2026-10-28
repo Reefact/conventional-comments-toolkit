@@ -148,6 +148,32 @@
   align-items: center;
 }
 
+/* La zone `reply` (§5.1, toolbar.ts) : un seul élément de la rangée, donc un bloc qui passe à
+   la ligne d'un coup, et qui ne se replie à l'intérieur de lui-même que s'il ne tient pas sur
+   une ligne entière. Mêmes écarts que la rangée, pour que rien d'autre ne bouge que le trait. */
+.cct-reply-zone {
+  display: inline-flex;
+  flex-wrap: wrap;
+  column-gap: 6px;
+  row-gap: 8px;
+  align-items: center;
+  align-self: stretch;
+  max-width: 100%;
+}
+
+/* Le trait entre les deux zones. `hidden` quand la zone commence une ligne : il ne séparerait
+   alors rien (toolbar.ts, `placeSeparator`). */
+.cct-zone-separator {
+  align-self: stretch;
+  width: 1px;
+  margin: 2px 0;
+  background: var(--cct-border-default);
+}
+
+.cct-zone-separator[hidden] {
+  display: none;
+}
+
 /* Fond plein, et non le fond de la page : sur un écran où 1 px CSS vaut MOINS d'un pixel
    physique (zoom arrière, mise à l'échelle système), un filet de 1 px ne peut pas être
    tracé plein — Chromium l'étale sur deux pixels et certains bords apparaissent « fondus »

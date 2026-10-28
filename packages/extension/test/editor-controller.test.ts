@@ -105,7 +105,7 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.attach();
     const toolbar = host.querySelector('.cct-toolbar');
     expect(toolbar).not.toBeNull();
-    expect(toolbar!.querySelectorAll('.cct-label-button')).toHaveLength(10);
+    expect(toolbar!.querySelectorAll('.cct-label-button')).toHaveLength(14); // dont 4 labels de réponse
     controller.dispose();
   });
 

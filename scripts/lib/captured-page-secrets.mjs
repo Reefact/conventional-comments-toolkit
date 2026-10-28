@@ -100,3 +100,64 @@ export function redactCapturedPage(html) {
   out = out.replace(/(_sockets\/u\/)\d+(\/ws)/g, '$10$2');
   return out;
 }
+
+/** Une valeur qui a la forme d'un jeton plutôt que d'un nom : vingt caractères au moins, d'un
+ * seul tenant (sans espace ni `/`), où les chiffres se mêlent aux lettres sans que celles-ci
+ * forment des mots. Un nom de classe (`prc-Button-ButtonBase-9n-Xk`) ou un identifiant d'élément
+ * se lisent ; un jeton, une empreinte ou un identifiant de session, non. Le filtre est grossier,
+ * et c'est voulu : il réduit la liste à trier, il ne trie pas. */
+function looksRandom(value) {
+  if (!/^[A-Za-z0-9+=_.:-]{20,}$/.test(value)) return false;
+  const digits = (value.match(/[0-9]/g) ?? []).length;
+  if (digits < 4) return false;
+  // Six lettres minuscules de suite : un mot, donc un nom.
+  return !/[a-z]{6,}/.test(value);
+}
+
+/** Les champs OPAQUES communs à des pages de PR DIFFÉRENTES, désignés par leur NOM — jamais par
+ * leur valeur.
+ *
+ * C'est l'outil d'une plateforme NOUVELLE, dont la liste ci-dessus ne connaît pas encore les
+ * secrets : une donnée de session est la même sur toutes les pages d'une session, une donnée
+ * de PR change d'une PR à l'autre. Sur des captures de PR DIFFÉRENTES, ce qui revient partout
+ * est donc soit de la session, soit une constante du site (empreinte de version) — à trier par
+ * un humain, avant tout envoi. C'est ainsi qu'a été trouvé `data-session-id`.
+ *
+ * Le rapport ne contient que des noms (`link[rel=shared-web-socket] @data-session-id`) : il peut
+ * être transmis sans rien divulguer, pour que la liste soit complétée AVANT le masquage. Les
+ * valeurs déjà masquées ne comptent pas. */
+export function sharedOpaqueFields(pages) {
+  const filesByValue = new Map();
+  const namesByValue = new Map();
+  const note = (value, name, index) => {
+    if (value === MASK || !looksRandom(value)) return;
+    if (!filesByValue.has(value)) filesByValue.set(value, new Set());
+    filesByValue.get(value).add(index);
+    if (!namesByValue.has(value)) namesByValue.set(value, new Set());
+    namesByValue.get(value).add(name);
+  };
+  // Une page est rattachée à sa PR par son `<title>`, qui la nomme sur toutes les plateformes
+  // mesurées. Deux captures de la même PR partagent ses données — identifiants de commit,
+  // dates —, qui ne sont pas de la session : seules comptent les valeurs communes à des
+  // TITRES différents.
+  const titles = pages.map((html, index) => /<title>([^<]*)<\/title>/.exec(html)?.[1]?.trim() || `page ${index}`);
+  pages.forEach((html, page) => {
+    const index = titles[page];
+    for (const m of html.matchAll(/<([a-z][a-z0-9-]*)\b([^>]*)>/g)) {
+      const [, tag, attrs] = m;
+      const pairs = [...attrs.matchAll(/\s([a-zA-Z_:][-a-zA-Z0-9_:.]*)="([^"]*)"/g)];
+      // Ce qui identifie l'élément sans être une valeur : son `name`, `rel`, `property` ou
+      // `http-equiv` quand il en a, faute de quoi la seule balise.
+      const label = pairs.find(([, n]) => ['name', 'rel', 'property', 'http-equiv'].includes(n));
+      const element = label ? `${tag}[${label[1]}=${label[2]}]` : tag;
+      for (const [, name, value] of pairs) note(value, `${element} @${name}`, index);
+    }
+    for (const m of html.matchAll(/"([A-Za-z_][A-Za-z0-9_]*)"\s*:\s*"([^"]*)"/g)) note(m[2], `json "${m[1]}"`, index);
+  });
+  const fields = new Map();
+  for (const [value, prs] of filesByValue) {
+    if (prs.size < 2) continue;
+    for (const name of namesByValue.get(value)) fields.set(name, Math.max(fields.get(name) ?? 0, prs.size));
+  }
+  return [...fields].map(([name, prs]) => ({ name, prs })).sort((a, b) => a.name.localeCompare(b.name));
+}

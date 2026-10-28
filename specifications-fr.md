@@ -1403,7 +1403,7 @@ interface ComposerMount {
 interface RenderedBodyShape {
   paragraphTags: readonly string[];    // conteneurs de premier niveau enveloppant une ligne de Markdown
                                        // ordinaire sans avoir consommé de syntaxe de tête ; tout le reste
-                                       // fait RENONCER le masquage, ce qui est l'issue sûre (§9.4, CA-11)
+                                       // fait RENONCER le masquage, ce qui est l'issue sûre (§5.5)
   lineBreakTag: string;                // ce qui matérialise une fin de ligne simple dans ce corps rendu
 }
 

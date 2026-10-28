@@ -96,9 +96,12 @@ check on `main`; the others report without gating.
 | [`browser-smoke.yml`](./.github/workflows/browser-smoke.yml) | Does the §9.3 programmatic-write strategy still hold in a current Chromium — the one thing happy-dom cannot tell us? | daily (04:17 UTC), PRs touching adapters or the spike |
 | [`release.yml`](./.github/workflows/release.yml) | Can someone install the extension without any build chain? Builds, verifies and publishes the Chromium and Firefox zips as a GitHub Release. | tag `v*`, manual dry run |
 
-The selector smoke test of §9.4 against the *real* platforms needs authenticated sessions
-and is therefore not run in CI: `spikes/p1-prime/smoke.mjs` carries its shape and exits
-cleanly while no DOM captures are supplied, rather than giving assurance it does not have.
+The selector smoke test of §9.4 runs on pages captured from each platform
+(`packages/adapters/<id>/test/fixtures/pages/`): `npm run check:captured-selectors` checks that
+happy-dom, where the real-page tests run, matches exactly the elements Chromium matches.
+Against the *live* platforms, only what an anonymous visitor can see is checked, weekly, by
+[`github-selectors-canary.yml`](./.github/workflows/github-selectors-canary.yml). Composers
+need a signed-in session and are not checked live.
 
 ## Status against the specification phases (§14)
 

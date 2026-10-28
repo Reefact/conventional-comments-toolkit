@@ -4,18 +4,24 @@
 // Usage :
 //   node scripts/check-captured-pages.mjs            contrôle, sort 1 sur un secret restant
 //   node scripts/check-captured-pages.mjs --redact   masque d'abord, en place, puis contrôle
+//   node scripts/check-captured-pages.mjs --audit    liste les champs opaques communs à des
+//                                                    PR différentes, par NOM, sans valeur
 //
-// `--redact` est le chemin d'une NOUVELLE capture : déposer le fichier dans
-// `packages/adapters/<id>/test/fixtures/pages/`, lancer la commande, relire le diff. Le message
-// d'erreur ne recopie jamais la valeur trouvée : un journal de CI est public.
+// Tout se fait sur la machine de qui a capturé, AVANT tout envoi : ce script et sa bibliothèque
+// n'importent que des modules de Node, un clone superficiel suffit, sans `npm install`.
+// `--redact` masque ce que la liste connaît ; `--audit` sert à une plateforme NOUVELLE, dont la
+// liste ne connaît pas encore les champs (.claude/skills/plateforme/SKILL.md, étape 2). Aucun
+// message ne recopie une valeur trouvée : un journal de CI est public, un rapport d'audit se
+// transmet.
 
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { findCapturedPageSecrets, redactCapturedPage } from './lib/captured-page-secrets.mjs';
+import { findCapturedPageSecrets, redactCapturedPage, sharedOpaqueFields } from './lib/captured-page-secrets.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const ADAPTERS = join(ROOT, 'packages', 'adapters');
 const redact = process.argv.includes('--redact');
+const audit = process.argv.includes('--audit');
 
 const pages = [];
 for (const id of readdirSync(ADAPTERS)) {
@@ -26,6 +32,18 @@ for (const id of readdirSync(ADAPTERS)) {
     continue; // pas de pages capturées pour cette plateforme
   }
   for (const f of readdirSync(dir)) if (f.endsWith('.html')) pages.push(join(dir, f));
+}
+
+if (audit) {
+  const fields = sharedOpaqueFields(pages.map((p) => readFileSync(p, 'utf8')));
+  console.log(`Champs opaques communs à des PR différentes (${pages.length} page(s)), sans leurs valeurs :\n`);
+  for (const f of fields) console.log(`  ${f.name} — ${f.prs} PR`);
+  if (fields.length === 0) console.log('  (aucun — il faut des captures d\'au moins deux PR différentes)');
+  console.log(
+    "\nTrier : une donnée de session (jeton, identifiant de session, signature) va dans la liste de" +
+      ' scripts/lib/captured-page-secrets.mjs ; une constante du site (empreinte de version) non.'
+  );
+  process.exit(0);
 }
 
 const failures = [];

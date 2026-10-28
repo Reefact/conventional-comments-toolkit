@@ -65,27 +65,59 @@ est affichée.
 `01-conversation-nouveau-commentaire.html`, `06-files-modification-commentaire.html`. Deux
 captures du même état dans deux vues portent le même numéro.
 
-## 2. Recevoir les captures sans publier de secret
+## 2. Désensibiliser AVANT tout envoi — sur la machine de qui a capturé
 
 Une page capturée porte la session de qui l'a prise : jetons CSRF, nonces, canaux signés,
-identifiant de session du socket. **Rien de brut ne doit entrer dans l'historique.**
+identifiant de session du socket. **Aucune capture brute ne quitte cette machine** — ni vers
+GitHub, ni dans la conversation. Masquer après coup ne rattrape rien : une branche réécrite ne
+garantit pas la disparition d'objets Git déjà reçus (forks, caches, références conservées par
+le serveur), et une déconnexion n'invalide pas forcément tous les jetons publiés (revue
+Reefact, PR #85). La conversation n'est pas une issue non plus : une page pèse de 0,5 à 3 Mo et
+sature le contexte, une capture s'y est perdue.
 
-- **Jamais collées dans la conversation** : une page pèse de 0,5 à 3 Mo et sature le contexte
-  — chaque collage a fait perdre le fil de la session, et une capture s'est perdue ainsi.
-- **Le bon chemin** : la personne a un clone du dépôt. Elle dépose les fichiers dans
-  `packages/adapters/<id>/test/fixtures/pages/`, lance `npm run check:captured-pages -- --redact`,
-  relit le diff, puis pousse. Le secret n'a jamais quitté sa machine.
-- **Sans clone** : dépôt par l'interface GitHub (« Add file » → « Upload files ») sur la branche
-  de travail, puis, de ce côté, `--redact`, et l'historique de la branche est RÉÉCRIT en un seul
-  commit avant toute PR (avec l'accord de la personne). Même ainsi, les commits bruts restent
-  joignables un temps par leur identifiant : lui demander de se déconnecter puis se reconnecter
-  à la plateforme, ce qui invalide la session publiée.
-- `npm run check:captured-pages` tourne dans `checks` et dans la CI : une page qui garde un
-  secret connu fait échouer la PR. Sa liste (`scripts/lib/captured-page-secrets.mjs`) est faite
-  de ce que GitHub sert : **une nouvelle plateforme a ses propres champs**. Avant le premier
-  commit, chercher les valeurs opaques COMMUNES à des captures de PR différentes — une donnée
-  de session est la même partout, une donnée de PR non — et ajouter à la liste ce qui en sort.
-  C'est ainsi qu'a été trouvé `data-session-id`, qu'aucune relecture n'avait vu.
+**L'outil tourne en local, sans installation.** `scripts/check-captured-pages.mjs` et sa
+bibliothèque n'importent que des modules de Node : un clone superficiel suffit, sans
+`npm install`. La consigne à donner, telle quelle :
+
+> ```
+> git clone --depth 1 https://github.com/Reefact/conventional-comments-toolkit cct-captures
+> cd cct-captures
+> mkdir -p packages/adapters/<id>/test/fixtures/pages
+> # y copier les captures, puis :
+> node scripts/check-captured-pages.mjs --redact
+> ```
+>
+> La dernière ligne doit dire « aucun secret de session en clair ». Ce sont les fichiers de ce
+> dossier, et eux seuls, qui s'envoient ensuite.
+
+Sans Node ni Git sur la machine, il n'y a PAS de voie de repli : on ne reçoit pas la capture.
+
+**Une plateforme NOUVELLE a ses propres secrets**, que la liste de
+`scripts/lib/captured-page-secrets.mjs` ne connaît pas encore : `--redact` les laisserait
+passer. Avant le premier envoi, donc :
+
+1. Capturer des pages d'**au moins deux PR différentes** — une donnée de session est la même
+   sur toutes les pages, une donnée de PR change d'une PR à l'autre.
+2. En local : `node scripts/check-captured-pages.mjs --audit`. Le rapport ne contient que des
+   NOMS de champs (`link[rel=shared-web-socket] @data-session-id`), jamais de valeur : il se
+   transmet sans rien divulguer. Sur les captures GitHub, c'est ce critère — une valeur commune
+   à des PR différentes — qui a trouvé `data-session-id`, qu'aucune relecture n'avait vu.
+3. Trier le rapport : ce qui authentifie (jeton, identifiant de session, signature) entre dans
+   la liste, par une PR d'outillage livrée AVANT les captures ; les empreintes de version du
+   site (`x-pjax-*-version`, `release`) et les données de PR restent.
+4. Alors seulement : `--redact` en local, puis envoi.
+
+**Si une capture brute a malgré tout été envoyée**, la traiter comme une fuite : révoquer
+explicitement la session concernée sur la plateforme — sur github.com, *Settings → Access → Sessions*
+liste les sessions web, et *Revoke session* révoque chacune (documentation GitHub, « Viewing
+and managing your sessions », lue le 2026-10-28) ; l'équivalent de chaque
+autre plateforme est à trouver et à écrire ici le jour où on la traite. Puis retirer la capture
+de l'historique (réécriture, avec l'accord de la personne) en sachant que cela n'efface pas ce
+qui a déjà été reçu.
+
+`npm run check:captured-pages` tourne dans `checks` et dans la CI : une page qui garde un
+secret CONNU fait échouer la PR. C'est un filet, pas la protection — à ce stade, le secret
+serait déjà publié.
 
 ## 3. Vérifier ce que montre chaque capture
 

@@ -1,17 +1,19 @@
 // Smoke test de sélecteurs (§9.4) sur les pages CAPTURÉES de chaque plateforme, et la question
-// qui le rend nécessaire : happy-dom répond-il comme un vrai navigateur ?
+// qui le rend nécessaire : happy-dom trouve-t-il les MÊMES éléments qu'un vrai navigateur ?
 //
 // Les tests sur pages réelles (`packages/adapters/<id>/test/real-pages.test.ts`) tournent dans
 // happy-dom. Ce qu'ils affirment n'est vrai d'un navigateur que si happy-dom trouve, pour CHAQUE
-// candidat de CHAQUE chaîne, exactement les éléments qu'y trouverait Chromium : un sélecteur
-// mal implémenté — pseudo-classe, combinateur, attribut sensible à la casse — ferait passer un
-// test sur un monde qui n'existe pas (CLAUDE.md, « un faux de test est une affirmation sur
-// l'environnement »). Ce garde compte donc les deux, et refuse le moindre écart.
+// candidat de CHAQUE chaîne, exactement les éléments qu'y trouverait Chromium. Mesuré : il ne
+// connaît ni `:enabled`, ni `:any-link`, ni `:placeholder-shown`, et tient pour `:empty` tout
+// élément sans enfant ÉLÉMENT, texte compris. Un candidat de ce genre ferait passer un test sur
+// un monde qui n'existe pas (CLAUDE.md, « un faux de test est une affirmation sur
+// l'environnement »). Ce garde compare donc l'identité de chaque élément trouvé, des deux côtés
+// (scripts/lib/selector-parity.mjs dit pourquoi pas seulement leur nombre).
 //
-// Ce qu'il NE dit PAS : qu'une chaîne trouve quelque chose. Un zéro des deux côtés est
+// Ce qu'il NE dit PAS : qu'une chaîne trouve quelque chose. Un vide des deux côtés est
 // concordant ; ce que la page DOIT porter, ce sont les tests sur pages réelles qui le disent,
-// état par état. Ce qu'il ne dit pas non plus : que la page servie AUJOURD'HUI ressemble encore
-// à la capture — c'est le rôle du canari en ligne (`check:github-selectors-live`).
+// état par état. Ni que la page servie AUJOURD'HUI ressemble encore à la capture — c'est le rôle
+// du canari en ligne (`check:github-selectors-live`).
 //
 // Usage : node scripts/check-captured-selectors.mjs [id…]   (défaut : toutes les plateformes
 // qui ont des pages capturées). Lit les sélecteurs COMPILÉS : `npm run build` d'abord.
@@ -21,6 +23,7 @@ import { Window } from 'happy-dom';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { COUNTER_PROOF, matchPaths, parityMismatches } from './lib/selector-parity.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const ADAPTERS = join(ROOT, 'packages', 'adapters');
@@ -46,23 +49,12 @@ if (ids.length === 0) {
   process.exit(0);
 }
 
-/** Comptes par candidat, dans happy-dom — de la même façon que les tests : `DOMParser`, qui
- * n'exécute aucun script et ne charge aucune ressource. */
-function happyDomCounts(html, selectors) {
+/** Le relevé de happy-dom, de la même façon que les tests : `DOMParser`, qui n'exécute aucun
+ * script et ne charge aucune ressource. */
+function inHappyDom(html, candidates) {
   const window = new Window();
   try {
-    const doc = new window.DOMParser().parseFromString(html, 'text/html');
-    const counts = {};
-    for (const [key, chain] of Object.entries(selectors)) {
-      counts[key] = chain.candidates.map((c) => {
-        try {
-          return doc.querySelectorAll(c).length;
-        } catch (err) {
-          return `erreur : ${err.message}`;
-        }
-      });
-    }
-    return counts;
+    return matchPaths(new window.DOMParser().parseFromString(html, 'text/html'), candidates);
   } finally {
     window.happyDOM.abort();
     window.close();
@@ -71,47 +63,57 @@ function happyDomCounts(html, selectors) {
 
 const browser = await chromium.launch({ executablePath: EXECUTABLE, args: ['--no-sandbox'] });
 // JavaScript coupé et réseau refusé : la capture est déjà la page RENDUE, et la rejouer la
-// réécrirait sous nos yeux. Les deux moteurs lisent ainsi le même arbre.
+// réécrirait sous nos yeux. `page.evaluate` s'exécute malgré tout, dans un monde à part.
 const context = await browser.newContext({ javaScriptEnabled: false });
 await context.route('**/*', (route) => route.abort());
+
+/** Le relevé de Chromium : `querySelectorAll` dans la page, et non `page.locator()`, dont le
+ * moteur a sa propre syntaxe et traverse les racines fantômes — ce que l'adaptateur ne fait pas. */
+async function inChromium(html, candidates) {
+  const page = await context.newPage();
+  try {
+    await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    return await page.evaluate(
+      ({ source, candidates }) => new Function(`return (${source})`)()(document, candidates),
+      { source: matchPaths.toString(), candidates }
+    );
+  } finally {
+    await page.close();
+  }
+}
+
 const mismatches = [];
 let compared = 0;
 try {
+  // La contre-épreuve d'abord : un garde qui ne voit pas cet écart-là ne prouve rien ailleurs.
+  const proof = parityMismatches(
+    COUNTER_PROOF.candidates,
+    await inChromium(COUNTER_PROOF.html, COUNTER_PROOF.candidates),
+    inHappyDom(COUNTER_PROOF.html, COUNTER_PROOF.candidates)
+  );
+  if (proof.length === 0) {
+    console.error(
+      '✗ garde inerte : la contre-épreuve (même nombre, éléments différents) ne produit aucun écart.'
+    );
+    process.exit(1);
+  }
+  console.log('  contre-épreuve : un écart de même cardinalité est bien détecté.');
+
   for (const id of ids) {
-    const url = pathToFileURL(join(ADAPTERS, id, 'dist', 'selectors.js')).href;
-    const { selectors } = await import(url);
+    const { selectors } = await import(pathToFileURL(join(ADAPTERS, id, 'dist', 'selectors.js')).href);
+    const candidates = Object.fromEntries(Object.entries(selectors).map(([k, c]) => [k, c.candidates]));
     for (const file of capturedPages(id)) {
       const html = readFileSync(file, 'utf8');
-      const page = await context.newPage();
-      await page.setContent(html, { waitUntil: 'domcontentloaded' });
-      const expected = happyDomCounts(html, selectors);
-      // `querySelectorAll` dans la page, et non `page.locator()` : le moteur de Playwright a sa
-      // propre syntaxe et traverse les racines fantômes, ce que l'adaptateur ne fait pas. On
-      // compare ce que l'adaptateur verrait, pas ce que verrait un outil de test.
-      const inChromium = await page.evaluate((all) => {
-        const out = {};
-        for (const [key, candidates] of Object.entries(all)) {
-          out[key] = candidates.map((c) => {
-            try {
-              return document.querySelectorAll(c).length;
-            } catch (err) {
-              return `erreur : ${err.message}`;
-            }
-          });
-        }
-        return out;
-      }, Object.fromEntries(Object.entries(selectors).map(([k, c]) => [k, c.candidates])));
-      for (const [key, chain] of Object.entries(selectors)) {
-        for (const [i, candidate] of chain.candidates.entries()) {
-          compared++;
-          if (inChromium[key][i] !== expected[key][i]) {
-            mismatches.push(
-              `${relative(ROOT, file)} · ${chain.name} · ${candidate} : Chromium ${inChromium[key][i]}, happy-dom ${expected[key][i]}`
-            );
-          }
-        }
+      const found = parityMismatches(candidates, await inChromium(html, candidates), inHappyDom(html, candidates));
+      compared += Object.values(candidates).flat().length;
+      for (const m of found) {
+        const count = (v) => (Array.isArray(v) ? `${v.length} élément(s)` : v);
+        mismatches.push(
+          `${relative(ROOT, file)} · ${selectors[m.key].name} · ${m.candidate} : ` +
+            `Chromium ${count(m.left)}, happy-dom ${count(m.right)}` +
+            (m.firstDiff ? `, premier écart au chemin ${m.firstDiff}` : '')
+        );
       }
-      await page.close();
       console.log(`  ${relative(ROOT, file)}`);
     }
   }
@@ -128,4 +130,4 @@ if (mismatches.length > 0) {
   );
   process.exit(1);
 }
-console.log(`\n✓ happy-dom et Chromium concordent : ${compared} comptes (${ids.join(', ')}).`);
+console.log(`\n✓ happy-dom et Chromium trouvent les mêmes éléments : ${compared} candidats comparés (${ids.join(', ')}).`);

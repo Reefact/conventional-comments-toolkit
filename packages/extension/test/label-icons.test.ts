@@ -7,7 +7,7 @@
 // délibéré : le badge d'un commentaire publié la porte (§5.5, docs/badges-decoration-
 // mockup.html), le bouton de la barre d'outils ne la porte pas, parce qu'il est un élément
 // d'une RANGÉE dont chaque pixel pris l'est à tous les autres — dix boutons par défaut,
-// treize labels optionnels activés (§3.2) — et que ces icônes suffisaient à renvoyer le
+// davantage avec les labels optionnels ou de réponse (§3.2) — et que ces icônes suffisaient à renvoyer le
 // dernier label sur la rangée du sélecteur de décoration (retour utilisateur).
 //
 // Rien dans le code ne relie ces deux décisions : elles vivent dans deux modules, et la plus

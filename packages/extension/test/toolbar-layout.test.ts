@@ -59,7 +59,8 @@ const rowOf = (el: Element | null): Element | null => el?.closest('.cct-toolbar-
 describe('§5.1 — la barre d’outils empile ses rangées', () => {
   it('aucun bouton de label ne partage sa rangée avec une commande de décoration', () => {
     const config = defaultConfig();
-    // Les labels optionnels aussi (§3.2) : treize boutons, c'est le cas qui déborde le plus.
+    // TOUS les labels livrés, optionnels et de réponse compris (§3.2) : c'est le cas qui déborde
+    // le plus, et il grandit avec la configuration plutôt qu'avec un nombre écrit ici.
     for (const label of config.labels) label.enabled = true;
     const root = toolbar(config);
 
@@ -103,7 +104,7 @@ describe('§5.1 — la barre d’outils empile ses rangées', () => {
     // réunit — le DOM ci-dessus resterait pourtant vrai, mot pour mot.
     expect(ruleBody('.cct-toolbar')).toMatch(/flex-direction\s*:\s*column/);
     expect(ruleBody('.cct-toolbar')).not.toMatch(/flex-wrap\s*:\s*wrap/);
-    // Et la rangée, elle, se replie sur elle-même : treize labels sur une fenêtre étroite
+    // Et la rangée, elle, se replie sur elle-même : tous les labels sur une fenêtre étroite
     // passent à la ligne DANS leur rangée, sans jamais rejoindre celle des décorations.
     expect(ruleBody('.cct-toolbar-row')).toMatch(/flex-wrap\s*:\s*wrap/);
   });

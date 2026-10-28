@@ -1619,7 +1619,7 @@ async function renderPrChrome(
     // Filtre local par label, « dans la liste des fils de discussion » (§5.5) : en tête des
     // fils rendus, jamais dans le bandeau. Seuls les labels effectivement PRÉSENTS sur la
     // page sont proposés — filtrer sur un label qu'aucun fil ne porte ne masquerait que
-    // tout, et treize puces pour trois fils sont un décor, pas un outil.
+    // tout, et une puce par label configuré pour trois fils est un décor, pas un outil.
     const rendered = adapter.getRenderedThreadElements();
     const present = new Set([...labelOfThread.values()].filter((id): id is string => id !== null));
     const filterLabelIds = enabledLabels(resolved.config)

@@ -95,6 +95,11 @@ They are enabled like any optional label, one entry each — there is no separat
               { "id": "disagree", "enabled": true } ] }
 ```
 
+With no existing `.conventional-comments.json`, this block can be the whole file. Otherwise, add
+the three entries to its existing `labels` array, or create that property, without replacing the
+other keys: pasting the block into an existing file makes it invalid JSON, and replacing the file
+drops your other settings.
+
 Enabling them changes **which labels exist**, nothing else. It does not require replies to carry
 a label: that is `scope.validateReplies`, still `false` by default, so a reply is not validated
 at all unless you turn it on (§4.1). It does not change the mode, and none of the three can make

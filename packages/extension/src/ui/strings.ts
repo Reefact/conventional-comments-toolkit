@@ -123,10 +123,10 @@ const fr: Record<string, string> = {
   'options.shortcuts.saved': 'Enregistré.',
   'options.shortcuts.saved.partial': 'Enregistré — lignes ignorées : {rejected}',
   'options.responses.heading': 'Labels de réponse',
-  'options.responses.sub': "Trois labels optionnels pour répondre à une remarque : ack, done et disagree. Ils ne font pas partie de Conventional Comments et sont désactivés par défaut. Ils ne s'activent pas ici : la configuration vit dans le dépôt, commune à toute l'équipe et au vérificateur. Collez ce bloc dans son fichier .conventional-comments.json, sur la branche par défaut.",
+  'options.responses.sub': "Trois labels optionnels pour répondre à une remarque : ack, done et disagree. Ils ne font pas partie de Conventional Comments et sont désactivés par défaut. Ces labels ne s'activent pas depuis cette page : ils se configurent dans le fichier .conventional-comments.json du dépôt, partagé par l'équipe et utilisé par le vérificateur. Sans fichier existant, ce bloc peut servir de fichier complet ; sinon, ajoutez ses trois entrées au tableau labels existant, ou créez cette propriété, sans remplacer les autres clés.",
   'options.responses.snippet': 'Configuration des labels de réponse',
   'options.responses.copy': 'Copier la configuration',
-  'options.responses.copied': 'Copié. Collez-le dans .conventional-comments.json, sur la branche par défaut du dépôt.',
+  'options.responses.copied': "Copié. Sans configuration existante, ce bloc peut servir de fichier .conventional-comments.json complet ; sinon, ajoutez ses trois entrées au tableau labels existant.",
   'options.responses.manual': 'Le presse-papiers a refusé la copie : le bloc est sélectionné, copiez-le avec Ctrl+C (⌘C sur Mac).',
   'options.status.degraded': 'Configuration non lue ({reason}) : l’extension assiste sans bloquer.',
   'options.status.ok': 'Configuration lue normalement.',
@@ -164,7 +164,7 @@ const fr: Record<string, string> = {
     'Une combinaison de touches insère directement un label dans le commentaire en cours de rédaction. Une ligne par raccourci ; une ligne sans label désactive celui d’origine.',
   'tour.responses.title': 'Labels de réponse',
   'tour.responses.body':
-    'Trois labels optionnels pour répondre à une remarque : ack, done et disagree. Ils ne s’activent pas ici, mais dans le fichier .conventional-comments.json du dépôt : ce bloc est à y coller, et le bouton le copie.',
+    "Ack, done et disagree ne s'activent pas depuis cette page, mais dans le fichier .conventional-comments.json du dépôt. Le bouton copie le bloc : un fichier complet s'il n'en existe pas, sinon trois entrées à ajouter au tableau labels existant.",
   'tour.telemetry.title': 'Télémétrie',
   'tour.telemetry.body':
     'Désactivée par défaut, et sans effet tant que votre organisation n’a pas déclaré de point de collecte. Elle n’émet que des compteurs — jamais le texte d’un commentaire, d’un code ou d’un diff, ni l’adresse de la page.',
@@ -303,10 +303,10 @@ const en: Record<string, string> = {
   'options.shortcuts.saved': 'Saved.',
   'options.shortcuts.saved.partial': 'Saved — lines ignored: {rejected}',
   'options.responses.heading': 'Response labels',
-  'options.responses.sub': "Three optional labels for replying to a remark: ack, done and disagree. They are not part of Conventional Comments and are disabled by default. They are not enabled here: the configuration lives in the repository, shared by the whole team and the verifier. Paste this block into its .conventional-comments.json file, on the default branch.",
+  'options.responses.sub': "Three optional labels for replying to a review comment: ack, done and disagree. They are not part of Conventional Comments and are disabled by default. These labels cannot be enabled from this page: they are configured in the repository's .conventional-comments.json file, shared by the team and used by the verifier. With no existing file, this block can serve as the whole file; otherwise, add its three entries to the existing labels array, or create that property, without replacing the other keys.",
   'options.responses.snippet': 'Response labels configuration',
   'options.responses.copy': 'Copy the configuration',
-  'options.responses.copied': "Copied. Paste it into .conventional-comments.json on the repository's default branch.",
+  'options.responses.copied': "Copied. With no existing configuration, this block can serve as the whole .conventional-comments.json file; otherwise, add its three entries to the existing labels array.",
   'options.responses.manual': 'The clipboard refused the copy: the block is selected, copy it with Ctrl+C (⌘C on Mac).',
   'options.status.degraded': 'Configuration not read ({reason}): the extension assists without blocking.',
   'options.status.ok': 'Configuration read normally.',
@@ -344,7 +344,7 @@ const en: Record<string, string> = {
     'A key combination inserts a label straight into the comment being written. One shortcut per line; a line with no label disables the original one.',
   'tour.responses.title': 'Response labels',
   'tour.responses.body':
-    'Three optional labels for replying to a remark: ack, done and disagree. They are not enabled here but in the repository’s .conventional-comments.json file: this block goes there, and the button copies it.',
+    "Ack, done and disagree cannot be enabled from this page, only in the repository's .conventional-comments.json file. The button copies the block: the whole file if there is none, otherwise three entries to add to the existing labels array.",
   'tour.telemetry.title': 'Telemetry',
   'tour.telemetry.body':
     'Off by default, and inert until your organisation declares a collection endpoint. It only emits counters — never the text of a comment, of code or of a diff, nor the page address.',

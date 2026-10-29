@@ -181,7 +181,10 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
    * ligne de remarques de plus — le trait dit « autre groupe ». Les réponses ont ainsi la même
    * place à toutes les largeurs. */
   const replyRow = newRow();
+  /** Les décorations, sous un DOUBLE trait fin : il sépare les labels — remarques et réponses —
+   * des décorations, un cran au-dessus du trait simple qui sépare les deux groupes de labels. */
   const decorationRow = newRow();
+  decorationRow.classList.add('cct-decoration-row');
 
   // Un bouton par label, avec libellé et couleur distincts et SANS son icône (§5.1) — là où le
   // badge d'un commentaire publié la garde (§5.5 ; badges.ts, `labelBadge()`).

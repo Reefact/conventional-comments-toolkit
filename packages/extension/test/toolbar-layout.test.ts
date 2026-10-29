@@ -130,6 +130,7 @@ describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
     ]);
     expect(labelsIn(replies!)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);
     expect(decorations!.querySelector('.cct-label-button')).toBeNull();
+    expect(decorations!.classList.contains('cct-decoration-row')).toBe(true);
   });
 
   it('le type range le bouton, pas son identifiant', () => {
@@ -139,10 +140,11 @@ describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
     expect(labelsIn(labels!)).toContain('done');
   });
 
-  it('sans label `reply` actif, ni rangée ni trait : la barre est celle d’avant', () => {
+  it('sans label `reply` actif, ni rangée ni trait simple ; le double trait des décorations reste', () => {
     const bar = toolbar(resolved({ labels: ['thanks', 'done', 'ack', 'decision', 'disagree'].map((id) => ({ id, enabled: false })) }));
     expect(bar.querySelectorAll('.cct-toolbar-row')).toHaveLength(2);
     expect(bar.querySelector('.cct-reply-row')).toBeNull();
+    expect(bar.querySelector('.cct-decoration-row')).not.toBeNull();
   });
 
   it('sans label `remark` actif, la rangée des réponses n’a pas de trait : il ne séparerait rien', () => {
@@ -152,9 +154,12 @@ describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
     expect(bar.querySelector('.cct-reply-row')).toBeNull();
   });
 
-  it('moitié CSS : le trait court sur toute la largeur de la barre', () => {
+  it('moitié CSS : trait simple au-dessus des réponses, double au-dessus des décorations, sur toute la largeur', () => {
     const row = ruleBody('.cct-reply-row');
     expect(row).toMatch(/border-top:\s*1px solid/);
     expect(row).toMatch(/align-self:\s*stretch/);
+    const decorations = ruleBody('.cct-decoration-row');
+    expect(decorations).toMatch(/border-top:\s*3px double/);
+    expect(decorations).toMatch(/align-self:\s*stretch/);
   });
 });

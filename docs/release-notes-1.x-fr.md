@@ -8,6 +8,14 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
 navigateur des personnes ayant installé l'extension.
 
+## 1.0.0-beta.17 — 29 octobre 2026
+
+_Deux champs de la page de réglages ne s'affichent plus en blanc dans le thème sombre._
+
+### 🐛 Corrections
+
+- **Le champ « Ordre des boutons » et le bloc de configuration des labels ajoutés suivent maintenant le thème sombre.** Tous deux restaient blancs sur une page de réglages sombre, ce qui les rendait pénibles à lire et détonnait à côté des autres champs. Ils ressemblent maintenant au reste de la page.
+
 ## 1.0.0-beta.16 — 29 octobre 2026
 
 _La page de réglages dit quelle version tourne, et l'adaptateur GitHub lit de nouveau correctement le bouton de fusion et les conversations résolues d'une PR._

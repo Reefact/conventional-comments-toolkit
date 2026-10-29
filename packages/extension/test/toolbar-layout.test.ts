@@ -154,6 +154,16 @@ describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
     expect(bar.querySelector('.cct-reply-row')).toBeNull();
   });
 
+  it('sans AUCUN label actif, ni trait simple ni double trait : il ne reste que les décorations', () => {
+    const none = defaultConfig().labels.map((l) => ({ id: l.id, enabled: false }));
+    const bar = toolbar(resolved({ labels: none }));
+    const rows = [...bar.querySelectorAll('.cct-toolbar-row')];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.querySelector('.cct-decoration-group')).not.toBeNull();
+    expect(bar.querySelector('.cct-decoration-row')).toBeNull();
+    expect(bar.querySelector('.cct-reply-row')).toBeNull();
+  });
+
   it('moitié CSS : trait simple au-dessus des réponses, double au-dessus des décorations, sur toute la largeur', () => {
     const row = ruleBody('.cct-reply-row');
     expect(row).toMatch(/border-top:\s*1px solid/);

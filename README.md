@@ -149,8 +149,9 @@ Since `done` is enabled by default, it is the shipped alias `fixed` that goes an
 that stays. An alias carried by two labels is removed from both. Each removal is reported as a
 configuration warning (§8.2).
 
-**Upgrading the extension and the verifier.** Because these labels are on by default, the
-configuration fingerprint of a repository with no configuration changes (§9.2.2). While the two
+**Upgrading the extension and the verifier.** Because these labels are enabled by default, the
+configuration fingerprint changes even for a repository with no custom configuration (§9.2.2).
+While the two
 run different versions, the extension reports the mismatch and stops blocking the send. Update
 them together.
 

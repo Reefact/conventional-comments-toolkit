@@ -55,17 +55,10 @@ export const en: Record<string, string> = {
   'headline.out-of-scope.no-activation-date': 'Activation not dated — no PR is in scope.',
   'headline.draft': 'Draft PR — informative status only.',
   'headline.exempted': 'PR exempted by {by} on {at}.',
-  'headline.grace-expired':
-    'Evaluation impossible beyond the grace period — see the rollback procedure (§6.3.3 of the specification).',
   'headline.invalid-config': 'Invalid configuration: {detail}',
-  'headline.config-vanished':
-    'The configuration file has disappeared from an already-evaluated repository.',
+  'headline.activation-undated':
+    'No configuration level dates this repository’s activation.',
   // Notices (§6.3.1)
-  'notice.weakening-edit':
-    'The root comment of blocking thread {ref} was edited to a non-blocking form{by}; the thread remains counted as blocking (§6.1).',
-  'notice.weakening-edit.by': ' by {login}',
-  'notice.root-deleted':
-    'The root comment of blocking thread {ref} was deleted; the thread is no longer counted. Deletion is the only remaining way to extinguish a thread without resolving it.',
   'notice.resolution-refused':
     'Resolution of blocking thread {ref} refused: {cause}. Reopen the thread and have it resolved by the root author, or post a valid "decision" reply.',
   'notice.resolution-refused.not-author':
@@ -78,17 +71,20 @@ export const en: Record<string, string> = {
     'Repository configuration key "{ref}" ignored: it would relax the enterprise floor.',
   'notice.invalid-config': 'Invalid configuration: {detail}',
   'notice.config-warning': '{detail}',
-  'notice.config-vanished':
-    'The configuration file .conventional-comments.json has disappeared from an already-evaluated repository. This is treated as an incident, not a deactivation (§8.1.5).',
+  'notice.activation-undated':
+    'No configuration level resolves activation.activatedAt: the repository is dated neither by its own file, nor by the organisation’s, nor by the floor. A neutral status is published, whatever the mode (§8.1.5).',
   'notice.exemption-reset':
     'PR exemption reset: a new blocking thread appeared. The label was removed and criterion 2 applies again.',
   'notice.exemption-refused':
     'Exemption label posted by {login}, who is not a member of resolverOverrideGroup: the exemption is refused and the label is left in place.',
-  'notice.exemption-label-restored':
-    'The exemption label had disappeared while a confirmed exemption is active: it was restored. Removing the label does not revoke on this platform — use the administration entry point.',
-  'notice.grace-expired':
-    'Unable to evaluate for longer than the grace period: neutral status published (§6.4).',
   'notice.unsupported-version': '{detail}',
+  // Sortie humaine du statut (§6.3.1) — sa langue suit la règle du §8.1, comme le reste
+  'output.unresolved-blocking-threads': 'Unresolved blocking threads',
+  'output.format-diagnostics': 'Format diagnostics',
+  'output.notices': 'Reported facts',
+  'output.fix': 'fix',
+  'output.doc-link': 'Convention documentation',
+  'output.empty-body': '(empty)',
   // Divers
   'and': 'and',
 };

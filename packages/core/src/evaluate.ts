@@ -32,9 +32,9 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
     configFingerprint: fingerprint(config),
     coreVersion: CORE_VERSION,
     docUrl: config.docUrl,
-    ...(config.server.statusTargetUrl
-      ? { targetUrl: buildTargetUrl(config.server.statusTargetUrl, pr) }
-      : {}),
+    // Pas de `targetUrl` : le §6.3.1 n'en fait plus le porteur de quoi que ce soit, et
+    // aucun porteur configurable ne la fournit (§9.2.1). Le vérificateur y met, s'il le
+    // veut, le lien de l'exécution qui publie — ce que `core/` ne peut pas connaître.
   };
 
   // ————— Périmètre d'activation (§6.2.3) : la PR est entièrement dedans ou dehors —————
@@ -54,9 +54,6 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
       notices,
       counts: { unresolvedThreads: 0, nonCompliantComments: 0, warnings: 0 },
       actions: {},
-      blockingThreadIds: [],
-      correctedThreadIds: [],
-      newFirstVerdicts: {},
     };
   }
 
@@ -89,27 +86,7 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
   for (const { comment, zone } of loose) check(comment, zone, comment.canCarryBlockingState);
 
   // ————— Critère 2 : fils bloquants (§6.1) —————
-  const known = new Set(ctx.knownBlockingThreadIds);
-  const presentIds = new Set(threads.map((th) => th.id));
-  const blockingThreadIds: string[] = [];
-  const correctedThreadIds: string[] = [];
-  const newFirstVerdicts: Record<string, { blocking: boolean; hadConflict: boolean }> = {};
   const unresolvedBlockingThreads: ThreadInfo[] = [];
-
-  // Suppression d'une racine bloquante (§6.1) — jamais dérivée sous un verdict imposé :
-  // les listes vides traduisent alors une lecture impossible, pas une disparition.
-  if (!forceState) {
-    for (const id of known) {
-      if (!presentIds.has(id)) {
-        notices.push({
-          kind: 'root-deleted',
-          message: t(lang, 'notice.root-deleted', { ref: id }),
-          ref: id,
-        });
-      }
-    }
-  }
-
   for (const thread of threads) {
     if (!thread.canCarryBlockingState) continue; // §4.1 — jamais compté au critère 2
 
@@ -122,50 +99,17 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
       author: thread.root.author,
       comment: thread.root,
     };
-    const analysis = analyze(rootInput, config);
-    const nowBlocking = analysis.blocking;
-    const hadConflictNow = analysis.hadConflict;
-
-    // Verdict de première observation — écrit une fois, jamais réécrit (§6.4).
-    const priorFirst = ctx.firstVerdicts[thread.id];
-    if (priorFirst === undefined) {
-      newFirstVerdicts[thread.id] = { blocking: nowBlocking, hadConflict: hadConflictNow };
-    }
-    const first = priorFirst ?? newFirstVerdicts[thread.id]!;
-
-    if (nowBlocking) blockingThreadIds.push(thread.id);
-
-    // Monotonie (§6.1) : une racine observée bloquante ne redevient pas non bloquante
-    // par édition — sauf l'exception de correction, sous ses deux conditions.
-    let effectiveBlocking = nowBlocking;
-    if (!nowBlocking && known.has(thread.id)) {
-      const correctionApplies =
-        first.hadConflict && // condition 1 — E-CONFLICT dès la première observation
-        !hadConflictNow &&
-        thread.root.lastEditedBy !== undefined && // sans auteur, l'exception est invérifiable
-        thread.root.lastEditedBy.id === thread.root.author.id; // condition 2 — l'auteur corrige
-      if (correctionApplies) {
-        correctedThreadIds.push(thread.id);
-      } else {
-        effectiveBlocking = true;
-        if (!forceState) {
-          const editor = thread.root.lastEditedBy;
-          notices.push({
-            kind: 'weakening-edit',
-            message: t(lang, 'notice.weakening-edit', {
-              ref: thread.root.permalink,
-              by: editor ? t(lang, 'notice.weakening-edit.by', { login: editor.login }) : '',
-            }),
-            // Sans auteur exposé, le notice est émis sans acteur — jamais avec l'auteur
-            // du dernier événement reçu (§6.1).
-            ...(editor ? { actor: editor } : {}),
-            ref: thread.root.permalink,
-          });
-        }
-      }
-    }
-
-    if (!effectiveBlocking) continue;
+    // Le verdict se lit de l'état COURANT, et de lui seul (§6.1). Une racine éditée de
+    // `issue:` en `note:` n'est donc plus bloquante au tour suivant, et rien n'est signalé :
+    // le vérificateur ne compare à aucun passé qu'il ne détient pas.
+    //
+    // Une rédaction antérieure maintenait la MONOTONIE — un fil observé bloquant le restait
+    // malgré une édition — avec une exception pour la correction d'un `E-CONFLICT` par
+    // l'auteur de la racine. Les deux demandaient de conserver, par fil, le verdict de
+    // première observation, et la seconde de savoir QUI avait édité. Le §6.4 ne le permet
+    // plus, et §6.1 l'assume : la suppression de la racine reste le seul chemin pour
+    // éteindre un fil sans le résoudre.
+    if (!analyze(rootInput, config).blocking) continue;
 
     // Résolution retenue ? (§6.1 — deux cas, et deux seulement.)
     let resolvedValidly = false;
@@ -215,26 +159,36 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
         at: ctx.exemption.at,
       });
     } else {
-      const newBlocking = blockingThreadIds.filter((id) => !known.has(id));
+      // §6.3.2 — l'exemption est remise à zéro par tout fil bloquant NON RÉSOLU dont le
+      // commentaire racine a été créé APRÈS la pose de l'étiquette. La comparaison porte sur
+      // `root.createdAt` et l'`at` de l'étiquette, deux faits de l'état courant.
+      //
+      // Une rédaction antérieure comparait les fils bloquants à « l'ensemble des fils déjà
+      // observés au tour précédent », ce qui demandait de les conserver. Sans mémoire, cet
+      // ensemble est vide et TOUT fil bloquant devient « nouveau » : l'exemption se remettait
+      // à zéro sur la PR même qu'elle existe pour débloquer.
+      const postedAt = Date.parse(ctx.exemption.at);
+      const newBlocking = unresolvedBlockingThreads.filter(
+        (thread) => Date.parse(thread.root.createdAt) > postedAt
+      );
       if (newBlocking.length > 0) {
-        // Remise à zéro : les deux gestes sont indissociables — retrait de l'étiquette,
-        // et suppression de l'exemption active persistée (portée par la même demande).
+        // Remise à zéro : retirer l'étiquette suffit désormais, l'exemption n'étant plus
+        // persistée nulle part — elle est lue sur la PR, à chaque évaluation (§6.3.2).
         actions.removeLabel = config.overrideLabel;
         notices.push({
           kind: 'exemption-reset',
           message: t(lang, 'notice.exemption-reset'),
-          ref: newBlocking[0],
+          // Le lien permanent, et non l'identifiant du fil : le §6.3.1 demande qu'une cause
+          // soit atteignable en un clic au plus (CA-25).
+          ref: newBlocking[0]!.root.permalink,
         });
       } else {
+        // L'exemption est LUE de l'étiquette et de sa provenance (§6.3.2) : si l'étiquette
+        // n'est pas là, il n'y a pas d'exemption à appliquer, et rien à restaurer. Une
+        // rédaction antérieure reposait l'étiquette disparue d'une exemption « confirmée »
+        // — ce qui demandait de se souvenir de l'avoir confirmée, et un `addLabel()` que le
+        // §9.2.4 ne donne plus.
         appliedExemption = { by: ctx.exemption.by, at: ctx.exemption.at };
-        if (!ctx.exemption.labelPresent) {
-          // Étiquette disparue d'une exemption confirmée : restaurée, jamais révoquée (§6.3.2).
-          actions.addLabel = config.overrideLabel;
-          notices.push({
-            kind: 'exemption-label-restored',
-            message: t(lang, 'notice.exemption-label-restored'),
-          });
-        }
       }
     }
   }
@@ -271,12 +225,13 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
   }
 
   const headlineParts: string[] = [];
-  if (forceState?.because === 'grace-expired') headlineParts.push(t(lang, 'headline.grace-expired'));
   if (forceState?.because === 'invalid-config') {
     const detail = notices.find((n) => n.kind === 'invalid-config')?.message ?? '';
     headlineParts.push(t(lang, 'headline.invalid-config', { detail }));
   }
-  if (forceState?.because === 'config-vanished') headlineParts.push(t(lang, 'headline.config-vanished'));
+  if (forceState?.because === 'activation-undated') {
+    headlineParts.push(t(lang, 'headline.activation-undated'));
+  }
   if (ctx.isDraft) headlineParts.push(t(lang, 'headline.draft'));
   if (appliedExemption) {
     headlineParts.push(
@@ -300,9 +255,6 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
     notices,
     counts,
     actions,
-    blockingThreadIds,
-    correctedThreadIds,
-    newFirstVerdicts,
     ...(appliedExemption ? { exemption: appliedExemption } : {}),
   };
 }
@@ -330,10 +282,4 @@ function hasValidDecision(thread: ThreadInfo, input: EvaluationInput): boolean {
     return true;
   }
   return false;
-}
-
-function buildTargetUrl(baseUrl: string, pr: EvaluationInput['pr']): string {
-  const trimmed = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  const path = [pr.platform, ...pr.scope, String(pr.number)].map(encodeURIComponent).join('/');
-  return `${trimmed}/pr/${path}`;
 }

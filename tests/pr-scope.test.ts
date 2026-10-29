@@ -9,7 +9,7 @@ const files = (...paths: string[]) => paths.map((path) => ({ path, added: false 
 describe('classement des chemins', () => {
   it('range chaque chemin dans sa classe', () => {
     expect(classifyPath('packages/adapters/azdo/src/selectors.ts', ids)).toBe('platform:azdo');
-    expect(classifyPath('packages/server/src/adapters/github/index.ts', ids)).toBe('platform:github');
+    expect(classifyPath('packages/action/src/github.ts', ids)).toBe('shared');
     expect(classifyPath('packages/adapters/shared/src/index.ts', ids)).toBe('shared');
     expect(classifyPath('packages/extension/src/editor-controller.ts', ids)).toBe('shared');
     expect(classifyPath('packages/extension/src/platforms.ts', ids)).toBe('registration');
@@ -40,7 +40,7 @@ describe('verdict sur une PR', () => {
     const v = prScopeVerdict(
       files(
         'packages/adapters/azdo/src/selectors.ts',
-        'packages/server/src/adapters/azdo/index.ts',
+        'packages/adapters/azdo/src/descriptor.ts',
         'packages/extension/test/badges.test.ts',
         'CHANGELOG.md',
         'spikes/composer-layout.mjs'
@@ -109,14 +109,11 @@ describe('verdict sur une PR', () => {
       [
         { path: 'packages/adapters/azdo/package.json', added: false, deleted: true },
         { path: 'packages/adapters/azdo/src/index.ts', added: false, deleted: true },
-        { path: 'packages/server/src/adapters/azdo/index.ts', added: false, deleted: true },
         { path: 'packages/extension/src/platforms.ts', added: false },
         { path: 'packages/extension/src/content.ts', added: false },
         { path: 'packages/extension/package.json', added: false },
         { path: 'packages/extension/tsconfig.json', added: false },
         { path: 'packages/extension/src/managed-schema.json', added: false },
-        { path: 'packages/server/src/bootstrap.ts', added: false },
-        { path: 'packages/server/src/index.ts', added: false },
       ],
       ids
     );

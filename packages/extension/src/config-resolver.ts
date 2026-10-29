@@ -1,7 +1,8 @@
 // Résolution de configuration côté composant A (§8.1.2, §9.2.3) : les trois mêmes
 // niveaux que le composant B — plancher (politique d'entreprise), organisation
 // (configUrl du canal de plancher), fichier de dépôt — via resolveConfig() de core/.
-// A n'épingle pas (§8.1.3, règle 2) : pinned=null, previouslyEvaluated=false.
+// Aucun des deux composants n'épingle : `resolveConfig()` ne prend que les trois documents
+// qu'on vient de lire (§8.1.3, règle 1).
 
 import {
   fingerprint,
@@ -85,7 +86,7 @@ export class ClientConfigResolver {
         ? { read: { status: 'absent' } as ConfigRead, degraded: false }
         : await this.#cached(`org:${configUrl}`, () => adapter.getOrgConfig(configUrl));
 
-    const { config, notices } = resolveConfig(floor, org.read, repo.read, null, false);
+    const { config, notices } = resolveConfig(floor, org.read, repo.read);
     this.#lastTtl = config.configCacheTtlSeconds;
     // §5.4, condition 4 : une lecture qui a rendu `unreachable` met en état dégradé —
     // jamais masqué par une entrée de cache expirée.

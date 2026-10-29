@@ -167,13 +167,6 @@ export function defaultConfig(): EffectiveConfig {
     // La page des labels du site de l'outil, et non conventionalcomments.org : celle-ci ne
     // documente aucun des labels ajoutés, actifs par défaut (§8.2, `docUrl`).
     docUrl: 'https://conventionalcomments.io/docs/labels/',
-    server: {
-      coalesceWindowSeconds: 10,
-      gracePeriodSeconds: 900,
-      reconcileIntervalSeconds: 900,
-      statusTargetUrl: null,
-    },
-    exemptionLog: { endpoint: null },
     language: null,
     telemetry: { enabled: false, endpoint: null },
   };

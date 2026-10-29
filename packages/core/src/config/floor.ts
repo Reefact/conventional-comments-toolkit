@@ -334,9 +334,10 @@ export interface FloorApplication {
  *
  * `written` — les clés effectivement écrites par un niveau inférieur (org/repo), pour
  * n'émettre `floor-override` que lorsqu'une valeur écrite est ignorée.
- * `skipActivation` — l'exception du §8.1.1 : un durcissement du plancher sur
- * `activation.activatedAt` est épinglé, pas appliqué en direct — le mélange d'épinglage
- * (pinning.ts) porte alors la clé.
+ * `skipActivation` — `resolveConfig()` calcule lui-même `min(plancher, niveau inférieur)`
+ * sur `activation.activatedAt` (§8.1.1) avant d'appeler cette fonction, qui ne doit donc
+ * pas le refaire. Le drapeau justifiait autrefois l'épinglage de cette clé ; l'épinglage a
+ * disparu avec la mémoire, le drapeau reste parce que le calcul vit ailleurs.
  */
 export function applyFloor(
   config: EffectiveConfig,

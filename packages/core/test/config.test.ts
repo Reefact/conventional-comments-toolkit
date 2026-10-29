@@ -131,10 +131,7 @@ describe('§8.1.2 / §8.1.4 — précédence et fusion', () => {
     const { config } = resolveConfig(
       null,
       found({ labels: [{ id: 'issue', color: '#111111' }], rules: { minSubjectLength: 3 } }),
-      found({ labels: [{ id: 'issue', color: '#222222' }, { id: 'perf-note', blockingByDefault: false }] }),
-      null,
-      false
-    );
+      found({ labels: [{ id: 'issue', color: '#222222' }, { id: 'perf-note', blockingByDefault: false }] }));
     expect(config.labels.find((l) => l.id === 'issue')!.color).toBe('#222222');
     expect(config.labels.find((l) => l.id === 'perf-note')).toBeDefined();
     expect(config.labels).toHaveLength(defaultConfig().labels.length + 1); // jamais de suppression
@@ -142,7 +139,7 @@ describe('§8.1.2 / §8.1.4 — précédence et fusion', () => {
   });
 
   it('retirer un label passe par enabled:false, jamais par suppression (§8.1.4)', () => {
-    const { config } = resolveConfig(null, absent, found({ labels: [{ id: 'chore', enabled: false }] }), null, false);
+    const { config } = resolveConfig(null, absent, found({ labels: [{ id: 'chore', enabled: false }] }));
     expect(config.labels.find((l) => l.id === 'chore')!.enabled).toBe(false);
     expect(config.labels).toHaveLength(defaultConfig().labels.length);
   });
@@ -151,10 +148,7 @@ describe('§8.1.2 / §8.1.4 — précédence et fusion', () => {
     const { config } = resolveConfig(
       null,
       found({ severities: { 'W-CASE': 'error' }, exemptUsers: ['bot-a'] }),
-      found({ severities: { 'W-NO-DISCUSSION': 'off' }, exemptUsers: ['bot-b'] }),
-      null,
-      false
-    );
+      found({ severities: { 'W-NO-DISCUSSION': 'off' }, exemptUsers: ['bot-b'] }));
     expect(config.severities).toEqual({ 'W-CASE': 'error', 'W-NO-DISCUSSION': 'off' });
     expect(config.exemptUsers).toEqual(['bot-a', 'bot-b']);
   });
@@ -163,10 +157,7 @@ describe('§8.1.2 / §8.1.4 — précédence et fusion', () => {
     const { config } = resolveConfig(
       { minimumMode: 'off', resolverOverrideGroup: ['org/leads'] },
       absent,
-      found({ resolverOverrideGroup: ['org/security'] }),
-      null,
-      false
-    );
+      found({ resolverOverrideGroup: ['org/security'] }));
     expect(config.resolverOverrideGroup.sort()).toEqual(['org/leads', 'org/security']);
   });
 });
@@ -175,18 +166,18 @@ describe('§8.1.1 — plancher', () => {
   const floor: Floor = { floorVersion: 1, minimumMode: 'enforce', formatSeverity: 'error' };
 
   it('CA-14/CA-24 : un mode de dépôt sous le plancher est ignoré, et le fait signalé', () => {
-    const { config, notices } = resolveConfig(floor, absent, found({ mode: 'off' }), null, false);
+    const { config, notices } = resolveConfig(floor, absent, found({ mode: 'off' }));
     expect(config.mode).toBe('enforce');
     expect(notices.some((n) => n.kind === 'floor-override' && n.ref === 'mode')).toBe(true);
   });
 
   it('durcir au-delà du plancher est permis', () => {
-    const { config } = resolveConfig({ minimumMode: 'warn' }, absent, found({ mode: 'enforce' }), null, false);
+    const { config } = resolveConfig({ minimumMode: 'warn' }, absent, found({ mode: 'enforce' }));
     expect(config.mode).toBe('enforce');
   });
 
   it('formatSeverity : minimum sur sa propre échelle', () => {
-    const { config } = resolveConfig(floor, absent, found({ formatSeverity: 'warn' }), null, false);
+    const { config } = resolveConfig(floor, absent, found({ formatSeverity: 'warn' }));
     expect(config.formatSeverity).toBe('error');
   });
 
@@ -194,10 +185,7 @@ describe('§8.1.1 — plancher', () => {
     const { config } = resolveConfig(
       { minimumMode: 'off', severities: { 'W-CASE': 'error' } },
       absent,
-      found({ severities: { 'W-CASE': 'warn' } }),
-      null,
-      false
-    );
+      found({ severities: { 'W-CASE': 'warn' } }));
     expect(config.severities['W-CASE']).toBe('error');
   });
 
@@ -205,10 +193,7 @@ describe('§8.1.1 — plancher', () => {
     const { config, notices } = resolveConfig(
       { minimumMode: 'off', labels: { minimum: ['issue', 'todo'] } },
       absent,
-      found({ labels: [{ id: 'issue', enabled: false }, { id: 'todo', blockingByDefault: false }, { id: 'chore', enabled: false }] }),
-      null,
-      false
-    );
+      found({ labels: [{ id: 'issue', enabled: false }, { id: 'todo', blockingByDefault: false }, { id: 'chore', enabled: false }] }));
     expect(config.labels.find((l) => l.id === 'issue')!.enabled).toBe(true);
     expect(config.labels.find((l) => l.id === 'todo')!.blockingByDefault).toBe(true);
     expect(config.labels.find((l) => l.id === 'chore')!.enabled).toBe(false); // hors minimum : libre
@@ -219,10 +204,7 @@ describe('§8.1.1 — plancher', () => {
     const { config } = resolveConfig(
       { minimumMode: 'off', activation: { activatedAt: '2026-06-01T00:00:00Z' } },
       absent,
-      found({ activation: { activatedAt: '2026-09-01T00:00:00Z' } }),
-      null,
-      false
-    );
+      found({ activation: { activatedAt: '2026-09-01T00:00:00Z' } }));
     expect(config.activation.activatedAt).toBe('2026-06-01T00:00:00Z');
   });
 
@@ -230,10 +212,7 @@ describe('§8.1.1 — plancher', () => {
     const { config } = resolveConfig(
       { minimumMode: 'off', activation: { activatedAt: '2026-06-01T00:00:00Z' } },
       absent,
-      found({ activation: { activatedAt: '2099-01-01T00:00:00Z' } }),
-      null,
-      false
-    );
+      found({ activation: { activatedAt: '2099-01-01T00:00:00Z' } }));
     expect(config.activation.activatedAt).toBe('2026-06-01T00:00:00Z');
   });
 
@@ -241,18 +220,12 @@ describe('§8.1.1 — plancher', () => {
     const open = resolveConfig(
       { minimumMode: 'off', exemptUsers: { minimum: ['svc-bot'], closed: false } },
       absent,
-      found({ exemptUsers: ['moi-meme'] }),
-      null,
-      false
-    );
+      found({ exemptUsers: ['moi-meme'] }));
     expect(open.config.exemptUsers.sort()).toEqual(['moi-meme', 'svc-bot']);
     const closed = resolveConfig(
       { minimumMode: 'off', exemptUsers: { minimum: ['svc-bot'], closed: true } },
       absent,
-      found({ exemptUsers: ['moi-meme'] }),
-      null,
-      false
-    );
+      found({ exemptUsers: ['moi-meme'] }));
     expect(closed.config.exemptUsers).toEqual(['svc-bot']); // un dépôt ne s'ajoute pas lui-même
   });
 
@@ -260,15 +233,12 @@ describe('§8.1.1 — plancher', () => {
     const { config } = resolveConfig(
       { minimumMode: 'off', configCacheTtlSeconds: 600 },
       absent,
-      found({ configCacheTtlSeconds: 60 }),
-      null,
-      false
-    );
+      found({ configCacheTtlSeconds: 60 }));
     expect(config.configCacheTtlSeconds).toBe(600);
   });
 
   it('plancher absent = {minimumMode: off}, aucune règle imposée', () => {
-    const { config } = resolveConfig(null, absent, found({ mode: 'off' }), null, false);
+    const { config } = resolveConfig(null, absent, found({ mode: 'off' }));
     expect(config.mode).toBe('off');
   });
 
@@ -276,10 +246,7 @@ describe('§8.1.1 — plancher', () => {
     const { config, notices } = resolveConfig(
       { floorVersion: 99, minimumMode: 'enforce' },
       absent,
-      found({ mode: 'enforce' }),
-      null,
-      false
-    );
+      found({ mode: 'enforce' }));
     expect(config.mode).toBe('assist');
     expect(notices.some((n) => n.kind === 'unsupported-version')).toBe(true);
   });
@@ -290,10 +257,7 @@ describe('§8.1.5 — configuration absente, illisible ou invalide', () => {
     const { config, notices } = resolveConfig(
       null,
       found({ mode: 'warn' }),
-      foundText('{\n  "mode": "warn",\n  oops\n}'),
-      null,
-      true
-    );
+      foundText('{\n  "mode": "warn",\n  oops\n}'));
     expect(config.mode).toBe('warn'); // organisation, puis défauts
     const notice = notices.find((n) => n.kind === 'invalid-config');
     expect(notice).toBeDefined();
@@ -301,7 +265,7 @@ describe('§8.1.5 — configuration absente, illisible ou invalide', () => {
   });
 
   it('valeur hors domaine pour une clé connue ("mode": "banana") : document invalide', () => {
-    const { config, notices } = resolveConfig(null, absent, found({ mode: 'banana' }), null, true);
+    const { config, notices } = resolveConfig(null, absent, found({ mode: 'banana' }));
     expect(config.mode).toBe('assist'); // défauts
     expect(notices.some((n) => n.kind === 'invalid-config')).toBe(true);
   });
@@ -310,41 +274,43 @@ describe('§8.1.5 — configuration absente, illisible ou invalide', () => {
     const { config, notices } = resolveConfig(
       null,
       absent,
-      found({ mode: 'enforce', futureKey: true }),
-      null,
-      false
-    );
+      found({ mode: 'enforce', futureKey: true }));
     expect(config.mode).toBe('enforce'); // la contrainte ne disparaît pas
     expect(notices.some((n) => n.kind === 'config-warning' && n.ref === 'futureKey')).toBe(true);
     expect(notices.some((n) => n.kind === 'invalid-config')).toBe(false);
   });
 
   it('fichier absent + jamais évalué : nominal, aucun notice', () => {
-    const { notices } = resolveConfig(null, absent, absent, null, false);
+    const { notices } = resolveConfig(null, absent, absent);
     expect(notices).toEqual([]);
   });
 
-  it('CA-29 : fichier absent + dépôt déjà évalué → config-vanished', () => {
-    const { notices } = resolveConfig(null, absent, absent, null, true);
-    expect(notices.some((n) => n.kind === 'config-vanished')).toBe(true);
+  it('CA-29 : un fichier absent ne produit AUCUN signal ici, et laisse l’activation non datée', () => {
+    // §8.1.5 : le même repli d'abord. `resolveConfig` ne signale rien — ni incident, ni
+    // désactivation —, et c'est la configuration résolue qui tranche ensuite : aucun niveau
+    // ne datant l'activation, c'est le vérificateur qui arme `activation-undated` (§6.2.2).
+    //
+    // Une rédaction antérieure émettait ici `config-vanished` dès lors que le dépôt avait
+    // « déjà été évalué ». C'était une mémoire par dépôt, et le nom affirmait une
+    // DISPARITION — une transition entre deux états, que ce code ne peut pas observer.
+    const { notices, config } = resolveConfig(null, absent, absent);
+    expect(notices).toEqual([]);
+    expect(config.activation.activatedAt).toBeNull();
   });
 
   it('version de schéma supérieure : repli assist, ou plancher si plus strict, signalé', () => {
-    const noFloor = resolveConfig(null, absent, found({ version: 99, mode: 'enforce' }), null, false);
+    const noFloor = resolveConfig(null, absent, found({ version: 99, mode: 'enforce' }));
     expect(noFloor.config.mode).toBe('assist');
     expect(noFloor.notices.some((n) => n.kind === 'unsupported-version')).toBe(true);
     const withFloor = resolveConfig(
       { minimumMode: 'warn' },
       absent,
-      found({ version: 99, mode: 'enforce' }),
-      null,
-      false
-    );
+      found({ version: 99, mode: 'enforce' }));
     expect(withFloor.config.mode).toBe('warn'); // le plancher en vigueur, plus strict
   });
 
   it('coreMinVersion non satisfaite : même repli, mot pour mot', () => {
-    const { config, notices } = resolveConfig(null, absent, found({ coreMinVersion: '99.0.0', mode: 'enforce' }), null, false);
+    const { config, notices } = resolveConfig(null, absent, found({ coreMinVersion: '99.0.0', mode: 'enforce' }));
     expect(config.mode).toBe('assist');
     expect(notices.some((n) => n.kind === 'unsupported-version')).toBe(true);
   });
@@ -353,10 +319,7 @@ describe('§8.1.5 — configuration absente, illisible ou invalide', () => {
     const { config } = resolveConfig(
       null,
       { status: 'unreachable', reason: 'network' },
-      found({ mode: 'warn' }),
-      null,
-      false
-    );
+      found({ mode: 'warn' }));
     expect(config.mode).toBe('warn');
   });
 
@@ -364,10 +327,7 @@ describe('§8.1.5 — configuration absente, illisible ou invalide', () => {
     const { config, notices } = resolveConfig(
       { minimumMode: 'off', configUrl: 'https://interne.example/org.json' },
       absent,
-      found({ configUrl: 'https://depot-pirate.example/ma-config.json' }),
-      null,
-      false
-    );
+      found({ configUrl: 'https://depot-pirate.example/ma-config.json' }));
     expect(config.configUrl).toBe('https://interne.example/org.json');
     expect(notices.some((n) => n.kind === 'config-warning' && n.ref === 'configUrl')).toBe(true);
   });
@@ -388,10 +348,7 @@ describe('§8.2 — bornes statiques des allowlistPatterns', () => {
     const { config, notices } = resolveConfig(
       null,
       absent,
-      found({ allowlistPatterns: ['^LGTM$', 'a'.repeat(300), '^(a+)+$', '[invalid'] }),
-      null,
-      false
-    );
+      found({ allowlistPatterns: ['^LGTM$', 'a'.repeat(300), '^(a+)+$', '[invalid'] }));
     expect(config.allowlistPatterns).toEqual(['^LGTM$']);
     expect(notices.filter((n) => n.kind === 'config-warning')).toHaveLength(3);
   });
@@ -422,7 +379,6 @@ describe('§9.2.2 — empreinte de configuration', () => {
     c.resolverOverrideGroup = ['org/leads'];
     c.configCacheTtlSeconds = 60;
     c.coreMinVersion = '1.2.0';
-    c.server.gracePeriodSeconds = 60;
     c.telemetry.enabled = true;
     c.labels[0]!.color = '#ff0000';
     c.labels[0]!.icon = '🔥';
@@ -499,14 +455,14 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // à un dépôt. Sans cette passe, un plancher l’imposait aux deux composants — le
     // navigateur du relecteur ET le service mutualisé.
     const floor: Floor = { allowlistPatterns: { minimum: ['^(a+)+$', '^ok$'] } };
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.allowlistPatterns).toEqual(['^ok$']);
     expect(notices.some((n) => n.kind === 'config-warning' && n.message.startsWith('floor: '))).toBe(true);
   });
 
   it('une entrée toolCommands hors grammaire est écartée et signalée', () => {
     const floor: Floor = { toolCommands: { minimum: ['LGTM', '@bot'] } };
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.toolCommands).toEqual(['@bot']);
     expect(notices.some((n) => n.kind === 'config-warning' && n.message.includes('floor: toolCommands'))).toBe(true);
   });
@@ -516,7 +472,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // identique à celui d’un fichier de dépôt et cherche au mauvais endroit.
     const floor: Floor = { toolCommands: { minimum: ['LGTM'] } };
     const repo = found({ toolCommands: ['NOPE'] });
-    const { notices } = resolveConfig(floor, absent, repo, null, false);
+    const { notices } = resolveConfig(floor, absent, repo);
     const warnings = notices.filter((n) => n.kind === 'config-warning' && n.ref === 'LGTM');
     expect(warnings).toHaveLength(1);
     expect(warnings[0]!.message.startsWith('floor: ')).toBe(true);
@@ -527,21 +483,21 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // `out[key] = [...rule.minimum]` sur un `minimum` absent : le type dit qu’il est
     // obligatoire, mais la valeur vient d’un JSON.parse, jamais d’un compilateur.
     const floor = { allowlistPatterns: { closed: true } } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, found({ allowlistPatterns: ['^x$'] }), null, false);
+    const { config, notices } = resolveConfig(floor, absent, found({ allowlistPatterns: ['^x$'] }));
     expect(config.allowlistPatterns).toEqual([]); // closed + minimum vide ferme la clé
     expect(notices.some((n) => n.ref === 'allowlistPatterns.minimum')).toBe(true);
   });
 
   it('un resolverOverrideGroup qui n’est pas un tableau ne fait plus lever', () => {
     const floor = { resolverOverrideGroup: 'org/team' } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.resolverOverrideGroup).toEqual([]);
     expect(notices.some((n) => n.ref === 'resolverOverrideGroup')).toBe(true);
   });
 
   it('un labels.minimum qui n’est pas un tableau ne fait plus lever', () => {
     const floor = { labels: { minimum: 'issue' } } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, found({ labels: [{ id: 'issue', enabled: false }] }), null, false);
+    const { config, notices } = resolveConfig(floor, absent, found({ labels: [{ id: 'issue', enabled: false }] }));
     expect(config.labels.find((l) => l.id === 'issue')!.enabled).toBe(false); // plancher vide : rien à protéger
     expect(notices.some((n) => n.ref === 'labels.minimum')).toBe(true);
   });
@@ -551,7 +507,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // `false` et ROUVRAIT la liste : le dépôt regagnait des exemptions que l'administration
     // croyait avoir fermées. Régression dans le sens permissif — le seul interdit ici.
     const floor = { exemptUsers: { minimum: ['ci[bot]'], closed: 'true' } } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, found({ exemptUsers: ['moi'] }), null, false);
+    const { config, notices } = resolveConfig(floor, absent, found({ exemptUsers: ['moi'] }));
     expect(config.exemptUsers).toEqual(['ci[bot]']); // fermée : l'ajout du dépôt est écarté
     expect(notices.some((n) => n.ref === 'exemptUsers.closed')).toBe(true);
   });
@@ -559,7 +515,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
   it('`closed` absent laisse la liste ouverte, sans avertissement', () => {
     // Contre-épreuve du précédent : l'absence est le défaut du schéma, pas une faute.
     const floor: Floor = { exemptUsers: { minimum: ['ci[bot]'] } };
-    const { config, notices } = resolveConfig(floor, absent, found({ exemptUsers: ['moi'] }), null, false);
+    const { config, notices } = resolveConfig(floor, absent, found({ exemptUsers: ['moi'] }));
     expect(config.exemptUsers).toEqual(expect.arrayContaining(['ci[bot]', 'moi']));
     expect(notices.some((n) => n.ref === 'exemptUsers.closed')).toBe(false);
   });
@@ -568,7 +524,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // Le contrat annoncé est « écartée ET signalée ». Ne signaler que le tableau absent
     // laissait une politique à moitié appliquée en silence.
     const floor = { resolverOverrideGroup: ['org/securite', 42] } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.resolverOverrideGroup).toEqual(['org/securite']);
     expect(notices.some((n) => n.ref === 'resolverOverrideGroup' && n.message.includes('non-string'))).toBe(true);
   });
@@ -579,21 +535,21 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // publie `success` partout. Une coquille de plancher annulait l'enforcement d'une
     // organisation entière, sans que rien ne le signale.
     const floor = { activation: { activatedAt: 'pas-une-date' } } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.activation.activatedAt).toBeNull(); // écartée : le défaut du produit
     expect(notices.some((n) => n.ref === 'activation.activatedAt')).toBe(true);
 
     // Et surtout : la date du dépôt survit au lieu d'être écrasée par la coquille. Sans
     // l'écart, `min(plancher, dépôt)` installait `NaN` et le périmètre du §6.2.3
     // devenait faux pour toute PR.
-    const avecDepot = resolveConfig(floor, absent, found({ activation: { activatedAt: '2026-01-01T00:00:00Z' } }), null, false);
+    const avecDepot = resolveConfig(floor, absent, found({ activation: { activatedAt: '2026-01-01T00:00:00Z' } }));
     expect(avecDepot.config.activation.activatedAt).toBe('2026-01-01T00:00:00Z');
     expect(Number.isNaN(Date.parse(avecDepot.config.activation.activatedAt!))).toBe(false);
   });
 
   it('une date d’activation valide passe intacte', () => {
     const floor: Floor = { activation: { activatedAt: '2026-09-01T00:00:00Z' } };
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.activation.activatedAt).toBe('2026-09-01T00:00:00Z');
     expect(notices.some((n) => n.ref === 'activation.activatedAt')).toBe(false);
   });
@@ -602,7 +558,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // `minimumMood` laisse l'administration croire son plancher posé alors que tout le
     // reste du code ignore la clé.
     const floor = { minimumMood: 'enforce' } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.mode).toBe('assist'); // le défaut produit : aucun plancher appliqué
     expect(notices.some((n) => n.ref === 'minimumMood' && n.message.includes('unknown floor key'))).toBe(true);
   });
@@ -611,21 +567,21 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // Installé, il rendait tout cache inutilisable : `écoulé < -1000` est toujours faux,
     // donc relecture des deux niveaux à chaque évaluation et à chaque navigation.
     const floor = { configCacheTtlSeconds: -1 } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.configCacheTtlSeconds).toBeGreaterThanOrEqual(0);
     expect(notices.some((n) => n.ref === 'configCacheTtlSeconds')).toBe(true);
   });
 
   it('un minimumMode hors énumération est écarté et signalé', () => {
     const floor = { minimumMode: 'ENFORCE' } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.mode).toBe('assist');
     expect(notices.some((n) => n.ref === 'minimumMode')).toBe(true);
   });
 
   it('une sévérité de plancher hors énumération est écartée, les autres restent', () => {
     const floor = { severities: { 'E-NO-LABEL': 'error', 'E-UNKNOWN-LABEL': 'critique' } } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, found({ severities: { 'E-NO-LABEL': 'warn' } }), null, false);
+    const { config, notices } = resolveConfig(floor, absent, found({ severities: { 'E-NO-LABEL': 'warn' } }));
     expect(config.severities['E-NO-LABEL']).toBe('error'); // le plancher tient
     expect(notices.some((n) => n.ref === 'severities.E-UNKNOWN-LABEL')).toBe(true);
   });
@@ -634,7 +590,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // `"99" > 1` est vrai en JavaScript : la comparaison passait avant la vérification de
     // type, et une version mal écrite faisait retomber le plancher en `assist`.
     const floor = { floorVersion: '99', minimumMode: 'enforce' } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, absent, null, false);
+    const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.mode).toBe('enforce'); // le plancher est appliqué, pas escamoté
     expect(notices.some((n) => n.ref === 'floorVersion')).toBe(true);
     expect(notices.some((n) => n.kind === 'unsupported-version')).toBe(false);
@@ -660,7 +616,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // `closd` laissait `closed` absent, donc la liste OUVERTE, alors que
     // l'administration la voulait fermée — et sans un mot.
     const floor = { exemptUsers: { minimum: ['ci[bot]'], closd: true } } as unknown as Floor;
-    const { notices } = resolveConfig(floor, absent, absent, null, false);
+    const { notices } = resolveConfig(floor, absent, absent);
     expect(notices.some((n) => n.ref === 'exemptUsers.closd')).toBe(true);
   });
 
@@ -671,7 +627,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     const vet = vetFloor(floor);
     expect(vet.unsupported).toBe(false);
     expect(vet.notices.some((n) => n.ref === 'floorVersion')).toBe(true);
-    const { config } = resolveConfig(floor, absent, absent, null, false);
+    const { config } = resolveConfig(floor, absent, absent);
     expect(config.mode).toBe('enforce'); // le reste du plancher s'applique
   });
 
@@ -680,7 +636,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     // inférieur peut alors le désactiver alors que l'administration le croyait protégé.
     const floor = { labels: { minimum: ['issue'], minmum: ['todo'] } } as unknown as Floor;
     const repo = found({ labels: [{ id: 'issue', enabled: false }, { id: 'todo', enabled: false }] });
-    const { config, notices } = resolveConfig(floor, absent, repo, null, false);
+    const { config, notices } = resolveConfig(floor, absent, repo);
     expect(config.labels.find((l) => l.id === 'issue')!.enabled).toBe(true);  // planché
     expect(config.labels.find((l) => l.id === 'todo')!.enabled).toBe(false);  // pas planché
     expect(notices.some((n) => n.ref === 'labels.minmum')).toBe(true);        // et c'est dit
@@ -695,7 +651,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
       labels: { minimum: ['issue'] },
       resolverOverrideGroup: ['org/champions'],
     };
-    const { config, notices } = resolveConfig(floor, absent, found({ labels: [{ id: 'issue', enabled: false }] }), null, false);
+    const { config, notices } = resolveConfig(floor, absent, found({ labels: [{ id: 'issue', enabled: false }] }));
     expect(config.mode).toBe('enforce');
     expect(config.exemptUsers).toContain('ci[bot]');
     expect(config.allowlistPatterns).toEqual(['^ok$']);

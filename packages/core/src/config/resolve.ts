@@ -1,13 +1,16 @@
 // Résolution de la configuration effective (§8.1.2, §8.1.3 r.1, §8.1.5).
-// `resolveConfig()` porte la règle — précédence, fusion, bornes, mélange épinglé — mais
-// aucune entrée-sortie : l'épinglage est lu et écrit par le composant B (§9.2.2).
+// `resolveConfig()` porte la règle — précédence, fusion, bornes — mais aucune entrée-sortie :
+// les deux documents sont LUS par l'adaptateur et lui arrivent déjà en main (§9.2.2).
+//
+// Il n'y a plus d'épinglage. La configuration résolue à l'instant s'applique, y compris aux
+// PR déjà ouvertes et dans les deux sens (§8.1.3, règle 1) — ce qui a un coût, assumé là :
+// durcir `labels[].blockingByDefault` fait rougir toutes les PR ouvertes d'un coup.
 
 import type { ConfigRead, EffectiveConfig, Floor, LabelConfig, Notice } from '../types.js';
 import { defaultConfig } from './defaults.js';
 import { parseConfigDocument } from './schema.js';
 import { mergeLevel } from './merge.js';
 import { applyFloor, maxMode, vetFloor, vettedConfigUrl } from './floor.js';
-import { mixPinnedWithLive } from './pinning.js';
 
 export interface ResolvedConfig {
   config: EffectiveConfig;
@@ -18,8 +21,6 @@ export function resolveConfig(
   floor: Floor | null,
   org: ConfigRead,
   repo: ConfigRead,
-  pinned: EffectiveConfig | null,
-  previouslyEvaluated: boolean
 ): ResolvedConfig {
   const notices: Notice[] = [];
   const vetted = vetFloor(floor);
@@ -53,17 +54,14 @@ export function resolveConfig(
       recordWrites(parsed.values, written);
     }
     // invalide → repli sur le dernier niveau valide : organisation, puis défauts (§8.1.5)
-  } else if (repo.status === 'absent' && previouslyEvaluated) {
-    // Incident, pas une désactivation (§8.1.5) : `git rm` ne doit ni éteindre ni bloquer.
-    notices.push({
-      kind: 'config-vanished',
-      message:
-        'the .conventional-comments.json file has disappeared from an already-evaluated repository: incident, not a deactivation (§8.1.5)',
-    });
   }
+  // Un fichier de dépôt ABSENT ne produit aucun signal ici : le §8.1.5 fait d'abord le même
+  // repli que l'extension, et c'est la configuration résolue qui tranche ensuite — si aucun
+  // niveau ne date l'activation, le vérificateur arme `activation-undated` (§6.2.2, §8.1.5).
+  // Une rédaction antérieure distinguait ici le dépôt « déjà évalué » de celui qui ne
+  // l'avait jamais été ; c'était une mémoire par dépôt, que le §9.2.2 ne tient plus.
 
-  // Activation vivante : min(plancher, niveau inférieur) — une date plus ancienne durcit
-  // (§8.1.1). Calculée à part parce que son durcissement par le plancher est épinglé.
+  // Activation : min(plancher, niveau inférieur) — une date plus ancienne durcit (§8.1.1).
   const floorAt = vetted.unsupported ? undefined : vetted.floor.activation?.activatedAt;
   const lowerAt = config.activation.activatedAt;
   let liveActivation: string | null;
@@ -71,17 +69,9 @@ export function resolveConfig(
   else if (lowerAt === null) liveActivation = floorAt;
   else liveActivation = Date.parse(floorAt) < Date.parse(lowerAt) ? floorAt : lowerAt;
 
-  // Mélange épinglé (§8.1.3, règle 1) — avant les bornes, qui s'appliquent en direct
-  // dans les deux sens (sauf l'activation, traitée par le mélange lui-même).
-  if (pinned !== null) {
-    const live = structuredClone(config);
-    live.activation = { activatedAt: liveActivation };
-    config = mixPinnedWithLive(pinned, live);
-  } else {
-    config.activation = { activatedAt: liveActivation };
-  }
+  config.activation = { activatedAt: liveActivation };
 
-  // Bornes d'entreprise (§8.1.1) — en direct, y compris sur une configuration épinglée.
+  // Bornes d'entreprise (§8.1.1) — en direct : il n'existe plus de configuration épinglée.
   if (!vetted.unsupported) {
     const floored = applyFloor(config, vetted.floor, written, { skipActivation: true });
     config = floored.config;

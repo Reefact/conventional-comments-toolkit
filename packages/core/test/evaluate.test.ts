@@ -56,7 +56,7 @@ describe('§6.2.1 — deux critères, deux sévérités', () => {
     );
     expect(r.state).toBe('success');
     expect(r.counts.unresolvedThreads).toBe(0);
-    expect(r.blockingThreadIds).toEqual([]);
+    expect(r.unresolvedBlockingThreads).toEqual([]);
     expect(r.counts.warnings).toBe(0); // pas de W-NO-DISCUSSION non plus (§3.1)
   });
 
@@ -194,140 +194,59 @@ describe('§6.1 — gouvernance de la résolution', () => {
   });
 });
 
-describe('§6.1 — monotonie du caractère bloquant', () => {
-  it('CA-36 : issue → note sur un fil déjà observé bloquant reste bloquant, signalé avec son auteur', () => {
-    const edited = comment('note: finalement non\n\nd', { author, lastEditedBy: prAuthor });
-    const t = thread(edited, { id: 'th-1' });
+describe('§6.1 — le verdict se lit de l’état courant', () => {
+  it('CA-36 : issue → note rend le fil non bloquant, et RIEN n’est signalé', () => {
+    // La monotonie a disparu avec la mémoire qu'elle exigeait (§6.4) : le vérificateur ne
+    // compare l'état courant à aucun passé qu'il ne détient pas. Une racine éditée se lit
+    // telle qu'elle est.
     const r = evaluate(
       evalInput({
         config: config((c) => (c.mode = 'enforce')),
-        threads: [t],
-        ctx: ctx({ knownBlockingThreadIds: ['th-1'], firstVerdicts: { 'th-1': { blocking: true, hadConflict: false } } }),
+        threads: [thread(comment('note: finalement non\n\nd', { author }), { id: 'th-1' })],
+        ctx: ctx({}),
+      })
+    );
+    expect(r.state).toBe('success');
+    expect(r.counts.unresolvedThreads).toBe(0);
+    expect(r.unresolvedBlockingThreads).toEqual([]);
+    // Et surtout : aucun signal. L'ancienne règle émettait ici un `weakening-edit`, qui
+    // nommait une édition affaiblissante — une cause que seul un passé conservé établit.
+    expect(r.notices).toEqual([]);
+  });
+
+  it('CA-36 contre-épreuve : une racine restée `issue:` bloque bien', () => {
+    // Sans elle, le test ci-dessus passerait aussi si AUCUN fil n'était jamais bloquant.
+    const r = evaluate(
+      evalInput({
+        config: config((c) => (c.mode = 'enforce')),
+        threads: [blockingThread({ id: 'th-2' })],
+        ctx: ctx({}),
       })
     );
     expect(r.state).toBe('failure');
     expect(r.counts.unresolvedThreads).toBe(1);
-    const notice = r.notices.find((n) => n.kind === 'weakening-edit');
-    expect(notice?.actor?.login).toBe('bob');
   });
 
-  it('lastEditedBy absent : notice émis sans acteur — jamais l’auteur du dernier événement (§6.1)', () => {
-    const edited = comment('note: finalement non\n\nd', { author });
-    const t = thread(edited, { id: 'th-1' });
+  it('une édition qui RENFORCE compte, comme toute autre lecture de l’état courant', () => {
     const r = evaluate(
       evalInput({
         config: config((c) => (c.mode = 'enforce')),
-        threads: [t],
-        ctx: ctx({ knownBlockingThreadIds: ['th-1'], firstVerdicts: { 'th-1': { blocking: true, hadConflict: false } } }),
+        threads: [thread(comment('issue: en fait si\n\nd', { author }), { id: 'th-3' })],
+        ctx: ctx({}),
       })
     );
-    const notice = r.notices.find((n) => n.kind === 'weakening-edit');
-    expect(notice).toBeDefined();
-    expect(notice!.actor).toBeUndefined();
+    expect(r.counts.unresolvedThreads).toBe(1);
   });
 
-  it('édition qui renforce (note → issue) : effet normal, entre dans l’ensemble', () => {
-    const t = thread(comment('issue: devenu bloquant\n\nd', { author }), { id: 'th-2' });
-    const r = evaluate(evalInput({ config: config((c) => (c.mode = 'enforce')), threads: [t] }));
-    expect(r.blockingThreadIds).toEqual(['th-2']);
-    expect(r.newFirstVerdicts['th-2']).toEqual({ blocking: true, hadConflict: false });
-  });
-
-  it('CA-36 contre-épreuve : corriger un E-CONFLICT présent dès la première observation, par l’auteur', () => {
-    const corrected = comment('issue (non-blocking): fuite\n\nd', { author, lastEditedBy: author });
-    const t = thread(corrected, { id: 'th-3' });
+  it('un fil absent de la lecture n’est tout simplement pas compté, sans signal', () => {
+    // L'ancienne règle signalait `root-deleted` en comparant les fils lus à ceux qu'elle
+    // avait retenus. Sans cet ensemble, une racine supprimée est une racine qu'on ne lit
+    // pas — et la suppression reste le seul chemin pour éteindre un fil sans le résoudre.
     const r = evaluate(
-      evalInput({
-        config: config((c) => (c.mode = 'enforce')),
-        threads: [t],
-        ctx: ctx({
-          knownBlockingThreadIds: ['th-3'],
-          firstVerdicts: { 'th-3': { blocking: true, hadConflict: true } },
-        }),
-      })
+      evalInput({ config: config((c) => (c.mode = 'enforce')), threads: [], ctx: ctx({}) })
     );
     expect(r.state).toBe('success');
-    expect(r.correctedThreadIds).toEqual(['th-3']);
-    expect(r.notices.some((n) => n.kind === 'weakening-edit')).toBe(false);
-  });
-
-  it('l’exception ne vaut pas sans E-CONFLICT à la première observation (§6.1, chemin d’évasion)', () => {
-    // issue: x observé bloquant sans conflit ; l'auteur de la PR édite vers (blocking, non-blocking)
-    // puis vers (non-blocking) : le départage garde le fil bloquant, l'exception est refusée.
-    const step2 = comment('issue (non-blocking): fuite\n\nd', { author, lastEditedBy: prAuthor });
-    const t = thread(step2, { id: 'th-4' });
-    const r = evaluate(
-      evalInput({
-        config: config((c) => (c.mode = 'enforce')),
-        threads: [t],
-        ctx: ctx({
-          knownBlockingThreadIds: ['th-4'],
-          firstVerdicts: { 'th-4': { blocking: true, hadConflict: false } },
-        }),
-      })
-    );
-    expect(r.state).toBe('failure');
-    expect(r.correctedThreadIds).toEqual([]);
-  });
-
-  it('l’exception ne vaut pas quand l’édition n’est pas de l’auteur de la racine', () => {
-    const t = thread(comment('issue (non-blocking): fuite\n\nd', { author, lastEditedBy: prAuthor }), {
-      id: 'th-5',
-    });
-    const r = evaluate(
-      evalInput({
-        config: config((c) => (c.mode = 'enforce')),
-        threads: [t],
-        ctx: ctx({
-          knownBlockingThreadIds: ['th-5'],
-          firstVerdicts: { 'th-5': { blocking: true, hadConflict: true } },
-        }),
-      })
-    );
-    expect(r.state).toBe('failure');
-  });
-
-  it('lastEditedBy absent : la seconde condition est invérifiable, l’exception ne s’applique pas', () => {
-    const t = thread(comment('issue (non-blocking): fuite\n\nd', { author }), { id: 'th-6' });
-    const r = evaluate(
-      evalInput({
-        config: config((c) => (c.mode = 'enforce')),
-        threads: [t],
-        ctx: ctx({
-          knownBlockingThreadIds: ['th-6'],
-          firstVerdicts: { 'th-6': { blocking: true, hadConflict: true } },
-        }),
-      })
-    );
-    expect(r.state).toBe('failure');
-  });
-
-  it('suppression de la racine : le fil cesse d’être compté, signalé sans auteur', () => {
-    const r = evaluate(
-      evalInput({
-        config: config((c) => (c.mode = 'enforce')),
-        threads: [],
-        ctx: ctx({ knownBlockingThreadIds: ['th-gone'] }),
-      })
-    );
-    expect(r.state).toBe('success');
-    const notice = r.notices.find((n) => n.kind === 'root-deleted');
-    expect(notice).toBeDefined();
-    expect(notice!.actor).toBeUndefined();
-  });
-
-  it('newFirstVerdicts : écrit pour les racines observées la première fois seulement', () => {
-    const t = thread(comment('issue (blocking, non-blocking): fuite\n\nd', { author }), { id: 'th-7' });
-    const first = evaluate(evalInput({ config: config(), threads: [t] }));
-    expect(first.newFirstVerdicts['th-7']).toEqual({ blocking: true, hadConflict: true });
-    const second = evaluate(
-      evalInput({
-        config: config(),
-        threads: [t],
-        ctx: ctx({ firstVerdicts: { 'th-7': { blocking: true, hadConflict: true } }, knownBlockingThreadIds: ['th-7'] }),
-      })
-    );
-    expect(second.newFirstVerdicts).toEqual({});
+    expect(r.notices).toEqual([]);
   });
 });
 
@@ -407,13 +326,22 @@ describe('§6.2.4 — brouillon et §6.3.2 — exemption', () => {
     expect(refused.actions.removeLabel).toBeUndefined(); // étiquette laissée en place
   });
 
-  it('CA-26 : un nouveau fil bloquant remet l’exemption à zéro — retrait demandé, échec', () => {
+  it('CA-26 : un fil bloquant POSTÉRIEUR à la pose remet l’exemption à zéro — retrait, échec', () => {
+    // La comparaison porte sur `root.createdAt` et l'`at` de l'étiquette, deux faits de
+    // l'état courant (§6.3.2). Une rédaction antérieure comparait aux fils « déjà observés
+    // au tour précédent » : sans mémoire cet ensemble est vide, donc TOUT fil bloquant
+    // passait pour nouveau et l'exemption se remettait à zéro sur la PR même qu'elle existe
+    // pour débloquer.
     const r = evaluate(
       evalInput({
         config: config((c) => (c.mode = 'enforce')),
-        threads: [blockingThread({ id: 'th-new' })],
+        threads: [
+          blockingThread({ id: 'th-new', root: comment('issue: fuite mémoire\n\ndétail', {
+            author,
+            createdAt: '2026-10-03T00:00:00Z',
+          }) }),
+        ],
         ctx: ctx({
-          knownBlockingThreadIds: [], // le fil n'était pas observé au tour précédent
           exemption: { by: lead, at: '2026-10-02T00:00:00Z', labelPresent: true },
           isOverrideMember: isLead,
         }),
@@ -425,23 +353,47 @@ describe('§6.2.4 — brouillon et §6.3.2 — exemption', () => {
     expect(r.exemption).toBeUndefined();
   });
 
-  it('CA-39 : étiquette disparue d’une exemption confirmée → restauration demandée, statut vert', () => {
+  it('CA-26, contre-épreuve : un fil bloquant ANTÉRIEUR à la pose laisse l’exemption vivre', () => {
+    // C'est le cas que l'exemption existe pour couvrir : une PR déjà bloquée, qu'un membre
+    // habilité décide de laisser passer. Le faire échouer viderait le mécanisme de son sens.
     const r = evaluate(
       evalInput({
         config: config((c) => (c.mode = 'enforce')),
-        threads: [blockingThread({ id: 'th-x' })],
+        threads: [
+          blockingThread({ id: 'th-old', root: comment('issue: fuite mémoire\n\ndétail', {
+            author,
+            createdAt: '2026-10-01T00:00:00Z',
+          }) }),
+        ],
         ctx: ctx({
-          knownBlockingThreadIds: ['th-x'],
-          firstVerdicts: { 'th-x': { blocking: true, hadConflict: false } },
-          exemption: { by: lead, at: '2026-10-02T00:00:00Z', labelPresent: false },
+          exemption: { by: lead, at: '2026-10-02T00:00:00Z', labelPresent: true },
           isOverrideMember: isLead,
         }),
       })
     );
     expect(r.state).toBe('success');
-    expect(r.actions.addLabel).toBe('cc-override');
-    expect(r.actions.removeLabel).toBeUndefined(); // jamais les deux (§9.2.1)
-    expect(r.notices.some((n) => n.kind === 'exemption-label-restored')).toBe(true);
+    expect(r.actions.removeLabel).toBeUndefined();
+    expect(r.exemption?.by.login).toBe('lead');
+    // Le compteur reste non nul : le vert vient de l'exemption, pas d'une PR propre (§6.5).
+    expect(r.counts.unresolvedThreads).toBe(1);
+  });
+
+  it('aucune exemption sans provenance : l’étiquette seule n’en accorde pas (§6.3.2)', () => {
+    // L'ancien `CA-39` vérifiait qu'une étiquette disparue d'une exemption « confirmée »
+    // était REPOSÉE. Confirmer demandait de s'en souvenir, et reposer demandait un
+    // `addLabel()` que le §9.2.4 ne donne plus ; le critère a disparu du §11 avec eux.
+    // Ce qui reste est la règle du §6.3.2 : l'exemption se lit de l'étiquette ET de sa
+    // provenance. Sans `by` ni `at`, le vérificateur n'en passe aucune à `evaluate()`.
+    const r = evaluate(
+      evalInput({
+        config: config((c) => (c.mode = 'enforce')),
+        threads: [blockingThread({ id: 'th-x' })],
+        ctx: ctx({ isOverrideMember: isLead }),
+      })
+    );
+    expect(r.state).toBe('failure');
+    expect(r.exemption).toBeUndefined();
+    expect(r.actions.removeLabel).toBeUndefined();
   });
 });
 
@@ -505,14 +457,11 @@ describe('§6.3.1 — contenu de la sortie', () => {
     expect(r.configFingerprint).toMatch(/^[0-9a-f]{8}$/);
   });
 
-  it('targetUrl composée depuis server.statusTargetUrl (§8.2)', () => {
-    const r = evaluate(
-      evalInput({
-        config: config((c) => {
-          c.server.statusTargetUrl = 'https://cc.example/status';
-        }),
-      })
-    );
-    expect(r.targetUrl).toBe('https://cc.example/status/pr/github/acme/demo/42');
+  it('aucune `targetUrl` composée : plus aucun porteur configurable ne la fournit (§9.2.1)', () => {
+    // §6.3.1 n'en fait plus le porteur de quoi que ce soit — le corps du statut porte la
+    // sortie. `core/` ne peut pas la connaître : le lien de l'exécution qui publie est un
+    // fait du vérificateur, pas de la configuration.
+    const r = evaluate(evalInput({ config: config((c) => (c.mode = 'enforce')) }));
+    expect(r.targetUrl).toBeUndefined();
   });
 });

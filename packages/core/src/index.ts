@@ -80,7 +80,6 @@ export {
   minSeverity,
   MODE_SCALE,
 } from './config/floor.js';
-export { mixPinnedWithLive } from './config/pinning.js';
 export { resolveConfig, type ResolvedConfig } from './config/resolve.js';
 export { fingerprint, fingerprintDomain } from './config/fingerprint.js';
 

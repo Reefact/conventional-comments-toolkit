@@ -42,8 +42,6 @@ const KNOWN_KEYS = new Set([
   'badgeStyle',
   'shortcuts',
   'docUrl',
-  'server',
-  'exemptionLog',
   'language',
   'telemetry',
 ]);
@@ -365,44 +363,6 @@ export function parseConfigDocument(
           if (k !== 'abbreviations') notices.push(warning(`unknown key "shortcuts.${k}" ignored`, `shortcuts.${k}`));
         }
         out[key] = shortcuts;
-        break;
-      }
-      case 'server': {
-        if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-          bad(key, 'must be an object');
-          break;
-        }
-        const s = value as Record<string, unknown>;
-        const server: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(s)) {
-          if (['coalesceWindowSeconds', 'gracePeriodSeconds', 'reconcileIntervalSeconds'].includes(k)) {
-            if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) bad(key, `"${k}" must be a non-negative integer`);
-            else server[k] = v;
-          } else if (k === 'statusTargetUrl') {
-            if (v !== null && typeof v !== 'string') bad(key, '"statusTargetUrl" must be a string or null');
-            else server[k] = v;
-          } else {
-            notices.push(warning(`unknown key "server.${k}" ignored`, `server.${k}`));
-          }
-        }
-        out[key] = server;
-        break;
-      }
-      case 'exemptionLog': {
-        if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-          bad(key, 'must be an object');
-          break;
-        }
-        const e = value as Record<string, unknown>;
-        const log: Record<string, unknown> = {};
-        if ('endpoint' in e) {
-          if (e['endpoint'] !== null && typeof e['endpoint'] !== 'string') bad(key, '"endpoint" must be a string or null');
-          else log['endpoint'] = e['endpoint'];
-        }
-        for (const k of Object.keys(e)) {
-          if (k !== 'endpoint') notices.push(warning(`unknown key "exemptionLog.${k}" ignored`, `exemptionLog.${k}`));
-        }
-        out[key] = log;
         break;
       }
       case 'language': {

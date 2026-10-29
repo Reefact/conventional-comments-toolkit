@@ -59,17 +59,10 @@ export const fr: Record<string, string> = {
     'Activation non datée — aucune PR n’est dans le périmètre.',
   'headline.draft': 'PR en brouillon — statut informatif uniquement.',
   'headline.exempted': 'PR exemptée par {by} le {at}.',
-  'headline.grace-expired':
-    'Évaluation impossible au-delà du délai de grâce — voir la procédure de retour arrière (§6.3.3 de la spécification).',
   'headline.invalid-config': 'Configuration invalide : {detail}',
-  'headline.config-vanished':
-    'Le fichier de configuration a disparu d’un dépôt déjà évalué.',
+  'headline.activation-undated':
+    'Aucun niveau de configuration ne date l’activation de ce dépôt.',
   // Notices (§6.3.1)
-  'notice.weakening-edit':
-    'Le commentaire racine du fil bloquant {ref} a été édité vers une forme non bloquante{by} ; le fil reste compté comme bloquant (§6.1).',
-  'notice.weakening-edit.by': ' par {login}',
-  'notice.root-deleted':
-    'Le commentaire racine du fil bloquant {ref} a été supprimé ; le fil n’est plus compté. La suppression est le seul chemin restant pour éteindre un fil sans le résoudre.',
   'notice.resolution-refused':
     'Résolution du fil bloquant {ref} refusée : {cause}. Rouvrez le fil et faites-le résoudre par l’auteur du commentaire racine, ou postez-y une réponse « decision » valide.',
   'notice.resolution-refused.not-author':
@@ -82,17 +75,20 @@ export const fr: Record<string, string> = {
     'Clé de configuration de dépôt « {ref} » ignorée : elle assouplirait le plancher d’entreprise.',
   'notice.invalid-config': 'Configuration invalide : {detail}',
   'notice.config-warning': '{detail}',
-  'notice.config-vanished':
-    'Le fichier de configuration .conventional-comments.json a disparu d’un dépôt déjà évalué. C’est un incident, pas une désactivation (§8.1.5).',
+  'notice.activation-undated':
+    'Aucun niveau de configuration ne résout activation.activatedAt : le dépôt n’est daté ni par son fichier, ni par celui de l’organisation, ni par le plancher. Statut neutre publié, quel que soit le mode (§8.1.5).',
   'notice.exemption-reset':
     'Exemption de PR remise à zéro : un nouveau fil bloquant est apparu. L’étiquette a été retirée et le critère 2 s’applique de nouveau.',
   'notice.exemption-refused':
     'Étiquette d’exemption posée par {login}, non membre de resolverOverrideGroup : l’exemption est refusée et l’étiquette est laissée en place.',
-  'notice.exemption-label-restored':
-    'L’étiquette d’exemption avait disparu alors qu’une exemption confirmée est active : elle a été restaurée. Sur cette plateforme, retirer l’étiquette ne révoque pas — passez par le point d’entrée d’administration.',
-  'notice.grace-expired':
-    'Incapacité à évaluer au-delà du délai de grâce : statut neutre publié (§6.4).',
   'notice.unsupported-version': '{detail}',
+  // Sortie humaine du statut (§6.3.1) — sa langue suit la règle du §8.1, comme le reste
+  'output.unresolved-blocking-threads': 'Fils bloquants non résolus',
+  'output.format-diagnostics': 'Diagnostics de format',
+  'output.notices': 'Faits signalés',
+  'output.fix': 'correction',
+  'output.doc-link': 'Documentation de la convention',
+  'output.empty-body': '(vide)',
   // Divers
   'and': 'et',
 };

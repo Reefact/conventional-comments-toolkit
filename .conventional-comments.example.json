@@ -34,8 +34,6 @@
   "badgeStyle": "pill",
   "shortcuts": { "abbreviations": { "?i": "issue: ", "?ib": "issue (blocking): " } },
   "docUrl": "https://conventionalcomments.org/",
-  "server": { "coalesceWindowSeconds": 10, "gracePeriodSeconds": 900, "reconcileIntervalSeconds": 900, "statusTargetUrl": null },
-  "exemptionLog": { "endpoint": null },
   "language": "fr",
   "telemetry": { "enabled": false, "endpoint": null }
 }

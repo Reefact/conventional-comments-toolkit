@@ -42,7 +42,7 @@ const resolving = (doc: object) =>
   resolveConfig(null, { status: 'absent' }, { status: 'found', text: JSON.stringify(doc) }, null, false).config;
 
 /** Les abréviations livrées pour les labels ajoutés — lues dans la table, jamais recopiées :
- * une liste écrite ici a déjà oublié `?tha` (revue Reefact, PR #91). */
+ * une liste écrite ici a déjà oublié celle de `thanks` (revue Reefact, PR #91). */
 const SHIPPED = Object.entries(defaultConfig().shortcuts.abbreviations)
   .filter(([, expansion]) => ADDED_LABELS.some((l) => expansion === `${l.id}: `))
   .map(([abbr]) => abbr);
@@ -50,7 +50,7 @@ const SHIPPED = Object.entries(defaultConfig().shortcuts.abbreviations)
 describe('CA-47 — une abréviation livrée ne se déplie que vers un label actif', () => {
   it('chaque label ajouté a son abréviation livrée', () => {
     expect(SHIPPED).toHaveLength(ADDED_LABELS.length);
-    expect(SHIPPED).toContain('?tha');
+    expect(SHIPPED).toContain('?thx'); // la même graphie que l'alias `thx`
   });
 
   it('famille désactivée : `?do` ne compose pas `done: `, et Tab garde son rôle', () => {

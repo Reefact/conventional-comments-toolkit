@@ -100,7 +100,7 @@ with `scope.validateReplies` on, it had to be written `note: thanks`.
 Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` does not. The
 toolbar shows the remark labels first — `reviewed` among them —, then, always on a line of their
 own under a thin horizontal rule, the reply labels: `thanks`, `done`, `ack`, `decision`,
-`disagree`. A label you declare is `"remark"` unless
+`disagree`. A thin double rule then separates the labels from the decorations. A label you declare is `"remark"` unless
 you write `"kind": "reply"`. The kind changes no verdict.
 
 **Button order.** By default, the order of conventionalcomments.org, then `reviewed`; the replies

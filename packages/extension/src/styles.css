@@ -158,6 +158,15 @@
   padding-top: 8px;
 }
 
+/* Les décorations sous un double trait fin (§5.1) : il sépare les labels des décorations, un
+   cran au-dessus du trait simple entre remarques et réponses. 3 px en `double` : deux traits de
+   1 px et un espace de 1 px, le plus fin qu'un double trait puisse être. */
+.cct-decoration-row {
+  align-self: stretch;
+  border-top: 3px double var(--cct-border-default);
+  padding-top: 8px;
+}
+
 /* Fond plein, et non le fond de la page : sur un écran où 1 px CSS vaut MOINS d'un pixel
    physique (zoom arrière, mise à l'échelle système), un filet de 1 px ne peut pas être
    tracé plein — Chromium l'étale sur deux pixels et certains bords apparaissent « fondus »

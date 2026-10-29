@@ -131,7 +131,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
   point come first, `reviewed` among them; then, under a thin horizontal rule, the labels that
   answer one — `thanks`, `done`, `ack`, `decision`, `disagree`, from the warmest to the firmest.
   `decision` now counts as a reply, since it answers a point. The replies keep the same place
-  at every width.
+  at every width. A thin double rule separates the labels from the decorations.
 - **A label can say which group it belongs to: `labels[].kind`** (§3.2, §8.2). `"remark"` raises
   a point, `"reply"` does not. A label you declare is `"remark"` unless you say otherwise.
   It changes no verdict.

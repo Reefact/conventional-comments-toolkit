@@ -238,10 +238,13 @@ for (const largeur of LARGEURS) {
       const barre = hote.querySelector('.cct-toolbar').getBoundingClientRect();
       const rangee = hote.querySelector('.cct-reply-row');
       // Pas de rangée `reply` : les réponses sont ailleurs — c'est un échec, pas un plantage.
-      if (rangee === null) return { largeur, lignesRemarques: 0, dessous: false, traitEntre: false, pleineLargeur: false, avantDecorations: false };
+      if (rangee === null) return { largeur, lignesRemarques: 0, dessous: false, traitEntre: false, pleineLargeur: false, avantDecorations: false, doubleEntre: false };
       const remarques = [...hote.querySelectorAll('.cct-toolbar-row:first-child > .cct-label-button')].map((b) => b.getBoundingClientRect());
       const reponses = [...rangee.querySelectorAll('.cct-label-button')].map((b) => b.getBoundingClientRect());
       const decorations = hote.querySelector('.cct-decoration-group').getBoundingClientRect();
+      const rangeeDeco = hote.querySelector('.cct-decoration-row');
+      const d = rangeeDeco.getBoundingClientRect();
+      const doubleTrait = getComputedStyle(rangeeDeco);
       const r = rangee.getBoundingClientRect();
       const trait = parseFloat(getComputedStyle(rangee).borderTopWidth);
       const basRemarques = Math.max(...remarques.map((x) => x.bottom));
@@ -253,6 +256,14 @@ for (const largeur of LARGEURS) {
         traitEntre: trait >= 1 && r.top >= basRemarques && r.top + trait <= hautReponses,
         pleineLargeur: Math.abs(r.left - barre.left) < 1 && Math.abs(r.right - barre.right) < 1,
         avantDecorations: Math.max(...reponses.map((x) => x.bottom)) <= decorations.top,
+        // Le double trait : au-dessus des décorations, sous la dernière réponse, sur toute la largeur.
+        doubleEntre:
+          doubleTrait.borderTopStyle === 'double' &&
+          parseFloat(doubleTrait.borderTopWidth) >= 3 &&
+          d.top >= Math.max(...reponses.map((x) => x.bottom)) &&
+          d.top + parseFloat(doubleTrait.borderTopWidth) <= decorations.top &&
+          Math.abs(d.left - barre.left) < 1 &&
+          Math.abs(d.right - barre.right) < 1,
       };
     }, largeur)
   );
@@ -265,6 +276,7 @@ for (const x of mesures) {
   assert(`${x.largeur}px — le trait est entre les deux`, x.traitEntre);
   assert(`${x.largeur}px — le trait court sur toute la largeur de la barre`, x.pleineLargeur);
   assert(`${x.largeur}px — les décorations restent dessous`, x.avantDecorations);
+  assert(`${x.largeur}px — un double trait sépare les réponses des décorations, sur toute la largeur`, x.doubleEntre);
 }
 assert(
   'le balayage rencontre des remarques sur une seule ligne ET sur plusieurs',

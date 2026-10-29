@@ -88,6 +88,52 @@ describe('§4.1, §9.2.3 — Conversation : nouveau commentaire (capture 01)', (
     expect(page.adapter.currentPr()?.createdAt).not.toBe('');
     expect((await page.adapter.getCurrentUser()).login).toBe('Reefact');
   });
+
+  it("trouve le bouton de fusion d'une PR ouverte, et ne journalise rien (§6.5, §9.4)", () => {
+    // Avant le 2026-10-29, aucun candidat ne trouvait ce bouton Primer React : le §6.5 ne
+    // grisait plus rien sur github.com.
+    const control = page.adapter.getCompletionControl();
+    expect(control?.kind).toBe('complete-pr');
+    expect(control?.element.textContent?.trim()).toBe('Rebase and merge');
+    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
+  });
+
+  it("lit l'état que chaque fil déclare, et ne journalise pas les fils repliés (§9.2.3, §9.4)", async () => {
+    const threads = await page.adapter.getThreads();
+    expect(threads).toHaveLength(13);
+    // Lus `unknown` jusque-là, donc comptés non résolus — dont deux `issue (blocking)` résolus.
+    expect(threads.filter((t) => t.resolution === 'unknown')).toEqual([]);
+    expect(threads.filter((t) => t.resolution === 'unresolved')).toHaveLength(1);
+    const byAnchor = (a: string) => threads.find((t) => t.root.permalink.endsWith(a));
+    // Recoupés avec la vue Files changed de la même PR (capture 05).
+    expect(byAnchor('#discussion_r4398202547')?.resolution).toBe('resolved');
+    expect(byAnchor('#discussion_r4397911246')?.resolution).toBe('unresolved');
+    expect(byAnchor('#discussion_r4398521306')?.root.body).toMatch(/^\s*issue \(blocking\)/);
+    expect(byAnchor('#discussion_r4398521306')?.resolution).toBe('resolved');
+    // Huit fils repliés, sans corps ni auteur dans la page : rien de pourri.
+    expect(threads.filter((t) => t.root.body === '')).toHaveLength(8);
+    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('comment-body');
+    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('comment-author');
+  });
+});
+
+describe('§9.4 — ce qui reste journalisé sur une PR ouverte (capture 01, altérée)', () => {
+  // Les deux sondes ne font taire le journal que lorsqu'elles matchent : si GitHub les renomme,
+  // l'absence redevient une entrée — du bruit, jamais du silence. Chaque test altère sa propre
+  // copie de la page.
+  it('un bouton de fusion devenu introuvable sur une PR ouverte est journalisé', () => {
+    const page = load('01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/331');
+    page.doc.querySelector('[data-testid="mergebox-partial"] button[data-variant="primary"]')!.remove();
+    expect(page.adapter.getCompletionControl()).toBeNull();
+    expect(page.adapter.log.failures.map((f) => f.chain)).toContain('merge-button');
+  }, T);
+
+  it('un fil sans corps ni auteur, qui ne se déclare pas replié, est journalisé', async () => {
+    const page = load('01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/331');
+    for (const el of page.doc.querySelectorAll('[data-deferred-content-url]')) el.removeAttribute('data-deferred-content-url');
+    await page.adapter.getThreads();
+    expect(page.adapter.log.failures.map((f) => f.chain)).toEqual(expect.arrayContaining(['comment-body', 'comment-author']));
+  }, T);
 });
 
 describe('§4.1 — Conversation : réponse dans un fil (capture 02)', () => {
@@ -124,9 +170,11 @@ describe('§5.5, §6.5 — PR fusionnée, commentaires préfixés (capture 03)',
     expect(page.adapter.getRenderedComments().map((c) => c.element)).not.toContain(description);
   });
 
-  it("n'expose aucun bouton de fusion sur une PR fusionnée, et le journalise (§9.4)", () => {
+  it("n'expose aucun bouton de fusion sur une PR fusionnée, et ne le journalise pas : c'est la norme (§9.4)", () => {
+    // L'inverse était attendu ici. Une entrée par PR fusionnée visitée enfouissait la seule qui
+    // comptait : le bouton d'une PR ouverte, introuvable depuis que GitHub l'a migré.
     expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(page.adapter.log.failures.map((f) => f.chain)).toContain('merge-button');
+    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
   });
 });
 
@@ -225,6 +273,16 @@ describe('§4.1, §4.3 — Conversation : modification d\'un commentaire génér
   it('laisse le champ de nouveau commentaire en composition', () => {
     const editor = editorOf(page, page.doc.getElementById('new_comment_field'));
     expect(editor.context).toMatchObject({ zone: 'conversation', action: 'compose' });
+  });
+
+  it('lit ses deux fils repliés comme résolus, sans rien journaliser (§9.2.3, §9.4)', async () => {
+    // La forme exacte du journal relevé le 2026-10-29 sur une PR fusionnée de ce dépôt :
+    // `comment-body` et `comment-author` à la même milliseconde, `merge-button` juste avant.
+    const threads = await page.adapter.getThreads();
+    expect(page.adapter.getCompletionControl()).toBeNull();
+    expect(threads.map((t) => t.resolution)).toEqual(['resolved', 'resolved']);
+    const logged = page.adapter.log.failures.map((f) => f.chain);
+    expect(logged.filter((c) => ['merge-button', 'comment-body', 'comment-author'].includes(c))).toEqual([]);
   });
 });
 

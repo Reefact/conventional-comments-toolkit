@@ -416,15 +416,17 @@ export class GithubClientAdapter implements PlatformAdapter {
     const containers = queryChainAll(this.#doc, selectors.renderedThreads);
     return containers.map((el, i) => {
       const id = el.id || el.getAttribute('data-thread-id') || `dom-thread-${i}`;
-      const resolvedElement = queryChain(el, selectors.resolvedMarker).element ?? this.#resolvedMarkerBeside(el);
       const bodyEl = queryChain(el, selectors.commentBody).element;
       const authorEl = queryChain(el, selectors.commentAuthor).element;
       const author = authorEl?.textContent?.trim() ?? '';
       const anchorOutcome = queryChain(el, selectors.threadAnchor);
       // §9.4 — un fil rendu dont on ne sait lire ni le corps ni l'auteur est une chaîne
-      // pourrie, pas un fil vide : sur la vue `…/changes`, les deux étaient muettes.
-      if (!bodyEl) this.log.degraded(selectors.commentBody);
-      if (!authorEl) this.log.degraded(selectors.commentAuthor);
+      // pourrie, pas un fil vide : sur la vue `…/changes`, les deux étaient muettes. Sauf
+      // quand GitHub n'a pas rendu ce contenu du tout — un fil replié, chargé au dépliage :
+      // il n'y avait rien à trouver (`selectors.deferredThread`).
+      const deferred = matchesChain(el, selectors.deferredThread).element !== null;
+      if (!bodyEl && !deferred) this.log.degraded(selectors.commentBody);
+      if (!authorEl && !deferred) this.log.degraded(selectors.commentAuthor);
       if (!anchorOutcome.element) this.log.degraded(selectors.threadAnchor);
       const anchor = anchorOutcome.element?.getAttribute('href') ?? `#${id}`;
       return {
@@ -440,10 +442,20 @@ export class GithubClientAdapter implements PlatformAdapter {
           canCarryBlockingState: true,
         },
         replies: [],
-        resolution: resolvedElement ? ('resolved' as const) : ('unknown' as const),
+        resolution: this.#resolution(el),
         canCarryBlockingState: true,
       };
     });
+  }
+
+  /** L'état que le conteneur du fil déclare lui-même d'abord (`data-resolved`, vue
+   * Conversation), puis les marqueurs rendus dedans ou à côté. `unknown` seulement quand la
+   * page ne rend l'état nulle part (§9.2.3). */
+  #resolution(thread: Element): ThreadInfo['resolution'] {
+    if (matchesChain(thread, selectors.threadResolvedFlag).element) return 'resolved';
+    if (matchesChain(thread, selectors.threadUnresolvedFlag).element) return 'unresolved';
+    const marker = queryChain(thread, selectors.resolvedMarker).element ?? this.#resolvedMarkerBeside(thread);
+    return marker ? 'resolved' : 'unknown';
   }
 
   /** Le marqueur de résolution cherché dans la BOÎTE qui entoure le fil, quand il n'est pas
@@ -465,7 +477,9 @@ export class GithubClientAdapter implements PlatformAdapter {
   getCompletionControl(): SubmitControl | null {
     const { element } = queryChain(this.#doc, selectors.mergeButton);
     if (!element) {
-      this.log.degraded(selectors.mergeButton);
+      // Fusionnée, fermée ou brouillon : GitHub ne rend aucun bouton, et ne rien trouver est
+      // le cas nominal, pas une chaîne pourrie (§9.4, `selectors.prSettledState`).
+      if (!queryChain(this.#doc, selectors.prSettledState).element) this.log.degraded(selectors.mergeButton);
       return null;
     }
     return { element, kind: 'complete-pr' };

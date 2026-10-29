@@ -35,6 +35,7 @@ import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } f
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
 import { clearCommentDecorations, decorateComment } from './ui/badges.js';
 import { ui } from './ui/strings.js';
+import { LABEL_ORDER_KEY, normalizeStoredOrder } from './ui/label-order.js';
 
 declare const chrome: {
   storage?: {
@@ -318,6 +319,20 @@ export function mergeDirectShortcuts(stored: unknown): Record<string, string> {
     }
   }
   return merged;
+}
+
+/** §5.1, §5.2 — ordre personnel des boutons de label, préférence locale (§8.1.2). Lu comme
+ * les raccourcis directs, à la construction de chaque contrôleur : il vaut à la prochaine
+ * zone de saisie instrumentée, pas en direct dans celles déjà ouvertes. */
+async function readLabelOrder(): Promise<string[]> {
+  return new Promise((resolve) => {
+    try {
+      if (!chrome?.storage?.sync) return resolve([]);
+      chrome.storage.sync.get([LABEL_ORDER_KEY], (items) => resolve(normalizeStoredOrder(items?.[LABEL_ORDER_KEY])));
+    } catch {
+      resolve([]);
+    }
+  });
 }
 
 async function readDirectShortcuts(): Promise<Record<string, string>> {
@@ -625,6 +640,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     previousController?.updateResolved(resolved, published);
     const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
     const directShortcuts = await readDirectShortcuts(); // §5.2 — préférence locale (§8.1.2)
+    const labelOrder = await readLabelOrder(); // §5.1 — préférence locale (§8.1.2)
     // Supplanté par une réconciliation plus récente sur la MÊME entrée, ou révoqué, pendant
     // les lectures ci-dessus : ne rien construire ni rien défaire au nom d'une génération
     // périmée — l'ancien contrôleur reste en place tel quel, une réconciliation plus
@@ -638,6 +654,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
       lang,
       currentUserLogin: currentUser.login,
       directShortcuts,
+      labelOrder,
       telemetry: count,
       // Repris tel quel de l'ancien contrôleur (revue Codex, PR #39) : cette reconstruction
       // peut survenir sans que le diagnostic affiché change (langue, style de badge, TTL,

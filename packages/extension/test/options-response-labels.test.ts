@@ -13,8 +13,11 @@ describe('page d’options — le bloc des labels de réponse', () => {
     const { config, notices } = resolveConfig(null, { status: 'absent' }, repo, null, false);
     const active = enabledLabels(config).map((l) => l.id);
     for (const r of ADDED_LABELS) expect(active, r.id).not.toContain(r.id);
-    // Rien d'autre ne change : les dix labels de base, et eux seuls.
-    expect(active).toEqual(['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'decision']);
+    // Rien d'autre ne change : Conventional Comments, et `decision`.
+    expect(active).toEqual([
+      'praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'quibble',
+      'decision',
+    ]);
     expect(notices).toEqual([]);
   });
 

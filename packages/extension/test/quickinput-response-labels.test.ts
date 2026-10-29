@@ -57,9 +57,10 @@ describe('CA-47 — une abréviation livrée ne se déplie que vers un label act
     expect(tabAfter('?r', defaultConfig()).value).toBe('reviewed: ');
   });
 
-  it('contre-épreuve sur le défaut antérieur : `?ty`, `?po`, `?qui` livrées pour des labels éteints', () => {
-    for (const abbr of ['?ty', '?po', '?qui']) expect(tabAfter(abbr, defaultConfig()).value, abbr).toBe(abbr);
-    expect(tabAfter('?ty', resolving({ labels: [{ id: 'typo', enabled: true }] })).value).toBe('typo: ');
+  it('contre-épreuve sur le défaut antérieur : `?ty`, `?po`, `?qui`, labels de Conventional Comments désactivés', () => {
+    const off = resolving({ labels: ['typo', 'polish', 'quibble'].map((id) => ({ id, enabled: false })) });
+    for (const abbr of ['?ty', '?po', '?qui']) expect(tabAfter(abbr, off).value, abbr).toBe(abbr);
+    expect(tabAfter('?ty', defaultConfig()).value).toBe('typo: '); // actifs par défaut
   });
 
   it('une abréviation écrite par une configuration n’est pas concernée', () => {

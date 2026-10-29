@@ -85,6 +85,8 @@ export interface ControllerDeps {
   /** Raccourcis directs (§5.2, ex. Alt+I → issue) — préférences locales de l'utilisateur
    * (§8.2), clé « Alt+<lettre> » → id de label. */
   directShortcuts?: Record<string, string>;
+  /** Ordre personnel des boutons de label (§5.1, §5.2) — préférence locale (§8.1.2). */
+  labelOrder?: readonly string[];
   /** Compteurs agrégés (§10) — absent hors extension et dans les tests qui ne s'y
    * intéressent pas. L'émetteur décide seul s'il a le droit d'émettre ; ce contrôleur
    * compte sans se poser la question, et sans jamais lui passer autre chose qu'un
@@ -316,6 +318,7 @@ export class EditorController {
       // label (revue Codex, PR #35).
       onFreeDecoration: (decoration, label) => this.insertPrefix(label, [decoration], false),
       currentPrefix: () => prefixPosedIn(this.deps.adapter.readValue(this.deps.editor), this.config),
+      ...(this.deps.labelOrder ? { labelOrder: this.deps.labelOrder } : {}),
     });
     this.#toolbar = toolbar;
     mount.container.insertBefore(toolbar.element, mount.anchor);
@@ -337,6 +340,7 @@ export class EditorController {
       // Même compteur que `insertPrefix()` : « label utilisé » ne doit pas dépendre du
       // chemin par lequel la personne l'a posé (§10, revue Codex PR #31).
       onLabelAccepted: (id) => this.deps.telemetry?.({ kind: 'label-used', label: id }),
+      ...(this.deps.labelOrder ? { labelOrder: this.deps.labelOrder } : {}),
     });
     this.#disposers.push(quick.dispose);
 

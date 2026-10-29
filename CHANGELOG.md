@@ -16,8 +16,8 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Changed
 
-- **A label you already named `ack`, `done`, `disagree` or `reviewed` needs one property to
-  keep working as before** (§8.2). It now merges into the shipped definition and inherits
+- **A label you already named `thanks`, `done`, `ack`, `disagree` or `reviewed` needs one
+  property to keep working as before** (§8.2). It now merges into the shipped definition and inherits
   `alwaysNonBlocking: true`, so `done (blocking):` turns into `E-CONFLICT`. Restore it with
   `"alwaysNonBlocking": false`.
 - **The configuration fingerprint of a repository with no configuration changes** (§9.2.2),
@@ -25,6 +25,8 @@ and what a reader needs from them is the behaviour, not the thirteen.
   an unknown word for the previous one. While the extension and the verifier run different
   versions, the extension reports the mismatch and stops blocking the send. Update both together.
 - **New icons:** `praise` is now 👏, `decision` is ⚖️, and 🎉 goes to `reviewed`.
+- **Every label the toolkit ships is enabled by default** (§3.2), Conventional Comments'
+  `typo`, `polish` and `quibble` included. A repository disables the ones it does not want.
 - **Two active labels can no longer share a name** (§8.2). An alias that repeats another active
   label's id is removed from its carrier, an alias carried by two labels is removed from both,
   and each removal is reported. Before, the order of the label list decided which one a
@@ -114,23 +116,30 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Added
 
-- **Three response labels, `ack`, `done`, `disagree`, and a `reviewed` label** (§3.2).
+- **Four response labels, `thanks`, `done`, `ack`, `disagree`, and a `reviewed` label** (§3.2).
   Conventional Comments has a vocabulary for review feedback and none for replying to it.
   These labels are the toolkit's own addition, not part of Conventional Comments, and ship
   **enabled**: a repository that wants to stick to Conventional Comments disables them with one
   `labels[]` entry each. `reviewed` closes your own review — the label people reached for when
   they wrote `praise: review done` — and approves nothing; it answers no point, so it is not a
-  response label. `fixed` is accepted for `done`, `acknowledged`
+  response label. `thanks` says thank you without taking a position, where a plain "thanks!"
+  reply used to need `note:`; `thx` is accepted for it, and `?tha` expands to it. `fixed` is accepted for `done`, `acknowledged`
   for `ack`. They are ordinary labels — same parser, same diagnostics, never blocking — and
   they do not make replies require a label, which remains `scope.validateReplies`. `?r` expands
   to `reviewed: `. See the README for the configuration and the upgrade note.
 - **The toolbar puts the response labels in a zone of their own** (§5.1). Labels that raise a
-  point come first, `reviewed` among them, then a thin line, then the labels that answer one. The response labels
+  point come first, `reviewed` among them, then a thin line, then the labels that answer one —
+  `thanks`, `done`, `ack`, `decision`, `disagree`, from the warmest to the firmest. `decision`
+  now counts as a reply, since it answers a point. The response labels
   wrap to the next line together, never one by one, and the line only shows when both zones
   share a line. Nothing else about the toolbar changes.
 - **A label can say which zone it belongs to: `labels[].kind`** (§3.2, §8.2). `"remark"` raises
   a point, `"reply"` does not. A label you declare is `"remark"` unless you say otherwise.
   It changes no verdict.
+- **You can choose the order of the label buttons** (§5.1, §5.2). *Button order*, in the
+  options, takes a comma-separated list; the labels you list come first in their own zone, the
+  others follow in the default order, which is conventionalcomments.org's. The completion list
+  follows the same order. It is a personal preference and applies to the next comment box.
 - **The options page presents the added labels and copies the block that disables them**
   (§8.2). The page cannot disable them, since the configuration lives in the repository, so it
   shows the block to paste into `.conventional-comments.json` and copies it to the clipboard.

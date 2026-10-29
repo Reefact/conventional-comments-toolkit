@@ -30,25 +30,25 @@ const input = (body: string, zone: Zone = 'thread-root'): ValidationInput => ({
 const codes = (body: string, config: EffectiveConfig, zone?: Zone) =>
   validate(input(body, zone), config).map((d) => d.code);
 
-describe('CA-41 — vocabulaire de réponse désactivé par un dépôt : comportement d’avant la famille', () => {
+describe('CA-41 — labels ajoutés désactivés par un dépôt : eux seuls disparaissent', () => {
   it("l'empreinte par défaut est la valeur LITTÉRALE, et elle a quitté celle d'avant la famille (§9.2.2)", () => {
     // Le garde du §9.2.2 : un changement de défaut qui n'aurait pas été décidé déplace cette
     // valeur. Le déplacement depuis `becd76df` EST décidé — avec les défauts, `done:` est un
     // label ici et un mot inconnu pour un `core/` antérieur.
-    expect(fingerprint(defaultConfig())).toBe('96b86cbd');
-    expect(fingerprint(resolveConfig(null, absent, absent, null, false).config)).toBe('96b86cbd');
+    expect(fingerprint(defaultConfig())).toBe('c2245ec0');
+    expect(fingerprint(resolveConfig(null, absent, absent, null, false).config)).toBe('c2245ec0');
   });
 
-  it('désactivée par un dépôt, la famille mesure `b9a2998f` — ses entrées restent projetées', () => {
-    expect(fingerprint(repo(OFF).config)).toBe('b9a2998f');
+  it('désactivés par un dépôt, les labels ajoutés mesurent `0c89180f` — leurs entrées restent projetées', () => {
+    expect(fingerprint(repo(OFF).config)).toBe('0c89180f');
   });
 
-  it('actifs par défaut : les dix d’avant, puis les quatre labels ajoutés — `reply` sauf `reviewed`', () => {
-    const ten = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'decision'];
-    expect(enabledLabels(defaultConfig()).map((l) => l.id)).toEqual([...ten, 'ack', 'done', 'disagree', 'reviewed']);
-    expect(enabledLabels(repo(OFF).config).map((l) => l.id)).toEqual(ten);
+  it('tous actifs par défaut ; désactiver les labels ajoutés ne retire qu’eux', () => {
+    const cc = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'quibble'];
+    expect(enabledLabels(defaultConfig()).map((l) => l.id)).toEqual([...cc, 'reviewed', 'thanks', 'done', 'ack', 'decision', 'disagree']);
+    expect(enabledLabels(repo(OFF).config).map((l) => l.id)).toEqual([...cc, 'decision']);
     for (const l of defaultConfig().labels) {
-      expect(l.kind, l.id).toBe(['ack', 'done', 'disagree'].includes(l.id) ? 'reply' : 'remark');
+      expect(l.kind, l.id).toBe(['thanks', 'done', 'ack', 'decision', 'disagree'].includes(l.id) ? 'reply' : 'remark');
     }
   });
 
@@ -61,7 +61,7 @@ describe('CA-41 — vocabulaire de réponse désactivé par un dépôt : comport
   it('contre-épreuve : aucune entrée de `labels` n’est omise de la projection', () => {
     // La règle d'omission retirée (§9.2.2) aurait effacé ici une différence qui change les
     // verdicts : `done:` reconnu d'un côté, inconnu de l'autre.
-    expect(fingerprint(repo({ labels: [{ id: 'done', enabled: false }] }).config)).not.toBe('96b86cbd');
+    expect(fingerprint(repo({ labels: [{ id: 'done', enabled: false }] }).config)).not.toBe('c2245ec0');
     expect(fingerprint(repo({ labels: [{ id: 'done', enabled: false }] }).config)).not.toBe('becd76df');
   });
 
@@ -76,7 +76,7 @@ describe('CA-41 — vocabulaire de réponse désactivé par un dépôt : comport
     const rows = [tableAfter('**Labels de réponse — extension du produit'), tableAfter('**`reviewed` — clore sa revue')]
       .flatMap((table) => [...table.matchAll(/^\| `([a-z]+)` \|[^\n]*\| ([^|\n]*) \|$/gm)])
       .map((m) => ({ id: m[1], aliases: [...m[2]!.matchAll(/`([a-z]+)`/g)].map((a) => a[1]) }));
-    expect(rows.map((r) => r.id)).toEqual(['ack', 'done', 'disagree', 'reviewed']);
+    expect(rows.map((r) => r.id)).toEqual(['thanks', 'done', 'ack', 'disagree', 'reviewed']);
     expect(ADDED_LABELS.map((l) => ({ id: l.id, aliases: [...l.aliases] }))).toEqual(rows);
   });
 });
@@ -188,7 +188,7 @@ describe('CA-44 — le plancher ne rend jamais bloquant un label toujours non bl
 describe('CA-45 — le dépôt garde la maîtrise de son vocabulaire', () => {
   it('désactiver un seul label, en réactiver un que l’organisation désactivait, surcharger sans tout redire', () => {
     const minusDone = repo({ labels: [{ id: 'done', enabled: false }] }).config;
-    expect(enabledLabels(minusDone).filter((l) => ADDED_LABELS.some((a) => a.id === l.id)).map((l) => l.id)).toEqual(['ack', 'disagree', 'reviewed']);
+    expect(enabledLabels(minusDone).filter((l) => ADDED_LABELS.some((a) => a.id === l.id)).map((l) => l.id)).toEqual(['reviewed', 'thanks', 'ack', 'disagree']);
 
     const orgOff = found(OFF);
     const plusAck = repo({ labels: [{ id: 'ack', enabled: true }] }, null, orgOff).config;

@@ -115,25 +115,38 @@ describe('§4.1, §9.2.3 — Conversation : nouveau commentaire (capture 01)', (
     expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('comment-body');
     expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('comment-author');
   });
-});
 
-describe('§9.4 — ce qui reste journalisé sur une PR ouverte (capture 01, altérée)', () => {
   // Les deux sondes ne font taire le journal que lorsqu'elles matchent : si GitHub les renomme,
-  // l'absence redevient une entrée — du bruit, jamais du silence. Chaque test altère sa propre
-  // copie de la page.
-  it('un bouton de fusion devenu introuvable sur une PR ouverte est journalisé', () => {
-    const page = load('01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/331');
-    page.doc.querySelector('[data-testid="mergebox-partial"] button[data-variant="primary"]')!.remove();
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(page.adapter.log.failures.map((f) => f.chain)).toContain('merge-button');
-  }, T);
+  // l'absence redevient une entrée — du bruit, jamais du silence. Ces deux tests altèrent la
+  // page déjà chargée, puis la restaurent, plutôt que d'en charger une copie : chaque chargement
+  // de cette capture coûte ~200 Mo de tas, et deux de plus faisaient déborder le worker en CI.
+  // Un adaptateur neuf sur le même document part d'un journal vide.
+  it('journalise un bouton de fusion devenu introuvable sur une PR ouverte (§9.4)', () => {
+    const button = page.doc.querySelector('[data-testid="mergebox-partial"] button[data-variant="primary"]')!;
+    const [parent, next] = [button.parentNode!, button.nextSibling];
+    button.remove();
+    try {
+      const adapter = new GithubClientAdapter({ documentRef: page.doc });
+      expect(adapter.getCompletionControl()).toBeNull();
+      expect(adapter.log.failures.map((f) => f.chain)).toContain('merge-button');
+    } finally {
+      parent.insertBefore(button, next);
+    }
+  });
 
-  it('un fil sans corps ni auteur, qui ne se déclare pas replié, est journalisé', async () => {
-    const page = load('01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/331');
-    for (const el of page.doc.querySelectorAll('[data-deferred-content-url]')) el.removeAttribute('data-deferred-content-url');
-    await page.adapter.getThreads();
-    expect(page.adapter.log.failures.map((f) => f.chain)).toEqual(expect.arrayContaining(['comment-body', 'comment-author']));
-  }, T);
+  it('journalise un fil sans corps ni auteur qui ne se déclare pas replié (§9.4)', async () => {
+    const deferred = [...page.doc.querySelectorAll('[data-deferred-content-url]')].map(
+      (el) => [el, el.getAttribute('data-deferred-content-url')!] as const
+    );
+    for (const [el] of deferred) el.removeAttribute('data-deferred-content-url');
+    try {
+      const adapter = new GithubClientAdapter({ documentRef: page.doc });
+      await adapter.getThreads();
+      expect(adapter.log.failures.map((f) => f.chain)).toEqual(expect.arrayContaining(['comment-body', 'comment-author']));
+    } finally {
+      for (const [el, url] of deferred) el.setAttribute('data-deferred-content-url', url);
+    }
+  });
 });
 
 describe('§4.1 — Conversation : réponse dans un fil (capture 02)', () => {

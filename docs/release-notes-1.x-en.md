@@ -8,6 +8,22 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
 extension installed.
 
+## 1.0.0-beta.16 — October 29, 2026
+
+_The settings page tells you which version you are running, and the GitHub adapter reads a pull request's merge button and resolved conversations correctly again._
+
+### ✨ Features
+
+- **The settings page shows the extension's version next to its title.** A release candidate reads `v1.0.0-beta.16`, where `chrome://extensions` shows `1.0.0` for every beta, so you can tell which build you are running before you report a problem. Firefox shows its own version number.
+
+### 🐛 Bug fixes
+
+- **The banner no longer counts resolved conversations as unresolved.** On a pull request whose resolved conversations GitHub collapses, the banner listed them among the unresolved ones, `issue (blocking)` threads included. It now agrees with the Files changed view of the same pull request.
+
+- **The extension finds the merge button of an open pull request on github.com again.** GitHub changed how the button is built and the extension no longer recognised it. Nothing changes on screen yet: the extension greys the button only when a verifier publishes a failing state, and none ships.
+
+- **The settings page no longer reports selector problems that were not one.** Its Status section listed searches that failed because there was nothing to find, such as the merge button of a merged pull request. They are no longer logged.
+
 ## 1.0.0-beta.15 — October 29, 2026
 
 _A label's badge now tells the reader what a comment means, and its button tells the writer when to use it._

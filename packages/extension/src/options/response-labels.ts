@@ -8,7 +8,7 @@
 // et à l'organisation (§8.1.2). Elle donne donc le bloc à coller. Le bouton dit « Copier »,
 // jamais « Désactiver » : un bouton qui annoncerait un effet sans le produire mentirait.
 
-import { RESPONSE_LABELS } from '@cct/core';
+import { ADDED_LABELS } from '@cct/core';
 
 /** Le bloc à coller dans `.conventional-comments.json` pour DÉSACTIVER la famille — une
  * entrée minimale par label. Construit depuis la définition livrée, jamais recopié : un label
@@ -19,7 +19,7 @@ export function responseLabelsSnippet(): string {
   // haut pour que la fiche de la visite guidée ne tienne ni dessous ni dessus, et sortait de la
   // fenêtre — mesuré par `spikes/options-tour.mjs`. Le texte reste du JSON valide, et le test
   // le relit comme tel.
-  const entries = RESPONSE_LABELS.map((l) => `    { "id": ${JSON.stringify(l.id)}, "enabled": false }`);
+  const entries = ADDED_LABELS.map((l) => `    { "id": ${JSON.stringify(l.id)}, "enabled": false }`);
   return `{\n  "labels": [\n${entries.join(',\n')}\n  ]\n}`;
 }
 

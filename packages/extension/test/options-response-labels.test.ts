@@ -4,7 +4,7 @@
 // réellement passé au moment de la copie.
 
 import { describe, expect, it, vi } from 'vitest';
-import { enabledLabels, resolveConfig, RESPONSE_LABELS } from '@cct/core';
+import { enabledLabels, resolveConfig, ADDED_LABELS } from '@cct/core';
 import { copySnippet, responseLabelsSnippet } from '../src/options/response-labels.js';
 
 describe('page d’options — le bloc des labels de réponse', () => {
@@ -12,7 +12,7 @@ describe('page d’options — le bloc des labels de réponse', () => {
     const repo = { status: 'found' as const, text: responseLabelsSnippet() };
     const { config, notices } = resolveConfig(null, { status: 'absent' }, repo, null, false);
     const active = enabledLabels(config).map((l) => l.id);
-    for (const r of RESPONSE_LABELS) expect(active, r.id).not.toContain(r.id);
+    for (const r of ADDED_LABELS) expect(active, r.id).not.toContain(r.id);
     // Rien d'autre ne change : les dix labels de base, et eux seuls.
     expect(active).toEqual(['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'decision']);
     expect(notices).toEqual([]);
@@ -20,7 +20,7 @@ describe('page d’options — le bloc des labels de réponse', () => {
 
   it('il est construit depuis la définition livrée, pas recopié', () => {
     const ids = (JSON.parse(responseLabelsSnippet()) as { labels: { id: string }[] }).labels.map((l) => l.id);
-    expect(ids).toEqual(RESPONSE_LABELS.map((l) => l.id));
+    expect(ids).toEqual(ADDED_LABELS.map((l) => l.id));
   });
 
   it('le message dit « copié » seulement quand le presse-papiers a accepté', async () => {

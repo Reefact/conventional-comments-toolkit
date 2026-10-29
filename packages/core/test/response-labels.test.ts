@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { resolveConfig } from '../src/config/resolve.js';
-import { defaultConfig, RESPONSE_LABELS } from '../src/config/defaults.js';
+import { defaultConfig, ADDED_LABELS } from '../src/config/defaults.js';
 import { fingerprint } from '../src/config/fingerprint.js';
 import { enabledLabels, resolveLabel } from '../src/parser.js';
 import { isBlocking, validate } from '../src/validator.js';
@@ -18,7 +18,7 @@ const found = (o: object): ConfigRead => ({ status: 'found', text: JSON.stringif
 const repo = (o: object, floor: Floor | null = null, org: ConfigRead = absent) =>
   resolveConfig(floor, org, found(o), null, false);
 // Un dépôt qui s'en tient à Conventional Comments : les labels de réponse, livrés activés, désactivés.
-const OFF = { labels: RESPONSE_LABELS.map((l) => ({ id: l.id, enabled: false })) };
+const OFF = { labels: ADDED_LABELS.map((l) => ({ id: l.id, enabled: false })) };
 
 const input = (body: string, zone: Zone = 'thread-root'): ValidationInput => ({
   body,
@@ -43,12 +43,12 @@ describe('CA-41 — vocabulaire de réponse désactivé par un dépôt : comport
     expect(fingerprint(repo(OFF).config)).toBe('b9a2998f');
   });
 
-  it('actifs par défaut : les dix d’avant, puis les quatre labels de réponse, de type `reply`', () => {
+  it('actifs par défaut : les dix d’avant, puis les quatre labels ajoutés — `reply` sauf `reviewed`', () => {
     const ten = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'decision'];
     expect(enabledLabels(defaultConfig()).map((l) => l.id)).toEqual([...ten, 'ack', 'done', 'disagree', 'reviewed']);
     expect(enabledLabels(repo(OFF).config).map((l) => l.id)).toEqual(ten);
     for (const l of defaultConfig().labels) {
-      expect(l.kind, l.id).toBe(RESPONSE_LABELS.some((r) => r.id === l.id) ? 'reply' : 'remark');
+      expect(l.kind, l.id).toBe(['ack', 'done', 'disagree'].includes(l.id) ? 'reply' : 'remark');
     }
   });
 
@@ -65,17 +65,19 @@ describe('CA-41 — vocabulaire de réponse désactivé par un dépôt : comport
     expect(fingerprint(repo({ labels: [{ id: 'done', enabled: false }] }).config)).not.toBe('becd76df');
   });
 
-  it('la famille livrée EST celle que le §3.2 déclare — identifiants et alias', () => {
-    // Une liste close d'identifiants, la forme qui vieillit : le tableau du §3.2 fait foi.
+  it('les labels ajoutés SONT ceux que le §3.2 déclare — identifiants et alias', () => {
+    // Une liste close d'identifiants, la forme qui vieillit : les deux tableaux du §3.2 font
+    // foi — celui des labels de réponse, puis celui de `reviewed`.
     const spec = readFileSync(new URL('../../../specifications-fr.md', import.meta.url), 'utf8');
-    const block = spec.slice(spec.indexOf('**Labels de réponse — extension du produit'));
-    const table = block.slice(0, block.indexOf('\n\n', block.indexOf('| Label |')));
-    const rows = [...table.matchAll(/^\| `([a-z]+)` \|[^\n]*\| ([^|\n]*) \|$/gm)].map((m) => ({
-      id: m[1],
-      aliases: [...m[2]!.matchAll(/`([a-z]+)`/g)].map((a) => a[1]),
-    }));
-    expect(rows.length).toBeGreaterThan(0);
-    expect(RESPONSE_LABELS.map((l) => ({ id: l.id, aliases: [...l.aliases] }))).toEqual(rows);
+    const tableAfter = (heading: string) => {
+      const block = spec.slice(spec.indexOf(heading));
+      return block.slice(0, block.indexOf('\n\n', block.indexOf('| Label |')));
+    };
+    const rows = [tableAfter('**Labels de réponse — extension du produit'), tableAfter('**`reviewed` — clore sa revue')]
+      .flatMap((table) => [...table.matchAll(/^\| `([a-z]+)` \|[^\n]*\| ([^|\n]*) \|$/gm)])
+      .map((m) => ({ id: m[1], aliases: [...m[2]!.matchAll(/`([a-z]+)`/g)].map((a) => a[1]) }));
+    expect(rows.map((r) => r.id)).toEqual(['ack', 'done', 'disagree', 'reviewed']);
+    expect(ADDED_LABELS.map((l) => ({ id: l.id, aliases: [...l.aliases] }))).toEqual(rows);
   });
 });
 
@@ -186,7 +188,7 @@ describe('CA-44 — le plancher ne rend jamais bloquant un label toujours non bl
 describe('CA-45 — le dépôt garde la maîtrise de son vocabulaire', () => {
   it('désactiver un seul label, en réactiver un que l’organisation désactivait, surcharger sans tout redire', () => {
     const minusDone = repo({ labels: [{ id: 'done', enabled: false }] }).config;
-    expect(enabledLabels(minusDone).filter((l) => l.kind === 'reply').map((l) => l.id)).toEqual(['ack', 'disagree', 'reviewed']);
+    expect(enabledLabels(minusDone).filter((l) => ADDED_LABELS.some((a) => a.id === l.id)).map((l) => l.id)).toEqual(['ack', 'disagree', 'reviewed']);
 
     const orgOff = found(OFF);
     const plusAck = repo({ labels: [{ id: 'ack', enabled: true }] }, null, orgOff).config;
@@ -269,7 +271,7 @@ describe('CA-46 — activation en direct, et sans effet possible sur le critère
     // Le §8.1.3 avertit qu'activer un label peut rendre bloquantes, sur toutes les PR ouvertes,
     // des racines non résolues : pas celui-là, quelle que soit la façon de l'écrire.
     const on = defaultConfig();
-    for (const r of RESPONSE_LABELS) {
+    for (const r of ADDED_LABELS) {
       expect([r.blockingByDefault, r.alwaysNonBlocking], r.id).toEqual([false, true]);
       for (const body of [`${r.id}: un sujet assez long`, `${r.id} (non-blocking): un sujet assez long`]) {
         expect(isBlocking(input(body), on), body).toBe(false);

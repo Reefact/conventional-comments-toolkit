@@ -554,7 +554,7 @@ document.getElementById('direct-shortcuts-save')?.addEventListener('click', () =
   }
 });
 
-// Labels de réponse (§3.2, §8.2) — la page ne les active pas, elle donne le bloc à coller
+// Labels ajoutés (§3.2, §8.2) — la page ne les désactive pas, elle donne le bloc à coller
 // dans le fichier du dépôt. Le message dit ce qui s'est réellement passé : « copié » si le
 // presse-papiers a accepté, sinon le bloc est sélectionné pour une copie manuelle.
 const snippetArea = document.getElementById('response-labels-snippet') as HTMLTextAreaElement | null;

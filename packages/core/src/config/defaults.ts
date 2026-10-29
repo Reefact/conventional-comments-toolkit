@@ -46,10 +46,13 @@ const label = (
 ): LabelConfig => ({ id, enabled, blockingByDefault, alwaysNonBlocking, kind, icon, color, aliases: [...aliases] });
 
 /**
- * Les labels de réponse du §3.2, tels que le produit les LIVRE — ACTIVÉS, de type `reply`,
- * toujours non bloquants, avec leurs alias. Une seule définition, lue par `defaultConfig()`
- * ci-dessous, par le test qui affirme que l'ensemble est celui que le §3.2 déclare, et par la
- * page d'options de l'extension, qui en tire le bloc qui les DÉSACTIVE.
+ * Les labels AJOUTÉS du §3.2, tels que le produit les LIVRE — ACTIVÉS, toujours non bloquants,
+ * avec leurs alias : les trois labels de réponse, de type `reply`, et `reviewed`, de type
+ * `remark` — il ne répond à aucun point, il fait le point sur la revue. Le groupe ne recoupe pas
+ * le type : il dit ce que le produit ajoute à Conventional Comments et qu'une équipe désactive
+ * d'un même geste. Une seule définition, lue par `defaultConfig()` ci-dessous, par le test qui
+ * affirme que l'ensemble est celui que le §3.2 déclare, et par la page d'options de
+ * l'extension, qui en tire le bloc qui les DÉSACTIVE.
  *
  * Couleurs mesurées, comme toutes les autres, contre les neuf fonds Primer de github.com
  * (`config.test.ts`) : #6A7FDB 3,48:1, #6B8E23 3,44:1, #8A7B6E 3,21:1, #D04A7A 3,08:1 au pire. La
@@ -58,15 +61,15 @@ const label = (
  * `praise`), `ack` en indigo (vers 230°, entre `question` et `thought`), `disagree` en taupe —
  * désaturé, donc neutre comme le §5.5 l'exige, mais CHAUD là où le neutre existant, `nitpick`
  * (#76818E), est froid —, `reviewed` en framboise (vers 340°, entre `typo` et `issue` ; à 15° de
- * `typo`, que le produit livre désactivé). `disagree` et `nitpick` sont à luminance quasi égale (écart
- * 0,008) : seule la teinte les sépare, ce que le garde de contraste ne vérifie pas — il
+ * `typo`, que le produit livre désactivé). `disagree` et `nitpick` sont à luminance quasi égale
+ * (écart 0,008) : seule la teinte les sépare, ce que le garde de contraste ne vérifie pas — il
  * n'écarte que les doublons exacts.
  */
-export const RESPONSE_LABELS: readonly LabelConfig[] = [
+export const ADDED_LABELS: readonly LabelConfig[] = [
   label('ack', '\u{1F44C}', '#6A7FDB', false, true, true, ['acknowledged'], 'reply'),
   label('done', '\u{2705}', '#6B8E23', false, true, true, ['fixed'], 'reply'),
   label('disagree', '\u{270B}', '#8A7B6E', false, true, true, [], 'reply'),
-  label('reviewed', '\u{1F389}', '#D04A7A', false, true, true, [], 'reply'),
+  label('reviewed', '\u{1F389}', '#D04A7A', false, true, true, [], 'remark'),
 ];
 
 export function defaultConfig(): EffectiveConfig {
@@ -94,11 +97,11 @@ export function defaultConfig(): EffectiveConfig {
       label('typo', '\u{1F524}', '#CC549C', false, false, false),
       label('polish', '\u{2728}', '#0C8E9A', false, false, false),
       label('quibble', '\u{1FAB6}', '#61896C', false, false, false),
-      // Labels de réponse (§3.2) — une extension propre à cette boîte à outils, absente de
-      // Conventional Comments (§3.1), livrée activée ; un dépôt qui veut s'en tenir à la liste
-      // de l'amont les désactive. Copiés à chaque appel : la
+      // Labels ajoutés (§3.2) — les labels de réponse et `reviewed`, une extension propre à
+      // cette boîte à outils, absente de Conventional Comments (§3.1), livrée activée ; un dépôt
+      // qui veut s'en tenir à la liste de l'amont les désactive. Copiés à chaque appel : la
       // configuration rendue est mutée par la fusion, la définition livrée ne doit jamais l'être.
-      ...RESPONSE_LABELS.map((l) => structuredClone(l)),
+      ...ADDED_LABELS.map((l) => structuredClone(l)),
     ],
     decorations: {
       allowFree: true,

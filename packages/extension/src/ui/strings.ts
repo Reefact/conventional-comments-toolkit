@@ -38,8 +38,8 @@ const fr: Record<string, string> = {
   'label.typo': 'Faute de frappe.',
   'label.polish': 'Amélioration de finition.',
   'label.quibble': 'Point de détail discutable.',
-  // Labels de réponse (§3.2) — extension propre à cette boîte à outils, absente de
-  // Conventional Comments (§3.1). `ack` est du jargon : la description l'ENSEIGNE (§10).
+  // Labels ajoutés (§3.2) — les labels de réponse et `reviewed`, extension propre à cette
+  // boîte à outils, absente de Conventional Comments (§3.1). `ack` est du jargon : la description l'ENSEIGNE (§10).
   'label.ack': "Accusé de réception (« ack », de l'anglais acknowledged) : reçu et accepté ; le code n'a pas changé.",
   'label.done': 'Le code a changé à la suite de la remarque — le diff est à relire.',
   'label.disagree': "Refuse la remarque, et le sujet dit pourquoi. N'a aucune autorité et ne résout rien.",
@@ -124,10 +124,10 @@ const fr: Record<string, string> = {
   'options.add.refused': 'Permission refusée.',
   'options.shortcuts.saved': 'Enregistré.',
   'options.shortcuts.saved.partial': 'Enregistré — lignes ignorées : {rejected}',
-  'options.responses.heading': 'Labels de réponse',
+  'options.responses.heading': "Labels ajoutés",
   'options.responses.sub':
-    "Quatre labels pour répondre à une remarque ou clore sa revue : ack, done, disagree et reviewed. Ils ne font pas partie de Conventional Comments et sont activés par défaut. Ils se désactivent dans le fichier .conventional-comments.json du dépôt, partagé par l'équipe et utilisé par le vérificateur, et non depuis cette page. Le bloc ci-dessous les désactive : sans fichier existant, il peut servir de fichier complet ; sinon, ajoutez ses quatre entrées au tableau labels existant, ou créez cette propriété, sans remplacer les autres clés.",
-  'options.responses.snippet': "Configuration qui désactive les labels de réponse",
+    "Quatre labels propres à cette extension, absents de Conventional Comments : ack, done et disagree pour répondre à une remarque, reviewed pour clore sa revue. Ils sont activés par défaut. Ils se désactivent dans le fichier .conventional-comments.json du dépôt, partagé par l'équipe et utilisé par le vérificateur, et non depuis cette page. Le bloc ci-dessous les désactive : sans fichier existant, il peut servir de fichier complet ; sinon, ajoutez ses quatre entrées au tableau labels existant, ou créez cette propriété, sans remplacer les autres clés.",
+  'options.responses.snippet': "Configuration qui désactive les labels ajoutés",
   'options.responses.copy': 'Copier la configuration',
   'options.responses.copied':
     "Copié. Sans configuration existante, ce bloc peut servir de fichier .conventional-comments.json complet ; sinon, ajoutez ses quatre entrées au tableau labels existant.",
@@ -166,7 +166,7 @@ const fr: Record<string, string> = {
   'tour.shortcuts.title': 'Raccourcis directs',
   'tour.shortcuts.body':
     'Une combinaison de touches insère directement un label dans le commentaire en cours de rédaction. Une ligne par raccourci ; une ligne sans label désactive celui d’origine.',
-  'tour.responses.title': 'Labels de réponse',
+  'tour.responses.title': "Labels ajoutés",
   'tour.responses.body':
     "Ack, done, disagree et reviewed sont actifs par défaut. Pour s'en tenir à Conventional Comments, désactivez-les dans le fichier .conventional-comments.json du dépôt : le bouton copie le bloc à y mettre.",
   'tour.telemetry.title': 'Télémétrie',
@@ -308,10 +308,10 @@ const en: Record<string, string> = {
   'options.add.refused': 'Permission denied.',
   'options.shortcuts.saved': 'Saved.',
   'options.shortcuts.saved.partial': 'Saved — lines ignored: {rejected}',
-  'options.responses.heading': 'Response labels',
+  'options.responses.heading': "Added labels",
   'options.responses.sub':
-    "Four labels for replying to a review comment or closing your review: ack, done, disagree and reviewed. They are not part of Conventional Comments and are enabled by default. They are disabled in the repository's .conventional-comments.json file, shared by the team and used by the verifier, not from this page. The block below disables them: with no existing file, it can serve as the whole file; otherwise, add its four entries to the existing labels array, or create that property, without replacing the other keys.",
-  'options.responses.snippet': "Configuration that disables the response labels",
+    "Four labels of this extension's own, not part of Conventional Comments: ack, done and disagree for replying to a review comment, reviewed for closing your review. They are enabled by default. They are disabled in the repository's .conventional-comments.json file, shared by the team and used by the verifier, not from this page. The block below disables them: with no existing file, it can serve as the whole file; otherwise, add its four entries to the existing labels array, or create that property, without replacing the other keys.",
+  'options.responses.snippet': "Configuration that disables the added labels",
   'options.responses.copy': 'Copy the configuration',
   'options.responses.copied':
     "Copied. With no existing configuration, this block can serve as the whole .conventional-comments.json file; otherwise, add its four entries to the existing labels array.",
@@ -350,7 +350,7 @@ const en: Record<string, string> = {
   'tour.shortcuts.title': 'Direct shortcuts',
   'tour.shortcuts.body':
     'A key combination inserts a label straight into the comment being written. One shortcut per line; a line with no label disables the original one.',
-  'tour.responses.title': 'Response labels',
+  'tour.responses.title': "Added labels",
   'tour.responses.body':
     "Ack, done, disagree and reviewed are enabled by default. To stick to Conventional Comments, disable them in the repository's .conventional-comments.json file: the button copies the block to put there.",
   'tour.telemetry.title': 'Telemetry',

@@ -70,12 +70,12 @@ they apply different rules on GitHub while still reporting that they agree. The 
 requiring a `core/` version across an organization is `coreMinVersion` (§8.2), not the
 fingerprint.
 
-### Response labels (on by default, not part of Conventional Comments)
+### Response labels and `reviewed` (on by default, not part of Conventional Comments)
 
 Conventional Comments gives review **feedback** a vocabulary and says nothing about **replying**
-to it. The toolkit adds four response labels of its own. They are **not part of Conventional
-Comments**: an extension of this tool, shipped enabled, that a repository can turn off (§3.1,
-§3.2).
+to it. The toolkit adds three response labels of its own, plus `reviewed` to close your review.
+These four **added labels** are **not part of Conventional Comments**: an extension of this tool,
+shipped enabled, that a repository can turn off (§3.1, §3.2).
 
 | Label | Meaning | Also accepted |
 |---|---|---|
@@ -90,11 +90,13 @@ done: removed the platform-specific token
 ```
 
 `reviewed` is the label people used to fake with `praise: review done`. It says you are done
-reading; approval stays with the platform's own control.
+reading; approval stays with the platform's own control. It is not a reply: it answers no
+point, it says where your review stands.
 
 Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` does not. The
-toolbar shows the remark labels first, then a thin line, then the reply labels. A label you
-declare is `"remark"` unless you write `"kind": "reply"`. The kind changes no verdict.
+toolbar shows the remark labels first — `reviewed` among them —, then a thin line, then the reply
+labels. A label you declare is `"remark"` unless you write `"kind": "reply"`. The kind changes no
+verdict.
 
 **To stick to Conventional Comments**, disable them, one entry each — there is no separate
 switch (§8.2). The extension's options page shows this block and copies it for you:

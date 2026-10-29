@@ -119,17 +119,18 @@ describe('CA-48 — deux zones dans la rangée des labels', () => {
   const labelsIn = (root: Element) =>
     [...root.querySelectorAll('.cct-label-button')].map((b) => (b as HTMLElement).dataset['label']);
 
-  it('les labels `remark` d’abord, puis la zone `reply` précédée de son trait, dans la même rangée', () => {
+  it('les labels `remark` d’abord — `reviewed` compris —, puis la zone `reply` précédée de son trait', () => {
     const bar = toolbar();
     const zone = bar.querySelector('.cct-reply-zone')!;
     expect(zone).not.toBeNull();
     expect(rowOf(zone)).toBe(rowOf(bar.querySelector('.cct-label-button')));
     expect(zone.firstElementChild!.classList.contains('cct-zone-separator')).toBe(true);
     expect(zone.firstElementChild!.getAttribute('aria-hidden')).toBe('true');
-    expect(labelsIn(zone)).toEqual(['ack', 'done', 'disagree', 'reviewed']);
+    expect(labelsIn(zone)).toEqual(['ack', 'done', 'disagree']);
+    // `reviewed` est ajouté par le produit, mais il ne répond à aucun point : il reste à gauche.
     expect(labelsIn(bar)).toEqual([
       'praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'decision',
-      'ack', 'done', 'disagree', 'reviewed',
+      'reviewed', 'ack', 'done', 'disagree',
     ]);
     // La zone est le DERNIER élément de la rangée : aucun bouton `remark` après elle.
     expect(zone.nextElementSibling).toBeNull();
@@ -138,12 +139,12 @@ describe('CA-48 — deux zones dans la rangée des labels', () => {
   it('le type range le bouton, pas son identifiant', () => {
     const bar = toolbar(resolved({ labels: [{ id: 'merci', kind: 'reply' }, { id: 'done', kind: 'remark' }] }));
     const zone = bar.querySelector('.cct-reply-zone')!;
-    expect(labelsIn(zone)).toEqual(['ack', 'disagree', 'reviewed', 'merci']);
+    expect(labelsIn(zone)).toEqual(['ack', 'disagree', 'merci']);
     expect(zone.parentElement!.querySelector(':scope > [data-label="done"]')).not.toBeNull();
   });
 
   it('sans label `reply` actif, ni zone ni trait : la rangée est celle d’avant', () => {
-    const bar = toolbar(resolved({ labels: ['ack', 'done', 'disagree', 'reviewed'].map((id) => ({ id, enabled: false })) }));
+    const bar = toolbar(resolved({ labels: ['ack', 'done', 'disagree'].map((id) => ({ id, enabled: false })) }));
     expect(bar.querySelector('.cct-reply-zone')).toBeNull();
     expect(bar.querySelector('.cct-zone-separator')).toBeNull();
   });

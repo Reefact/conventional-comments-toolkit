@@ -15,7 +15,7 @@ import { ADDED_LABELS } from '@cct/core';
  * ajouté à la famille y apparaît sans que cette page ait à le savoir. */
 export function responseLabelsSnippet(): string {
   // Une entrée par ligne, comme dans le README, plutôt que `JSON.stringify(…, null, 2)` qui
-  // en met une PROPRIÉTÉ par ligne : seize lignes pour trois labels, vingt pour quatre. Le bloc était alors assez
+  // en met une PROPRIÉTÉ par ligne : seize lignes pour trois labels, vingt-quatre pour cinq. Le bloc était alors assez
   // haut pour que la fiche de la visite guidée ne tienne ni dessous ni dessus, et sortait de la
   // fenêtre — mesuré par `spikes/options-tour.mjs`. Le texte reste du JSON valide, et le test
   // le relit comme tel.

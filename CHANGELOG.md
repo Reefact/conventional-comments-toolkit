@@ -20,8 +20,8 @@ and what a reader needs from them is the behaviour, not the thirteen.
   property to keep working as before** (§8.2). It now merges into the shipped definition and inherits
   `alwaysNonBlocking: true`, so `done (blocking):` turns into `E-CONFLICT`. Restore it with
   `"alwaysNonBlocking": false`.
-- **The configuration fingerprint of a repository with no configuration changes** (§9.2.2),
-  because the response labels are enabled by default: `done:` is a label for this version and
+- **The configuration fingerprint changes even for a repository with no custom configuration**
+  (§9.2.2), because the added labels are enabled by default: `done:` is a label for this version and
   an unknown word for the previous one. While the extension and the verifier run different
   versions, the extension reports the mismatch and stops blocking the send. Update both together.
 - **New icons:** `praise` is now 👏, `decision` is ⚖️, and 🎉 goes to `reviewed`.

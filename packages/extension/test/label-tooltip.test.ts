@@ -4,7 +4,7 @@
 //
 // Le §5.1 la demandait au bouton de la barre d'outils ; le badge d'un commentaire publié (§5.5)
 // est pourtant l'endroit où un lecteur rencontre un label qu'il ne connaît pas — `ack`,
-// `quibble` —, bien plus souvent qu'en écrivant. Les deux passent par `labelTooltip()`, et ce
+// `polish` —, bien plus souvent qu'en écrivant. Les deux passent par `labelTooltip()`, et ce
 // fichier les tient ensemble, pour que l'une ne change pas sans l'autre.
 //
 // Le curseur du badge est une affirmation de CSS : lue dans le texte de styles.css, comme le

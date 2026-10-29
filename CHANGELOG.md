@@ -16,7 +16,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Added
 
-- **A label badge explains itself on hover** (§5.5). Hovering the badge of a published comment shows the same tooltip as the label's toolbar button — its definition and an example, in the interface language —, so a reader meeting `ack` or `quibble` for the first time can find out what it means where they read it. Badges also keep the arrow cursor instead of the text-selection bar, since they are hovered, not selected. Measured on a github.com comment body: `cursor: auto` before, `default` after.
+- **A label badge explains itself on hover** (§5.5). Hovering the badge of a published comment shows the same tooltip as the label's toolbar button — its definition and an example, in the interface language — so a reader meeting `ack` or `polish` for the first time can find out what it means where they read it. Badges also keep the arrow cursor instead of the text-selection bar, since they are hovered, not selected. Measured on a github.com comment body: `cursor: auto` before, `default` after.
 
 - **A label can carry its own definition: `labels[].description`** (§8.2). A repository or an organisation writes it for a label it creates, or for a shipped one such as `issue`, and the tooltip of the label's button and badge shows it. Written, it replaces the shipped definition and its example; written empty, it removes the tooltip; left out, a shipped label keeps its definition. It is shown as written, whatever the interface language, and it is not part of the configuration fingerprint (§9.2.2), since it changes no verdict.
 

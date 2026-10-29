@@ -73,14 +73,17 @@ fingerprint.
 ### Response labels and `reviewed` (on by default, not part of Conventional Comments)
 
 Conventional Comments gives review **feedback** a vocabulary and says nothing about **replying**
-to it. The toolkit adds three response labels of its own, plus `reviewed` to close your review.
-These four **added labels** are **not part of Conventional Comments**: an extension of this tool,
-shipped enabled, that a repository can turn off (§3.1, §3.2).
+to it. The toolkit adds four response labels of its own, plus `reviewed` to close your review.
+These five **added labels** are **not part of Conventional Comments**: an extension of this tool,
+shipped enabled, that a repository can turn off (§3.1, §3.2). Every label the toolkit ships is
+enabled by default, including Conventional Comments' `typo`, `polish` and `quibble`; disable the
+ones you don't want.
 
 | Label | Meaning | Also accepted |
 |---|---|---|
-| `ack` | Received and accepted; the code has not changed. | `acknowledged` |
+| `thanks` | Says thank you, taking no position on the point or the code. | `thx` |
 | `done` | The code changed because of the remark. | `fixed` |
+| `ack` | Received and accepted; the code has not changed. | `acknowledged` |
 | `disagree` | Declines the remark, and the subject says why. Carries no authority, resolves nothing. | |
 | `reviewed` | Closes your own review: you have finished reading. Approves nothing. | |
 
@@ -91,38 +94,47 @@ done: removed the platform-specific token
 
 `reviewed` is the label people used to fake with `praise: review done`. It says you are done
 reading; approval stays with the platform's own control. It is not a reply: it answers no
-point, it says where your review stands.
+point, it says where your review stands. `thanks` fills the gap a plain "thanks!" reply left:
+with `scope.validateReplies` on, it had to be written `note: thanks`.
 
 Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` does not. The
 toolbar shows the remark labels first — `reviewed` among them —, then a thin line, then the reply
-labels. A label you declare is `"remark"` unless you write `"kind": "reply"`. The kind changes no
-verdict.
+labels: `thanks`, `done`, `ack`, `decision`, `disagree`. A label you declare is `"remark"` unless
+you write `"kind": "reply"`. The kind changes no verdict.
+
+**Button order.** By default, the order of conventionalcomments.org, then `reviewed`; the reply
+zone goes from the warmest to the firmest. In the extension's options, *Button order* takes a
+comma-separated list, for example `suggestion,nitpick,disagree`: the labels you list come first
+in their own zone, the others follow in the default order. Spaces are ignored. It is a personal
+preference, synced by your browser; it changes no verdict and applies to the next comment box
+that opens. The completion list (`/` or `:`) follows the same order.
 
 **To stick to Conventional Comments**, disable them, one entry each — there is no separate
 switch (§8.2). The extension's options page shows this block and copies it for you:
 
 ```json
-{ "labels": [ { "id": "ack", "enabled": false },
+{ "labels": [ { "id": "thanks", "enabled": false },
               { "id": "done", "enabled": false },
+              { "id": "ack", "enabled": false },
               { "id": "disagree", "enabled": false },
               { "id": "reviewed", "enabled": false } ] }
 ```
 
 With no existing `.conventional-comments.json`, this block can be the whole file. Otherwise, add
-the four entries to its existing `labels` array, or create that property, without replacing the
+the five entries to its existing `labels` array, or create that property, without replacing the
 other keys: pasting the block into an existing file makes it invalid JSON, and replacing the file
 drops your other settings.
 
 The labels change **which labels exist**, nothing else. They do not require replies to carry a
 label: that is `scope.validateReplies`, still `false` by default, so a reply is not validated at
-all unless you turn it on (§4.1). They do not change the mode, and none of the four can make a
+all unless you turn it on (§4.1). They do not change the mode, and none of the five can make a
 thread blocking. `decision` is unchanged and remains the only reply that can close a blocking
 thread on someone else's behalf (§6.1.1); `disagree` is an opinion and resolves nothing.
 
 If you point `docUrl` at your own documentation, it is worth doing: its default,
 conventionalcomments.org, documents none of these labels.
 
-**Upgrading with a label already called `ack`, `done`, `disagree` or `reviewed`.** Your entry
+**Upgrading with a label already called `thanks`, `done`, `ack`, `disagree` or `reviewed`.** Your entry
 now merges into the shipped one (§8.1.4) and inherits `alwaysNonBlocking: true`, so
 `done (blocking):` becomes `E-CONFLICT`. Restore your label with:
 
@@ -130,7 +142,7 @@ now merges into the shipped one (§8.1.4) and inherits `alwaysNonBlocking: true`
 { "labels": [ { "id": "done", "alwaysNonBlocking": false } ] }
 ```
 
-A label of your own called `fixed` or `acknowledged` is a different case. Two active labels may
+A label of your own called `fixed`, `acknowledged` or `thx` is a different case. Two active labels may
 not share a name: an alias that repeats another active label's id is removed from its carrier.
 Since `done` is enabled by default, it is the shipped alias `fixed` that goes and your label
 that stays. An alias carried by two labels is removed from both. Each removal is reported as a

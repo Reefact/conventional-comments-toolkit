@@ -24,6 +24,8 @@ function setup(
     /** Clé `language` du document de configuration (§8.2) — `null` par défaut, comme
      * `defaultConfig()` : c'est le cas ordinaire, celui où seule la préférence locale parle. */
     configLanguage?: string | null;
+    /** Ordre personnel des boutons (§5.1) — préférence locale lue par le script de contenu. */
+    labelOrder?: string[];
   } = {}
 ) {
   const host = document.createElement('div');
@@ -69,6 +71,7 @@ function setup(
     currentUserLogin: 'alice',
     telemetry: opts.telemetry,
     initialCountedCodes: opts.initialCountedCodes,
+    ...(opts.labelOrder ? { labelOrder: opts.labelOrder } : {}),
   });
   return {
     controller,
@@ -105,7 +108,16 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.attach();
     const toolbar = host.querySelector('.cct-toolbar');
     expect(toolbar).not.toBeNull();
-    expect(toolbar!.querySelectorAll('.cct-label-button')).toHaveLength(14); // dont 4 labels de réponse
+    expect(toolbar!.querySelectorAll('.cct-label-button')).toHaveLength(18); // tous les labels livrés sont actifs
+    controller.dispose();
+  });
+
+  it('CA-50 : l’ordre personnel des boutons atteint la barre qu’il injecte', () => {
+    const { controller, host } = setup('enforce', { labelOrder: ['ack', 'issue'] });
+    controller.attach();
+    const first = (sel: string) => (host.querySelector(sel) as HTMLElement).dataset['label'];
+    expect(first('.cct-toolbar-row > .cct-label-button')).toBe('issue');
+    expect(first('.cct-reply-zone .cct-label-button')).toBe('ack');
     controller.dispose();
   });
 

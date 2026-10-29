@@ -2,7 +2,8 @@
 // construit depuis la configuration — un segment par décoration dont `forces` n'est pas
 // null —, champ libre lorsque `decorations.allowFree` vaut true.
 
-import { IDENTIFIER_RE, enabledLabels, resolveDecoration, type EffectiveConfig } from '@cct/core';
+import { IDENTIFIER_RE, resolveDecoration, type EffectiveConfig } from '@cct/core';
+import { labelsByZone } from './label-order.js';
 import { ui } from './strings.js';
 
 /** Ce que le commentaire porte à cet instant, tel que `core/` le lit (§3.4.1). */
@@ -45,6 +46,9 @@ export interface ToolbarOptions {
    * savoir sur quel label agir (retour utilisateur). Le texte est la seule source qui ne
    * dépende pas du chemin par lequel on y est arrivé. */
   currentPrefix: () => PosedPrefix;
+  /** Ordre personnel des boutons (§5.1, §8.1.2) — identifiants en minuscules, placés en tête
+   * de leur zone. Absent ou vide : l'ordre de la configuration. */
+  labelOrder?: readonly string[];
 }
 
 /** Ce que la barre sait de la décoration, et surtout D'OÙ elle le sait.
@@ -206,7 +210,9 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   // seule (§10), et l'infobulle ci-dessous porte définition et exemple. C'est ce que la
   // spécification décrit : le §5.1 dit « avec libellé et couleur distincts, sans icône », et le
   // §5.5 dit où l'icône est rendue — sur le badge, lorsqu'elle est configurée.
-  for (const label of enabledLabels(opts.config)) {
+  // Ordre : la préférence personnelle en tête de chaque zone, puis la configuration (§5.1).
+  const zones = labelsByZone(opts.config, opts.labelOrder);
+  for (const label of [...zones.remark, ...zones.reply]) {
     const button = doc.createElement('button');
     button.type = 'button';
     button.className = 'cct-label-button';

@@ -40,6 +40,7 @@ const fr: Record<string, string> = {
   'label.quibble': 'Point de détail discutable.',
   // Labels ajoutés (§3.2) — les labels de réponse et `reviewed`, extension propre à cette
   // boîte à outils, absente de Conventional Comments (§3.1). `ack` est du jargon : la description l'ENSEIGNE (§10).
+  'label.thanks': 'Remercie, sans prendre position sur le point ni sur le code.',
   'label.ack': "Accusé de réception (« ack », de l'anglais acknowledged) : reçu et accepté ; le code n'a pas changé.",
   'label.done': 'Le code a changé à la suite de la remarque — le diff est à relire.',
   'label.disagree': "Refuse la remarque, et le sujet dit pourquoi. N'a aucune autorité et ne résout rien.",
@@ -60,6 +61,7 @@ const fr: Record<string, string> = {
   'example.quibble': 'quibble: nom un peu long',
   // Un accusé de réception PUR, jamais un refus poli : « juste, mais je laisse tel quel »
   // relève de `disagree`, et enseignerait la mauvaise frontière dès la première infobulle (§3.2).
+  'example.thanks': 'thanks: merci pour la relecture attentive',
   'example.ack': 'ack: bien noté, je garde ça pour le module suivant',
   'example.done': 'done: jeton propre à la plateforme retiré',
   'example.disagree': 'disagree: la correspondance est volontairement indépendante de la plateforme',
@@ -105,6 +107,10 @@ const fr: Record<string, string> = {
   'options.shortcuts.hint.1': 'Une ligne par raccourci. Une ligne sans label (',
   'options.shortcuts.hint.2': ') désactive le raccourci par défaut.',
   'options.shortcuts.save': 'Enregistrer',
+  'options.order.label': 'Ordre des boutons',
+  'options.order.hint':
+    'Labels séparés par des virgules, espaces ignorés. Ceux que vous listez passent en tête de leur zone ; les autres suivent dans l’ordre par défaut.',
+  'options.order.save': 'Enregistrer',
   'options.telemetry.heading': 'Télémétrie',
   'options.telemetry.sub':
     'Désactivée par défaut. N’émet que des compteurs agrégés — label utilisé, code d’erreur, mode, dépôt — jamais le texte d’un commentaire, d’un code ou d’un diff, ni l’adresse de la page. Elle ne s’active que si la politique d’entreprise de votre organisation déclare un point de collecte et que vous cochez cette case. Un dépôt ne peut ni l’activer, ni choisir la destination.',
@@ -124,6 +130,9 @@ const fr: Record<string, string> = {
   'options.add.refused': 'Permission refusée.',
   'options.shortcuts.saved': 'Enregistré.',
   'options.shortcuts.saved.partial': 'Enregistré — lignes ignorées : {rejected}',
+  'options.order.saved': 'Enregistré. Pris en compte à la prochaine zone de commentaire ouverte.',
+  'options.order.unknown': 'Non livrés par l’extension, placés s’ils existent sur le dépôt : {unknown}.',
+  'options.order.rejected': 'Ignorés, ce ne sont pas des noms de label : {rejected}.',
   'options.responses.heading': "Labels ajoutés",
   'options.responses.sub':
     "Quatre labels propres à cette extension, absents de Conventional Comments : ack, done et disagree pour répondre à une remarque, reviewed pour clore sa revue. Ils sont activés par défaut. Ils se désactivent dans le fichier .conventional-comments.json du dépôt, partagé par l'équipe et utilisé par le vérificateur, et non depuis cette page. Le bloc ci-dessous les désactive : sans fichier existant, il peut servir de fichier complet ; sinon, ajoutez ses quatre entrées au tableau labels existant, ou créez cette propriété, sans remplacer les autres clés.",
@@ -227,6 +236,7 @@ const en: Record<string, string> = {
   'label.typo': 'Typo.',
   'label.polish': 'Finishing touch.',
   'label.quibble': 'Debatable detail.',
+  'label.thanks': 'Says thank you, taking no position on the point or the code.',
   'label.ack': 'Acknowledged: received and accepted; the code has not changed.',
   'label.done': 'The code changed because of the remark — re-read the diff.',
   'label.disagree': 'Declines the remark, and the subject says why. Carries no authority and resolves nothing.',
@@ -245,6 +255,7 @@ const en: Record<string, string> = {
   'example.typo': 'typo: "recieve" → "receive"',
   'example.polish': 'polish: align the imports',
   'example.quibble': 'quibble: slightly long name',
+  'example.thanks': 'thanks: thanks for the careful review',
   'example.ack': "ack: understood, I'll keep it in mind for the next module",
   'example.done': 'done: removed the platform-specific token',
   'example.disagree': 'disagree: the mapping is intentionally platform-independent',
@@ -289,6 +300,10 @@ const en: Record<string, string> = {
   'options.shortcuts.hint.1': 'One shortcut per line. A line with no label (',
   'options.shortcuts.hint.2': ') disables the default shortcut.',
   'options.shortcuts.save': 'Save',
+  'options.order.label': 'Button order',
+  'options.order.hint':
+    'Labels separated by commas, spaces ignored. The ones you list come first in their zone; the others follow in the default order.',
+  'options.order.save': 'Save',
   'options.telemetry.heading': 'Telemetry',
   'options.telemetry.sub':
     'Off by default. It only emits aggregate counters — label used, error code, mode, repository — never the text of a comment, of code or of a diff, nor the page address. It turns on only if your organisation’s enterprise policy declares a collection endpoint and you tick this box. A repository can neither enable it nor choose the destination.',
@@ -308,6 +323,9 @@ const en: Record<string, string> = {
   'options.add.refused': 'Permission denied.',
   'options.shortcuts.saved': 'Saved.',
   'options.shortcuts.saved.partial': 'Saved — lines ignored: {rejected}',
+  'options.order.saved': 'Saved. Applies to the next comment box that opens.',
+  'options.order.unknown': 'Not shipped with the extension, placed if the repository defines them: {unknown}.',
+  'options.order.rejected': 'Ignored, not label names: {rejected}.',
   'options.responses.heading': "Added labels",
   'options.responses.sub':
     "Four labels of this extension's own, not part of Conventional Comments: ack, done and disagree for replying to a review comment, reviewed for closing your review. They are enabled by default. They are disabled in the repository's .conventional-comments.json file, shared by the team and used by the verifier, not from this page. The block below disables them: with no existing file, it can serve as the whole file; otherwise, add its four entries to the existing labels array, or create that property, without replacing the other keys.",

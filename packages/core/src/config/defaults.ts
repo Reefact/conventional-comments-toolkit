@@ -47,7 +47,7 @@ const label = (
 
 /**
  * Les labels AJOUTÉS du §3.2, tels que le produit les LIVRE — ACTIVÉS, toujours non bloquants,
- * avec leurs alias : les trois labels de réponse, de type `reply`, et `reviewed`, de type
+ * avec leurs alias : les quatre labels de réponse, de type `reply`, et `reviewed`, de type
  * `remark` — il ne répond à aucun point, il fait le point sur la revue. Le groupe ne recoupe pas
  * le type : il dit ce que le produit ajoute à Conventional Comments et qu'une équipe désactive
  * d'un même geste. Une seule définition, lue par `defaultConfig()` ci-dessous, par le test qui
@@ -55,22 +55,28 @@ const label = (
  * l'extension, qui en tire le bloc qui les DÉSACTIVE.
  *
  * Couleurs mesurées, comme toutes les autres, contre les neuf fonds Primer de github.com
- * (`config.test.ts`) : #6A7FDB 3,48:1, #6B8E23 3,44:1, #8A7B6E 3,21:1, #D04A7A 3,08:1 au pire. La
+ * (`config.test.ts`) : #6A7FDB 3,48:1, #6B8E23 3,44:1, #8A7B6E 3,21:1, #D04A7A 3,08:1, #9C8C1A 3,19:1 au
+ * pire. La
  * contrainte de contraste enferme la luminance dans une bande étroite, si bien que la teinte
  * seule distingue un label d'un autre : `done` en olive (vers 80°, entre `suggestion` et
- * `praise`), `ack` en indigo (vers 230°, entre `question` et `thought`), `disagree` en taupe —
+ * `praise`), `thanks` en or (vers 53°, entre `suggestion` et `done`), `ack` en indigo (vers 230°, entre `question` et `thought`), `disagree` en taupe —
  * désaturé, donc neutre comme le §5.5 l'exige, mais CHAUD là où le neutre existant, `nitpick`
- * (#76818E), est froid —, `reviewed` en framboise (vers 340°, entre `typo` et `issue` ; à 15° de
- * `typo`, que le produit livre désactivé). `disagree` et `nitpick` sont à luminance quasi égale
+ * (#76818E), est froid —, `reviewed` en framboise (vers 340°, entre `typo` et `issue`, à 15° du
+ * premier). `disagree` et `nitpick` sont à luminance quasi égale
  * (écart 0,008) : seule la teinte les sépare, ce que le garde de contraste ne vérifie pas — il
  * n'écarte que les doublons exacts.
  */
 export const ADDED_LABELS: readonly LabelConfig[] = [
-  label('ack', '\u{1F44C}', '#6A7FDB', false, true, true, ['acknowledged'], 'reply'),
+  label('thanks', '\u{1F91D}', '#9C8C1A', false, true, true, ['thx'], 'reply'),
   label('done', '\u{2705}', '#6B8E23', false, true, true, ['fixed'], 'reply'),
+  label('ack', '\u{1F44C}', '#6A7FDB', false, true, true, ['acknowledged'], 'reply'),
   label('disagree', '\u{270B}', '#8A7B6E', false, true, true, [], 'reply'),
   label('reviewed', '\u{1F389}', '#D04A7A', false, true, true, [], 'remark'),
 ];
+
+/** Une copie de la définition livrée : la configuration rendue est mutée par la fusion, la
+ * définition livrée ne doit jamais l'être. */
+const added = (id: string): LabelConfig => structuredClone(ADDED_LABELS.find((l) => l.id === id)!);
 
 export function defaultConfig(): EffectiveConfig {
   return {
@@ -90,18 +96,23 @@ export function defaultConfig(): EffectiveConfig {
       label('thought', '\u{1F4AD}', '#9368E3', false, true),
       label('chore', '\u{1F9F9}', '#A97735', true, false),
       label('note', '\u{1F4DD}', '#1F8E96', false, true),
-      label('decision', '\u{2696}\u{FE0F}', '#936DD4', false, true),
-      // Labels optionnels, livrés désactivés (§3.2, §8.1.4) — icône et couleur assignées
-      // quand même : (re)activer un label ne doit pas exiger de configurer aussi son
-      // apparence pour sortir du rendu monochrome que #18 décrit.
-      label('typo', '\u{1F524}', '#CC549C', false, false, false),
-      label('polish', '\u{2728}', '#0C8E9A', false, false, false),
-      label('quibble', '\u{1FAB6}', '#61896C', false, false, false),
-      // Labels ajoutés (§3.2) — les labels de réponse et `reviewed`, une extension propre à
-      // cette boîte à outils, absente de Conventional Comments (§3.1), livrée activée ; un dépôt
-      // qui veut s'en tenir à la liste de l'amont les désactive. Copiés à chaque appel : la
-      // configuration rendue est mutée par la fusion, la définition livrée ne doit jamais l'être.
-      ...ADDED_LABELS.map((l) => structuredClone(l)),
+      // `typo`, `polish`, `quibble` : de Conventional Comments, longtemps livrés désactivés,
+      // actifs comme tous les autres (§3.2) — une équipe désactive ceux qu'elle ne veut pas.
+      label('typo', '\u{1F524}', '#CC549C', false, false),
+      label('polish', '\u{2728}', '#0C8E9A', false, false),
+      label('quibble', '\u{1FAB6}', '#61896C', false, false),
+      // Labels ajoutés (§3.2) — une extension propre à cette boîte à outils, absente de
+      // Conventional Comments (§3.1), livrée activée ; un dépôt qui veut s'en tenir à la liste de
+      // l'amont les désactive. L'ordre de cette liste EST l'ordre par défaut des boutons (§5.1) :
+      // `reviewed` clôt la zone `remark`, puis la zone `reply` va du plus conciliant au plus
+      // tranché — `thanks`, `done`, `ack`, `decision`, `disagree`. `decision`, propre au produit lui aussi,
+      // n'est pas un label ajouté (§3.2) : il s'intercale, il ne rejoint pas le groupe.
+      added('reviewed'),
+      added('thanks'),
+      added('done'),
+      added('ack'),
+      label('decision', '\u{2696}\u{FE0F}', '#936DD4', false, true, true, [], 'reply'),
+      added('disagree'),
     ],
     decorations: {
       allowFree: true,
@@ -137,6 +148,7 @@ export function defaultConfig(): EffectiveConfig {
         '?do': 'done: ',
         '?di': 'disagree: ',
         '?r': 'reviewed: ',
+        '?tha': 'thanks: ', // `?th` est `thought` et ne se redéfinit pas (§5.2)
         '?ib': 'issue (blocking): ',
         '?su': 'suggestion: ',
         '?ni': 'nitpick: ',

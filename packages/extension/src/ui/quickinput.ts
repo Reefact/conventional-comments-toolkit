@@ -4,6 +4,7 @@
 // de l'abréviation au moment où Tab est pressée (§5.2).
 
 import { defaultConfig, enabledLabels, matchPrefix, resolveLabel, splitBody, type EffectiveConfig } from '@cct/core';
+import { labelsByZone } from './label-order.js';
 import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
 
 export interface QuickInputOptions {
@@ -16,6 +17,8 @@ export interface QuickInputOptions {
    * « label utilisé » (§10) dépendait du chemin d'interaction — la barre d'outils et les
    * raccourcis directs comptaient, la complétion `/` ou `:` non (revue Codex, PR #31). */
   onLabelAccepted?: (id: string) => void;
+  /** Ordre personnel des labels (§5.2, §8.1.2) : la liste suit celui de la barre d'outils. */
+  labelOrder?: readonly string[];
 }
 
 /** Le label que ce commentaire porte MAINTENANT, ou `null` — lu sur le RÉSULTAT, jamais sur
@@ -78,7 +81,9 @@ export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void
 
   const openList = (filter: string) => {
     closeList();
-    items = enabledLabels(opts.config)
+    // Le même ordre que la barre (§5.2) : zone `remark`, puis zone `reply`.
+    const zones = labelsByZone(opts.config, opts.labelOrder);
+    items = [...zones.remark, ...zones.reply]
       .map((l) => l.id)
       .filter((id) => id.startsWith(filter.toLowerCase()));
     if (items.length === 0) return;

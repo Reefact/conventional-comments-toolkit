@@ -21,6 +21,8 @@ import { ui } from '../ui/strings.js';
 import { applyStaticStrings, currentLanguage } from './i18n.js';
 import { maybeStartTour, startTour } from './tour.js';
 import { copySnippet, responseLabelsSnippet } from './response-labels.js';
+import { LABEL_ORDER_KEY, normalizeStoredOrder, parseLabelOrder } from '../ui/label-order.js';
+import { defaultConfig } from '@cct/core';
 import {
   CLOUD_PLATFORMS,
   HOST_PLATFORMS_KEY,
@@ -551,6 +553,31 @@ document.getElementById('direct-shortcuts-save')?.addEventListener('click', () =
       rejected.length === 0
         ? ui(lang, 'options.shortcuts.saved')
         : ui(lang, 'options.shortcuts.saved.partial', { rejected: rejected.join(' ; ') });
+  }
+});
+
+// Ordre des boutons de label (§5.1, §5.2) — préférence locale (§8.1.2), une seule liste pour
+// les deux zones : la page ne connaît pas le type que chaque dépôt donne à ses labels, chaque
+// zone y prend les siens. Les noms que l'extension ne livre pas ne sont pas une erreur — un
+// dépôt peut les définir —, la page le dit seulement.
+const orderInput = document.getElementById('label-order') as HTMLInputElement | null;
+const orderState = document.getElementById('label-order-state');
+chrome?.storage?.sync?.get([LABEL_ORDER_KEY], (items) => {
+  if (orderInput) orderInput.value = normalizeStoredOrder(items[LABEL_ORDER_KEY]).join(', ');
+});
+document.getElementById('label-order-save')?.addEventListener('click', () => {
+  if (!orderInput) return;
+  const { order, rejected } = parseLabelOrder(orderInput.value);
+  const shipped = new Set(defaultConfig().labels.map((l) => l.id));
+  const unknown = order.filter((id) => !shipped.has(id));
+  chrome?.storage?.sync?.set({ [LABEL_ORDER_KEY]: order });
+  orderInput.value = order.join(', ');
+  if (orderState) {
+    orderState.textContent = [
+      ui(lang, 'options.order.saved'),
+      ...(unknown.length > 0 ? [ui(lang, 'options.order.unknown', { unknown: unknown.join(', ') })] : []),
+      ...(rejected.length > 0 ? [ui(lang, 'options.order.rejected', { rejected: rejected.join(', ') })] : []),
+    ].join(' ');
   }
 });
 

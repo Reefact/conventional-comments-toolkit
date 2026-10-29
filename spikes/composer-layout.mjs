@@ -296,7 +296,7 @@ assert(
   await zonesPage.evaluate(() => {
     const hote = document.getElementById('hote');
     hote.innerHTML = '';
-    hote.appendChild(globalThis.cctBar({ labels: ['ack', 'done', 'disagree'].map((id) => ({ id, enabled: false })) }));
+    hote.appendChild(globalThis.cctBar({ labels: ['thanks', 'done', 'ack', 'decision', 'disagree'].map((id) => ({ id, enabled: false })) }));
     return hote.querySelector('.cct-reply-zone') === null && hote.querySelector('.cct-zone-separator') === null;
   })
 );

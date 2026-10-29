@@ -11,13 +11,14 @@ const found = (o: object): ConfigRead => ({ status: 'found', text: JSON.stringif
 const foundText = (t: string): ConfigRead => ({ status: 'found', text: t });
 
 describe('§8.2 — valeurs par défaut du produit', () => {
-  it('dix-sept labels — dix de Conventional Comments, trois optionnels désactivés, quatre labels ajoutés actifs — et les décorations du §3.3', () => {
+  it('dix-huit labels, tous actifs — Conventional Comments, `decision` et les cinq labels ajoutés — et les décorations du §3.3', () => {
     const c = defaultConfig();
-    expect(c.labels).toHaveLength(17);
-    expect(c.labels.filter((l) => l.enabled)).toHaveLength(14);
-    expect(c.labels.filter((l) => !l.enabled).map((l) => l.id).sort()).toEqual(['polish', 'quibble', 'typo']);
-    // `reviewed` est ajouté mais ne répond à aucun point : il est `remark` (§3.2).
-    expect(c.labels.filter((l) => l.kind === 'reply').map((l) => l.id)).toEqual(['ack', 'done', 'disagree']);
+    expect(c.labels).toHaveLength(18);
+    expect(c.labels.filter((l) => !l.enabled)).toEqual([]);
+    // L'ordre de la liste est l'ordre par défaut des boutons (§5.1) : la zone `reply` va du plus
+    // conciliant au plus tranché. `reviewed` est ajouté mais n'ouvre ni ne répond à aucun point
+    // précis : il est `remark`. `decision` répond à un point : il est `reply`.
+    expect(c.labels.filter((l) => l.kind === 'reply').map((l) => l.id)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);
     expect(c.labels.filter((l) => l.blockingByDefault).map((l) => l.id).sort()).toEqual([
       'chore',
       'issue',
@@ -31,6 +32,7 @@ describe('§8.2 — valeurs par défaut du produit', () => {
       'nitpick',
       'note',
       'reviewed',
+      'thanks',
       'thought',
     ]);
     expect(c.mode).toBe('assist');

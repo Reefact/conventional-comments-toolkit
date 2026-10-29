@@ -311,7 +311,7 @@ jobs:
             echo
             echo "Chaque archive contient un \`INSTALLATION.txt\` reprenant ces étapes (FR et EN). Guide détaillé : [\`docs/extension-setup-fr.md\`](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/extension-setup-fr.md) (EN : [\`docs/extension-setup-en.md\`](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/docs/extension-setup-en.md))."
             echo
-            echo "L'extension démarre en mode \`assist\` : elle aide et signale, elle ne bloque jamais l'envoi. La source de vérité reste le compagnon serveur (composant B)."
+            echo "L'extension démarre en mode \`assist\` : elle aide et signale, elle ne bloque jamais l'envoi. Aucun vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le navigateur des personnes ayant installé l'extension."
             echo
             echo "### Empreintes SHA-256"
             echo

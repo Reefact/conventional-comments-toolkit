@@ -60,7 +60,7 @@ describe('CA-06 — corpus de parité (verdicts de référence et invariance de 
       const repo: ConfigRead = c.configDoc
         ? { status: 'found', text: JSON.stringify(c.configDoc) }
         : absent;
-      const { config } = resolveConfig(null, absent, repo, null, false);
+      const { config } = resolveConfig(null, absent, repo);
 
       // Forme de saisie (LF), telle que lue par le composant A.
       const lf = validate(inputFor(c.body, c), config).map((d) => [d.code, d.severity]);

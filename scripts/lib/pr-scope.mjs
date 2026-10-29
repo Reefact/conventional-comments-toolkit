@@ -18,7 +18,7 @@
 //     pas dans l'extension ni dans le serveur. La règle protège le produit livré.
 //
 // L'inscription d'une plateforme (registre, composition root, dépendances, schéma managé,
-// libellé de menu, amorçage du serveur) touche forcément des fichiers partagés : ces fichiers
+// libellé de menu) touche forcément des fichiers partagés : ces fichiers
 // sont admis avec une plateforme, mais seulement quand la PR CRÉE cette plateforme ou la RETIRE
 // (son `package.json` est ajouté ou supprimé). Le reste du temps, ils comptent comme partagés.
 
@@ -32,8 +32,6 @@ export const REGISTRATION_FILES = [
   'packages/extension/tsconfig.json',
   'packages/extension/src/managed-schema.json',
   'packages/extension/src/ui/strings.ts',
-  'packages/server/src/bootstrap.ts',
-  'packages/server/src/index.ts',
 ];
 
 /**
@@ -60,7 +58,11 @@ export function platformIds(...listings) {
  */
 export function classifyPath(path, ids) {
   if (path.endsWith('.md') || path.startsWith('docs/')) return 'docs';
-  const own = /^packages\/(?:adapters|server\/src\/adapters)\/([^/]+)\//.exec(path);
+  // `packages/action/` n'est PAS une plateforme ici, bien qu'il ne serve que GitHub : c'est
+  // le classement prudent. L'y rattacher autoriserait « vérificateur GitHub + adaptateur
+  // GitHub » dans une même PR, et interdirait « core/ + vérificateur » — deux effets qu'il
+  // faut vouloir. Tant que GitHub est le seul vérificateur livré (§B.7), partagé suffit.
+  const own = /^packages\/adapters\/([^/]+)\//.exec(path);
   if (own && ids.includes(own[1])) return `platform:${own[1]}`;
   // Un test ou un outil reste neutre MÊME s'il porte le nom d'une plateforme. L'y rattacher
   // (`check-github-theme-vars.mjs` → github) en faisait une plateforme touchée : une PR partagée

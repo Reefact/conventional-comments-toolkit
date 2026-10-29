@@ -1,9 +1,9 @@
 # conventional-comments-toolkit
 
-Browser extension + server companion enforcing [Conventional Comments](https://conventionalcomments.org/) in code reviews, for GitHub (github.com, Enterprise Cloud/EMU, Enterprise Server) and Azure DevOps (Services, Server).
+Browser extension enforcing [Conventional Comments](https://conventionalcomments.org/) in code reviews, for GitHub (github.com, Enterprise Cloud/EMU, Enterprise Server) and Azure DevOps (Services, Server).
 
 - **Browser extension (component A)** — authoring assistance and real-time validation while writing review comments. Convenience and prevention; bypassable by construction.
-- **Server companion (component B)** — the actual source of truth: verifies every comment after the fact, computes "blocking threads resolved", and publishes a required status check, so a PR can't be completed with an unresolved blocking comment even without the extension installed.
+- **Verifier (component B)** — the source of truth the specification describes: it verifies every comment after the fact, computes "blocking threads resolved", and publishes a required status check, so a PR can't be completed with an unresolved blocking comment even without the extension installed. **No verifier ships today.** The companion server that used to fill this role is removed: the specification now requires a verifier that runs *inside* the platform and keeps no state (§6.4), and [issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56) tracks building one for GitHub. Until then, objective O3 is not enforced anywhere.
 
 No comment, code, or diff content ever leaves the browser. The full specification (the normative source) is [`specifications-fr.md`](./specifications-fr.md) (in French).
 
@@ -15,13 +15,12 @@ A TypeScript monorepo (npm workspaces). The full breakdown is in [`docs/architec
 packages/core           @cct/core            parser, validator, config, evaluation — shared verbatim by A and B
 packages/adapters/*     @cct/adapter-*        client (component A) platform adapters + shared editor plumbing
 packages/extension      @cct/extension        Manifest V3 extension — toolbar, quick input, feedback, guard
-packages/server         @cct/server           component B — orchestrator, storage, admin, platform adapters
 spikes/p1-prime         P1' spike             programmatic-write assumption, validated in Chromium
 ```
 
 `packages/core/` holds every validation rule; it is consumed identically by both
 components so that a comment judged compliant by the extension is always judged compliant
-by the server, and conversely (§2). See [`docs/architecture-fr.md`](./docs/architecture-fr.md)
+by the verifier, and conversely (§2). See [`docs/architecture-fr.md`](./docs/architecture-fr.md)
 for how the A/B parity holds by construction.
 
 ## Getting started
@@ -65,7 +64,7 @@ and widens it to every slash command, by adding `"/*"` to `toolCommands`. The ex
 above carries the full recommended GitHub list, mentions included.
 
 Note that this behaviour lives in `core/`, not in the configuration, so `fingerprint()`
-(§9.2.2) cannot see it: while the extension and the server run different `core/` versions,
+(§9.2.2) cannot see it: while the extension and the verifier run different `core/` versions,
 they apply different rules on GitHub while still reporting that they agree. The lever for
 requiring a `core/` version across an organization is `coreMinVersion` (§8.2), not the
 fingerprint.
@@ -200,8 +199,8 @@ need a signed-in session and are not checked live.
 | P1' | Programmatic-write spike (GitHub React + Azure DevOps) | Assumption validated in Chromium; remaining platform assumptions documented with their fallbacks (`spikes/p1-prime/README-fr.md`) |
 | P2 | Extension `assist` on GitHub | Implemented |
 | P3 | Azure DevOps adapter | Implemented, with the P1' fallbacks in place |
-| P4 | `warn` mode + indicators (§12) | Implemented (`computeIndicators`, admin endpoint) |
-| P5 | Server companion + status checks | Implemented |
-| P6 | `enforce` on a pilot repo, then rollout | Prerequisites and rollback documented (`docs/operations-fr.md`); the org-admin steps are deployment-time |
+| P4 | `warn` mode + indicators (§12) | `warn` implemented. The §12 indicators are not: they were an endpoint of the removed server, and the section now states that none of them needs collecting as it happens — each recomputes in batch from what the platform keeps |
+| P5 | Verifier + status checks | **Not delivered.** The companion server is removed (it was never deployed); its replacement is designed in §6.4 and §A.8 and tracked by [#56](https://github.com/Reefact/conventional-comments-toolkit/issues/56). Azure DevOps has no verifier either, and §B.7 says why |
+| P6 | `enforce` on a pilot repo, then rollout | Blocked on P5: `enforce` means nothing without a verifier. Prerequisites and rollback are documented (`docs/operations-fr.md`) |
 
 License: Apache-2.0.

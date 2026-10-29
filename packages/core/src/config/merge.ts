@@ -78,8 +78,6 @@ export function mergeLevel(base: EffectiveConfig, values: Record<string, unknown
       }
       case 'scope':
       case 'rules':
-      case 'server':
-      case 'exemptionLog':
       case 'telemetry':
       case 'activation': {
         // Remplacement clé par clé à l'intérieur de l'objet.

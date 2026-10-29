@@ -114,7 +114,7 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
  * du moment, pour qu'un test puisse isoler le blocage dû au seul diagnostic du commentaire
  * sans jamais le confondre avec un écart d'empreinte (§8.1.3, règle 2). */
 function fingerprintFor(configText: string): string {
-  const { config } = resolveConfig(null, { status: 'absent' }, { status: 'found', text: configText }, null, false);
+  const { config } = resolveConfig(null, { status: 'absent' }, { status: 'found', text: configText });
   return fingerprint(config);
 }
 

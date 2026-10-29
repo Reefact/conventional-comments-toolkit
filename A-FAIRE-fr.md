@@ -8,32 +8,39 @@ partie d'aucune convention du chantier.
 
 ## En une phrase
 
-Le **code** de toute la spécification est écrit, testé (440 tests automatisés) et vérifié
+Le **code** de toute la spécification est écrit, testé (1 159 tests automatisés) et vérifié
 par plusieurs revues contradictoires. Ce qui **manque** n'est pas du code non écrit, mais
-des étapes humaines : essayer l'extension en vrai, choisir où héberger le serveur, et
-mener une phase de mesure (P0) qui ne peut se faire qu'avant tout déploiement.
+des étapes humaines : essayer l'extension en vrai, poser les deux fichiers de workflow sur
+un dépôt pilote, et mener une phase de mesure (P0) qui ne peut se faire qu'avant tout
+déploiement. **Il n'y a plus rien à héberger** — et, pour l'instant, plus rien qui bloque
+une PR non plus : le compagnon serveur est retiré, son remplacement reste à écrire.
 
 ## 1. Deux composants, deux niveaux de préparation très différents
 
 ### Composant A — l'extension navigateur : **installable et testable dès maintenant**
 
-Elle fonctionne **seule**, sans le composant serveur : en mode `assist` (celui livré par
+Elle fonctionne **seule**, sans le vérificateur : en mode `assist` (celui livré par
 défaut), elle aide à écrire un commentaire conforme et affiche des diagnostics, mais ne
 bloque jamais rien. C'est ce que vous pouvez tester tout de suite.
 
-### Composant B — le serveur : **déployable, pas encore déployé**
+### Composant B — le vérificateur : **retiré, pas encore remplacé**
 
-Le service auto-hébergeable existe : `packages/server/src/main.ts` (configuration par
-variables d'environnement `CCT_*`), une image Docker (`Dockerfile`, validée par le job
-CI « Image Docker du composant B »), et trois stockages au choix — mémoire, fichier
-JSON, SQLite — derrière l'interface `Storage`, point d'extension documenté pour une
-base externe. Tout est dans **`docs/deployment-fr.md`** : variables, `docker run`,
-branchement des webhooks, volume `/data`.
+Le service auto-hébergeable n'existe plus, et c'était l'objet de l'issue #56 : plus de
+serveur, plus d'image Docker, plus de stockage, plus de webhooks, plus de secrets. Personne
+ne l'avait jamais déployé, donc rien ne régresse — ce qui n'était pas en service cesse de
+l'être sur le papier.
 
-Ce qui manque encore est **chez le client** : une machine où le faire tourner en
-continu, une URL HTTPS publique pour les webhooks, et de vrais jetons d'API. Tant que
-personne ne l'a déployé, aucune PR n'est réellement bloquée — c'est attendu (§2 : le
-composant A est contournable par construction, c'est B qui porte la contrainte réelle).
+Ce qui doit le remplacer est **conçu mais pas écrit** : un vérificateur qui s'exécute dans
+la plateforme, ne retient rien entre deux évaluations, et publie le check que la protection
+de branche exige. Le §6.4 en pose les règles, le §A.8 la mise en œuvre GitHub, et
+[l'issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56) suit le
+chantier.
+
+**Conséquence à assumer : aucune PR n'est réellement bloquée aujourd'hui**, et ce n'était
+déjà pas le cas hier (§2 : le composant A est contournable par construction, c'est B qui
+porte la contrainte réelle).
+
+**Azure DevOps n'a pas de vérificateur non plus** (§B.7), et le §B.7 dit pourquoi.
 
 ## 2. Installer l'extension pour l'essayer
 
@@ -107,9 +114,9 @@ Chromium sans interface. Un passage humain reste donc utile, dans cet ordre :
 4. **Page d'options** — ajouter le domaine `dev.azure.com`, vérifier qu'une page Azure
    DevOps (PR réelle) fait apparaître la même barre d'outils. C'est le test qui valide
    la correction du jour, jamais exécuté en conditions réelles.
-5. **Mode `enforce` sans serveur** — sans composant B déployé, l'extension ne peut jamais
-   passer en blocage réel (c'est le mode `warn`/`assist` qui s'applique de fait) : rien à
-   tester ici tant que le serveur n'est pas en place.
+5. **Mode `enforce` sans vérificateur** — tant qu'aucun vérificateur ne publie de statut,
+   l'extension ne peut jamais passer en blocage réel (c'est le mode `warn`/`assist` qui
+   s'applique de fait) : rien à tester ici avant l'issue #56.
 
 Deux critères d'acceptation de la spec (§11) ne sont *que partiellement* automatisés et
 attendent ce genre de passage manuel — voir `docs/ca-matrix-fr.md`, section « Critères
@@ -118,21 +125,22 @@ corps du check GitHub (`CA-25`).
 
 ## 4. Ce qui reste à faire, et par qui
 
-| # | Tâche | Qui | Bloquant pour merger #2 ? |
-|---|-------|-----|---------------------------|
-| 1 | Essayer l'extension en vrai (§3 ci-dessus) | Vous | Non |
-| 2 | ~~Programme de déploiement du composant B~~ — **fait** : `docs/deployment-fr.md`, image Docker | — | — |
-| 3 | Choisir un hébergement pour le serveur (conteneur toujours actif, VM — pas de « sans serveur » qui endort le processus) et l'y déployer | Vous | Non — mais bloquant pour tout blocage réel de PR |
-| 4 | Créer une app GitHub / un service hook Azure DevOps (jetons, secret de webhook) | Vous | Non |
-| 5 | **Mesure de référence P0** (temps de revue, taux de conformité *avant* l'outil) | Vous | Non, mais **irrattrapable** si l'outil est déployé avant — §14, `docs/operations-fr.md` |
-| 6 | Choisir un dépôt pilote et suivre la trajoire `assist → warn → enforce` | Vous | Non |
-| 7 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) : **toute livraison du composant A y passe** (§10, §14), et c'est le seul chemin qui donne la mise à jour automatique. Les zips de release (`docs/release-fr.md`) servent à l'essai et aux postes sans chaîne de build, ils ne s'y substituent pas | Vous | Non |
-| 8 | Fournir des captures DOM réelles pour le smoke test de sélecteurs (§9.4) | Vous (ou moi, avec un accès) | Non |
-| 9 | Vérifier sur un vrai tenant Azure DevOps ce que le spike n'a pas tranché : type d'éditeur, lisibilité du fichier de config, et **la forme du corps rendu** — quelle balise enveloppe une ligne de Markdown ordinaire, laquelle matérialise une fin de ligne simple (`renderedBodyShape()`, §9.2.3) | Vous (ou moi, avec un accès) | Non — replis dégradés déjà en place, documentés dans `spikes/p1-prime/README-fr.md` |
+| # | Tâche | Qui |
+|---|-------|-----|
+| 1 | Essayer l'extension en vrai (§3 ci-dessus) | Vous |
+| 2 | **Mesure de référence P0** (temps de revue, taux de conformité *avant* l'outil). **Irrattrapable** si l'outil est posé avant — §14, `docs/operations-fr.md` | Vous |
+| 3 | Écrire le vérificateur GitHub (issue #56), puis choisir un dépôt pilote et suivre la trajectoire `assist → warn → enforce`. Bloquant pour tout blocage réel de PR | Moi, puis vous |
+| 4 | ~~Choisir un hébergement pour le serveur~~ — **sans objet** : il n'y a plus de serveur (issue #56) | — |
+| 5 | ~~Créer une app GitHub / un service hook~~ — **sans objet** : aucune app, aucun webhook, aucun secret ; le runner remet son jeton | — |
+| 6 | **Une prémisse que seule une exécution réelle peut établir**, et que le §A.8 range comme telle : **où GitHub rend exactement l'`output.title` d'un check run sur la page d'une PR** — le §6.5 fait dépendre de cette ligne le grisage du bouton de merge par l'extension. Se tranche avec l'étape 3 | Vous (ou moi, avec un accès) |
+| 7 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) : **toute livraison du composant A y passe** (§10, §14), et c'est le seul chemin qui donne la mise à jour automatique. Les zips de release (`docs/release-fr.md`) servent à l'essai et aux postes sans chaîne de build, ils ne s'y substituent pas | Vous |
+| 8 | Fournir des captures DOM réelles pour le smoke test de sélecteurs (§9.4) | Vous (ou moi, avec un accès) |
+| 9 | Vérifier sur un vrai tenant Azure DevOps ce que le spike n'a pas tranché : type d'éditeur, lisibilité du fichier de config, et **la forme du corps rendu** — quelle balise enveloppe une ligne de Markdown ordinaire, laquelle matérialise une fin de ligne simple (`renderedBodyShape()`, §9.2.3). Replis dégradés déjà en place, documentés dans `spikes/p1-prime/README-fr.md` | Vous (ou moi, avec un accès) |
 
-Rien dans cette liste ne bloque le merge de la PR #2 : le code est complet, testé, et la
-CI est verte. Ces tâches sont des étapes d'**exploitation**, pas de développement
-inachevé.
+Une seule ligne est du développement, et c'est l'étape 3 : le vérificateur reste à écrire.
+Le reste sont des étapes d'**exploitation**, à l'exception de l'étape 6, qui est une
+**mesure** — une affirmation sur la plateforme que ce dépôt écrit sans l'avoir vérifiée, et
+qu'il dit telle quelle plutôt que de la présenter comme acquise.
 
 ## 5. Où trouver le reste
 

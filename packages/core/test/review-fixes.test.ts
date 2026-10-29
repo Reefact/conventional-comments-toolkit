@@ -40,10 +40,7 @@ describe('écart 2 — §8.1.1 : le plancher `severities` est un minimum, jamais
     const { config: c } = resolveConfig(
       { minimumMode: 'off', severities: { 'E-NO-LABEL': 'warn' } },
       absent,
-      absent,
-      null,
-      false
-    );
+      absent);
     // Rien d'écrit en dessous : la sévérité effective reste celle du tableau §3.5.2 (error).
     expect(c.severities['E-NO-LABEL'] ?? 'error').toBe('error');
   });
@@ -52,18 +49,12 @@ describe('écart 2 — §8.1.1 : le plancher `severities` est un minimum, jamais
     const raised = resolveConfig(
       { minimumMode: 'off', severities: { 'W-CASE': 'error' } },
       absent,
-      found({ severities: { 'W-CASE': 'warn' } }),
-      null,
-      false
-    );
+      found({ severities: { 'W-CASE': 'warn' } }));
     expect(raised.config.severities['W-CASE']).toBe('error');
     const fromDefault = resolveConfig(
       { minimumMode: 'off', severities: { 'W-CASE': 'error' } },
       absent,
-      absent,
-      null,
-      false
-    );
+      absent);
     expect(fromDefault.config.severities['W-CASE']).toBe('error'); // défaut warn < plancher error
   });
 });
@@ -89,88 +80,67 @@ describe('écart 5 — §8.2 : limite basse E- appliquée même quand le planche
     const { config: c, notices } = resolveConfig(
       { floorVersion: 99, minimumMode: 'enforce' },
       absent,
-      found({ severities: { 'E-EMPTY-SUBJECT': 'off' } }),
-      null,
-      false
-    );
+      found({ severities: { 'E-EMPTY-SUBJECT': 'off' } }));
     expect(c.severities['E-EMPTY-SUBJECT']).toBe('warn');
     expect(notices.some((n) => n.kind === 'config-warning' && n.ref === 'severities.E-EMPTY-SUBJECT')).toBe(true);
   });
 });
 
 describe('écart 6 — §8.1.5 : clé inconnue imbriquée ignorée AVEC avertissement', () => {
-  it('shortcuts, telemetry, exemptionLog et entrées de labels', () => {
+  it('shortcuts, telemetry et entrées de labels', () => {
     const { notices } = resolveConfig(
       null,
       absent,
       found({
         shortcuts: { abbreviations: {}, futureKey: 1 },
         telemetry: { enabled: false, futureKey: 1 },
-        exemptionLog: { endpoint: null, futureKey: 1 },
         labels: [{ id: 'issue', futureKey: true }],
-      }),
-      null,
-      false
-    );
+      }));
     const refs = notices.filter((n) => n.kind === 'config-warning').map((n) => n.ref);
     expect(refs).toContain('shortcuts.futureKey');
     expect(refs).toContain('telemetry.futureKey');
-    expect(refs).toContain('exemptionLog.futureKey');
     expect(refs).toContain('labels[].futureKey');
   });
 });
 
-describe('écart 7 — §8.1.3 : resolverOverrideGroup, restriction épinglée sans durcissement infligé', () => {
-  const pin = (repo: object) => resolveConfig(null, absent, found(repo), null, false).config;
+describe('écart 7 — §8.1.3 : `resolverOverrideGroup` suit le document, dans les deux sens', () => {
+  // Ces trois tests affirmaient l'inverse : une restriction était ÉPINGLÉE, et la PR
+  // ouverte gardait son habilitation. L'épinglage a disparu avec la mémoire qu'il exigeait
+  // (§6.4), et le §8.1.3 règle 1 s'applique ici comme partout.
+  it('ajouter un groupe prend effet immédiatement', () => {
+    const { config } = resolveConfig(null, absent, found({ resolverOverrideGroup: ['org/leads', 'org/security'] }));
+    expect(config.resolverOverrideGroup).toEqual(['org/leads', 'org/security']);
+  });
 
-  it('ajout d’un groupe (restriction) : épinglé — la PR ouverte garde son habilitation', () => {
-    const pinned = pin({ resolverOverrideGroup: ['org/leads'] });
-    const { config: c } = resolveConfig(
-      null,
+  it('en retirer un aussi', () => {
+    const { config } = resolveConfig(null, absent, found({ resolverOverrideGroup: ['org/leads'] }));
+    expect(config.resolverOverrideGroup).toEqual(['org/leads']);
+  });
+
+  it('retirer la déclaration ramène au repli terminal : la liste vide, qui n’habilite personne', () => {
+    // §8.2 — « repli terminal », et non participant à l'intersection du §8.1.1. Le coût est
+    // réel et assumé : sans groupe habilité, les deux soupapes du §6.3 sont inertes en même
+    // temps — ni `decision`, ni exemption de PR.
+    const { config } = resolveConfig(null, absent, found({}));
+    expect(config.resolverOverrideGroup).toEqual([]);
+  });
+
+  it('le groupe du plancher ne peut pas être remplacé : il s’AJOUTE à la liste (§8.1.1)', () => {
+    // Piège de lecture, et il a coûté une assertion fausse ici : le §8.1.1 dit que
+    // « l'habilitation effective est l'INTERSECTION de toutes les listes en présence », mais
+    // l'intersection porte sur l'APPARTENANCE, pas sur la liste. Il faut être membre de
+    // CHACUN des groupes cités, donc allonger la liste RESTREINT. L'union des listes produit
+    // l'intersection des habilitations — et c'est bien ce que `applyFloor` fait.
+    const { config } = resolveConfig(
+      { minimumMode: 'off', resolverOverrideGroup: ['org/leads', 'org/security'] },
       absent,
-      found({ resolverOverrideGroup: ['org/leads', 'org/security'] }),
-      pinned,
-      true
+      found({ resolverOverrideGroup: ['org/security', 'org/newteam'] })
     );
-    expect(c.resolverOverrideGroup).toEqual(['org/leads']);
-  });
-
-  it('retrait d’un groupe (élargissement) : en direct', () => {
-    const pinned = pin({ resolverOverrideGroup: ['org/leads', 'org/security'] });
-    const { config: c } = resolveConfig(null, absent, found({ resolverOverrideGroup: ['org/leads'] }), pinned, true);
-    expect(c.resolverOverrideGroup).toEqual(['org/leads']);
-  });
-
-  it('remplacement complet : jamais « personne » — la valeur épinglée subsiste', () => {
-    const pinned = pin({ resolverOverrideGroup: ['org/leads'] });
-    const { config: c } = resolveConfig(null, absent, found({ resolverOverrideGroup: ['org/newteam'] }), pinned, true);
-    expect(c.resolverOverrideGroup).toEqual(['org/leads']); // pas [] (qui n'habiliterait personne, §8.2)
-  });
-
-  it('depuis « personne » vers un groupe : élargissement de l’habilitation, en direct', () => {
-    const pinned = pin({});
-    expect(pinned.resolverOverrideGroup).toEqual([]);
-    const { config: c } = resolveConfig(null, absent, found({ resolverOverrideGroup: ['org/leads'] }), pinned, true);
-    expect(c.resolverOverrideGroup).toEqual(['org/leads']);
-  });
-
-  it('vers « personne » (déclaration retirée) : durcissement maximal, épinglé', () => {
-    const pinned = pin({ resolverOverrideGroup: ['org/leads'] });
-    const { config: c } = resolveConfig(null, absent, found({}), pinned, true);
-    expect(c.resolverOverrideGroup).toEqual(['org/leads']);
+    expect(config.resolverOverrideGroup.sort()).toEqual(['org/leads', 'org/newteam', 'org/security']);
   });
 });
 
-describe('écart 8 — §8.1.3 règle 2 : aucun désaccord d’empreinte fabriqué par le mélange', () => {
-  it('après le retrait d’un durcissement de sévérité, l’empreinte mélangée rejoint la vivante', () => {
-    const pinned = resolveConfig(null, absent, found({ severities: { 'W-CASE': 'error' } }), null, false).config;
-    const live = resolveConfig(null, absent, found({}), null, false);
-    const mixed = resolveConfig(null, absent, found({}), pinned, true);
-    // min(error épinglé, warn vivant) = warn = défaut du tableau → pas matérialisé.
-    expect(mixed.config.severities['W-CASE']).toBeUndefined();
-    expect(fingerprint(mixed.config)).toBe(fingerprint(live.config));
-  });
-
+describe('écart 8 — §9.2.2 : l’empreinte ne diverge pas sur une valeur égale au défaut', () => {
   it('une surcharge explicitement égale au défaut ne change pas l’empreinte', () => {
     const a = defaultConfig();
     const b = defaultConfig();
@@ -179,25 +149,16 @@ describe('écart 8 — §8.1.3 règle 2 : aucun désaccord d’empreinte fabriqu
   });
 });
 
-describe('écart 9 — §8.1.3 clause de fermeture : labels[].icon épinglée, labels[].color en direct', () => {
-  it('icon reste celle du jugement d’origine ; color suit le vivant', () => {
-    const pinned = resolveConfig(
+describe('écart 9 — §8.1.3 : `labels[].icon` et `labels[].color` suivent le document', () => {
+  it('les deux sont en direct — il n’y a plus de clause de fermeture à épingler', () => {
+    const { config } = resolveConfig(
       null,
       absent,
-      found({ labels: [{ id: 'issue', icon: '🔨', color: '#111111' }] }),
-      null,
-      false
-    ).config;
-    const { config: c } = resolveConfig(
-      null,
-      absent,
-      found({ labels: [{ id: 'issue', icon: '🧨', color: '#222222' }] }),
-      pinned,
-      true
+      found({ labels: [{ id: 'issue', icon: '\u{1F9E8}', color: '#222222' }] })
     );
-    const issue = c.labels.find((l) => l.id === 'issue')!;
-    expect(issue.icon).toBe('🔨'); // épinglée (clause de fermeture)
-    expect(issue.color).toBe('#222222'); // énumérée en direct
+    const issue = config.labels.find((l) => l.id === 'issue')!;
+    expect(issue.icon).toBe('\u{1F9E8}');
+    expect(issue.color).toBe('#222222');
   });
 });
 
@@ -206,10 +167,7 @@ describe('écart 3 — §8.1.1 : labels.minimum contraint la valeur effective, p
     const { config: c } = resolveConfig(
       { minimumMode: 'off', labels: { minimum: ['typo'] } }, // typo est livré désactivé (§3.2)
       absent,
-      absent,
-      null,
-      false
-    );
+      absent);
     const typo = c.labels.find((l) => l.id === 'typo')!;
     expect(typo.enabled).toBe(true);
     expect(typo.blockingByDefault).toBe(true);
@@ -225,10 +183,7 @@ describe('écart 3 — §8.1.1 : labels.minimum contraint la valeur effective, p
           { id: 'todo', enabled: false },
           { id: 'chore', blockingByDefault: false },
         ],
-      }),
-      null,
-      false
-    );
+      }));
     for (const id of ['issue', 'todo', 'chore']) {
       const l = c.labels.find((x) => x.id === id)!;
       expect(l.enabled).toBe(true);

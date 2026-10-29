@@ -22,8 +22,9 @@ export interface CommentInfo {
   author: UserInfo;
   body: string; // corps stocké brut — normalisation faite par core/ (§3.4.1)
   createdAt: string;
-  updatedAt?: string;
-  lastEditedBy?: UserInfo; // §6.1 — absent si la plateforme ne l'expose pas
+  // `updatedAt` et `lastEditedBy` ont été retirés d'ici : ils n'existaient que pour signaler
+  // une édition affaiblissante « avec son auteur » (§6.1), règle qui demandait de se souvenir
+  // du corps précédent. Une racine éditée se lit désormais telle qu'elle est.
   permalink: string; // requis par la sortie du check (§6.3.1)
   isSystemGenerated: boolean; // §4.2 — posé par l'adaptateur
   canCarryBlockingState: boolean; // §4.1 — pilote W-NOT-BLOCKABLE
@@ -49,18 +50,17 @@ export interface Diagnostic {
 }
 
 export type NoticeKind =
-  | 'weakening-edit'
-  | 'root-deleted'
   | 'resolution-refused'
   | 'resolution-unattributed'
   | 'floor-override'
   | 'invalid-config'
   | 'config-warning'
-  | 'config-vanished'
+  // §8.1.5 — aucun niveau ne résout `activation.activatedAt`. Un fait de l'état courant,
+  // là où `config-vanished` affirmait une DISPARITION, c'est-à-dire une transition entre
+  // deux états, que seul un vérificateur doté de mémoire pourrait constater.
+  | 'activation-undated'
   | 'exemption-reset'
   | 'exemption-refused'
-  | 'exemption-label-restored'
-  | 'grace-expired'
   | 'unsupported-version';
 
 export interface Notice {
@@ -91,10 +91,10 @@ export interface ComplianceResult {
     nonCompliantComments: number;
     warnings: number;
   };
-  actions: { removeLabel?: string; addLabel?: string }; // jamais les deux (§6.3.2)
-  blockingThreadIds: string[]; // fils bloquants observés à ce tour, résolus compris (§6.1)
-  correctedThreadIds: string[]; // exception de correction — à retirer de l'ensemble persisté
-  newFirstVerdicts: Record<string, { blocking: boolean; hadConflict: boolean }>;
+  // §6.3.2 — ce que le vérificateur doit FAIRE en plus de publier. Il n'y a pas d'`addLabel` :
+  // poser l'étiquette pour le compte de quelqu'un n'existait que sur le chemin de repli qui
+  // demandait une mémoire (§9.2.4).
+  actions: { removeLabel?: string };
   exemption?: { by: UserInfo; at: string };
 }
 
@@ -160,10 +160,8 @@ export interface ValidationInput {
 export interface EvaluationContext {
   activatedAt: string | null; // date effective, résolue par l'orchestrateur
   isDraft: boolean;
-  exemption?: { by: UserInfo; at: string; labelPresent: boolean };
-  isOverrideMember: (u: UserInfo) => boolean; // résolue en amont via isInGroup()
-  knownBlockingThreadIds: string[]; // §6.1 — monotonie
-  firstVerdicts: Record<string, { blocking: boolean; hadConflict: boolean }>;
+  exemption?: { by: UserInfo; at: string }; // §6.3.2 — lue de l'étiquette et de sa provenance
+  isOverrideMember: (u: UserInfo) => boolean; // résolue en amont via isInGroup() (§9.2.4)
 }
 
 export interface EvaluationInput {
@@ -228,13 +226,9 @@ export interface EffectiveConfig {
   badgeStyle: string;
   shortcuts: { abbreviations: Record<string, string> };
   docUrl: string;
-  server: {
-    coalesceWindowSeconds: number;
-    gracePeriodSeconds: number;
-    reconcileIntervalSeconds: number;
-    statusTargetUrl: string | null;
-  };
-  exemptionLog: { endpoint: string | null };
+  // Ni bloc `server`, ni `exemptionLog` : la fenêtre de coalescence, le délai de grâce,
+  // l'intervalle de réconciliation, la `targetUrl` configurable et le journal d'exemption
+  // décrivaient tous un service qui survit à son exécution. Le §8.2 ne les liste plus.
   language: string | null;
   telemetry: { enabled: boolean; endpoint: string | null };
 }

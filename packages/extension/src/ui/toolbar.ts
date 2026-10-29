@@ -215,7 +215,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     button.textContent = label.id;
     if (label.color) button.style.setProperty('--cct-label-color', label.color);
     // Infobulle : définition + exemple, dans la langue de l'interface (§5.1).
-    const tooltip = labelTooltip(opts.lang, label);
+    const tooltip = labelTooltip(opts.lang, label, 'button');
     if (tooltip !== null) button.title = tooltip;
     button.addEventListener('click', () => {
       // Le second clic RETIRE (§5.1). Ce qui décide est donc le label que le commentaire

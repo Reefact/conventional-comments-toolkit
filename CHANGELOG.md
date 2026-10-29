@@ -12,6 +12,16 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Changed
+
+- **A label's badge and button no longer show the same tooltip** (§5.1, §5.5). They answer two questions. The badge tells whoever reads a published comment what it means, positively and without an example: `issue` reads "A problem spotted in this code; the comment explains which one." The toolbar button tells whoever writes when to use the label, then gives the example: `issue` reads "Flag a problem to fix, ideally with a lead." Every shipped label has both texts, in both languages. A badge text promises nothing the label does not guarantee: neither that a point blocks, which the decoration badge says, nor that a fix comes with it.
+
+### Added
+
+- **`labels[].usage`, the button's text** (§8.2). `labels[].description` now goes to the badge, and `usage` to the button, with the same rules: written, it replaces the shipped text and its example; written empty, it removes the tooltip; left out, the button falls back to `description`, so a configuration written for 1.0.0-beta.14 shows the same text as before on both. Neither key is part of the configuration fingerprint (§9.2.2).
+
 ## [1.0.0-beta.14] - 2026-10-29
 
 ### Added

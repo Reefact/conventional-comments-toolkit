@@ -23,6 +23,7 @@ export function mergeLevel(base: EffectiveConfig, values: Record<string, unknown
             // Écrite, même vide, elle remplace : `""` est une décision (« pas d'infobulle »), pas
             // une absence.
             if (entry.description !== undefined) existing.description = entry.description;
+            if (entry.usage !== undefined) existing.usage = entry.usage;
             if (entry.aliases !== undefined) existing.aliases = [...entry.aliases];
           } else {
             out.labels.push({
@@ -35,6 +36,7 @@ export function mergeLevel(base: EffectiveConfig, values: Record<string, unknown
               ...(entry.icon !== undefined ? { icon: entry.icon } : {}),
               ...(entry.color !== undefined ? { color: entry.color } : {}),
               ...(entry.description !== undefined ? { description: entry.description } : {}),
+              ...(entry.usage !== undefined ? { usage: entry.usage } : {}),
               aliases: entry.aliases ? [...entry.aliases] : [],
             });
           }

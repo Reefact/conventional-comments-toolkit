@@ -25,26 +25,47 @@ const fr: Record<string, string> = {
   'banner.untitled': '(sans sujet)',
   'banner.judged': 'jugée en {mode} par core/ {coreVersion}',
   'merge.blocked': 'Complétion bloquée par le statut de conformité — voir le check.',
-  'label.praise': 'Souligne un point positif.',
-  'label.nitpick': 'Préférence triviale, sans enjeu réel.',
-  'label.suggestion': 'Proposition d’amélioration argumentée.',
-  'label.issue': 'Problème identifié. Idéalement accompagné d’une suggestion.',
-  'label.todo': 'Changement petit mais nécessaire.',
-  'label.question': 'Demande de clarification sur un point incertain.',
-  'label.thought': 'Idée surgie pendant la revue, sans demande d’action.',
-  'label.chore': 'Tâche annexe à réaliser avant acceptation.',
-  'label.note': 'Information à porter à connaissance.',
-  'label.decision': 'Acte le choix de ne pas traiter un point soulevé, en énonçant pourquoi.',
-  'label.typo': 'Faute de frappe.',
-  'label.polish': 'Amélioration de finition.',
-  'label.quibble': 'Point de détail discutable.',
+  'label.praise': 'Saluer un point remarquable du code.',
+  'label.nitpick': 'Signaler une préférence mineure, sans enjeu.',
+  'label.suggestion': 'Proposer une amélioration et dire pourquoi.',
+  'label.issue': 'Signaler un problème à corriger, idéalement avec une piste.',
+  'label.todo': 'Demander un petit changement nécessaire.',
+  'label.question': 'Demander une précision avant de conclure.',
+  'label.thought': 'Partager une idée, sans rien demander.',
+  'label.chore': 'Demander une tâche annexe avant la fusion (job, doc, config…).',
+  'label.note': 'Porter une information à la connaissance de tous.',
+  'label.decision': 'Acter qu’un point ne sera pas traité, motif à l’appui.',
+  'label.typo': 'Signaler une faute de frappe.',
+  'label.polish': 'Proposer une finition, sans changer le sens.',
+  'label.quibble': 'Signaler un détail discutable.',
   // Labels ajoutés (§3.2) — les labels de réponse et `reviewed`, extension propre à cette
-  // boîte à outils, absente de Conventional Comments (§3.1). `ack` est du jargon : la description l'ENSEIGNE (§10).
-  'label.thanks': 'Remercie, sans prendre position sur le point ni sur le code.',
-  'label.ack': "Accusé de réception (« ack », de l'anglais acknowledged) : reçu et accepté ; le code n'a pas changé.",
-  'label.done': 'Le code a changé à la suite de la remarque — le diff est à relire.',
-  'label.disagree': "Refuse la remarque, et le sujet dit pourquoi. N'a aucune autorité et ne résout rien.",
-  'label.reviewed': "Clôt votre revue : vos points sont traités, vous n'avez plus rien à ajouter. N'approuve rien — l'approbation reste celle de la plateforme.",
+  // boîte à outils, absente de Conventional Comments (§3.1). `ack` est du jargon : son badge l'ENSEIGNE (§10).
+  'label.thanks': 'Remercier, sans prendre position.',
+  'label.ack': 'Accepter un point sans changer le code à ce stade.',
+  'label.done': 'Indiquer que la correction est poussée, avec son commit.',
+  'label.disagree': 'Décliner une remarque en disant pourquoi.',
+  'label.reviewed': 'Clore votre revue quand tous vos points sont traités. N’approuve rien.',
+  // Badge d'un commentaire publié (§5.5) : ce que le commentaire VEUT DIRE, pour qui le lit —
+  // positif, sans exemple, et sans rien promettre que le label ne garantit pas. Le bouton
+  // (`label.*`, ci-dessus) dit, lui, QUAND employer le label, à qui l'écrit.
+  'badge.label.praise': 'Le relecteur salue quelque chose de réussi dans ce code.',
+  'badge.label.nitpick': 'Un petit détail de préférence : libre à vous de le suivre ou non.',
+  'badge.label.suggestion': 'Une piste d’amélioration proposée par le relecteur.',
+  'badge.label.issue': 'Un problème repéré dans ce code ; le commentaire explique lequel.',
+  'badge.label.todo': 'Un petit changement demandé par le relecteur.',
+  'badge.label.question': 'Le relecteur aimerait mieux comprendre ce point.',
+  'badge.label.thought': 'Une idée partagée en passant, sans rien attendre de vous.',
+  'badge.label.chore': 'Une tâche annexe à faire avant la fusion : relancer un job, mettre à jour une doc ou une config…',
+  'badge.label.note': 'Une information utile à garder en tête.',
+  'badge.label.decision': 'Un choix d’équipe assumé : ce point ne sera pas traité ici, et voici pourquoi.',
+  'badge.label.typo': 'Une coquille à corriger, rien de plus.',
+  'badge.label.polish': 'Une touche de finition proposée, sans changer le sens.',
+  'badge.label.quibble': 'Un petit détail discutable relevé par le relecteur.',
+  'badge.label.thanks': 'Un merci, tout simplement.',
+  'badge.label.ack': 'Bien reçu (« ack », pour acknowledged) : le point est accepté, sans changement de code pour l’instant.',
+  'badge.label.done': 'Le code a été modifié suite à la remarque : le changement est à vérifier.',
+  'badge.label.disagree': 'Un avis différent, argumenté : la discussion reste ouverte.',
+  'badge.label.reviewed': 'Le relecteur a terminé sa revue : il n’a plus rien à ajouter.',
   'label.example': 'Exemple : « {example} »',
   'example.praise': 'praise: gestion d’erreur très lisible',
   'example.nitpick': 'nitpick: virgule finale',
@@ -223,24 +244,42 @@ const en: Record<string, string> = {
   'banner.untitled': '(no subject)',
   'banner.judged': 'judged in {mode} by core/ {coreVersion}',
   'merge.blocked': 'Completion blocked by the compliance status — see the check.',
-  'label.praise': 'Highlights something positive.',
-  'label.nitpick': 'Trivial preference, no real stake.',
-  'label.suggestion': 'Argued improvement proposal.',
-  'label.issue': 'Identified problem. Ideally with a suggestion.',
-  'label.todo': 'Small but necessary change.',
-  'label.question': 'Clarification request on an uncertain point.',
-  'label.thought': 'Idea that came up during review, no action requested.',
-  'label.chore': 'Side task to complete before acceptance.',
-  'label.note': 'Information worth knowing.',
-  'label.decision': 'Records the choice NOT to address a raised point, stating why.',
-  'label.typo': 'Typo.',
-  'label.polish': 'Finishing touch.',
-  'label.quibble': 'Debatable detail.',
-  'label.thanks': 'Says thank you, taking no position on the point or the code.',
-  'label.ack': 'Acknowledged: received and accepted; the code has not changed.',
-  'label.done': 'The code changed because of the remark — re-read the diff.',
-  'label.disagree': 'Declines the remark, and the subject says why. Carries no authority and resolves nothing.',
-  'label.reviewed': 'Closes your review: your points are dealt with, you have nothing to add. Approves nothing — approval stays with the platform.',
+  'label.praise': 'Point out something remarkable in the code.',
+  'label.nitpick': 'Flag a minor preference, with nothing at stake.',
+  'label.suggestion': 'Propose an improvement and say why.',
+  'label.issue': 'Flag a problem to fix, ideally with a lead.',
+  'label.todo': 'Ask for a small but necessary change.',
+  'label.question': 'Ask for clarification before concluding.',
+  'label.thought': 'Share an idea, asking for nothing.',
+  'label.chore': 'Ask for a side task before merging (job, doc, config…).',
+  'label.note': 'Share information everyone should know.',
+  'label.decision': 'Record that a point will not be addressed, with the reason.',
+  'label.typo': 'Flag a typo.',
+  'label.polish': 'Propose a finishing touch, without changing the meaning.',
+  'label.quibble': 'Flag a debatable detail.',
+  'label.thanks': 'Say thank you, without taking a position.',
+  'label.ack': 'Accept a point without changing the code at this stage.',
+  'label.done': 'Say the fix is pushed, citing its commit.',
+  'label.disagree': 'Decline a remark and say why.',
+  'label.reviewed': 'Close your review once all your points are dealt with. Approves nothing.',
+  'badge.label.praise': 'The reviewer is pointing out something done well in this code.',
+  'badge.label.nitpick': 'A small matter of preference: up to you whether to follow it.',
+  'badge.label.suggestion': 'An improvement idea from the reviewer.',
+  'badge.label.issue': 'A problem spotted in this code; the comment explains which one.',
+  'badge.label.todo': 'A small change requested by the reviewer.',
+  'badge.label.question': 'The reviewer would like to understand this point better.',
+  'badge.label.thought': 'An idea shared in passing, with nothing expected from you.',
+  'badge.label.chore': 'A side task to do before merging: rerun a job, update a doc or a config…',
+  'badge.label.note': 'A piece of information worth keeping in mind.',
+  'badge.label.decision': 'A deliberate team choice: this point will not be addressed here, and the comment says why.',
+  'badge.label.typo': 'A typo to fix, nothing more.',
+  'badge.label.polish': 'A finishing touch, without changing the meaning.',
+  'badge.label.quibble': 'A small debatable detail raised by the reviewer.',
+  'badge.label.thanks': 'Simply a thank-you.',
+  'badge.label.ack': 'Acknowledged (“ack”): the point is accepted, with no code change for now.',
+  'badge.label.done': 'The code was changed in response to the remark; the change is there to check.',
+  'badge.label.disagree': 'A different, reasoned view: the discussion stays open.',
+  'badge.label.reviewed': 'The reviewer has finished their review: nothing more to add.',
   'label.example': 'Example: "{example}"',
   'example.praise': 'praise: very readable error handling',
   'example.nitpick': 'nitpick: trailing comma',
@@ -392,25 +431,33 @@ const en: Record<string, string> = {
   'options.tour.replay.title': 'Replay the guided tour',
 };
 
-/** Infobulle d'un label (§5.1, §5.5), partagée par la barre d'outils et les badges pour que les
- * deux disent la même chose du même label.
+/** Infobulle d'un label (§5.1, §5.5). Les deux surfaces ne répondent pas à la même question :
  *
- * - `description` écrite par la configuration (§8.2) : elle EST l'infobulle, sans l'exemple du
- *   catalogue, qui illustrait une définition qu'elle vient de remplacer. Vide, aucune infobulle :
- *   c'est ce que l'équipe a écrit.
- * - absente : la définition du catalogue, puis son exemple quand il en porte un ;
- * - absente, et aucun catalogue ne décrit le label (un label créé par une organisation ou un
- *   dépôt) : `null`. Sans ce garde, `ui()` rendait la CLÉ elle-même, et l'infobulle d'un label
- *   `risk` affichait « label.risk ». */
-export function labelTooltip(lang: string, label: { id: string; description?: string }): string | null {
-  if (label.description !== undefined) return label.description === '' ? null : label.description;
-  const id = label.id;
-  const key = `label.${id}`;
-  const description = ui(lang, key);
-  if (description === key) return null;
-  const exampleKey = `example.${id}`;
+ * - le BOUTON, à qui écrit — « quand l'employer ? » : la consigne d'emploi, puis l'exemple ;
+ * - le BADGE, à qui lit — « que me dit ce commentaire ? » : la signification, sans exemple, puisque
+ *   le commentaire est sous ses yeux.
+ *
+ * Ce que la configuration écrit (§8.2) l'emporte, exemple compris, et vide (`""`) retire
+ * l'infobulle : c'est ce que l'équipe a décidé. Le badge lit `description` ; le bouton lit `usage`,
+ * puis `description` à défaut — le comportement de 1.0.0-beta.14, où une seule clé servait aux deux.
+ *
+ * `null` pour un label qu'aucune source ne décrit (un label créé par une organisation ou un dépôt,
+ * sans texte) : sans ce garde, `ui()` rendait la CLÉ elle-même, et l'infobulle d'un label `risk`
+ * affichait « label.risk ». */
+export function labelTooltip(
+  lang: string,
+  label: { id: string; description?: string; usage?: string },
+  surface: 'button' | 'badge'
+): string | null {
+  const written = surface === 'button' ? (label.usage ?? label.description) : label.description;
+  if (written !== undefined) return written === '' ? null : written;
+  const key = surface === 'button' ? `label.${label.id}` : `badge.label.${label.id}`;
+  const text = ui(lang, key);
+  if (text === key) return null;
+  if (surface === 'badge') return text;
+  const exampleKey = `example.${label.id}`;
   const example = ui(lang, exampleKey);
-  return example !== exampleKey ? `${description}\n${ui(lang, 'label.example', { example })}` : description;
+  return example !== exampleKey ? `${text}\n${ui(lang, 'label.example', { example })}` : text;
 }
 
 /** Exporté pour le garde de parité (`test/i18n-strings.test.ts`) : une clé présente d'un

@@ -45,11 +45,11 @@ function labelBadge(
   badge.className = `cct-badge cct-badge-label cct-badge-${config.badgeStyle}`;
   badge.textContent = `${label.icon ?? ''} ${label.id}`.trim();
   if (label.color) badge.style.setProperty('--cct-label-color', label.color);
-  // La même infobulle que le bouton de la barre d'outils (§5.5) : le badge est l'endroit où un
-  // lecteur rencontre un label qu'il ne connaît pas — `ack`, `polish` —, bien plus souvent
-  // qu'en écrivant. `lang` et `description` entrent dans badgeSignature(), si bien qu'un
-  // changement de langue ou de configuration la rafraîchit.
-  const tooltip = labelTooltip(lang, label);
+  // L'infobulle dit ce que le commentaire SIGNIFIE (§5.5), pas quand employer le label, ce que
+  // fait le bouton : le badge est l'endroit où un lecteur rencontre un label qu'il ne connaît pas
+  // — `ack`, `polish` —, bien plus souvent qu'en écrivant. `lang` et `description` entrent dans
+  // badgeSignature(), si bien qu'un changement de langue ou de configuration la rafraîchit.
+  const tooltip = labelTooltip(lang, label, 'badge');
   if (tooltip !== null) badge.title = tooltip;
   return badge;
 }

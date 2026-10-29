@@ -53,4 +53,17 @@ describe('`labels[].description` (§8.2)', () => {
     expect(fingerprint(resolveConfig(null, absent, found({ labels: [{ id: 'issue', description: 'Autre chose.' }] })).config)).toBe(base);
     expect(fingerprint(resolveConfig(null, absent, found({ labels: [{ id: 'issue', description: '' }] })).config)).toBe(base);
   });
+
+  it('`usage` se lit, se fusionne et reste hors de l’empreinte comme `description`', () => {
+    const usageOf = (r: ReturnType<typeof resolveConfig>, id: string) => r.config.labels.find((l) => l.id === id)?.usage;
+    const org = found({ labels: [{ id: 'issue', usage: 'Version de l’organisation.' }] });
+    expect(usageOf(resolveConfig(null, org, found({ labels: [{ id: 'issue', usage: '' }] })), 'issue')).toBe('');
+    expect(usageOf(resolveConfig(null, org, found({ labels: [{ id: 'issue', description: 'x' }] })), 'issue')).toBe('Version de l’organisation.');
+    expect(usageOf(resolveConfig(null, absent, found({ labels: [{ id: 'risk', usage: 'Signaler un risque.' }] })), 'risk')).toBe('Signaler un risque.');
+    const bad = resolveConfig(null, absent, found({ labels: [{ id: 'issue', usage: 42 }] }));
+    expect(usageOf(bad, 'issue')).toBeUndefined();
+    expect(bad.notices.some((n) => n.message.includes('"usage" of label "issue" must be a string'))).toBe(true);
+    const base = fingerprint(resolveConfig(null, absent, found({ labels: [{ id: 'issue' }] })).config);
+    expect(fingerprint(resolveConfig(null, absent, found({ labels: [{ id: 'issue', usage: 'Autre.' }] })).config)).toBe(base);
+  });
 });

@@ -16,6 +16,8 @@ _A label's badge now tells the reader what a comment means, and its button tells
 
 - **The badge and the button no longer show the same tooltip.** Hovering the label badge of a published comment tells you what the comment means, without an example: `issue` reads "A problem spotted in this code; the comment explains which one." Hovering the label's toolbar button tells you when to use it, then gives an example: "Flag a problem to fix, ideally with a lead." Every shipped label has both texts, in English and French. A badge text never claims more than the label says: whether a point blocks is still shown by the decoration badge next to it.
 
+- **The reviewer skill shows priorities as coloured badges.** An agent following `skills/review-pull-request` now marks each finding with a P0 to P3 badge; where the image does not show, the reader sees `[P1]` as before.
+
 ### ✨ Features
 
 - **A team can write each text: `labels[].usage` for the button.** In `.conventional-comments.json`, `description` now goes to the badge and `usage` to the button. Written, each replaces the shipped text; written empty (`""`), it removes that tooltip. Without `usage`, the button shows `description`, so a configuration written for 1.0.0-beta.14 keeps showing the same text on both.

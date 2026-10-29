@@ -16,6 +16,8 @@ _Le badge d'un label dit désormais au lecteur ce que signifie un commentaire, e
 
 - **Le badge et le bouton n'affichent plus la même infobulle.** Au survol du badge de label d'un commentaire publié, vous lisez ce que le commentaire signifie, sans exemple : `issue` affiche « Un problème repéré dans ce code ; le commentaire explique lequel. » Au survol du bouton du label dans la barre d'outils, vous lisez quand l'employer, suivi d'un exemple : « Signaler un problème à corriger, idéalement avec une piste. » Chaque label livré a ses deux textes, en français et en anglais. Le texte d'un badge n'affirme jamais plus que ce que dit le label : le caractère bloquant d'un point reste indiqué par le badge de décoration voisin.
 
+- **Le skill relecteur affiche les priorités en badges colorés.** Un agent qui suit `skills/review-pull-request` marque désormais chaque remarque d'un badge P0 à P3 ; là où l'image ne s'affiche pas, le lecteur voit `[P1]` comme avant.
+
 ### ✨ Nouveautés
 
 - **Une équipe peut écrire chaque texte : `labels[].usage` pour le bouton.** Dans `.conventional-comments.json`, `description` va désormais au badge et `usage` au bouton. Écrit, chacun remplace le texte livré ; écrit vide (`""`), il retire l'infobulle correspondante. Sans `usage`, le bouton affiche `description` : une configuration écrite pour la 1.0.0-beta.14 continue d'afficher le même texte sur les deux.

@@ -392,6 +392,20 @@ const en: Record<string, string> = {
   'options.tour.replay.title': 'Replay the guided tour',
 };
 
+/** Infobulle d'un label : définition, puis exemple quand le catalogue en porte un (§5.1, §5.5).
+ * `null` pour un label qu'aucun catalogue ne décrit — un label créé par une organisation ou un
+ * dépôt n'a pas de description (`labels[]` n'en déclare pas) : sans ce garde, `ui()` rendait la
+ * CLÉ elle-même, et l'infobulle d'un label `risk` affichait « label.risk ». Partagée par la barre
+ * d'outils et les badges, pour que les deux disent la même chose du même label. */
+export function labelTooltip(lang: string, id: string): string | null {
+  const key = `label.${id}`;
+  const description = ui(lang, key);
+  if (description === key) return null;
+  const exampleKey = `example.${id}`;
+  const example = ui(lang, exampleKey);
+  return example !== exampleKey ? `${description}\n${ui(lang, 'label.example', { example })}` : description;
+}
+
 /** Exporté pour le garde de parité (`test/i18n-strings.test.ts`) : une clé présente d'un
  * côté et absente de l'autre ne casse rien — `ui()` se rabat sur l'anglais —, elle se
  * contente de rendre une phrase anglaise au milieu de phrases françaises. */

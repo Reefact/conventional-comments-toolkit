@@ -14,6 +14,14 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ## [Unreleased]
 
+### Added
+
+- **A label badge explains itself on hover** (§5.5). Hovering the badge of a published comment shows the same tooltip as the label's toolbar button — its definition and an example, in the interface language —, so a reader meeting `ack` or `quibble` for the first time can find out what it means where they read it. Badges also keep the arrow cursor instead of the text-selection bar, since they are hovered, not selected. Measured on a github.com comment body: `cursor: auto` before, `default` after.
+
+### Fixed
+
+- **A label your organisation or repository declares no longer shows its internal key as a tooltip** (§5.1). The toolbar button of a custom label such as `risk` showed "label.risk" on hover, since no catalogue describes it. It now shows no tooltip, and neither does its badge.
+
 ### Changed
 
 - **`reviewed` says when to post it** (§3.2). Its description read "you have finished reading", which could be taken for the end of one reading pass. It now reads "your points are dealt with, you have nothing to add", in the button's tooltip and in the README, and the specification states the convention: a reviewer posts `reviewed` once each of their points is fixed and checked, or set aside by a reply they accept, and a last read turns up nothing new. It only covers the pull request as examined: any later change reopens the review, and a new `reviewed` comes only once the new changes are examined and every closing condition holds again. Each reviewer closes their own, and what a merge requires stays with the platform: the toolkit does not count `reviewed`, and it approves nothing.

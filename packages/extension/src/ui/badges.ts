@@ -34,13 +34,23 @@ import {
 // que prenait `applyPrefixVisibility()` en défaisant —, tous deux retirés. Le rendu partagé
 // reçoit désormais la forme, il ne l'invente jamais (revue Reefact, PR #66).
 import { normalizeBodyShape, OWN_BADGES, type RenderedBodyShape } from '@cct/adapter-shared';
-import { ui } from './strings.js';
+import { labelTooltip, ui } from './strings.js';
 
-function labelBadge(label: { icon?: string; id: string; color?: string }, config: EffectiveConfig): HTMLElement {
+function labelBadge(
+  label: { icon?: string; id: string; color?: string },
+  config: EffectiveConfig,
+  lang: string
+): HTMLElement {
   const badge = globalThis.document.createElement('span');
   badge.className = `cct-badge cct-badge-label cct-badge-${config.badgeStyle}`;
   badge.textContent = `${label.icon ?? ''} ${label.id}`.trim();
   if (label.color) badge.style.setProperty('--cct-label-color', label.color);
+  // La même infobulle que le bouton de la barre d'outils (§5.5) : le badge est l'endroit où un
+  // lecteur rencontre un label qu'il ne connaît pas — `ack`, `quibble` —, bien plus souvent
+  // qu'en écrivant. `lang` entre déjà dans badgeSignature(), si bien qu'un changement de langue
+  // la rafraîchit.
+  const tooltip = labelTooltip(lang, label.id);
+  if (tooltip !== null) badge.title = tooltip;
   return badge;
 }
 
@@ -717,7 +727,7 @@ export function decorateComment(
     return; // inchangé — aucune écriture DOM de badge ; le préfixe a déjà été réentretenu plus haut
   }
 
-  const badge = labelBadge(a.resolved.label, config);
+  const badge = labelBadge(a.resolved.label, config, lang);
   badge.dataset['blocking'] = a.blocking ? 'true' : 'false';
   badge.dataset['cctSig'] = signature;
   for (const old of stale) old.remove();

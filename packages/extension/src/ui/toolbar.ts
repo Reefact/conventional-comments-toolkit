@@ -4,7 +4,7 @@
 
 import { IDENTIFIER_RE, resolveDecoration, type EffectiveConfig } from '@cct/core';
 import { labelsByZone } from './label-order.js';
-import { ui } from './strings.js';
+import { labelTooltip, ui } from './strings.js';
 
 /** Ce que le commentaire porte à cet instant, tel que `core/` le lit (§3.4.1). */
 export interface PosedPrefix {
@@ -215,12 +215,8 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     button.textContent = label.id;
     if (label.color) button.style.setProperty('--cct-label-color', label.color);
     // Infobulle : définition + exemple, dans la langue de l'interface (§5.1).
-    const description = ui(opts.lang, `label.${label.id}`);
-    const example = ui(opts.lang, `example.${label.id}`);
-    button.title =
-      example !== `example.${label.id}`
-        ? `${description}\n${ui(opts.lang, 'label.example', { example })}`
-        : description;
+    const tooltip = labelTooltip(opts.lang, label.id);
+    if (tooltip !== null) button.title = tooltip;
     button.addEventListener('click', () => {
       // Le second clic RETIRE (§5.1). Ce qui décide est donc le label que le commentaire
       // porte à cet instant, lu dans le texte — pas celui qu'on se souvient d'avoir cliqué.

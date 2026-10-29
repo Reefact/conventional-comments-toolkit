@@ -16,6 +16,7 @@ packages/core           @cct/core            parser, validator, config, evaluati
 packages/adapters/*     @cct/adapter-*        client (component A) platform adapters + shared editor plumbing
 packages/extension      @cct/extension        Manifest V3 extension — toolbar, quick input, feedback, guard
 spikes/p1-prime         P1' spike             programmatic-write assumption, validated in Chromium
+skills/*                agent skills          review a pull request, or answer its review, in Conventional Comments
 ```
 
 `packages/core/` holds every validation rule; it is consumed identically by both
@@ -181,6 +182,23 @@ configuration fingerprint changes even for a repository with no custom configura
 While the two
 run different versions, the extension reports the mismatch and stops blocking the send. Update
 them together.
+
+## Review skills for AI agents
+
+Two skills let an AI agent take part in a review the way this toolkit expects. Each is a
+`SKILL.md` file that Claude Code loads as is, and that any other agent can be given as
+instructions:
+
+- [`skills/review-pull-request`](./skills/review-pull-request/SKILL.md), for the **reviewer**:
+  publishes findings as Conventional Comments, rated P0 to P3, follows them up until each fix is
+  verified, and closes its review with `reviewed:` once nothing is left. It never approves and
+  never merges: those stay human decisions.
+- [`skills/respond-to-review`](./skills/respond-to-review/SKILL.md), for the **author** of the
+  pull request: answers every thread with `done:`, `ack:`, `disagree:` or `thanks:`, pushes the
+  fixes, and never posts `reviewed` or `decision`.
+
+Both read the repository's `.conventional-comments.json` first, so they only use the labels it
+enables.
 
 ## Modes and adoption (§7)
 

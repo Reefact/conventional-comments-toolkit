@@ -61,7 +61,11 @@ export type NoticeKind =
   | 'activation-undated'
   | 'exemption-reset'
   | 'exemption-refused'
-  | 'unsupported-version';
+  | 'unsupported-version'
+  // §6.4 — une lecture impossible, donc une incapacité à évaluer. Ni une absence ni une
+  // invalidité : les deux premières se replient sur un niveau inférieur, celle-ci n'a rien
+  // sur quoi se replier.
+  | 'read-failed';
 
 export interface Notice {
   kind: NoticeKind;
@@ -81,6 +85,12 @@ export interface ComplianceResult {
   headline: string; // résumé humain (§6.3.1), distinct de la ligne cc/1
   configFingerprint: string;
   coreVersion: string;
+  // La langue de la configuration effective (§6.3.1, §8.1). Elle voyage AVEC le résultat,
+  // comme `docUrl` et `mode`, parce que la sortie humaine se rend hors de `core/` : un
+  // adaptateur qui devrait la retrouver par ailleurs est un adaptateur qui l'oubliera —
+  // c'est précisément ce qui est arrivé, et le corps du check restait en langue de repli
+  // sur un dépôt configuré en `fr` alors que `headline`, rendu ici, suivait la clé.
+  language: string | null;
   formatDiagnostics: (Diagnostic & { comment: CommentInfo })[]; // critère 1, toutes sévérités
   unresolvedBlockingThreads: ThreadInfo[]; // critère 2
   notices: Notice[];

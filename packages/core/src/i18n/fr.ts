@@ -62,6 +62,8 @@ export const fr: Record<string, string> = {
   'headline.invalid-config': 'Configuration invalide : {detail}',
   'headline.activation-undated':
     'Aucun niveau de configuration ne date l’activation de ce dépôt.',
+  'headline.read-failed':
+    'Évaluation impossible : {detail}. Le check échoue plutôt que de laisser un statut périmé décider (§6.4).',
   // Notices (§6.3.1)
   'notice.resolution-refused':
     'Résolution du fil bloquant {ref} refusée : {cause}. Rouvrez le fil et faites-le résoudre par l’auteur du commentaire racine, ou postez-y une réponse « decision » valide.',
@@ -82,6 +84,8 @@ export const fr: Record<string, string> = {
   'notice.exemption-refused':
     'Étiquette d’exemption posée par {login}, non membre de resolverOverrideGroup : l’exemption est refusée et l’étiquette est laissée en place.',
   'notice.unsupported-version': '{detail}',
+  'notice.read-failed':
+    'Lecture impossible : {detail}. Le check échoue plutôt que de laisser un statut périmé décider (§6.4).',
   // Sortie humaine du statut (§6.3.1) — sa langue suit la règle du §8.1, comme le reste
   'output.unresolved-blocking-threads': 'Fils bloquants non résolus',
   'output.format-diagnostics': 'Diagnostics de format',

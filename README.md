@@ -84,17 +84,28 @@ ones you don't want.
 | `done` | The code changed because of the remark. | `fixed` |
 | `ack` | Received and accepted; the code has not changed. | `acknowledged` |
 | `disagree` | Declines the remark, and the subject says why. Carries no authority, resolves nothing. | |
-| `reviewed` | Closes your own review: you have finished reading. Approves nothing. | |
+| `reviewed` | Closes your own review: your points are dealt with, you have nothing to add. Approves nothing. | |
 
 ```text
 issue (blocking): platform CSS tokens leak into the shared stylesheet
 done: removed the platform-specific token
 ```
 
-`reviewed` is the label people used to fake with `praise: review done`. It says you are done
-reading; approval stays with the platform's own control. It is not a reply: it answers no
-point, it says where your review stands. `thanks` fills the gap a plain "thanks!" reply left:
-with `scope.validateReplies` on, it had to be written `note: thanks`.
+`reviewed` is the label people used to fake with `praise: review done`. It says your review is
+over; approval stays with the platform's own control. It is not a reply: it answers no point,
+it says where your review stands. `thanks` fills the gap a plain "thanks!" reply left: with
+`scope.validateReplies` on, it had to be written `note: thanks`.
+
+**When to post `reviewed`.** It closes your review as a whole, not one reading pass: a review
+covers raising points, following how they are handled and checking the fixes. Post it once each
+of your points is dealt with — fixed and checked, or set aside by a reply you accept, which a
+non-blocking point may legitimately be — and a last read turns up nothing new. While one of your
+points is still open, whatever its priority, so is your review. It holds for the pull request
+as it stands when you post it: a later push can reopen your review, and a new `reviewed` closes
+it again. Each reviewer closes their own. What the pull request needs to be merged — approvals,
+required reviewers — stays with the platform: the toolkit does not count `reviewed`, and no
+number of them amounts to an approval. This is a convention the toolkit states, not one it
+checks (§3.2).
 
 Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` does not. The
 toolbar shows the remark labels first — `reviewed` among them —, then, always on a line of their

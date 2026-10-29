@@ -12,6 +12,12 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Changed
+
+- **`reviewed` says when to post it** (§3.2). Its description read "you have finished reading", which could be taken for the end of one reading pass. It now reads "your points are dealt with, you have nothing to add", in the button's tooltip and in the README, and the specification states the convention: a reviewer posts `reviewed` once each of their points is fixed and checked, or set aside by a reply they accept, and a last read turns up nothing new; a later push can reopen the review. Each reviewer closes their own, and what a merge requires stays with the platform: the toolkit does not count `reviewed`, and it approves nothing.
+
 ## [1.0.0-beta.13] - 2026-10-29
 
 ### Added

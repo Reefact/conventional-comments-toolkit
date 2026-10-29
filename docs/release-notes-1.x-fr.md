@@ -22,7 +22,7 @@ _La page de réglages dit quelle version tourne, et l'adaptateur GitHub lit de n
 
 - **L'extension retrouve le bouton de fusion d'une PR ouverte sur github.com.** GitHub a changé la construction du bouton et l'extension ne le reconnaissait plus. Rien ne change encore à l'écran : l'extension ne grise le bouton que lorsqu'un vérificateur publie un état en échec, et aucun n'est livré.
 
-- **La page de réglages ne signale plus de problèmes de sélecteurs qui n'en étaient pas.** Sa section État listait des recherches qui échouaient faute de rien à trouver, comme le bouton de fusion d'une PR déjà fusionnée. Elles ne sont plus consignées.
+- **La page de réglages ne signale plus de problèmes de sélecteurs qui n'en étaient pas.** Sa section État signalait des recherches infructueuses alors que l'élément recherché était normalement absent, comme le bouton de fusion d'une PR déjà fusionnée. Elles ne sont plus consignées.
 
 ## 1.0.0-beta.15 — 29 octobre 2026
 

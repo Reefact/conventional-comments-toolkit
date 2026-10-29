@@ -22,7 +22,7 @@ _The settings page tells you which version you are running, and the GitHub adapt
 
 - **The extension finds the merge button of an open pull request on github.com again.** GitHub changed how the button is built and the extension no longer recognised it. Nothing changes on screen yet: the extension greys the button only when a verifier publishes a failing state, and none ships.
 
-- **The settings page no longer reports selector problems that were not one.** Its Status section listed searches that failed because there was nothing to find, such as the merge button of a merged pull request. They are no longer logged.
+- **The settings page no longer reports false selector failures.** Its Status section listed searches that failed because there was nothing to find, such as the merge button of a merged pull request. They are no longer logged.
 
 ## 1.0.0-beta.15 — October 29, 2026
 

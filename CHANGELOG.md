@@ -12,6 +12,12 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Added
+
+- **The settings page shows the extension's version next to its title.** A release candidate such as `1.0.0-beta.15` reads `v1.0.0-beta.15`, taken from the manifest's `version_name`, which is where the release workflow writes the announced version: `version` can only hold digits, so it reads `1.0.0` for every beta. Firefox has no `version_name` and shows `version`. Nothing is shown when the browser gives no manifest.
+
 ## [1.0.0-beta.15] - 2026-10-29
 
 ### Changed
@@ -677,6 +683,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[Unreleased]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.15...HEAD
 [1.0.0-beta.15]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.14...v1.0.0-beta.15
 [1.0.0-beta.14]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.13...v1.0.0-beta.14
 [1.0.0-beta.13]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.12...v1.0.0-beta.13

@@ -140,13 +140,22 @@
         padding: 0.32rem 0.55rem;
       }
       .btn-tour svg { width: 12px; height: 12px; }
+      /* La marge basse vit sur la rangée, plus sur le `<h1>` : la hauteur du bloc titre +
+         sous-titre reste celle que l'icône de 48 px borde exactement. */
+      header.top .title-row { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin: 0 0 0.3rem; }
       header.top h1 {
         font-family: var(--font-display);
         font-weight: 700;
         letter-spacing: -0.02em;
         font-size: 1.5rem;
         line-height: 1.1;
-        margin: 0 0 0.3rem;
+        margin: 0;
+      }
+      header.top .version-badge {
+        font-size: 0.78rem;
+        color: var(--fg-muted);
+        font-variant-numeric: tabular-nums;
+        user-select: all;
       }
       header.top p { margin: 0; color: var(--fg-muted); font-size: 0.88rem; }
 
@@ -378,7 +387,13 @@
         <div class="brand">
           <img class="brand-mark" src="icons/icon-128.png" alt="" aria-hidden="true" />
           <div class="titles">
-            <h1 data-i18n="options.title">Conventional Comments Toolkit</h1>
+            <div class="title-row">
+              <h1 data-i18n="options.title">Conventional Comments Toolkit</h1>
+              <!-- Sœur du `<h1>`, pour la même raison que l'icône : `applyStaticStrings` écrit
+                   `textContent` sur tout `[data-i18n]`. Cachée tant que `boot()` n'a rien lu. -->
+              <span id="extension-version" class="version-badge" hidden
+                title="Version de l'extension" data-i18n-title="options.version.title"></span>
+            </div>
             <p data-i18n="options.subtitle">Réglages de l'extension.</p>
           </div>
         </div>

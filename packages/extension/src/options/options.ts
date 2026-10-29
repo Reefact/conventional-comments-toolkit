@@ -19,6 +19,7 @@ import { TELEMETRY_CONSENT_KEY, managedEndpoint, parseConsent } from '../telemet
 import { pageKey, pageMark } from '../page-mark.js';
 import { ui } from '../ui/strings.js';
 import { applyStaticStrings, currentLanguage } from './i18n.js';
+import { displayVersion } from './version.js';
 import { maybeStartTour, startTour } from './tour.js';
 import { copySnippet, responseLabelsSnippet } from './response-labels.js';
 import { LABEL_ORDER_KEY, normalizeStoredOrder, parseLabelOrder } from '../ui/label-order.js';
@@ -41,7 +42,10 @@ interface ChromePermissions {
 
 declare const chrome: {
   permissions?: ChromePermissions;
-  runtime?: { lastError?: { message?: string } | null };
+  runtime?: {
+    lastError?: { message?: string } | null;
+    getManifest?: () => { version?: string; version_name?: string };
+  };
   storage?: {
     sync?: {
       get: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
@@ -799,6 +803,14 @@ function renderSelectorClear(): HTMLElement {
     chrome?.storage?.local?.remove(['selectorFailures'], () => refreshStatus());
   });
 }
+function renderVersion(): void {
+  const badge = document.getElementById('extension-version');
+  const text = displayVersion(chrome?.runtime?.getManifest?.());
+  if (badge === null || text === null) return;
+  badge.textContent = text;
+  badge.hidden = false;
+}
+
 /** Démarrage. L'ordre n'est pas cosmétique : `lang` doit être posée AVANT le premier rendu,
  * sinon les chaînes construites par le code sortent en anglais sur une page française — le
  * genre d'incohérence qui se voit une fois sur deux, au rythme d'une course. Les blocs qui
@@ -806,6 +818,7 @@ function renderSelectorClear(): HTMLElement {
 async function boot(): Promise<void> {
   lang = await currentLanguage();
   applyStaticStrings(document, lang);
+  renderVersion();
   fillPlatformSelect();
   // TOUT rendu qui écrit du texte part d'ici, et pas d'un effet de bord d'import. Un test
   // de télémétrie a trouvé ce défaut dans la première version de ce démarrage : la ligne du

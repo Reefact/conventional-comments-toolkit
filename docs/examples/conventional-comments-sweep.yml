@@ -1,0 +1,95 @@
+# Conventional Comments — le balayage périodique.
+#
+# CE FICHIER EST REQUIS, et pas optionnel. La résolution d'un fil ne déclenche aucun
+# workflow : `pull_request_review_thread` existe comme webhook mais ne figure pas parmi les
+# événements déclencheurs, et c'est le seul qui signale une résolution. La conséquence est
+# asymétrique — résoudre le dernier fil bloquant ne fait pas passer le check au vert de
+# lui-même (gênant, jamais dangereux) ; DÉ-RÉSOUDRE un fil ne le fait pas repasser au rouge,
+# et c'est le sens dangereux. Ce balayage est la SEULE borne sur l'âge d'un statut.
+#
+# POURQUOI C'EST UN FICHIER À PART, et non un déclencheur de plus dans le workflow
+# principal. Au-dessus de 256 PR ouvertes, la liste se découpe en tranches, et l'indice de
+# tranche vient de `GITHUB_RUN_NUMBER`. Or ce compteur s'incrémente à chaque exécution DU
+# WORKFLOW — donc aussi à chaque commentaire, chaque revue, chaque push, si le balayage
+# partage son fichier avec les déclencheurs d'événements. L'indice avance alors d'un pas
+# variable mais souvent CONSTANT : avec 512 PR (deux tranches) et une exécution
+# événementielle entre deux passages, il avance de 2 à chaque fois, `runIndex % 2` ne change
+# jamais, et la seconde tranche n'est JAMAIS évaluée. Le découpage réintroduirait alors
+# exactement le trou silencieux qu'il existe pour fermer.
+#
+# Dans son propre fichier, déclenché par la seule horloge, ce compteur ne compte que des
+# balayages et avance de 1 à chaque passage : toutes les tranches défilent. C'est pour cette
+# raison, et pour elle seule, que ce workflow est séparé.
+#
+# AUCUN `checkout`, ET LE REF EST CELUI D'UNE RELEASE, comme dans le workflow principal :
+# `uses:` lit l'arbre du dépôt de l'Action au ref demandé.
+
+name: Conventional Comments (balayage)
+
+on:
+  schedule:
+    # Borne l'âge maximal d'un statut. Le resserrer resserre la borne, au prix d'exécutions
+    # plus fréquentes.
+    - cron: '*/30 * * * *'
+  # Le rejeu du §6.4, et le seul qui marche : le bouton de rejeu d'un check run créé par une
+  # Action ne déclenche rien — garde anti-récursion de la plateforme.
+  workflow_dispatch:
+
+permissions:
+  checks: write
+  pull-requests: read
+  contents: read
+  # `pull-requests: write` DÈS QUE le dépôt emploie l'étiquette d'exemption, ici comme dans
+  # le workflow principal : la remise à zéro doit pouvoir la retirer.
+
+jobs:
+  # ————— Deux étages, parce qu'un balayage porte sur PLUSIEURS PR —————
+  #
+  # Il ne peut pas former de `group` au niveau du workflow : l'expression n'y dispose que
+  # des contextes `github`, `inputs` et `vars`, et il n'y aurait de toute façon pas UN
+  # numéro de PR à y mettre.
+  enumerate:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: conventional-comments-enumerate
+      # `false`, qui est la valeur par défaut, et le choix compte : ce que GitHub annule
+      # alors dans ce groupe est l'exécution EN ATTENTE, au profit de la plus récente ;
+      # celle qui tourne va au bout. L'inverse réévaluerait sans fin les premières PR de
+      # l'énumération et jamais les dernières.
+      cancel-in-progress: false
+    outputs:
+      prs: ${{ steps.list.outputs.prs }}
+      count: ${{ steps.list.outputs.count }}
+      total: ${{ steps.list.outputs.total }}
+    steps:
+      - id: list
+        uses: Reefact/conventional-comments-toolkit/packages/action@v1
+        with:
+          mode: dispatch # ce job NE PUBLIE AUCUN STATUT : il répartit
+
+  # AU-DESSUS DE 256 PR OUVERTES, LA TRANCHE TOURNE. Une matrice produit au plus 256 jobs
+  # par exécution de workflow (limites d'Actions) ; le mode `dispatch` borne donc sa liste
+  # et fait avancer la tranche d'un balayage au suivant. Chaque PR ouverte est réévaluée au
+  # plus tous les `intervalle de cron × ceil(total / 256)`. La sortie `total` dit combien de
+  # PR ouvertes existent en tout, et le journal du job le signale dès qu'il tronque.
+  evaluate:
+    needs: enumerate
+    if: needs.enumerate.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pr: ${{ fromJSON(needs.enumerate.outputs.prs) }}
+    concurrency:
+      # Au niveau du JOB — le seul endroit où le contexte `matrix` est disponible — et avec
+      # EXACTEMENT le `group` du workflow principal. Un groupe de concurrence est à
+      # l'échelle du DÉPÔT : c'est cette identité, et elle seule, qui sérialise un balayage
+      # avec les évaluations événementielles d'une même PR. Un nom qui diverge d'un
+      # caractère rouvre la course sans rien signaler.
+      group: conventional-comments-${{ matrix.pr }}
+      cancel-in-progress: true
+    steps:
+      - uses: Reefact/conventional-comments-toolkit/packages/action@v1
+        with:
+          pr-number: ${{ matrix.pr }}
+          # floor-url: https://interne.example/cc/plancher.json

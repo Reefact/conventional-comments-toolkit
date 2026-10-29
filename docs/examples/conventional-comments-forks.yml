@@ -1,0 +1,74 @@
+# Conventional Comments — workflow compagnon pour les PR de fork.
+#
+# CE FICHIER EST REQUIS, et pas optionnel, dès qu'un dépôt déclare le check obligatoire ET
+# accepte des PR de forks. Voici pourquoi, et le mécanisme est un contournement complet :
+#
+#   Sur une PR issue d'un fork, le `GITHUB_TOKEN` est EN LECTURE SEULE — y compris sur
+#   `pull_request_review` et `pull_request_review_comment`. La restriction est connue pour
+#   `pull_request` ; elle vaut aussi pour les événements de revue. Ces PR reçoivent bien un
+#   statut, publié par `pull_request_target` à l'ouverture et à chaque push, mais il CESSE
+#   D'ÊTRE RAFRAÎCHI dès qu'un relecteur écrit. La PR reçoit ensuite un `issue:` bloquant,
+#   l'événement de revue s'exécute en lecture seule et ne peut pas remplacer le vert — qui
+#   satisfait alors la vérification obligatoire.
+#
+# Sans ce fichier, ces PR sont hors d'atteinte de l'objectif O3 tout en portant un statut
+# qui dit le contraire. Un dépôt qui n'en veut pas doit assumer l'autre branche de
+# l'alternative, et l'écrire : ces PR sont hors du périmètre de l'enforcement.
+#
+# LES PR DE DEPENDABOT SUIVENT LES MÊMES RÈGLES que celles d'un fork, y compris sur un dépôt
+# qui n'accepte aucun fork.
+#
+# DEUX CONTRAINTES À NE PAS PERDRE :
+#
+#   — SON FICHIER DOIT VIVRE SUR LA BRANCHE PAR DÉFAUT, faute de quoi il ne se déclenche
+#     jamais. C'est vrai de tout workflow `workflow_run`.
+#   — AUCUN `checkout`, ET LE REF EST CELUI D'UNE RELEASE, comme dans le workflow
+#     principal : `uses:` lit l'arbre du dépôt de l'Action au ref demandé.
+#   — Un réglage de dépôt lève bien la restriction de jeton — *Send write tokens to
+#     workflows from pull requests* — mais il la lève pour TOUS les workflows, y compris
+#     ceux qui construisent le code proposé. Ce n'est pas une case à cocher pour installer
+#     un vérificateur.
+
+name: Conventional Comments (forks)
+
+on:
+  workflow_run:
+    workflows: ['Conventional Comments']
+    types: [completed]
+
+permissions:
+  checks: write
+  pull-requests: read
+  contents: read
+
+jobs:
+  enumerate:
+    runs-on: ubuntu-latest
+    outputs:
+      prs: ${{ steps.list.outputs.prs }}
+      count: ${{ steps.list.outputs.count }}
+    steps:
+      - id: list
+        uses: Reefact/conventional-comments-toolkit/packages/action@v1
+        with:
+          mode: dispatch
+
+  evaluate:
+    needs: enumerate
+    if: needs.enumerate.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pr: ${{ fromJSON(needs.enumerate.outputs.prs) }}
+    concurrency:
+      # LE MÊME `group` que le workflow principal, au caractère près : un groupe de
+      # concurrence est à l'échelle du dépôt, et c'est cette identité qui sérialise les deux
+      # workflows sur une même PR. Un nom qui diverge rouvre la course sans rien signaler.
+      group: conventional-comments-${{ matrix.pr }}
+      cancel-in-progress: true
+    steps:
+      - uses: Reefact/conventional-comments-toolkit/packages/action@v1
+        with:
+          pr-number: ${{ matrix.pr }}
+          # floor-url: https://interne.example/cc/plancher.json

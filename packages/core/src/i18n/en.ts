@@ -58,6 +58,8 @@ export const en: Record<string, string> = {
   'headline.invalid-config': 'Invalid configuration: {detail}',
   'headline.activation-undated':
     'No configuration level dates this repository’s activation.',
+  'headline.read-failed':
+    'Evaluation impossible: {detail}. The check fails rather than letting a stale status decide (§6.4).',
   // Notices (§6.3.1)
   'notice.resolution-refused':
     'Resolution of blocking thread {ref} refused: {cause}. Reopen the thread and have it resolved by the root author, or post a valid "decision" reply.',
@@ -78,6 +80,8 @@ export const en: Record<string, string> = {
   'notice.exemption-refused':
     'Exemption label posted by {login}, who is not a member of resolverOverrideGroup: the exemption is refused and the label is left in place.',
   'notice.unsupported-version': '{detail}',
+  'notice.read-failed':
+    'Read failed: {detail}. The check fails rather than letting a stale status decide (§6.4).',
   // Sortie humaine du statut (§6.3.1) — sa langue suit la règle du §8.1, comme le reste
   'output.unresolved-blocking-threads': 'Unresolved blocking threads',
   'output.format-diagnostics': 'Format diagnostics',

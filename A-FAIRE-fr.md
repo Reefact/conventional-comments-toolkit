@@ -8,17 +8,17 @@ partie d'aucune convention du chantier.
 
 ## En une phrase
 
-**L'extension est écrite, testée (1 184 tests automatisés) et passée par plusieurs revues
-contradictoires. Le vérificateur, lui, n'existe pas.** Le compagnon serveur a été retiré —
-il demandait un hébergement et un stockage que le §6.4 ne veut plus, et personne ne l'avait
-jamais déployé —, et son remplacement reste à écrire (#56).
+**L'extension est écrite, testée et livrée ; le vérificateur est écrit et testé, mais n'a
+jamais tourné.** La distinction compte : 1 247 tests automatisés et plusieurs revues
+contradictoires disent que le code fait ce qu'on croit, pas qu'il a été éprouvé en vrai.
+Le compagnon serveur est retiré — **il n'y a plus rien à héberger**, le vérificateur est
+une GitHub Action qui s'exécute dans le dépôt qu'elle protège.
 
-Ce qui manque est donc de deux natures, qu'il vaut mieux ne pas confondre :
-
-- **du code**, et un seul morceau : le vérificateur, sans lequel aucune PR n'est bloquée —
-  ce qui était déjà le cas en pratique ;
-- **des étapes humaines** : essayer l'extension en vrai, et mener la phase de mesure (P0)
-  qui ne peut se faire qu'avant tout déploiement.
+Ce qui manque n'est donc pas du code non écrit, mais des étapes qu'aucun test ne remplace :
+essayer l'extension dans un vrai navigateur, poser les workflows sur un dépôt pilote — ce
+qui tranchera du même coup les deux prémisses de plateforme que ce dépôt écrit sans les
+avoir mesurées (§A.8) —, et mener la phase de mesure (P0), qui ne peut se faire qu'avant
+tout déploiement.
 
 ## 1. Deux composants, deux niveaux de préparation très différents
 
@@ -28,24 +28,26 @@ Elle fonctionne **seule**, sans le vérificateur : en mode `assist` (celui livr�
 défaut), elle aide à écrire un commentaire conforme et affiche des diagnostics, mais ne
 bloque jamais rien. C'est ce que vous pouvez tester tout de suite.
 
-### Composant B — le vérificateur : **retiré, pas encore remplacé**
+### Composant B — le vérificateur : **une GitHub Action, rien à héberger**
 
 Le service auto-hébergeable n'existe plus, et c'était l'objet de l'issue #56 : plus de
-serveur, plus d'image Docker, plus de stockage, plus de webhooks, plus de secrets. Personne
-ne l'avait jamais déployé, donc rien ne régresse — ce qui n'était pas en service cesse de
-l'être sur le papier.
+serveur, plus d'image Docker, plus de stockage, plus de webhooks, plus de secrets. Le
+vérificateur est `packages/action/` — une GitHub Action qui s'exécute dans le dépôt qu'elle
+protège, authentifiée par le `GITHUB_TOKEN` que le runner lui remet, et qui publie le check
+run `conventional-comments`.
 
-Ce qui doit le remplacer est **conçu mais pas écrit** : un vérificateur qui s'exécute dans
-la plateforme, ne retient rien entre deux évaluations, et publie le check que la protection
-de branche exige. Le §6.4 en pose les règles, le §A.8 la mise en œuvre GitHub, et
-[l'issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56) suit le
-chantier.
+La mise en place tient en **deux fichiers de workflow, un fichier de configuration et une
+règle de branche**. Elle est écrite pas à pas dans
+[`docs/github-setup-fr.md`](./docs/github-setup-fr.md) (anglais :
+[`docs/github-setup-en.md`](./docs/github-setup-en.md)), avec les workflows prêts à copier
+dans `docs/examples/`.
 
-**Conséquence à assumer : aucune PR n'est réellement bloquée aujourd'hui**, et ce n'était
-déjà pas le cas hier (§2 : le composant A est contournable par construction, c'est B qui
-porte la contrainte réelle).
+Ce qui manque est donc **un dépôt pilote où le poser**. Tant que personne ne l'a fait,
+aucune PR n'est réellement bloquée — c'est attendu (§2 : le composant A est contournable par
+construction, c'est B qui porte la contrainte réelle).
 
-**Azure DevOps n'a pas de vérificateur non plus** (§B.7), et le §B.7 dit pourquoi.
+**Azure DevOps n'a pas de vérificateur** (§B.7) : l'extension y est un composant
+d'assistance, et rien d'autre.
 
 ## 2. Installer l'extension pour l'essayer
 
@@ -119,9 +121,9 @@ Chromium sans interface. Un passage humain reste donc utile, dans cet ordre :
 4. **Page d'options** — ajouter le domaine `dev.azure.com`, vérifier qu'une page Azure
    DevOps (PR réelle) fait apparaître la même barre d'outils. C'est le test qui valide
    la correction du jour, jamais exécuté en conditions réelles.
-5. **Mode `enforce` sans vérificateur** — tant qu'aucun vérificateur ne publie de statut,
-   l'extension ne peut jamais passer en blocage réel (c'est le mode `warn`/`assist` qui
-   s'applique de fait) : rien à tester ici avant l'issue #56.
+5. **Mode `enforce` sans vérificateur** — tant que les workflows ne sont pas posés sur un
+   dépôt, l'extension ne peut jamais passer en blocage réel (c'est le mode `warn`/`assist`
+   qui s'applique de fait) : rien à tester ici avant l'étape 2 du tableau ci-dessous.
 
 Deux critères d'acceptation de la spec (§11) ne sont *que partiellement* automatisés et
 attendent ce genre de passage manuel — voir `docs/ca-matrix-fr.md`, section « Critères
@@ -134,22 +136,23 @@ corps du check GitHub (`CA-25`).
 |---|-------|-----|
 | 1 | Essayer l'extension en vrai (§3 ci-dessus) | Vous |
 | 2 | **Mesure de référence P0** (temps de revue, taux de conformité *avant* l'outil). **Irrattrapable** si l'outil est posé avant — §14, `docs/operations-fr.md` | Vous |
-| 3 | Écrire le vérificateur GitHub (issue #56), puis choisir un dépôt pilote et suivre la trajectoire `assist → warn → enforce`. Bloquant pour tout blocage réel de PR | Moi, puis vous |
+| 3 | Choisir un dépôt pilote, y poser les deux workflows de `docs/examples/` et son `.conventional-comments.json`, puis suivre la trajectoire `assist → warn → enforce` — pas à pas dans `docs/github-setup-fr.md`. Bloquant pour tout blocage réel de PR | Vous |
 | 4 | ~~Choisir un hébergement pour le serveur~~ — **sans objet** : il n'y a plus de serveur (issue #56) | — |
 | 5 | ~~Créer une app GitHub / un service hook~~ — **sans objet** : aucune app, aucun webhook, aucun secret ; le runner remet son jeton | — |
-| 6 | **Une prémisse que seule une exécution réelle peut établir**, et que le §A.8 range comme telle : **où GitHub rend exactement l'`output.title` d'un check run sur la page d'une PR** — le §6.5 fait dépendre de cette ligne le grisage du bouton de merge par l'extension. Se tranche avec l'étape 3 | Vous (ou moi, avec un accès) |
+| 6 | **Deux prémisses que seule une exécution réelle peut établir**, et que le §A.8 range comme telles : les variables que le runner pose (`GITHUB_EVENT_PATH`, `GITHUB_API_URL`, la convention `INPUT_<NOM>`), et **où GitHub rend exactement l'`output.title` d'un check run sur la page d'une PR** — le §6.5 fait dépendre de cette ligne le grisage du bouton de merge par l'extension. Se tranche avec l'étape 3 | Vous (ou moi, avec un accès) |
 | 7 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) : **toute livraison du composant A y passe** (§10, §14), et c'est le seul chemin qui donne la mise à jour automatique. Les zips de release (`docs/release-fr.md`) servent à l'essai et aux postes sans chaîne de build, ils ne s'y substituent pas | Vous |
 | 8 | Fournir des captures DOM réelles pour le smoke test de sélecteurs (§9.4) | Vous (ou moi, avec un accès) |
 | 9 | Vérifier sur un vrai tenant Azure DevOps ce que le spike n'a pas tranché : type d'éditeur, lisibilité du fichier de config, et **la forme du corps rendu** — quelle balise enveloppe une ligne de Markdown ordinaire, laquelle matérialise une fin de ligne simple (`renderedBodyShape()`, §9.2.3). Replis dégradés déjà en place, documentés dans `spikes/p1-prime/README-fr.md` | Vous (ou moi, avec un accès) |
 
-Une seule ligne est du développement, et c'est l'étape 3 : le vérificateur reste à écrire.
-Le reste sont des étapes d'**exploitation**, à l'exception de l'étape 6, qui est une
-**mesure** — une affirmation sur la plateforme que ce dépôt écrit sans l'avoir vérifiée, et
-qu'il dit telle quelle plutôt que de la présenter comme acquise.
+Rien dans cette liste n'est du développement inachevé : le code est complet, testé, et la
+CI est verte. Ce sont des étapes d'**exploitation**, à l'exception de l'étape 6, qui est une
+**mesure** — deux affirmations sur la plateforme que ce dépôt écrit aujourd'hui sans les
+avoir vérifiées, et qu'il dit telles quelles plutôt que de les présenter comme acquises.
 
 ## 5. Où trouver le reste
 
 - `README.md` — vue d'ensemble, commandes, statut par phase (§14).
+- `docs/github-setup-fr.md` — mettre en place le contrôle sur GitHub, de bout en bout.
 - `docs/architecture-fr.md` — comment A et B partagent les règles sans jamais diverger.
 - `docs/operations-fr.md` — procédure de retour arrière, prérequis avant `enforce`, rapport
   à blanc.

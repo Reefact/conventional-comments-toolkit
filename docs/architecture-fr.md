@@ -4,14 +4,6 @@ Découpage conforme au §9.1. `packages/core/` est publié comme paquet et conso
 l'identique** par l'extension (composant A) et par le vérificateur (composant B) — aucune
 règle de validation n'est dupliquée hors de ce paquet.
 
-**Le composant B n'existe pas dans l'arbre.** Le compagnon serveur a été retiré : il
-demandait un hébergement, un stockage et des webhooks que le §6.4 ne veut plus, et personne
-ne l'avait jamais déployé. Ce qui le remplace sur GitHub — un vérificateur qui s'exécute
-dans la plateforme et ne retient rien — est conçu au §6.4 et au §A.8, et suivi par
-[l'issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56). Tout ce
-que ce document dit de la frontière A/B décrit donc un contrat que `core/` tient déjà, et
-qu'un futur B consommera tel quel.
-
 ```
 packages/
 ├── core/                     # @cct/core — aucune dépendance DOM ni plateforme (§9.1)
@@ -28,8 +20,17 @@ packages/
 │   ├── shared/               # @cct/adapter-shared — contrat §9.2.3, écriture §9.3, sélecteurs §9.4
 │   ├── github/               # @cct/adapter-github — sélecteurs, générations DOM, Turbo (§A)
 │   └── azdo/                 # @cct/adapter-azdo — MutationObserver, replis P1' (§B)
-└── extension/                # @cct/extension — MV3, content/background, barre, pastille, garde
+├── extension/                # @cct/extension — MV3, content/background, barre, pastille, garde
+└── action/                   # @cct/action — composant B, la GitHub Action (§A.8)
+    ├── adapter.ts            #   contrat §9.2.4 du vérificateur
+    ├── github.ts             #   GraphQL fils, timeline étiquettes, check run (§A.6, §A.8)
+    ├── run.ts                #   UNE évaluation de bout en bout (§6.2 à §6.5)
+    ├── main.ts               #   point d'entrée du runner : modes `evaluate` et `dispatch`
+    └── dist/main.js          #   bundle COMMITÉ — ce que `uses:` livre réellement
 ```
+
+Azure DevOps n'a **pas** de vérificateur (§B.7) : `adapters/azdo/` est l'adaptateur de
+l'extension, et rien d'autre.
 
 ## Frontière A/B et parité (§2, §8.1.3)
 
@@ -42,7 +43,8 @@ construction :
    appelés à l'identique des deux côtés (`packages/core/src/index.ts`).
 2. **Même configuration.** Les deux composants résolvent les **trois** mêmes niveaux
    (plancher, organisation, dépôt) via `resolveConfig()`, qui est pure et ne prend que ces
-   trois documents : il n'existe plus de configuration épinglée (§8.1.3, règle 1).
+   trois documents. Un seul des deux met ces lectures en cache, et c'est l'extension : le
+   vérificateur les relit à chaque exécution, n'ayant nulle part où garder un cache.
 3. **Empreinte comparée.** Le composant B publie `configFingerprint` dans la ligne `cc/1` ;
    l'extension la relit dans le DOM et la compare à la sienne. En cas d'écart, elle cesse
    de bloquer l'envoi et le signale (§8.1.3, règle 2) — jamais un rejet que la source de
@@ -57,23 +59,33 @@ construction :
 `ComplianceResult.actions`. Un adaptateur traduit et transporte ; il ne juge
 jamais (§9.2.4).
 
-## Ce que `core/` attend d'un vérificateur (§6.4, §9.2.4)
+## Exécution du composant B (§6.4)
 
-Le composant B n'est plus dans l'arbre, mais `packages/core/` expose déjà le contrat que le
-futur vérificateur devra respecter : **le verdict est une fonction pure de l'état courant de
-la PR**.
+Une exécution, une PR, un statut — et rien qui survive à l'exécution. `run.ts` porte la
+séquence entière :
 
-- `resolveConfig(plancher, organisation, dépôt)` est pure et relit tout à chaque appel. Un
-  seul des deux composants met ces lectures en cache, et c'est l'extension.
-- `evaluate()` est pure elle aussi : brouillon, exemption et appartenances lui arrivent
-  déjà résolus par `EvaluationContext`, et les effets sortent par `ComplianceResult.actions`.
-- **Aucun stockage.** Ni séquence par PR, ni fenêtre de coalescence, ni délai de grâce, ni
-  réconciliation, ni épinglage, ni monotonie : chacune de ces règles supposait une mémoire
-  d'une évaluation à la suivante. Elles ont disparu du §6.4 avec le service qui les portait,
-  et `core/` n'en expose plus aucune trace.
+- **Configuration** : plancher (`floor-url`), puis organisation (`configUrl` du plancher),
+  puis dépôt. Une lecture *impossible* n'est ni une absence ni une invalidité : c'est une
+  incapacité à évaluer, et le check est publié **en échec** — `neutral` satisferait la
+  vérification obligatoire.
+- **Mode** : `off` et `assist` ne publient rien, sauf les deux incidents du §8.1.5.
+- **Lecture de l'état courant** : fils (GraphQL), commentaires isolés, étiquettes avec leur
+  provenance (timeline REST), brouillon.
+- **Habilitations pré-résolues** : `evaluate()` est pure et n'appelle rien. Sur GitHub cela
+  ne coûte aucun appel d'API — `resolverOverrideGroup` est une liste de comptes (§A.7) — et
+  l'habilitation effective est l'**intersection** : membre de CHACUN des groupes cités.
+- **`evaluate()`**, puis publication. Le SHA de tête est relu **juste avant** la publication,
+  pour que le statut se pose sur ce que la PR est au moment où on la juge.
 
-Ce que la mémoire rendait — empêcher un vert périmé de décider du merge — devra être rendu
-par la plateforme qui héberge le futur vérificateur, et non par lui (§A.8).
+**Il n'y a aucun stockage.** Ni séquence par PR, ni fenêtre de coalescence, ni délai de
+grâce, ni réconciliation, ni épinglage, ni monotonie : chacune de ces règles supposait une
+mémoire, et une exécution de workflow ne survit pas à la suivante. Le verdict est une
+fonction pure de l'état courant de la PR. Ce que la mémoire rendait — empêcher un vert
+périmé de décider du merge — est rendu par l'exécution planifiée du workflow, qui borne
+l'âge d'un statut (§A.8).
+
+La sérialisation, elle, est portée par la plateforme : un groupe de concurrence par PR, à
+l'échelle du dépôt, que tous les déclencheurs partagent au caractère près.
 
 ## Points de plateforme et replis (spike P1')
 

@@ -2,7 +2,8 @@
 # repository lui-même, et qu'aucun test unitaire ne peut constater.
 #   - la matrice des CA reste vraie (chaque critère du §11 cité par un test réel) ;
 #   - aucun caractère invisible littéral dans les sources ni les tests ;
-#   - une PR touche UNE plateforme, OU le code partagé — jamais les deux.
+#   - une PR touche UNE plateforme, OU le code partagé — jamais les deux ;
+#   - le bundle commité de l'Action correspond bien aux sources de ce commit.
 name: Conformité
 
 on:
@@ -63,6 +64,17 @@ jobs:
         # ce qui est arrivé ici, la vérification locale ayant été faite dans un
         # environnement déjà compilé, donc dans un monde qui n'était pas celui de la CI.
         run: npm run build && npm run build:extension && npm run check:context-apis && npm run check:bundle-isolation && npm run check:content-script-io
+
+      # Le bundle de l'Action est COMMITÉ (`.gitignore` le dit, et pourquoi) : c'est lui, et
+      # pas les sources, que charge le runtime `node20` chez qui écrit
+      # `uses: .../packages/action@v1`. Un bundle périmé livrerait donc une version du
+      # vérificateur que ce dépôt n'a jamais testée, sans qu'aucun test ne s'en aperçoive —
+      # les tests, eux, importent les sources. Le reconstruire et exiger un diff vide est la
+      # seule façon de constater qu'il correspond au code de ce commit.
+      - name: Le bundle commité de l'Action est à jour
+        run: |
+          npm run build:action
+          git diff --exit-code -- packages/action/dist
 
       # Une clé que le schéma ne déclare pas n'arrive jamais : Chrome la retire du
       # stockage managé sans rien dire, et un faux de test fabrique justement l'objet

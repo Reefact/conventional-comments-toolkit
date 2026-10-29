@@ -11,3 +11,12 @@ dist-meta/
 *.tmp
 result.txt
 data/
+
+# Exception : le bundle de l'Action est COMMITÉ, et il le faut. Un `uses:` lit l'arbre du
+# dépôt au ref demandé, jamais une archive de release : sans ce fichier, l'Action désignée
+# par `action.yml` n'existe pas chez qui l'emploie. `npm run build:action` le régénère, et
+# `npm run checks` l'appelle — un diff après coup signale un bundle périmé.
+!packages/action/dist/
+packages/action/dist/*
+!packages/action/dist/main.js
+!packages/action/dist/main.js.map

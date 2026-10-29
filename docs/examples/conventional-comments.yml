@@ -1,0 +1,71 @@
+# Conventional Comments — le vérificateur, dans le dépôt qu'il protège.
+#
+# À copier dans `.github/workflows/` du dépôt à protéger, AVEC
+# `conventional-comments-sweep.yml` — celui-ci n'écoute que les événements, l'autre borne
+# l'âge des statuts. Rien à héberger, aucun secret à poser : le runner remet son jeton.
+#
+# AUCUN `checkout`, ET LE REF EST CELUI D'UNE RELEASE. `uses:` lit l'arbre du dépôt de
+# l'Action au ref demandé — c'est de là que vient le bundle empaqueté, et un `checkout` du
+# dépôt protégé n'y changerait rien. `v1` est le tag mobile que pose la première release
+# portant l'Action ; tant qu'il n'existe pas, ou pour une installation durcie, poser un SHA
+# de commit à sa place.
+#
+# TROIS FAITS DE PLATEFORME décident de la forme de ce fichier. Aucun ne va de soi, et c'est
+# pourquoi ils sont écrits ici plutôt que supposés.
+#
+# 1. LA RÉSOLUTION D'UN FIL NE DÉCLENCHE AUCUN WORKFLOW. `pull_request_review_thread` existe
+#    comme webhook mais ne figure pas parmi les événements déclencheurs. La conséquence est
+#    asymétrique : résoudre le dernier fil bloquant ne fait pas passer le check au vert de
+#    lui-même (gênant, jamais dangereux) ; DÉ-RÉSOUDRE un fil ne le fait pas repasser au
+#    rouge, et c'est le sens dangereux. C'est `conventional-comments-sweep.yml` qui borne
+#    cette fenêtre — un SECOND fichier, requis et pas optionnel, et séparé pour une raison
+#    précise que son en-tête expose : son compteur d'exécutions ne doit compter que des
+#    balayages.
+#
+# 2. `pull_request_target`, ET NON `pull_request` — c'est le seul déclencheur d'événement de
+#    PR dont le jeton peut publier sur une PR de fork. Il est un piège de sécurité dès qu'un
+#    workflow CONSTRUIT ou EXÉCUTE le code proposé ; celui-ci ne fait aucun `checkout` de la
+#    PR et n'exécute rien qui en provienne. La condition est structurelle et doit le rester.
+#
+# 3. UN GROUPE DE CONCURRENCE EST À L'ÉCHELLE DU DÉPÔT, pas du workflow : deux workflows qui
+#    déclarent le même `group` se sérialisent l'un l'autre. C'est ce qui rend l'unité de
+#    sérialisation égale à la PR quel que soit le déclencheur — et ce qui la rend facile à
+#    casser, un nom de groupe qui diverge suffisant à rouvrir la course sans rien signaler.
+
+name: Conventional Comments
+
+on:
+  pull_request_target:
+    # `converted_to_draft` AUTANT que `ready_for_review` : le brouillon change le verdict
+    # (§6.2.4 — un brouillon reçoit un statut informatif, jamais en échec), donc les DEUX
+    # sens de la bascule doivent réveiller le vérificateur. N'écouter que le retour hors
+    # brouillon laisse une PR rouge le rester en brouillon jusqu'au balayage planifié.
+    types:
+      [opened, synchronize, reopened, ready_for_review, converted_to_draft, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  issue_comment:
+    types: [created, edited, deleted]
+
+permissions:
+  checks: write # publier le check run
+  pull-requests: read # fils, commentaires, étiquettes, brouillon
+  contents: read # le fichier .conventional-comments.json
+  # `pull-requests: write` DÈS QUE le dépôt emploie l'étiquette d'exemption : la remise à
+  # zéro doit pouvoir la retirer. Ce n'est pas un repli, c'est le fonctionnement normal.
+
+jobs:
+  # ————— Déclencheur qui DÉSIGNE une PR : une évaluation, un statut —————
+  evaluate:
+    runs-on: ubuntu-latest
+    concurrency:
+      # Le numéro vient de `pull_request` ou d'`issue` selon l'événement. Ce `group` est
+      # celui que les jobs de la matrice ci-dessous reprennent, mot pour mot.
+      group: conventional-comments-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: Reefact/conventional-comments-toolkit/packages/action@v1
+        # with:
+        #   floor-url: https://interne.example/cc/plancher.json

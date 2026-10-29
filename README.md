@@ -1,9 +1,9 @@
 # conventional-comments-toolkit
 
-Browser extension enforcing [Conventional Comments](https://conventionalcomments.org/) in code reviews, for GitHub (github.com, Enterprise Cloud/EMU, Enterprise Server) and Azure DevOps (Services, Server).
+Browser extension + GitHub Action enforcing [Conventional Comments](https://conventionalcomments.org/) in code reviews, for GitHub (github.com, Enterprise Cloud/EMU, Enterprise Server) and Azure DevOps (Services, Server).
 
 - **Browser extension (component A)** — authoring assistance and real-time validation while writing review comments. Convenience and prevention; bypassable by construction.
-- **Verifier (component B)** — the source of truth the specification describes: it verifies every comment after the fact, computes "blocking threads resolved", and publishes a required status check, so a PR can't be completed with an unresolved blocking comment even without the extension installed. **No verifier ships today.** The companion server that used to fill this role is removed: the specification now requires a verifier that runs *inside* the platform and keeps no state (§6.4), and [issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56) tracks building one for GitHub. Until then, objective O3 is not enforced anywhere.
+- **Verifier (component B)** — the actual source of truth: verifies every comment after the fact, computes "blocking threads resolved", and publishes a required status check, so a PR can't be completed with an unresolved blocking comment even without the extension installed. On GitHub it is a **GitHub Action running inside the repository it protects** — nothing to host, no secret to store, no database. Setup: [`docs/github-setup-en.md`](./docs/github-setup-en.md) (French: [`docs/github-setup-fr.md`](./docs/github-setup-fr.md)).
 
 No comment, code, or diff content ever leaves the browser. The full specification (the normative source) is [`specifications-fr.md`](./specifications-fr.md) (in French).
 
@@ -15,6 +15,7 @@ A TypeScript monorepo (npm workspaces). The full breakdown is in [`docs/architec
 packages/core           @cct/core            parser, validator, config, evaluation — shared verbatim by A and B
 packages/adapters/*     @cct/adapter-*        client (component A) platform adapters + shared editor plumbing
 packages/extension      @cct/extension        Manifest V3 extension — toolbar, quick input, feedback, guard
+packages/action         @cct/action           component B — the GitHub Action: one evaluation, one status, no state
 spikes/p1-prime         P1' spike             programmatic-write assumption, validated in Chromium
 ```
 
@@ -52,8 +53,8 @@ public stores. How a release is cut: [`docs/release-fr.md`](./docs/release-fr.md
 A repository is configured by a `.conventional-comments.json` file on its default branch —
 see [`.conventional-comments.example.json`](./.conventional-comments.example.json) for the
 shape of every key (it is **not** the product defaults, which live in
-`packages/core/src/config/defaults.ts`). Resolution, floor bounds, merge semantics and
-pinning are specified in §8 and implemented in `packages/core/src/config/`.
+`packages/core/src/config/defaults.ts`). Resolution, floor bounds and merge
+semantics are specified in §8 and implemented in `packages/core/src/config/`.
 
 **Upgrading from a version without `toolCommands`.** Slash commands used to be exempted
 through a list built into the GitHub adapter (`/azp`, `/rebase`). That list is gone, and
@@ -172,23 +173,30 @@ tests, and CI fails if that stops being true.
 
 ## Continuous integration
 
-Five workflows, each answering a different question. Only **CI** is meant to be a required
+Seven workflows, each answering a different question. Only **CI** is meant to be a required
 check on `main`; the others report without gating.
 
 | Workflow | Question it answers | When |
 |----------|--------------------|------|
 | [`ci.yml`](./.github/workflows/ci.yml) | Does everything compile and does every test pass, on both supported Node versions? | push to `main`, every PR |
-| [`conformance.yml`](./.github/workflows/conformance.yml) | Do the repository's own rules still hold — CA matrix in step with the tests, invisible characters written as escapes, normative spec untouched by a code PR? | push to `main`, every PR |
+| [`conformance.yml`](./.github/workflows/conformance.yml) | Do the repository's own rules still hold — CA matrix in step with the tests, invisible characters written as escapes, one platform or the shared code per PR, and the committed Action bundle in step with its sources? | push to `main`, every PR |
 | [`extension-package.yml`](./.github/workflows/extension-package.yml) | Does the MV3 bundle build, stay free of remote code (§10), and keep both manifests loadable? Publishes the Chromium and Firefox bundles as artifacts. | push to `main`, PRs touching `packages/` |
 | [`browser-smoke.yml`](./.github/workflows/browser-smoke.yml) | Does the §9.3 programmatic-write strategy still hold in a current Chromium — the one thing happy-dom cannot tell us? | daily (04:17 UTC), PRs touching adapters or the spike |
 | [`release.yml`](./.github/workflows/release.yml) | Can someone install the extension without any build chain? Builds, verifies and publishes the Chromium and Firefox zips as a GitHub Release. | tag `v*`, manual dry run |
+| [`github-selectors-canary.yml`](./.github/workflows/github-selectors-canary.yml) | Do the selector strings still match on the live github.com, as an anonymous visitor sees it? | weekly (Mon 09:33 UTC) |
+| [`theme-vars-canary.yml`](./.github/workflows/theme-vars-canary.yml) | Are the Primer theme variables `styles.css` relies on still defined on github.com? | weekly (Mon 09:03 UTC) |
 
 The selector smoke test of §9.4 runs on pages captured from each platform
 (`packages/adapters/<id>/test/fixtures/pages/`): `npm run check:captured-selectors` checks that
 happy-dom, where the real-page tests run, matches exactly the elements Chromium matches.
 Against the *live* platforms, only what an anonymous visitor can see is checked, weekly, by
-[`github-selectors-canary.yml`](./.github/workflows/github-selectors-canary.yml). Composers
-need a signed-in session and are not checked live.
+the two canaries above. Composers need a signed-in session and are not checked live.
+
+The Action bundle (`packages/action/dist/main.js`) is **committed on purpose**: `uses:` reads
+the repository tree at the requested ref, with no `npm ci` on the consumer's side, so that
+file is what actually runs for anyone who installs the verifier. `npm run build:action`
+regenerates it and `conformance.yml` fails on a diff — the tests import the sources and would
+not notice a stale bundle.
 
 ## Status against the specification phases (§14)
 
@@ -199,8 +207,8 @@ need a signed-in session and are not checked live.
 | P1' | Programmatic-write spike (GitHub React + Azure DevOps) | Assumption validated in Chromium; remaining platform assumptions documented with their fallbacks (`spikes/p1-prime/README-fr.md`) |
 | P2 | Extension `assist` on GitHub | Implemented |
 | P3 | Azure DevOps adapter | Implemented, with the P1' fallbacks in place |
-| P4 | `warn` mode + indicators (§12) | `warn` implemented. The §12 indicators are not: they were an endpoint of the removed server, and the section now states that none of them needs collecting as it happens — each recomputes in batch from what the platform keeps |
-| P5 | Verifier + status checks | **Not delivered.** The companion server is removed (it was never deployed); its replacement is designed in §6.4 and §A.8 and tracked by [#56](https://github.com/Reefact/conventional-comments-toolkit/issues/56). Azure DevOps has no verifier either, and §B.7 says why |
-| P6 | `enforce` on a pilot repo, then rollout | Blocked on P5: `enforce` means nothing without a verifier. Prerequisites and rollback are documented (`docs/operations-fr.md`) |
+| P4 | `warn` mode + indicators (§12) | `warn` implemented. The §12 indicators are not: they were an endpoint of the companion server, and the section now states they need no dedicated component — each one recomputes in batch from what the platform keeps |
+| P5 | Verifier + status checks | Implemented on GitHub as a GitHub Action (`packages/action`); Azure DevOps has no verifier (§B.7) |
+| P6 | `enforce` on a pilot repo, then rollout | Setup documented end to end (`docs/github-setup-en.md`); prerequisites and rollback in `docs/operations-fr.md`; the org-admin steps are deployment-time |
 
 License: Apache-2.0.

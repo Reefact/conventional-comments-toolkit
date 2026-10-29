@@ -807,7 +807,7 @@ Ce que l'absence de mémoire garantit, en revanche, tient même sans ce réglage
 
 **Republier n'a pas de coût qu'il faille éviter.** Une rédaction antérieure interdisait de republier un statut identique au précédent, et définissait par le menu ce que « identique » voulait dire. La règle existait pour un service qui recevait des rafales de webhooks et se coalesçait lui-même ; elle supposait de retenir le dernier résultat publié. Une exécution déclenchée par un événement publie une fois, et une publication de plus coûte un appel d'API — moins que la mémoire qu'il faudrait tenir pour l'éviter.
 
-**Quand la lecture échoue, le check échoue.** Une lecture impossible — API injoignable, limite d'appels atteinte — après les tentatives prévues fait publier un statut **en échec**, jamais un statut absent ni un neutre.
+**Quand la lecture échoue, le check échoue.** Une lecture impossible — API injoignable, limite d'appels atteinte — après les tentatives prévues fait publier un statut **en échec**, jamais un statut absent ni un neutre. Le vérificateur l'obtient en armant `forceState` sur `read-failed` (§9.2.1, §9.2.2) : le verdict reste calculé par `core/`, comme tous les autres.
 
 C'est un choix, et il va contre l'intuition. Publier un neutre laisserait passer le merge : `neutral` satisfait une vérification obligatoire, exactement comme le statut vert périmé qu'on aurait laissé en place en ne publiant rien. Un vérificateur qui porte une garantie ne peut donc pas s'abstenir sur une panne — il rendrait la garantie fausse précisément au moment où personne ne regarde.
 
@@ -1295,7 +1295,10 @@ type NoticeKind =
   | 'activation-undated'    // §8.1.5 — aucun niveau ne résout `activation.activatedAt`
   | 'exemption-reset'       // §6.3.2 — étiquette d'exemption retirée après un nouveau commentaire bloquant
   | 'exemption-refused'     // §6.3.2 — étiquette posée par une personne non habilitée
-  | 'unsupported-version';  // §8.1.5, §8.1.3 — schéma, plancher ou core/ trop récent
+  | 'unsupported-version'   // §8.1.5, §8.1.3 — schéma, plancher ou core/ trop récent
+  | 'read-failed';          // §6.4 — une lecture impossible, donc une incapacité à évaluer. Ni une
+                            // absence ni une invalidité : les deux premières se replient sur un
+                            // niveau inférieur, celle-ci n'a rien sur quoi se replier
 
 interface Notice {
   kind: NoticeKind;
@@ -1319,6 +1322,11 @@ interface ComplianceResult {
                                        // qui est machine et produite par `encodeSummary()`
   configFingerprint: string;           // configuration appliquée — seule empreinte comparée par A (§8.1.3, r. 2)
   coreVersion: string;
+  language: string | null;             // §6.3.1 — la clé `language` de la configuration effective, recopiée
+                                       // pour la même raison que `docUrl` : la sortie humaine se rend HORS
+                                       // de `core/`, et un adaptateur qui devrait retrouver la langue par
+                                       // ailleurs est un adaptateur qui l'oubliera. C'est arrivé : `headline`
+                                       // suivait la clé, les titres de sections du corps non
   formatDiagnostics: (Diagnostic & { comment: CommentInfo })[];   // critère 1 (§6.2.1) — toutes sévérités.
                                        // `comment` y est requis : le §6.3.1 exige un lien permanent par
                                        // diagnostic, et le `headline` regroupe les diagnostics par commentaire
@@ -1414,8 +1422,16 @@ interface EvaluationInput {
                                        // disent les listes : `neutral` pour une activation non datée, et
                                        // pour la configuration invalide sous un mode inférieur à
                                        // `enforce` ; `failure` pour une configuration invalide
-                                       // **sous `enforce`** (§8.1.5). C'est **le vérificateur** qui
+                                       // **sous `enforce`** (§8.1.5), et pour une **lecture impossible**
+                                       // (§6.4), quel que soit le mode. C'est **le vérificateur** qui
                                        // l'arme, en inspectant les `notices` rendues par `resolveConfig()`
+                                       // et le résultat de ses propres lectures.
+                                       //
+                                       // Une rédaction antérieure n'ouvrait `forceState` qu'aux deux cas
+                                       // du §8.1.5, alors que le §6.4 exigeait déjà un échec sur une
+                                       // lecture impossible : le vérificateur n'avait donc aucun chemin
+                                       // pour l'obtenir de `core/`, et devait fabriquer le résultat
+                                       // lui-même — ce que la ligne `state` de §9.2.1 lui interdit
   ctx: EvaluationContext;
 }
 

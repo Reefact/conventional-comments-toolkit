@@ -32,6 +32,7 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
     configFingerprint: fingerprint(config),
     coreVersion: CORE_VERSION,
     docUrl: config.docUrl,
+    language: lang,
     // Pas de `targetUrl` : le §6.3.1 n'en fait plus le porteur de quoi que ce soit, et
     // aucun porteur configurable ne la fournit (§9.2.1). Le vérificateur y met, s'il le
     // veut, le lien de l'exécution qui publie — ce que `core/` ne peut pas connaître.
@@ -228,6 +229,10 @@ export function evaluate(input: EvaluationInput): ComplianceResult {
   if (forceState?.because === 'invalid-config') {
     const detail = notices.find((n) => n.kind === 'invalid-config')?.message ?? '';
     headlineParts.push(t(lang, 'headline.invalid-config', { detail }));
+  }
+  if (forceState?.because === 'read-failed') {
+    const detail = notices.find((n) => n.kind === 'read-failed')?.message ?? '';
+    headlineParts.push(t(lang, 'headline.read-failed', { detail }));
   }
   if (forceState?.because === 'activation-undated') {
     headlineParts.push(t(lang, 'headline.activation-undated'));

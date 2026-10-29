@@ -1,0 +1,63 @@
+name: 'Conventional Comments — vérificateur'
+description: >-
+  Évalue les commentaires de revue d'une pull request et publie le check
+  `conventional-comments`. S'exécute dans le dépôt qu'il protège, avec le jeton que le
+  runner lui remet : rien à héberger, aucun secret à stocker, aucune base.
+author: 'Reefact'
+
+inputs:
+  token:
+    description: >-
+      Le jeton employé pour lire la PR et publier le check. Par défaut le `GITHUB_TOKEN` de
+      l'exécution. Permissions requises : `checks: write` pour publier, `pull-requests: read`
+      pour lire fils, commentaires, étiquettes et brouillon, `contents: read` pour le fichier
+      de configuration — et `pull-requests: write` dès que le dépôt emploie l'étiquette
+      d'exemption, dont la remise à zéro doit pouvoir la retirer.
+    required: false
+    default: ${{ github.token }}
+  mode:
+    description: >-
+      `evaluate` (défaut) évalue UNE pull request et publie son statut. `dispatch` énumère
+      les PR qu'un déclencheur couvre quand il en couvre plusieurs et ne publie AUCUN
+      statut : il rend `prs`, que le job suivant consomme en matrice.
+    required: false
+    default: 'evaluate'
+  pr-number:
+    description: >-
+      La PR à évaluer, quand l'événement ne la désigne pas lui-même — c'est la matrice de la
+      répartition qui l'injecte. Ignorée en mode `dispatch`.
+    required: false
+  floor-url:
+    description: >-
+      URL du document de plancher d'entreprise (§8.1.1), servie par l'organisation. Laissée
+      vide, aucune politique d'entreprise ne s'applique et le plancher vaut
+      `{"minimumMode": "off"}`. Une URL posée mais injoignable fait échouer le check, comme
+      toute lecture impossible (§6.4).
+    required: false
+  check-name:
+    description: >-
+      Nom du check run publié. Le changer après avoir déclaré le check obligatoire laisse la
+      protection de branche attendre un nom que plus rien ne publie.
+    required: false
+    default: 'conventional-comments'
+
+outputs:
+  state:
+    description: "Le verdict publié : `success`, `failure`, `neutral`, ou `none` si le mode commandait le silence."
+  published:
+    description: '`true` si un statut a été publié, `false` si le mode l’interdisait (§6.2.2).'
+  prs:
+    description: 'Mode `dispatch` : les numéros des PR couvertes, en JSON, pour `fromJSON` dans une matrice.'
+  count:
+    description: 'Mode `dispatch` : combien de PR la liste contient — au plus 256, ce qu''une matrice admet.'
+  total:
+    description: >-
+      Mode `dispatch` : combien de PR ouvertes existent en tout. Supérieur à `count` quand
+      le dépôt en a plus qu'une matrice n'admet : la tranche tourne alors d'une exécution à
+      la suivante, et chaque PR est réévaluée au plus tous les
+      `intervalle de cron × ceil(total / 256)`.
+
+runs:
+  using: 'node20'
+  # Relatif à CE fichier. Le bundle autonome que `build.mjs` produit.
+  main: 'dist/main.js'

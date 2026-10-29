@@ -268,13 +268,18 @@
       .field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.1rem; }
       .field:last-child { margin-bottom: 0; }
       .field-label { font-weight: 600; font-size: 0.85rem; }
-      .field select, .field textarea {
+      /* `input[type="text"]` et `.config-snippet` n'y figuraient pas : sans fond ni couleur
+         explicites, le champ de l'ordre des boutons et le bloc de configuration retombaient
+         sur le blanc du navigateur, en plein thème sombre. */
+      .field select, .field textarea, .field input[type="text"], .config-snippet {
         font-family: var(--font-body); font-size: 0.85rem;
         background: var(--bg-sunken); border: 1px solid var(--line); color: var(--fg);
         border-radius: var(--radius); padding: 0.42rem 0.6rem;
       }
-      .field textarea { font-family: var(--font-mono); resize: vertical; }
-      .field select:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .field textarea, .field input[type="text"], .config-snippet { font-family: var(--font-mono); }
+      .field textarea, .config-snippet { resize: vertical; }
+      .field select:focus-visible, .field textarea:focus-visible, .field input[type="text"]:focus-visible,
+      .config-snippet:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
       .field-hint { font-size: 0.78rem; color: var(--fg-faint); margin: 0; }
       .field-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.6rem; }
       .config-snippet { width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: 0.82rem; resize: vertical; margin: 0 0 0.6rem; }

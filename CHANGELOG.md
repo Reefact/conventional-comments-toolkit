@@ -12,13 +12,15 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
-## [Unreleased]
+## [1.0.0-beta.14] - 2026-10-29
 
 ### Added
 
 - **A label badge explains itself on hover** (§5.5). Hovering the badge of a published comment shows the same tooltip as the label's toolbar button — its definition and an example, in the interface language — so a reader meeting `ack` or `polish` for the first time can find out what it means where they read it. Badges also keep the arrow cursor instead of the text-selection bar, since they are hovered, not selected. Measured on a github.com comment body: `cursor: auto` before, `default` after.
 
 - **A label can carry its own definition: `labels[].description`** (§8.2). A repository or an organisation writes it for a label it creates, or for a shipped one such as `issue`, and the tooltip of the label's button and badge shows it. Written, it replaces the shipped definition and its example; written empty, it removes the tooltip; left out, a shipped label keeps its definition. It is shown as written, whatever the interface language, and it is not part of the configuration fingerprint (§9.2.2), since it changes no verdict.
+
+- **Two review skills for AI agents.** `skills/review-pull-request` and `skills/respond-to-review` are `SKILL.md` files an agent follows to review a pull request, or to answer its review, the way the toolkit expects: labels confirmed in the repository's configuration, findings followed up until verified, `reviewed:` posted by the reviewer once nothing is left, reply labels and never `reviewed` or `decision` for the author, and never an approval or a merge. They write in the language the repository requires. See the README.
 
 ### Fixed
 
@@ -663,6 +665,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[1.0.0-beta.14]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.13...v1.0.0-beta.14
 [1.0.0-beta.13]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.12...v1.0.0-beta.13
 [1.0.0-beta.12]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.11...v1.0.0-beta.12
 [1.0.0-beta.11]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.10...v1.0.0-beta.11

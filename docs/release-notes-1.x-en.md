@@ -8,6 +8,30 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
 extension installed.
 
+## 1.0.0-beta.14 — October 29, 2026
+
+_Labels explain themselves where you read them: a hover on a badge shows its definition, and a team can write its own. `quibble` steps aside for `nitpick`, and two skills let AI agents review the toolkit's way._
+
+### ✨ Features
+
+- **A badge tells you what its label means.** Hover the label badge of a published comment and you get the same tooltip as its toolbar button: the definition and an example, in the interface language. The badge also keeps the arrow cursor rather than the text-selection bar.
+
+- **Your team can define its labels: `labels[].description`.** Write a description for a label you create, or for a shipped one such as `issue`, in `.conventional-comments.json`, and the tooltip of the button and the badge shows it. Written, it replaces the shipped definition and its example; written empty (`""`), it removes the tooltip; left out, a shipped label keeps its definition. It is shown as written, whatever the interface language.
+
+- **Two review skills for AI agents.** `skills/review-pull-request` and `skills/respond-to-review` tell an agent how to review a pull request, or answer its review, with this toolkit's labels: findings followed up until verified, `reviewed:` once nothing is left, reply labels for the author, and never an approval or a merge. See the [README](https://github.com/Reefact/conventional-comments-toolkit/blob/main/README.md#review-skills-for-ai-agents).
+
+### 🔧 Changed
+
+- **`quibble` is off by default.** Conventional Comments itself describes it as "very much like nitpick", so the toolbar showed two buttons for one meaning. Use `nitpick`, or bring `quibble` back with `{ "id": "quibble", "enabled": true }` in `.conventional-comments.json`. Until you do, a `quibble:` comment is an unknown label where comments are validated.
+
+- **`reviewed` now says when to use it.** Its tooltip read "you have finished reading"; it now reads "your points are dealt with, you have nothing to add". Post it once each of your points is fixed and checked, or set aside by a reply you accept. Any later change reopens your review. It still approves nothing.
+
+- **The extension's description no longer mentions the companion server**, removed in 1.0.0-beta.13, in `chrome://extensions` and in the Release pages.
+
+### 🐛 Bug fixes
+
+- **A custom label no longer shows its internal key as a tooltip.** Hovering the button of a label your repository created, such as `risk`, showed "label.risk". It now shows its `description` if it has one, and nothing otherwise.
+
 ## 1.0.0-beta.13 — October 29, 2026
 
 _Labels for replying to a review, every shipped label enabled by default, GitHub's comment box recognised again on today's pages — and the companion server retired, with no verifier in its place yet._

@@ -108,6 +108,19 @@ closes their own. What the pull request needs to be merged — approvals, requir
 stays with the platform: the toolkit does not count `reviewed`, and no number of them amounts to
 an approval. This is a convention the toolkit states, not one it checks (§3.2).
 
+**Describe a label: `labels[].description`.** The tooltip of a label's button and badge shows its
+definition. A repository or an organisation can write its own, for a label it creates or for a
+shipped one:
+
+```json
+{ "labels": [ { "id": "risk", "description": "A regression risk to assess before merging." },
+              { "id": "issue", "description": "Here: a defect that breaks a test or a contract." } ] }
+```
+
+Written, it replaces the shipped definition and its example; written empty (`""`), it removes the
+tooltip; left out, a shipped label keeps its definition. It is shown as written, whatever the
+interface language, and changes no verdict.
+
 Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` does not. The
 toolbar shows the remark labels first — `reviewed` among them —, then, always on a line of their
 own under a thin horizontal rule, the reply labels: `thanks`, `done`, `ack`, `decision`,

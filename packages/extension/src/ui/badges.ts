@@ -37,7 +37,7 @@ import { normalizeBodyShape, OWN_BADGES, type RenderedBodyShape } from '@cct/ada
 import { labelTooltip, ui } from './strings.js';
 
 function labelBadge(
-  label: { icon?: string; id: string; color?: string },
+  label: { icon?: string; id: string; color?: string; description?: string },
   config: EffectiveConfig,
   lang: string
 ): HTMLElement {
@@ -47,9 +47,9 @@ function labelBadge(
   if (label.color) badge.style.setProperty('--cct-label-color', label.color);
   // La même infobulle que le bouton de la barre d'outils (§5.5) : le badge est l'endroit où un
   // lecteur rencontre un label qu'il ne connaît pas — `ack`, `quibble` —, bien plus souvent
-  // qu'en écrivant. `lang` entre déjà dans badgeSignature(), si bien qu'un changement de langue
-  // la rafraîchit.
-  const tooltip = labelTooltip(lang, label.id);
+  // qu'en écrivant. `lang` et `description` entrent dans badgeSignature(), si bien qu'un
+  // changement de langue ou de configuration la rafraîchit.
+  const tooltip = labelTooltip(lang, label);
   if (tooltip !== null) badge.title = tooltip;
   return badge;
 }
@@ -143,7 +143,12 @@ function badgeSignature(
 ): string {
   return JSON.stringify({
     style: config.badgeStyle,
-    label: { id: a.resolved.label.id, icon: a.resolved.label.icon ?? null, color: a.resolved.label.color ?? null },
+    label: {
+      id: a.resolved.label.id,
+      icon: a.resolved.label.icon ?? null,
+      color: a.resolved.label.color ?? null,
+      description: a.resolved.label.description ?? null,
+    },
     blocking: a.blocking,
     decorations: shown,
     hiddenDescriptive,

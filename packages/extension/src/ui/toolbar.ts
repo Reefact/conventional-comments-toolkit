@@ -174,21 +174,14 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     return row;
   };
   const labelRow = newRow();
+  /** La rangée `reply` (§5.1) : les labels qui n'ouvrent aucun point, TOUJOURS sur leur propre
+   * ligne, sous ceux qui en ouvrent un, et séparés d'eux par un trait horizontal fin. Une ligne
+   * à part, plutôt qu'une zone qui partagerait la dernière ligne des remarques : quand celles-ci
+   * se replient sur plusieurs lignes, rien ne distinguerait sinon la ligne des réponses d'une
+   * ligne de remarques de plus — le trait dit « autre groupe ». Les réponses ont ainsi la même
+   * place à toutes les largeurs. */
+  const replyRow = newRow();
   const decorationRow = newRow();
-
-  /** La zone `reply` (§5.1) : les labels qui n'ouvrent aucun point, après ceux qui en ouvrent
-   * un, séparés par un trait. Une boîte à elle, et pas seulement un ordre : c'est ce qui la
-   * fait passer à la ligne d'un BLOC — un `ack` resté seul en bout de ligne, séparé de `done`
-   * et `disagree`, couperait la zone que le trait dessine. Les boutons `remark` restent
-   * enfants directs de la rangée et se replient un à un, comme avant ; la zone peut donc
-   * partager leur dernière ligne. `role="none"`, pour la raison donnée sur `newRow()`. */
-  const replyZone = doc.createElement('span');
-  replyZone.className = 'cct-reply-zone';
-  replyZone.setAttribute('role', 'none');
-  const separator = doc.createElement('span');
-  separator.className = 'cct-zone-separator';
-  separator.setAttribute('aria-hidden', 'true');
-  replyZone.appendChild(separator);
 
   // Un bouton par label, avec libellé et couleur distincts et SANS son icône (§5.1) — là où le
   // badge d'un commentaire publié la garde (§5.5 ; badges.ts, `labelBadge()`).
@@ -196,7 +189,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   // Les deux surfaces n'ont pas la même contrainte de place. Un badge est SEUL en tête de son
   // commentaire : l'icône y est un repère qui ne coûte rien, et c'est ce que montre le mockup
   // de référence (docs/badges-decoration-mockup.html). Les boutons, eux, sont une RANGÉE —
-  // quatorze dans la configuration par défaut, dix-sept si les labels optionnels sont activés (§3.2) —
+  // dix-huit dans la configuration par défaut, tous les labels livrés étant actifs (§3.2) —
   // posée au-dessus du sélecteur de décoration, et ce qu'un bouton prend en largeur, il le
   // prend à tous les autres. Sur la largeur d'une boîte de commentaire GitHub, ces icônes
   // suffisaient à renvoyer le dernier label à la ligne suivante, où il se mêlait alors aux
@@ -210,7 +203,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   // seule (§10), et l'infobulle ci-dessous porte définition et exemple. C'est ce que la
   // spécification décrit : le §5.1 dit « avec libellé et couleur distincts, sans icône », et le
   // §5.5 dit où l'icône est rendue — sur le badge, lorsqu'elle est configurée.
-  // Ordre : la préférence personnelle en tête de chaque zone, puis la configuration (§5.1).
+  // Ordre : la préférence personnelle en tête de chaque groupe, puis la configuration (§5.1).
   const zones = labelsByZone(opts.config, opts.labelOrder);
   for (const label of [...zones.remark, ...zones.reply]) {
     const button = doc.createElement('button');
@@ -262,39 +255,14 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       }
     });
     button.setAttribute('aria-pressed', 'false');
-    (label.kind === 'reply' ? replyZone : labelRow).appendChild(button);
+    (label.kind === 'reply' ? replyRow : labelRow).appendChild(button);
   }
 
-  // Une zone vide n'a ni boîte ni trait : sans label `reply` actif, la rangée est celle d'avant.
-  if (replyZone.childElementCount > 1) labelRow.appendChild(replyZone);
-
-  /** Le trait ne sépare que ce qui partage une ligne (§5.1) : quand la zone commence une ligne,
-   * le passage à la ligne sépare déjà les deux zones, et un trait en tête de ligne ne
-   * séparerait rien. Seul le moteur de rendu sait sur quelle ligne tombe un bouton — d'où la
-   * mesure, refaite quand la rangée change de taille, et que `check:composer-layout` vérifie
-   * dans un vrai navigateur. Sans moteur (tests happy-dom, toutes les boîtes à zéro), le trait
-   * reste affiché : rien ne dit qu'il commence une ligne. */
-  const placeSeparator = (): void => {
-    const previous = replyZone.previousElementSibling;
-    if (previous === null) {
-      separator.hidden = true; // aucun label `remark` actif : rien à séparer
-      return;
-    }
-    const before = previous.getBoundingClientRect();
-    const first = (separator.nextElementSibling as Element).getBoundingClientRect();
-    // Pas encore de boîte — barre pas encore insérée, ou DOM sans moteur : ne rien décider.
-    // L'observateur ci-dessous rappelle cette fonction dès que la rangée prend sa taille.
-    if (before.height === 0) {
-      separator.hidden = false;
-      return;
-    }
-    separator.hidden = first.top >= before.bottom;
-  };
-  if (labelRow.contains(replyZone)) {
-    placeSeparator();
-    const Observer = (doc.defaultView as (Window & typeof globalThis) | null)?.ResizeObserver;
-    if (Observer) new Observer(placeSeparator).observe(labelRow);
-  }
+  // Une rangée vide n'a ni ligne ni trait : sans label `reply` actif, la barre est celle d'avant.
+  // Et le trait ne sépare que ce qui existe des deux côtés : sans label `remark` actif, il ne
+  // séparerait rien.
+  if (replyRow.childElementCount === 0) replyRow.remove();
+  else if (labelRow.childElementCount > 0) replyRow.classList.add('cct-reply-row');
 
   // Sélecteur de décoration segmenté : « aucune », puis un segment par décoration
   // porteuse de la configuration (§5.1).

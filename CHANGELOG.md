@@ -127,17 +127,16 @@ and what a reader needs from them is the behaviour, not the thirteen.
   for `ack`. They are ordinary labels — same parser, same diagnostics, never blocking — and
   they do not make replies require a label, which remains `scope.validateReplies`. `?r` expands
   to `reviewed: `. See the README for the configuration and the upgrade note.
-- **The toolbar puts the response labels in a zone of their own** (§5.1). Labels that raise a
-  point come first, `reviewed` among them, then a thin line, then the labels that answer one —
-  `thanks`, `done`, `ack`, `decision`, `disagree`, from the warmest to the firmest. `decision`
-  now counts as a reply, since it answers a point. The response labels
-  wrap to the next line together, never one by one, and the line only shows when both zones
-  share a line. Nothing else about the toolbar changes.
-- **A label can say which zone it belongs to: `labels[].kind`** (§3.2, §8.2). `"remark"` raises
+- **The toolbar puts the response labels on a line of their own** (§5.1). Labels that raise a
+  point come first, `reviewed` among them; then, under a thin horizontal rule, the labels that
+  answer one — `thanks`, `done`, `ack`, `decision`, `disagree`, from the warmest to the firmest.
+  `decision` now counts as a reply, since it answers a point. The replies keep the same place
+  at every width.
+- **A label can say which group it belongs to: `labels[].kind`** (§3.2, §8.2). `"remark"` raises
   a point, `"reply"` does not. A label you declare is `"remark"` unless you say otherwise.
   It changes no verdict.
 - **You can choose the order of the label buttons** (§5.1, §5.2). *Button order*, in the
-  options, takes a comma-separated list; the labels you list come first in their own zone, the
+  options, takes a comma-separated list; the labels you list come first in their own group, the
   others follow in the default order, which is conventionalcomments.org's. The completion list
   follows the same order. It is a personal preference and applies to the next comment box.
 - **The options page presents the added labels and copies the block that disables them**

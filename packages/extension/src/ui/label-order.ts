@@ -2,9 +2,9 @@
 // barre d'outils et par la liste de complétion, qui doivent dire le même ordre.
 //
 // L'ordre par défaut est celui de la configuration résolue : rien n'est trié. La préférence
-// ne fait que placer certains labels en tête de LEUR zone ; elle ne déplace jamais un label
-// d'une zone à l'autre — le type (`labels[].kind`) appartient au dépôt, que la page d'options
-// ne connaît pas, d'où une seule liste pour les deux zones plutôt qu'une par zone.
+// ne fait que placer certains labels en tête de LEUR groupe ; elle ne déplace jamais un label
+// d'un groupe à l'autre — le type (`labels[].kind`) appartient au dépôt, que la page d'options
+// ne connaît pas, d'où une seule liste pour les deux groupes plutôt qu'une par groupe.
 
 import { enabledLabels, type EffectiveConfig, type LabelConfig } from '@cct/core';
 
@@ -33,8 +33,8 @@ export function normalizeStoredOrder(stored: unknown): string[] {
   return parseLabelOrder(stored.filter((x): x is string => typeof x === 'string').join(',')).order;
 }
 
-/** Les labels ACTIFS, rangés par zone : dans chacune, ceux que la préférence nomme d'abord,
- * dans son ordre, puis les autres dans l'ordre de la configuration. Un nom inconnu ou désactivé
+/** Les labels ACTIFS, rangés par groupe — remarques, réponses : dans chacun, ceux que la
+ * préférence nomme d'abord, dans son ordre, puis les autres dans l'ordre de la configuration. Un nom inconnu ou désactivé
  * sur ce dépôt n'a simplement aucun label à placer. */
 export function labelsByZone(
   config: EffectiveConfig,

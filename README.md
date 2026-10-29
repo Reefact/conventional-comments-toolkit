@@ -98,14 +98,15 @@ point, it says where your review stands. `thanks` fills the gap a plain "thanks!
 with `scope.validateReplies` on, it had to be written `note: thanks`.
 
 Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` does not. The
-toolbar shows the remark labels first — `reviewed` among them —, then a thin line, then the reply
-labels: `thanks`, `done`, `ack`, `decision`, `disagree`. A label you declare is `"remark"` unless
+toolbar shows the remark labels first — `reviewed` among them —, then, always on a line of their
+own under a thin horizontal rule, the reply labels: `thanks`, `done`, `ack`, `decision`,
+`disagree`. A label you declare is `"remark"` unless
 you write `"kind": "reply"`. The kind changes no verdict.
 
-**Button order.** By default, the order of conventionalcomments.org, then `reviewed`; the reply
-zone goes from the warmest to the firmest. In the extension's options, *Button order* takes a
+**Button order.** By default, the order of conventionalcomments.org, then `reviewed`; the replies
+go from the warmest to the firmest. In the extension's options, *Button order* takes a
 comma-separated list, for example `suggestion,nitpick,disagree`: the labels you list come first
-in their own zone, the others follow in the default order. Spaces are ignored. It is a personal
+in their own group, remarks or replies, the others follow in the default order. Spaces are ignored. It is a personal
 preference, synced by your browser; it changes no verdict and applies to the next comment box
 that opens. The completion list (`/` or `:`) follows the same order.
 

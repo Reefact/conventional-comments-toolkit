@@ -117,7 +117,7 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.attach();
     const first = (sel: string) => (host.querySelector(sel) as HTMLElement).dataset['label'];
     expect(first('.cct-toolbar-row > .cct-label-button')).toBe('issue');
-    expect(first('.cct-reply-zone .cct-label-button')).toBe('ack');
+    expect(first('.cct-reply-row .cct-label-button')).toBe('ack');
     controller.dispose();
   });
 

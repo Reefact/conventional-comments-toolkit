@@ -81,7 +81,7 @@ export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void
 
   const openList = (filter: string) => {
     closeList();
-    // Le même ordre que la barre (§5.2) : zone `remark`, puis zone `reply`.
+    // Le même ordre que la barre (§5.2) : les remarques, puis les réponses.
     const zones = labelsByZone(opts.config, opts.labelOrder);
     items = [...zones.remark, ...zones.reply]
       .map((l) => l.id)

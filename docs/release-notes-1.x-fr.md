@@ -6,7 +6,7 @@ cas limite, chaque section de la spécification sur laquelle une entrée s'appui
 
 L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. Aucun
 vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
-navigateur de qui a installé l'extension.
+navigateur des personnes ayant installé l'extension.
 
 ## 1.0.0-beta.13 — 29 octobre 2026
 
@@ -22,7 +22,7 @@ _Des labels pour répondre à une revue, tous les labels livrés activés par d�
 
 - **Un label peut dire s'il soulève un point ou y répond**, avec `labels[].kind` (`"remark"` ou `"reply"`). Un label que vous déclarez est `"remark"` sauf mention contraire. Cela ne change aucun verdict.
 
-- **Chaque ligne du journal dit de quelle page elle vient.** Il indiquait quel sélecteur avait échoué et quand, jamais où : devant quatre lignes horodatées à la même seconde, rien ne permettait de savoir si elles venaient d'une seule page ou de quatre. Chaque ligne commence désormais par une marque de six caractères — même marque, même page — ; un clic ouvre l'adresse exacte relevée dans un nouvel onglet. Cette adresse reste sur votre appareil : lorsque vous l'avez autorisée, la télémétrie ne transmet toujours que le nom du sélecteur. La mise à jour conserve toutefois les lignes déjà présentes : comme leur adresse n'était pas enregistrée, elles affichent une marque neutre jusqu'à ce que le sélecteur correspondant échoue de nouveau ou que vous effaciez le journal.
+- **Chaque ligne du journal dit de quelle page elle vient.** Il indiquait quel sélecteur avait échoué et quand, jamais où : devant quatre lignes horodatées à la même seconde, rien ne permettait de savoir si elles venaient d'une seule page ou de quatre. Chaque ligne commence désormais par une marque de six caractères : une même page produit la même marque. Un clic ouvre l'adresse exacte relevée dans un nouvel onglet. Cette adresse reste sur votre appareil : si vous avez autorisé la télémétrie, celle-ci ne transmet toujours que le nom du sélecteur. La mise à jour conserve toutefois les lignes déjà présentes : comme leur adresse n'était pas enregistrée, elles affichent une marque neutre jusqu'à ce que le sélecteur correspondant échoue de nouveau ou que vous effaciez le journal.
 
 - **Le journal s'efface depuis la page d'options.** Un bouton le vide ; les onglets déjà ouverts recommencent aussitôt à mesurer, et la section se met à jour d'elle-même quand l'un d'eux y écrit, sans rechargement.
 
@@ -50,7 +50,7 @@ _Des labels pour répondre à une revue, tous les labels livrés activés par d�
 
 ### 🐛 Corrections
 
-- **La vue « Files changed » de GitHub est de nouveau reconnue.** Sur les pages telles que github.com les sert aujourd'hui, l'extension ne trouvait aucun bouton de publication, si bien qu'en mode `enforce` un commentaire non conforme pouvait y être publié quand même. Elle prenait aussi la modification d'un commentaire pour l'écriture d'un nouveau, traitait le résumé de revue comme un commentaire de ligne pouvant bloquer la pull request, et n'affichait aucun badge sur les fils. Sur l'onglet « Conversation », modifier un commentaire publié était aussi traité comme un commentaire de ligne pouvant bloquer. « Cancel » n'est toujours jamais intercepté.
+- **La vue « Files changed » de GitHub est de nouveau reconnue.** Sur les pages telles que github.com les sert aujourd'hui, l'extension ne trouvait aucun bouton de publication, si bien qu'en mode `enforce` un commentaire non conforme pouvait y être publié quand même. Elle prenait aussi la modification d'un commentaire pour l'écriture d'un nouveau, traitait le résumé de revue comme un commentaire en ligne susceptible de bloquer la pull request, et n'affichait aucun badge sur les fils. Sur l'onglet « Conversation », modifier un commentaire publié était aussi traité comme un commentaire en ligne susceptible de bloquer la pull request. « Cancel » n'est toujours jamais intercepté.
 
 - **GitHub : la date de création de la pull request est lue sur la pull request elle-même.** Cette date décide si une pull request est antérieure à `activatedAt`, donc si l'extension peut bloquer dessus. C'était la première date de la page — sur une pull request fusionnée, la date de fusion, si bien que la même pull request pouvait afficher deux dates selon l'onglet. Quand la date ne peut pas être lue, l'extension ne bloque pas.
 

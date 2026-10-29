@@ -109,11 +109,16 @@ const FIXTURE = `
   <div class="cct-toolbar" id="toolbar">
     <button class="cct-label-button" id="btn">issue</button>
     <button class="cct-label-button" id="btnActive" aria-pressed="true">todo</button>
-    <div class="cct-decoration-group" id="decoGroup">
-      <button class="cct-decoration-segment" id="seg" aria-checked="false">blocking</button>
-      <button class="cct-decoration-segment" id="segActive" aria-checked="true">none</button>
+    <div class="cct-toolbar-row cct-reply-row" id="replyRow">
+      <button class="cct-label-button" id="btnReply">done</button>
     </div>
-    <button class="cct-free-decoration" id="freeDeco">+</button>
+    <div class="cct-toolbar-row cct-decoration-row" id="decoRow">
+      <div class="cct-decoration-group" id="decoGroup">
+        <button class="cct-decoration-segment" id="seg" aria-checked="false">blocking</button>
+        <button class="cct-decoration-segment" id="segActive" aria-checked="true">none</button>
+      </div>
+      <button class="cct-free-decoration" id="freeDeco">+</button>
+    </div>
   </div>
   <div class="cct-feedback" id="feedback">
     <ul class="cct-diagnostics">
@@ -174,7 +179,8 @@ const PROPS = [
 ];
 
 const IDS = [
-  'editor', 'toolbar', 'btn', 'btnActive', 'decoGroup', 'seg', 'segActive', 'freeDeco',
+  'editor', 'toolbar', 'btn', 'btnActive', 'replyRow', 'btnReply', 'decoRow', 'decoGroup', 'seg',
+  'segActive', 'freeDeco',
   'feedback', 'diagError', 'diagWarn',
   'ringOk', 'ringWarn', 'ringError', 'ringInset',
   'host', 'banner', 'bannerHead', 'glyph', 'bannerLabel', 'bannerHint', 'bannerLi',

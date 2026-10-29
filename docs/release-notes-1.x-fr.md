@@ -8,6 +8,30 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
 navigateur des personnes ayant installé l'extension.
 
+## 1.0.0-beta.14 — 29 octobre 2026
+
+_Les labels s'expliquent là où on les lit : le survol d'un badge affiche sa définition, et une équipe peut écrire la sienne. `quibble` s'efface devant `nitpick`, et deux skills permettent à des agents IA de relire à la façon de l'outil._
+
+### ✨ Nouveautés
+
+- **Un badge dit ce que son label signifie.** Au survol du badge de label d'un commentaire publié, vous obtenez la même infobulle que sur son bouton de la barre d'outils : la définition et un exemple, dans la langue de l'interface. Le badge garde aussi le curseur flèche plutôt que la barre de sélection de texte.
+
+- **Votre équipe peut définir ses labels : `labels[].description`.** Écrivez une description pour un label que vous créez, ou pour un label livré comme `issue`, dans `.conventional-comments.json`, et l'infobulle du bouton et du badge l'affiche. Écrite, elle remplace la définition livrée et son exemple ; écrite vide (`""`), elle retire l'infobulle ; absente, un label livré garde sa définition. Elle s'affiche telle qu'écrite, quelle que soit la langue de l'interface.
+
+- **Deux skills de revue pour les agents IA.** `skills/review-pull-request` et `skills/respond-to-review` indiquent à un agent comment relire une pull request, ou répondre à sa revue, avec les labels de l'outil : remarques suivies jusqu'à vérification, `reviewed:` quand plus rien ne reste, labels de réponse pour l'auteur, et jamais d'approbation ni de fusion. Voir le [README](https://github.com/Reefact/conventional-comments-toolkit/blob/main/README.md#review-skills-for-ai-agents).
+
+### 🔧 Changements
+
+- **`quibble` est désactivé par défaut.** Conventional Comments le décrit lui-même comme « très proche de nitpick », si bien que la barre affichait deux boutons pour un même sens. Utilisez `nitpick`, ou réactivez `quibble` avec `{ "id": "quibble", "enabled": true }` dans `.conventional-comments.json`. D'ici là, un commentaire `quibble:` est un label inconnu là où les commentaires sont validés.
+
+- **`reviewed` dit désormais quand l'employer.** Son infobulle disait « vous avez fini de relire » ; elle dit maintenant « vos points sont traités, vous n'avez plus rien à ajouter ». Publiez-le quand chacun de vos points est corrigé et vérifié, ou écarté par une réponse que vous acceptez. Toute modification ultérieure rouvre votre revue. Il n'approuve toujours rien.
+
+- **La description de l'extension ne mentionne plus le compagnon serveur**, retiré en 1.0.0-beta.13, ni dans `chrome://extensions` ni sur les pages de Release.
+
+### 🐛 Corrections
+
+- **Un label personnalisé n'affiche plus sa clé interne en infobulle.** Le survol du bouton d'un label créé par votre dépôt, comme `risk`, affichait « label.risk ». Il affiche maintenant sa `description` s'il en a une, et rien sinon.
+
 ## 1.0.0-beta.13 — 29 octobre 2026
 
 _Des labels pour répondre à une revue, tous les labels livrés activés par défaut, la zone de commentaire de GitHub de nouveau reconnue sur ses pages actuelles — et le compagnon serveur retiré, sans vérificateur pour le remplacer à ce jour._

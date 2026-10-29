@@ -1,13 +1,14 @@
 ---
 name: respond-to-review
-description: As the author of a GitHub pull request, answer its review comments with Conventional Comments reply labels — `done`, `ack`, `disagree`, `thanks` — fix what needs fixing, and push. Use when a pull request you wrote receives review comments, or when asked to address a review. Never posts `reviewed` or `decision`, never approves, never merges.
+description: As the author of a GitHub pull request, answer its review findings and questions with Conventional Comments reply labels — `done`, `ack`, `disagree`, `thanks`, plus `note` and `question` — fix what needs fixing, and push. Use when a pull request you wrote receives review comments, or when asked to address a review. Never posts `reviewed` or `decision`, never approves, never merges.
 ---
 
 # Respond to a review
 
 You are the author of the pull request: you wrote its code, and you are answering its review.
-Every comment a reviewer posts gets an answer, in its own thread, and the answer says what you
-did about it.
+Every finding or question a reviewer raises gets an answer, in its own thread, and the answer
+says what you did about it. A reviewer's `reviewed:` comment is not one of them: it closes their
+review, raises no point and asks nothing, so it needs no reply.
 
 ## 0. Language
 
@@ -52,7 +53,7 @@ The subject is at most **72 characters**. The discussion below it adds what the 
 
 ## 2. The reply labels
 
-Answer each comment with the label that says what you did:
+Answer each finding with the label that says what you did:
 
 - **`done:`** — the code changed because of the comment. Use it only once the change is
   **pushed**, and name the commit: `done: fixed in a1b2c3d, null now returns an error`. A change
@@ -66,8 +67,16 @@ Answer each comment with the label that says what you did:
 - **`thanks:`** — you thank the reviewer without taking a position on the point or the code: the
   natural answer to a `praise`. `thx` is accepted for `thanks`.
 
-A `question` gets a plain answer to the question, under the label that says what followed: `ack:`
-if the answer changes nothing, `done:` if it led to a pushed change.
+Two more gestures in a thread already have their labels, and they are yours too (specification
+§3.2):
+
+- **`note:`** — you provide information: the answer to a reviewer's `question`, or a fact the
+  reviewer needs to settle a point.
+- **`question:`** — you ask back, when you need the reviewer to clarify before you can act.
+
+A reviewer's `question` gets the label that says what followed: `note:` when you answer it with
+information, `done:` when it led to a pushed change. `ack:` is not a neutral answer: keep it for a
+point you accept.
 
 ## 3. What you never post
 
@@ -76,8 +85,8 @@ if the answer changes nothing, `done:` if it led to a pushed change.
   blocking point should not be addressed, answer `disagree:` with your reason, and tell the
   person you work for that a `decision` may be needed.
 - **`reviewed`**: it closes a reviewer's review, not yours.
-- The reviewer's labels (`issue`, `suggestion`, `nitpick`, `praise`…): you are answering, not
-  reviewing. If you find a problem of your own while fixing, fix it and say so in the reply.
+- The other labels that raise a point (`issue`, `suggestion`, `nitpick`, `praise`…): you are
+  answering, not reviewing. If you find a problem of your own while fixing, fix it and say so in the reply.
 
 Never approve or merge the pull request.
 
@@ -91,7 +100,8 @@ For each comment that calls for a change:
 3. Run the repository's checks and tests before pushing.
 4. Push, then answer `done:` with the commit.
 
-Answer every thread, including optional findings, `(non-blocking)` ones and `praise`.
+Answer every finding and question, including optional findings, `(non-blocking)` ones and
+`praise`. A standalone `reviewed:` closure needs no answer.
 
 ## 5. Resolving threads
 

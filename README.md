@@ -194,8 +194,9 @@ instructions:
   verified, and closes its review with `reviewed:` once nothing is left. It never approves and
   never merges: those stay human decisions.
 - [`skills/respond-to-review`](./skills/respond-to-review/SKILL.md), for the **author** of the
-  pull request: answers every thread with `done:`, `ack:`, `disagree:` or `thanks:`, pushes the
-  fixes, and never posts `reviewed` or `decision`.
+  pull request: answers every finding and question with `done:`, `ack:`, `disagree:` or
+  `thanks:` — or `note:` to inform and `question:` to ask back —, pushes the fixes, and never
+  posts `reviewed` or `decision`.
 
 Both read the repository's `.conventional-comments.json` first, so they only use the labels it
 enables.

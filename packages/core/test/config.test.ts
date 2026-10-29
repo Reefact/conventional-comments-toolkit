@@ -11,12 +11,13 @@ const found = (o: object): ConfigRead => ({ status: 'found', text: JSON.stringif
 const foundText = (t: string): ConfigRead => ({ status: 'found', text: t });
 
 describe('§8.2 — valeurs par défaut du produit', () => {
-  it('dix-sept labels — dix de Conventional Comments, trois optionnels désactivés, quatre labels de réponse actifs — et les décorations du §3.3', () => {
+  it('dix-sept labels — dix de Conventional Comments, trois optionnels désactivés, quatre labels ajoutés actifs — et les décorations du §3.3', () => {
     const c = defaultConfig();
     expect(c.labels).toHaveLength(17);
     expect(c.labels.filter((l) => l.enabled)).toHaveLength(14);
     expect(c.labels.filter((l) => !l.enabled).map((l) => l.id).sort()).toEqual(['polish', 'quibble', 'typo']);
-    expect(c.labels.filter((l) => l.kind === 'reply').map((l) => l.id)).toEqual(['ack', 'done', 'disagree', 'reviewed']);
+    // `reviewed` est ajouté mais ne répond à aucun point : il est `remark` (§3.2).
+    expect(c.labels.filter((l) => l.kind === 'reply').map((l) => l.id)).toEqual(['ack', 'done', 'disagree']);
     expect(c.labels.filter((l) => l.blockingByDefault).map((l) => l.id).sort()).toEqual([
       'chore',
       'issue',

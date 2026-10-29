@@ -114,23 +114,24 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Added
 
-- **Four response labels: `ack`, `done`, `disagree`, `reviewed`** (§3.2). Conventional
-  Comments has a vocabulary for review feedback and none for replying to it. These labels are
-  the toolkit's own addition, not part of Conventional Comments, and ship **enabled**: a
-  repository that wants to stick to Conventional Comments disables them with one `labels[]`
-  entry each. `reviewed` closes your own review — the label people reached for when they wrote
-  `praise: review done` — and approves nothing. `fixed` is accepted for `done`, `acknowledged`
+- **Three response labels, `ack`, `done`, `disagree`, and a `reviewed` label** (§3.2).
+  Conventional Comments has a vocabulary for review feedback and none for replying to it.
+  These labels are the toolkit's own addition, not part of Conventional Comments, and ship
+  **enabled**: a repository that wants to stick to Conventional Comments disables them with one
+  `labels[]` entry each. `reviewed` closes your own review — the label people reached for when
+  they wrote `praise: review done` — and approves nothing; it answers no point, so it is not a
+  response label. `fixed` is accepted for `done`, `acknowledged`
   for `ack`. They are ordinary labels — same parser, same diagnostics, never blocking — and
   they do not make replies require a label, which remains `scope.validateReplies`. `?r` expands
   to `reviewed: `. See the README for the configuration and the upgrade note.
 - **The toolbar puts the response labels in a zone of their own** (§5.1). Labels that raise a
-  point come first, then a thin line, then the labels that answer one. The response labels
+  point come first, `reviewed` among them, then a thin line, then the labels that answer one. The response labels
   wrap to the next line together, never one by one, and the line only shows when both zones
   share a line. Nothing else about the toolbar changes.
 - **A label can say which zone it belongs to: `labels[].kind`** (§3.2, §8.2). `"remark"` raises
   a point, `"reply"` does not. A label you declare is `"remark"` unless you say otherwise.
   It changes no verdict.
-- **The options page presents the response labels and copies the block that disables them**
+- **The options page presents the added labels and copies the block that disables them**
   (§8.2). The page cannot disable them, since the configuration lives in the repository, so it
   shows the block to paste into `.conventional-comments.json` and copies it to the clipboard.
   If the clipboard refuses, the block is selected for a manual copy, and the page says so

@@ -410,6 +410,10 @@
   padding: 0 6px;
   margin-right: 6px;
   color: var(--cct-fg-default);
+  /* La flèche, et non la barre de texte que le navigateur pose sur tout texte : un badge est
+     une étiquette qu'on survole pour lire son infobulle (§5.5), pas un texte qu'on sélectionne.
+     Le texte du commentaire autour garde son curseur. */
+  cursor: default;
 }
 
 .cct-badge-pill { border-radius: 999px; }

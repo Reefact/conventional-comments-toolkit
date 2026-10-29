@@ -42,12 +42,13 @@ ce qui échouerait sous `enforce`, avec un lien permanent par commentaire.
    est activée** (§6.2.2, annexes) — sans quoi O3 n'est pas satisfait pour les
    administrateurs : *Require status checks to pass* sur `conventional-comments`, et
    *Do not allow bypassing the above settings*.
-5. **Le workflow compagnon des forks est en place**, ou l'autre branche de l'alternative est
-   écrite : *les PR de forks et de Dependabot ne sont pas soumises au contrôle*. Sans
-   l'un ni l'autre, ces PR portent un statut vert qui cesse d'être rafraîchi dès qu'un
-   relecteur écrit (§A.8).
-6. **Le dépôt n'emploie pas de merge queue.** Le vérificateur ne se déclenche pas sur un SHA
-   de *merge group* : le check n'y arrive jamais, et la file ne se vide plus (§A.8).
+5. **Les PR de forks et de Dependabot sont couvertes**, ou l'autre branche de l'alternative
+   est écrite : *elles ne sont pas soumises au contrôle*. Sans l'un ni l'autre, ces PR
+   portent un statut vert qui cesse d'être rafraîchi dès qu'un relecteur écrit — le §A.8
+   décrit ce que le vérificateur devra prévoir pour les atteindre.
+6. **Le dépôt n'emploie pas de merge queue.** Une file de merge crée un SHA de *merge
+   group*, sur lequel le §A.8 ne fait se déclencher aucun vérificateur : le check n'y
+   arriverait jamais, et la file ne se viderait plus.
 
 **Azure DevOps n'a pas de vérificateur** (§B.7) : rien de ce qui précède ne s'y applique, et
 l'extension y reste un composant d'assistance, contournable par construction (§2).
@@ -79,8 +80,9 @@ Ordre des opérations pour un retour arrière d'urgence :
    d'entrée d'invalidation : tous deux appartenaient au service compagnon, et il n'y a plus
    de cache à invalider là où le blocage se décide.
 3. Vérifier qu'un statut vert `warn` réapparaît sur une PR témoin. Si rien ne se publie,
-   c'est qu'aucun événement n'est survenu depuis : l'exécution planifiée y pourvoit dans
-   l'intervalle de son cron, et `workflow_dispatch` force la main immédiatement.
+   c'est qu'aucun événement n'est survenu depuis : le §6.4 demande au vérificateur une
+   réévaluation périodique, qui borne cette attente, et un rejeu manuel pour ne pas avoir à
+   l'attendre.
 
 Pour revenir plus bas que `warn` (`assist`/`off`), retirer **d'abord** la protection de
 branche, **puis** changer le mode.

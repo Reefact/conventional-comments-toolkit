@@ -255,14 +255,57 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
-  /** Bouton de complétion/merge (§6.5) — jamais intercepté, grisé visuellement seulement. */
+  /** Bouton de complétion/merge (§6.5) — jamais intercepté, grisé visuellement seulement.
+   *
+   * MESURÉ le 2026-10-29 sur `test/fixtures/pages/01` — la seule capture d'une PR OUVERTE : le
+   * bouton est un bouton Primer React, `button.prc-Button-ButtonBase-… [data-variant="primary"]`
+   * libellé « Rebase and merge », premier item d'un `[data-component="ButtonGroup"]` (le second,
+   * vide sur ce dépôt, porte le choix de la méthode quand il y en a plusieurs). Aucun `.btn-primary`
+   * nulle part : aucun des candidats suivants ne matchait, et le §6.5 ne grisait plus rien sur
+   * github.com. Le journal le disait — `merge-button`, sur chaque page —, noyé dans les entrées
+   * des PR fusionnées où l'absence est la norme (cf. `prSettledState`).
+   *
+   * Non mesuré : l'étape de confirmation qui suit le clic, si GitHub en rend une. Le grisage ne
+   * porte que sur le bouton affiché à l'arrivée sur la page. */
   mergeButton: {
     name: 'merge-button',
     candidates: [
+      '[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-variant="primary"]', // MESURÉ
       '[data-testid="mergebox-partial"] button.btn-primary',
       'button[data-testid*="merge-button"]',
       '.merge-message button.btn-group-merge',
       'button.js-merge-commit-button',
+    ],
+  } satisfies SelectorChain,
+
+  /** Sonde « cette PR ne peut PAS être fusionnée d'ici » — elle ne sert qu'à DÉCIDER si
+   * l'absence de `mergeButton` est une dégradation (§9.4) ou le cas nominal, comme
+   * `editingSurfaces` pour `editors`. Sur une PR fusionnée, fermée ou en brouillon, GitHub ne
+   * rend aucun bouton de fusion : journaliser son absence remplissait le journal d'une entrée
+   * par PR visitée, si bien que la vraie rupture — le bouton d'une PR OUVERTE devenu
+   * introuvable — y passait pour du bruit.
+   *
+   * MESURÉ le 2026-10-29 : `[data-component="StateLabel"]` porte l'état de la PR dans
+   * `data-status`, sur les deux vues — `pullOpened` sur la capture 01, `pullMerged` sur les
+   * captures 02 à 07, Conversation comme Files changed. Les valeurs `pullClosed` et `draft` ne
+   * figurent sur aucune capture : elles sont lues dans le source de `@primer/react` 38.43.0
+   * (`StateLabel.js`, `octiconMap`), qui les définit à côté des deux mesurées. Un brouillon ne
+   * se fusionne pas (§6.2.4) ; une PR fermée non plus.
+   *
+   * Restreinte à l'EN-TÊTE de la page (`prc-PageHeader-PageHeader`, où se trouve, mesuré, le
+   * `StateLabel` de la PR sur chaque capture) : un `StateLabel` « Merged » ailleurs — une PR
+   * citée dans la timeline — ferait sinon taire le journal sur une PR ouverte.
+   *
+   * Le sens de l'erreur est choisi : si cette sonde pourrit, elle ne matche plus, et
+   * l'absence du bouton est journalisée comme avant — du bruit, jamais du silence.
+   * `pullQueued` (file de fusion) n'y figure pas : ce que la page rend alors n'est pas
+   * mesuré. */
+  prSettledState: {
+    name: 'pr-settled-state',
+    candidates: [
+      '[class*="prc-PageHeader-PageHeader"] [data-component="StateLabel"][data-status="pullMerged"]', // MESURÉ
+      '[class*="prc-PageHeader-PageHeader"] [data-component="StateLabel"][data-status="pullClosed"]',
+      '[class*="prc-PageHeader-PageHeader"] [data-component="StateLabel"][data-status="draft"]',
     ],
   } satisfies SelectorChain,
 
@@ -334,6 +377,46 @@ export const selectors = {
   renderedThreads: {
     name: 'rendered-threads',
     candidates: ['[data-testid="review-thread"]', '.js-resolvable-timeline-thread-container'],
+  } satisfies SelectorChain,
+
+  /** Sonde « ce fil est REPLIÉ, son contenu n'est pas dans la page » — elle ne sert qu'à
+   * DÉCIDER si un fil sans corps ni auteur lisibles est une dégradation (§9.4) ou le cas
+   * nominal, comme `editingSurfaces` pour `editors`.
+   *
+   * MESURÉ le 2026-10-29 sur les captures 01, 02 et 06 (vue Conversation) : chaque fil y est un
+   * `<review-thread-collapsible>`, et un fil résolu ou obsolète arrive REPLIÉ — un en-tête
+   * « Comment thread », le lien du fichier, « Outdated » —, son contenu n'étant chargé qu'au
+   * dépliage, depuis `data-deferred-content-url`. La correspondance est exacte sur les 28 fils
+   * des trois captures : les 21 qui portent l'attribut n'ont ni corps ni auteur, les 7 qui ne le
+   * portent pas (dépliés une fois, l'attribut disparaît avec le chargement) ont les deux.
+   * `getThreads()` journalisait donc `comment-body` et `comment-author` sur toute PR ayant un
+   * fil résolu — deux entrées qui ne disaient rien d'autre que « GitHub a replié un fil ».
+   *
+   * Si la sonde pourrit, elle ne matche plus, et le fil replié est journalisé comme avant :
+   * du bruit, jamais du silence. */
+  deferredThread: {
+    name: 'deferred-thread',
+    candidates: ['review-thread-collapsible[data-deferred-content-url]'], // MESURÉ
+  } satisfies SelectorChain,
+
+  /** L'état de résolution que le conteneur du fil porte LUI-MÊME — évalué sur le conteneur,
+   * jamais sur ses descendants (`matchesChain`).
+   *
+   * MESURÉ le 2026-10-29 : sur la vue Conversation (captures 01, 02, 06), chaque
+   * `<review-thread-collapsible>` porte `data-resolved="true"` ou `"false"`, replié ou non, et
+   * aucun des marqueurs de `resolvedMarker` : les 28 fils y étaient lus `unknown`, donc comptés
+   * NON résolus par le repli local du bandeau (§5.5) — deux fils `issue (blocking)` résolus de
+   * la capture 01 y passaient pour bloquants. Le §9.2.3 réserve `unknown` à l'état « non rendu »
+   * ; celui-ci l'est. Recoupé avec la vue Files changed de la MÊME PR (capture 05, lue par
+   * `resolvedMarker`) : `r4398202547` y est résolu et porte `"true"` sur la capture 01,
+   * `r4397911246` ne l'est pas et porte `"false"`. */
+  threadResolvedFlag: {
+    name: 'thread-resolved-flag',
+    candidates: ['review-thread-collapsible[data-resolved="true"]'], // MESURÉ
+  } satisfies SelectorChain,
+  threadUnresolvedFlag: {
+    name: 'thread-unresolved-flag',
+    candidates: ['review-thread-collapsible[data-resolved="false"]'], // MESURÉ
   } satisfies SelectorChain,
 
   /** Permalien d'ancrage d'un fil rendu — l'ancre du bandeau (§5.5). Le repli large

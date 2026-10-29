@@ -109,7 +109,7 @@ const fr: Record<string, string> = {
   'options.shortcuts.save': 'Enregistrer',
   'options.order.label': 'Ordre des boutons',
   'options.order.hint':
-    'Labels séparés par des virgules, espaces ignorés. Ceux que vous listez passent en tête de leur zone ; les autres suivent dans l’ordre par défaut.',
+    'Labels séparés par des virgules, espaces ignorés. Ceux que vous listez passent en tête de leur groupe, remarques ou réponses ; les autres suivent dans l’ordre par défaut.',
   'options.order.save': 'Enregistrer',
   'options.telemetry.heading': 'Télémétrie',
   'options.telemetry.sub':
@@ -302,7 +302,7 @@ const en: Record<string, string> = {
   'options.shortcuts.save': 'Save',
   'options.order.label': 'Button order',
   'options.order.hint':
-    'Labels separated by commas, spaces ignored. The ones you list come first in their zone; the others follow in the default order.',
+    'Labels separated by commas, spaces ignored. The ones you list come first in their group, remarks or replies; the others follow in the default order.',
   'options.order.save': 'Save',
   'options.telemetry.heading': 'Telemetry',
   'options.telemetry.sub':

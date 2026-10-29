@@ -186,14 +186,13 @@ assert('le texte garde sa gouttière (≥ 5px)', m.gouttiereHerite >= 5, `${m.go
 assert('la barre n’a aucun retrait horizontal', m.barreRetrait === 0, `${m.barreRetrait}px`);
 assert('la pastille est 2 à 5 px sous le champ', m.ecartPastille >= 2 && m.ecartPastille <= 5, `${m.ecartPastille}px`);
 
-// ————— CA-48 — les deux zones de la rangée des labels (§5.1) —————
+// ————— CA-48 — les réponses sur leur propre ligne, sous un trait (§5.1) —————
 //
 // La barre est ici la VRAIE (`buildToolbar`, configuration par défaut résolue), pas une copie :
 // ce qui se mesure est sur quelle ligne tombe chaque bouton, et seul un moteur de rendu le sait.
-// Elle est montée à plusieurs largeurs, parce que la règle a deux branches — trait affiché quand
-// la zone `reply` partage sa ligne avec un label `remark`, absent quand elle commence une
-// ligne — et qu'une seule largeur n'en exercerait qu'une : le balayage doit rencontrer les
-// deux, sinon le garde ne prouve rien.
+// Elle est montée à plusieurs largeurs, de la plus étroite — où les remarques se replient sur
+// plusieurs lignes — à la plus large — où, sans rangée à part, les réponses rejoindraient la
+// dernière ligne des remarques : c'est là que la règle peut casser.
 const toolbarBundle = await build({
   stdin: {
     contents: `
@@ -226,7 +225,7 @@ await zonesPage.evaluate(() => {
 });
 await zonesPage.addScriptTag({ content: toolbarBundle.outputFiles[0].text });
 
-const LARGEURS = [240, 360, 480, 600, 700, 800, 900, 1000, 1100, 1200, 1400];
+const LARGEURS = [240, 360, 480, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 2000];
 const mesures = [];
 for (const largeur of LARGEURS) {
   mesures.push(
@@ -235,69 +234,50 @@ for (const largeur of LARGEURS) {
       hote.innerHTML = '';
       hote.style.width = `${largeur}px`;
       hote.appendChild(globalThis.cctBar());
-      // L'observateur de taille rappelle `placeSeparator` après la mise en page.
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const top = (e) => Math.round(e.getBoundingClientRect().top);
-      const zone = hote.querySelector('.cct-reply-zone');
-      const trait = zone.querySelector('.cct-zone-separator');
-      const remarks = [...zone.parentElement.querySelectorAll(':scope > .cct-label-button')];
-      const replies = [...zone.querySelectorAll('.cct-label-button')];
-      const dernier = remarks.at(-1).getBoundingClientRect();
-      const premier = replies[0].getBoundingClientRect();
-      const t = trait.getBoundingClientRect();
+      const barre = hote.querySelector('.cct-toolbar').getBoundingClientRect();
+      const rangee = hote.querySelector('.cct-reply-row');
+      // Pas de rangée `reply` : les réponses sont ailleurs — c'est un échec, pas un plantage.
+      if (rangee === null) return { largeur, lignesRemarques: 0, dessous: false, traitEntre: false, pleineLargeur: false, avantDecorations: false };
+      const remarques = [...hote.querySelectorAll('.cct-toolbar-row:first-child > .cct-label-button')].map((b) => b.getBoundingClientRect());
+      const reponses = [...rangee.querySelectorAll('.cct-label-button')].map((b) => b.getBoundingClientRect());
+      const decorations = hote.querySelector('.cct-decoration-group').getBoundingClientRect();
+      const r = rangee.getBoundingClientRect();
+      const trait = parseFloat(getComputedStyle(rangee).borderTopWidth);
+      const basRemarques = Math.max(...remarques.map((x) => x.bottom));
+      const hautReponses = Math.min(...reponses.map((x) => x.top));
       return {
         largeur,
-        traitVisible: getComputedStyle(trait).display !== 'none' && t.width > 0,
-        partageLigne: top(replies[0]) === top(remarks.at(-1)),
-        zoneTient: zone.scrollWidth <= zone.parentElement.clientWidth && zone.getBoundingClientRect().width < hote.clientWidth,
-        lignesReply: new Set(replies.map(top)).size,
-        traitEntre: t.left >= dernier.right && t.right <= premier.left && t.top < premier.bottom && t.bottom > premier.top,
+        lignesRemarques: new Set(remarques.map((x) => Math.round(x.top))).size,
+        dessous: hautReponses >= basRemarques,
+        traitEntre: trait >= 1 && r.top >= basRemarques && r.top + trait <= hautReponses,
+        pleineLargeur: Math.abs(r.left - barre.left) < 1 && Math.abs(r.right - barre.right) < 1,
+        avantDecorations: Math.max(...reponses.map((x) => x.bottom)) <= decorations.top,
       };
     }, largeur)
   );
 }
 
-console.log('\nDeux zones dans la rangée des labels (CA-48) — mesurées dans Chromium\n');
+console.log('\nLes réponses sur leur propre ligne, sous un trait (CA-48) — mesurées dans Chromium\n');
 for (const x of mesures) {
-  const detail = `${x.largeur}px : ${x.partageLigne ? 'même ligne' : 'zone en tête de ligne'}, trait ${x.traitVisible ? 'affiché' : 'absent'}`;
-  assert(`${x.largeur}px — trait affiché si et seulement si la zone partage sa ligne`, x.traitVisible === x.partageLigne, detail);
-  if (x.traitVisible) assert(`${x.largeur}px — le trait est ENTRE les deux zones`, x.traitEntre);
-  if (x.zoneTient) assert(`${x.largeur}px — la zone \`reply\` n'est pas coupée`, x.lignesReply === 1, `${x.lignesReply} ligne(s)`);
+  const detail = `${x.largeur}px : remarques sur ${x.lignesRemarques} ligne(s)`;
+  assert(`${x.largeur}px — les réponses sont SOUS la dernière remarque, jamais à côté`, x.dessous, detail);
+  assert(`${x.largeur}px — le trait est entre les deux`, x.traitEntre);
+  assert(`${x.largeur}px — le trait court sur toute la largeur de la barre`, x.pleineLargeur);
+  assert(`${x.largeur}px — les décorations restent dessous`, x.avantDecorations);
 }
 assert(
-  'le balayage rencontre les deux branches — trait affiché ET absent',
-  mesures.some((x) => x.traitVisible) && mesures.some((x) => !x.traitVisible),
-  mesures.map((x) => `${x.largeur}:${x.traitVisible ? '|' : '-'}`).join(' ')
+  'le balayage rencontre des remarques sur une seule ligne ET sur plusieurs',
+  mesures.some((x) => x.lignesRemarques === 1) && mesures.some((x) => x.lignesRemarques > 1),
+  mesures.map((x) => `${x.largeur}:${x.lignesRemarques}`).join(' ')
 );
 assert(
-  'il rencontre aussi une zone qui partage sa ligne APRÈS un passage à la ligne des labels `remark`',
-  await zonesPage.evaluate(async () => {
-    // La branche que la première version du calcul ratait : comparée au PREMIER bouton de la
-    // rangée plutôt qu'au dernier label `remark`, la zone semblait commencer une ligne.
-    for (let w = 300; w <= 1400; w += 20) {
-      const hote = document.getElementById('hote');
-      hote.innerHTML = '';
-      hote.style.width = `${w}px`;
-      hote.appendChild(globalThis.cctBar());
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const zone = hote.querySelector('.cct-reply-zone');
-      const remarks = [...zone.parentElement.querySelectorAll(':scope > .cct-label-button')];
-      const top = (e) => Math.round(e.getBoundingClientRect().top);
-      const plusieursLignes = top(remarks[0]) !== top(remarks.at(-1));
-      const partage = top(zone.querySelector('.cct-label-button')) === top(remarks.at(-1));
-      const trait = getComputedStyle(zone.querySelector('.cct-zone-separator')).display !== 'none';
-      if (plusieursLignes && partage) return trait;
-    }
-    return false;
-  })
-);
-assert(
-  'sans label `reply` actif, ni zone ni trait',
+  'sans label `reply` actif, ni rangée ni trait',
   await zonesPage.evaluate(() => {
     const hote = document.getElementById('hote');
     hote.innerHTML = '';
     hote.appendChild(globalThis.cctBar({ labels: ['thanks', 'done', 'ack', 'decision', 'disagree'].map((id) => ({ id, enabled: false })) }));
-    return hote.querySelector('.cct-reply-zone') === null && hote.querySelector('.cct-zone-separator') === null;
+    return hote.querySelector('.cct-reply-row') === null && hote.querySelectorAll('.cct-toolbar-row').length === 2;
   })
 );
 

@@ -557,8 +557,8 @@ document.getElementById('direct-shortcuts-save')?.addEventListener('click', () =
 });
 
 // Ordre des boutons de label (§5.1, §5.2) — préférence locale (§8.1.2), une seule liste pour
-// les deux zones : la page ne connaît pas le type que chaque dépôt donne à ses labels, chaque
-// zone y prend les siens. Les noms que l'extension ne livre pas ne sont pas une erreur — un
+// les deux groupes : la page ne connaît pas le type que chaque dépôt donne à ses labels, chaque
+// groupe y prend les siens. Les noms que l'extension ne livre pas ne sont pas une erreur — un
 // dépôt peut les définir —, la page le dit seulement.
 const orderInput = document.getElementById('label-order') as HTMLInputElement | null;
 const orderState = document.getElementById('label-order-state');

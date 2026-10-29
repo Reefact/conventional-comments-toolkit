@@ -72,7 +72,7 @@ describe('CA-50 — ordre des boutons', () => {
     }).element;
     const buttons = [...bar.querySelectorAll('.cct-label-button')].map((b) => (b as HTMLElement).dataset['label']);
     expect(buttons[0]).toBe('issue');
-    const zone = [...bar.querySelectorAll('.cct-reply-zone .cct-label-button')].map((b) => (b as HTMLElement).dataset['label']);
+    const zone = [...bar.querySelectorAll('.cct-reply-row .cct-label-button')].map((b) => (b as HTMLElement).dataset['label']);
     expect(zone).toEqual(['done', 'thanks', 'ack', 'decision', 'disagree']);
   });
 });

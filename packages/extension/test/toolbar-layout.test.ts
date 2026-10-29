@@ -68,7 +68,8 @@ describe('§5.1 — la barre d’outils empile ses rangées', () => {
     const decorationRows = new Set(
       [...root.querySelectorAll('.cct-decoration-group, .cct-free-decoration')].map(rowOf)
     );
-    expect(labelRows.size).toBe(1);
+    // Deux rangées de labels — les remarques, puis les réponses (CA-48) —, une de décorations.
+    expect(labelRows.size).toBe(2);
     expect(decorationRows.size).toBe(1);
     for (const row of labelRows) expect(decorationRows.has(row)).toBe(false);
     // Aucune des deux n'est `null` : un `closest()` qui ne trouve rien rendrait deux
@@ -94,7 +95,7 @@ describe('§5.1 — la barre d’outils empile ses rangées', () => {
     // entre le `role="toolbar"` et ses commandes.
     const root = toolbar();
     const rows = [...root.querySelectorAll('.cct-toolbar-row')];
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3); // remarques, réponses, décorations
     for (const row of rows) expect(row.getAttribute('role')).toBe('none');
     expect(root.getAttribute('role')).toBe('toolbar');
   });
@@ -110,51 +111,50 @@ describe('§5.1 — la barre d’outils empile ses rangées', () => {
   });
 });
 
-// CA-48 — la STRUCTURE des deux zones (§5.1). Ce que happy-dom ne sait pas dire — sur quelle
-// ligne tombe un bouton, donc si le trait est affiché — est mesuré dans un vrai navigateur par
-// `npm run check:composer-layout`.
-describe('CA-48 — deux zones dans la rangée des labels', () => {
+// CA-48 — la STRUCTURE des deux groupes (§5.1). La géométrie — les réponses sous la dernière
+// remarque, jamais à côté, et le trait entre les deux, à toutes les largeurs — est mesurée dans
+// un vrai navigateur par `npm run check:composer-layout`.
+describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
   const resolved = (doc: object) =>
     resolveConfig(null, { status: 'absent' }, { status: 'found', text: JSON.stringify(doc) }, null, false).config;
   const labelsIn = (root: Element) =>
     [...root.querySelectorAll('.cct-label-button')].map((b) => (b as HTMLElement).dataset['label']);
 
-  it('les labels `remark` d’abord — `reviewed` compris —, puis la zone `reply` précédée de son trait', () => {
+  it('les labels `remark` — `reviewed` compris —, puis une rangée `reply` à part, puis les décorations', () => {
     const bar = toolbar();
-    const zone = bar.querySelector('.cct-reply-zone')!;
-    expect(zone).not.toBeNull();
-    expect(rowOf(zone)).toBe(rowOf(bar.querySelector('.cct-label-button')));
-    expect(zone.firstElementChild!.classList.contains('cct-zone-separator')).toBe(true);
-    expect(zone.firstElementChild!.getAttribute('aria-hidden')).toBe('true');
-    expect(labelsIn(zone)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);
-    // `reviewed` est ajouté par le produit, mais il ne répond à aucun point : il reste à gauche.
-    expect(labelsIn(bar)).toEqual([
+    const [labels, replies, decorations] = [...bar.querySelectorAll('.cct-toolbar-row')];
+    expect(replies!.classList.contains('cct-reply-row')).toBe(true);
+    expect(labelsIn(labels!)).toEqual([
       'praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'quibble',
-      'reviewed', 'thanks', 'done', 'ack', 'decision', 'disagree',
+      'reviewed',
     ]);
-    // La zone est le DERNIER élément de la rangée : aucun bouton `remark` après elle.
-    expect(zone.nextElementSibling).toBeNull();
+    expect(labelsIn(replies!)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);
+    expect(decorations!.querySelector('.cct-label-button')).toBeNull();
   });
 
   it('le type range le bouton, pas son identifiant', () => {
     const bar = toolbar(resolved({ labels: [{ id: 'merci', kind: 'reply' }, { id: 'done', kind: 'remark' }] }));
-    const zone = bar.querySelector('.cct-reply-zone')!;
-    expect(labelsIn(zone)).toEqual(['thanks', 'ack', 'decision', 'disagree', 'merci']);
-    expect(zone.parentElement!.querySelector(':scope > [data-label="done"]')).not.toBeNull();
+    const [labels, replies] = [...bar.querySelectorAll('.cct-toolbar-row')];
+    expect(labelsIn(replies!)).toEqual(['thanks', 'ack', 'decision', 'disagree', 'merci']);
+    expect(labelsIn(labels!)).toContain('done');
   });
 
-  it('sans label `reply` actif, ni zone ni trait : la rangée est celle d’avant', () => {
+  it('sans label `reply` actif, ni rangée ni trait : la barre est celle d’avant', () => {
     const bar = toolbar(resolved({ labels: ['thanks', 'done', 'ack', 'decision', 'disagree'].map((id) => ({ id, enabled: false })) }));
-    expect(bar.querySelector('.cct-reply-zone')).toBeNull();
-    expect(bar.querySelector('.cct-zone-separator')).toBeNull();
+    expect(bar.querySelectorAll('.cct-toolbar-row')).toHaveLength(2);
+    expect(bar.querySelector('.cct-reply-row')).toBeNull();
   });
 
-  it('la zone passe à la ligne d’un bloc : une seule boîte, sans retour à la ligne entre ses boutons tant qu’elle tient', () => {
-    // Moitié CSS de la règle, lue dans le texte : la zone est UN élément de la rangée, et elle
-    // ne se replie sur elle-même que bornée à la largeur de la rangée.
-    const zone = ruleBody('.cct-reply-zone');
-    expect(zone).toMatch(/display:\s*inline-flex/);
-    expect(zone).toMatch(/max-width:\s*100%/);
-    expect(css).toMatch(/\.cct-zone-separator\[hidden\]\s*\{\s*display:\s*none/);
+  it('sans label `remark` actif, la rangée des réponses n’a pas de trait : il ne séparerait rien', () => {
+    const remarks = defaultConfig().labels.filter((l) => l.kind === 'remark').map((l) => ({ id: l.id, enabled: false }));
+    const bar = toolbar(resolved({ labels: remarks }));
+    expect(labelsIn(bar)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);
+    expect(bar.querySelector('.cct-reply-row')).toBeNull();
+  });
+
+  it('moitié CSS : le trait court sur toute la largeur de la barre', () => {
+    const row = ruleBody('.cct-reply-row');
+    expect(row).toMatch(/border-top:\s*1px solid/);
+    expect(row).toMatch(/align-self:\s*stretch/);
   });
 });

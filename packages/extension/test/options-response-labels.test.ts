@@ -9,7 +9,7 @@ import { copySnippet, responseLabelsSnippet } from '../src/options/response-labe
 import { ui } from '../src/ui/strings.js';
 
 describe('page d’options — le bloc des labels de réponse', () => {
-  it('collé tel quel dans `.conventional-comments.json`, il désactive les quatre labels et rien d’autre', () => {
+  it('collé tel quel dans `.conventional-comments.json`, il désactive tous les labels ajoutés et rien d’autre', () => {
     const repo = { status: 'found' as const, text: responseLabelsSnippet() };
     const { config, notices } = resolveConfig(null, { status: 'absent' }, repo, null, false);
     const active = enabledLabels(config).map((l) => l.id);

@@ -46,7 +46,7 @@ function labelBadge(
   badge.textContent = `${label.icon ?? ''} ${label.id}`.trim();
   if (label.color) badge.style.setProperty('--cct-label-color', label.color);
   // La même infobulle que le bouton de la barre d'outils (§5.5) : le badge est l'endroit où un
-  // lecteur rencontre un label qu'il ne connaît pas — `ack`, `quibble` —, bien plus souvent
+  // lecteur rencontre un label qu'il ne connaît pas — `ack`, `polish` —, bien plus souvent
   // qu'en écrivant. `lang` et `description` entrent dans badgeSignature(), si bien qu'un
   // changement de langue ou de configuration la rafraîchit.
   const tooltip = labelTooltip(lang, label);

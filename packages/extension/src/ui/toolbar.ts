@@ -184,7 +184,6 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   /** Les décorations, sous un DOUBLE trait fin : il sépare les labels — remarques et réponses —
    * des décorations, un cran au-dessus du trait simple qui sépare les deux groupes de labels. */
   const decorationRow = newRow();
-  decorationRow.classList.add('cct-decoration-row');
 
   // Un bouton par label, avec libellé et couleur distincts et SANS son icône (§5.1) — là où le
   // badge d'un commentaire publié la garde (§5.5 ; badges.ts, `labelBadge()`).
@@ -266,6 +265,12 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
   // séparerait rien.
   if (replyRow.childElementCount === 0) replyRow.remove();
   else if (labelRow.childElementCount > 0) replyRow.classList.add('cct-reply-row');
+  // Le double trait sépare des labels de décorations : sans aucun label actif, il ne séparerait
+  // rien, et la rangée des remarques, vide, ne laisserait qu'un espace au-dessus des décorations.
+  if (labelRow.childElementCount === 0) labelRow.remove();
+  if (root.contains(labelRow) || root.contains(replyRow)) {
+    decorationRow.classList.add('cct-decoration-row');
+  }
 
   // Sélecteur de décoration segmenté : « aucune », puis un segment par décoration
   // porteuse de la configuration (§5.1).

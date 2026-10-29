@@ -101,12 +101,26 @@ Rate each finding on its own:
 Write the priority **in the discussion, never in the header line**. It measures severity, not
 whether the finding blocks.
 
+Write it as a badge, exactly in this form:
+
+| Priority | Markdown |
+|---|---|
+| P0 | `![[P0]](https://img.shields.io/badge/P0-red?style=flat)` |
+| P1 | `![[P1]](https://img.shields.io/badge/P1-orange?style=flat)` |
+| P2 | `![[P2]](https://img.shields.io/badge/P2-yellow?style=flat)` |
+| P3 | `![[P3]](https://img.shields.io/badge/P3-lightgrey?style=flat)` |
+
+The text between the outer brackets, `[P1]`, is what a reader sees wherever the image is not
+shown: a plain-text notification, or the badge service being down. Keep it exactly so. Where you
+cannot publish Markdown images, write that text alone.
+
 ```text
 issue (blocking): This state can produce a wrong result.
 
-[P1] When `value` is null, this branch returns a success, against the contract.
+![[P1]](https://img.shields.io/badge/P1-orange?style=flat) When `value` is null, this branch
+returns a success, against the contract.
 
-[P2] No test covers this behaviour.
+![[P2]](https://img.shields.io/badge/P2-yellow?style=flat) No test covers this behaviour.
 ```
 
 Group findings only when they concern exactly the same subject or location.

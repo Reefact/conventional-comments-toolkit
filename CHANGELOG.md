@@ -12,11 +12,19 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
-## [Unreleased]
+## [1.0.0-beta.16] - 2026-10-29
 
 ### Added
 
 - **The settings page shows the extension's version next to its title.** A release candidate such as `1.0.0-beta.15` reads `v1.0.0-beta.15`, taken from the manifest's `version_name`, which is where the release workflow writes the announced version: `version` can only hold digits, so it reads `1.0.0` for every beta. Firefox has no `version_name` and shows `version`. Nothing is shown when the browser gives no manifest.
+
+### Fixed
+
+- **On github.com, the extension finds the merge button of an open pull request again** (§6.5). The button is now a Primer React button (`[data-component="ButtonGroup"] button[data-variant="primary"]` inside `mergebox-partial`) with no `.btn-primary` anywhere, and no candidate matched it, so the greying §6.5 asks for would have had nothing to grey. Measured on the one open pull request among the captured pages. It stays invisible until a verifier publishes a `failure` state, since §6.5 greys the button only then, and none ships yet.
+
+- **The banner no longer counts resolved conversations as unresolved when GitHub renders them collapsed.** A collapsed thread (resolved or outdated) carries `data-resolved="true|false"`, which nothing read: all 28 threads of the captured pages came back `unknown`, and the local fallback counted them unresolved, including two resolved `issue (blocking)` threads. The value is now read, and it matches the Files changed view of the same pull request.
+
+- **The selector journal on the settings page lists only searches that failed for a reason** (§9.4). Three entries on a merged pull request were not selector failures: the merge button is absent from a merged, closed or draft pull request, and a collapsed thread has no body or author until it is expanded. They are no longer logged. If the probe that recognises a merged, closed or draft pull request stops matching, the absence is logged again, which is noise and never silence.
 
 ## [1.0.0-beta.15] - 2026-10-29
 
@@ -683,7 +691,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
-[Unreleased]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.15...HEAD
+[1.0.0-beta.16]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.15...v1.0.0-beta.16
 [1.0.0-beta.15]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.14...v1.0.0-beta.15
 [1.0.0-beta.14]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.13...v1.0.0-beta.14
 [1.0.0-beta.13]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.12...v1.0.0-beta.13

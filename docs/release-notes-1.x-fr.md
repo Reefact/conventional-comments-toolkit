@@ -8,6 +8,22 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
 navigateur des personnes ayant installé l'extension.
 
+## 1.0.0-beta.16 — 29 octobre 2026
+
+_La page de réglages dit quelle version tourne, et l'adaptateur GitHub lit de nouveau correctement le bouton de fusion et les conversations résolues d'une PR._
+
+### ✨ Nouveautés
+
+- **La page de réglages affiche la version de l'extension à côté de son titre.** Une version de test se lit `v1.0.0-beta.16`, là où `chrome://extensions` affiche `1.0.0` pour toutes les bêtas : vous savez quelle build tourne avant de signaler un problème. Firefox affiche son propre numéro de version.
+
+### 🐛 Corrections
+
+- **Le bandeau ne compte plus les conversations résolues comme non résolues.** Sur une PR dont GitHub replie les conversations résolues, le bandeau les rangeait parmi les non résolues, fils `issue (blocking)` compris. Il s'accorde maintenant avec la vue « Files changed » de la même PR.
+
+- **L'extension retrouve le bouton de fusion d'une PR ouverte sur github.com.** GitHub a changé la construction du bouton et l'extension ne le reconnaissait plus. Rien ne change encore à l'écran : l'extension ne grise le bouton que lorsqu'un vérificateur publie un état en échec, et aucun n'est livré.
+
+- **La page de réglages ne signale plus de problèmes de sélecteurs qui n'en étaient pas.** Sa section État listait des recherches qui échouaient faute de rien à trouver, comme le bouton de fusion d'une PR déjà fusionnée. Elles ne sont plus consignées.
+
 ## 1.0.0-beta.15 — 29 octobre 2026
 
 _Le badge d'un label dit désormais au lecteur ce que signifie un commentaire, et son bouton dit au rédacteur quand l'employer._

@@ -125,7 +125,7 @@ describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
     const [labels, replies, decorations] = [...bar.querySelectorAll('.cct-toolbar-row')];
     expect(replies!.classList.contains('cct-reply-row')).toBe(true);
     expect(labelsIn(labels!)).toEqual([
-      'praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'quibble',
+      'praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish',
       'reviewed',
     ]);
     expect(labelsIn(replies!)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);

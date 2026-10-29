@@ -11,10 +11,12 @@ const found = (o: object): ConfigRead => ({ status: 'found', text: JSON.stringif
 const foundText = (t: string): ConfigRead => ({ status: 'found', text: t });
 
 describe('§8.2 — valeurs par défaut du produit', () => {
-  it('dix-huit labels, tous actifs — Conventional Comments, `decision` et les labels ajoutés — et les décorations du §3.3', () => {
+  it('dix-huit labels livrés, tous actifs sauf `quibble` — Conventional Comments, `decision` et les labels ajoutés — et les décorations du §3.3', () => {
     const c = defaultConfig();
     expect(c.labels).toHaveLength(18);
-    expect(c.labels.filter((l) => !l.enabled)).toEqual([]);
+    // `quibble` est livré, pour rester fidèle à la liste de l'amont, mais désactivé : l'amont le
+    // définit lui-même comme un `nitpick` sous un autre nom (§3.2).
+    expect(c.labels.filter((l) => !l.enabled).map((l) => l.id)).toEqual(['quibble']);
     // L'ordre de la liste est l'ordre par défaut des boutons (§5.1) : la zone `reply` va du plus
     // conciliant au plus tranché. `reviewed` est ajouté mais n'ouvre ni ne répond à aucun point
     // précis : il est `remark`. `decision` répond à un point : il est `reply`.

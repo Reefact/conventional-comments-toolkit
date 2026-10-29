@@ -34,17 +34,18 @@ describe('CA-41 — labels ajoutés désactivés par un dépôt : eux seuls disp
   it("l'empreinte par défaut est la valeur LITTÉRALE, et elle a quitté celle d'avant la famille (§9.2.2)", () => {
     // Le garde du §9.2.2 : un changement de défaut qui n'aurait pas été décidé déplace cette
     // valeur. Le déplacement depuis `becd76df` EST décidé — avec les défauts, `done:` est un
-    // label ici et un mot inconnu pour un `core/` antérieur.
-    expect(fingerprint(defaultConfig())).toBe('c2245ec0');
-    expect(fingerprint(resolveConfig(null, absent, absent, null, false).config)).toBe('c2245ec0');
+    // label ici et un mot inconnu pour un `core/` antérieur —, et le second aussi : `c2245ec0`,
+    // la valeur de 1.0.0-beta.13, a bougé quand `quibble` a été livré désactivé (§3.2).
+    expect(fingerprint(defaultConfig())).toBe('c14b4d01');
+    expect(fingerprint(resolveConfig(null, absent, absent, null, false).config)).toBe('c14b4d01');
   });
 
-  it('désactivés par un dépôt, les labels ajoutés mesurent `0c89180f` — leurs entrées restent projetées', () => {
-    expect(fingerprint(repo(OFF).config)).toBe('0c89180f');
+  it('désactivés par un dépôt, les labels ajoutés mesurent `40672114` — leurs entrées restent projetées', () => {
+    expect(fingerprint(repo(OFF).config)).toBe('40672114');
   });
 
-  it('tous actifs par défaut ; désactiver les labels ajoutés ne retire qu’eux', () => {
-    const cc = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'quibble'];
+  it('tous actifs par défaut sauf `quibble` ; désactiver les labels ajoutés ne retire qu’eux', () => {
+    const cc = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish'];
     expect(enabledLabels(defaultConfig()).map((l) => l.id)).toEqual([...cc, 'reviewed', 'thanks', 'done', 'ack', 'decision', 'disagree']);
     expect(enabledLabels(repo(OFF).config).map((l) => l.id)).toEqual([...cc, 'decision']);
     for (const l of defaultConfig().labels) {
@@ -61,7 +62,7 @@ describe('CA-41 — labels ajoutés désactivés par un dépôt : eux seuls disp
   it('contre-épreuve : aucune entrée de `labels` n’est omise de la projection', () => {
     // La règle d'omission retirée (§9.2.2) aurait effacé ici une différence qui change les
     // verdicts : `done:` reconnu d'un côté, inconnu de l'autre.
-    expect(fingerprint(repo({ labels: [{ id: 'done', enabled: false }] }).config)).not.toBe('c2245ec0');
+    expect(fingerprint(repo({ labels: [{ id: 'done', enabled: false }] }).config)).not.toBe('c14b4d01');
     expect(fingerprint(repo({ labels: [{ id: 'done', enabled: false }] }).config)).not.toBe('becd76df');
   });
 

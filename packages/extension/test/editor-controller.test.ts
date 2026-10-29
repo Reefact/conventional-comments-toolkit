@@ -108,7 +108,7 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.attach();
     const toolbar = host.querySelector('.cct-toolbar');
     expect(toolbar).not.toBeNull();
-    expect(toolbar!.querySelectorAll('.cct-label-button')).toHaveLength(18); // tous les labels livrés sont actifs
+    expect(toolbar!.querySelectorAll('.cct-label-button')).toHaveLength(17); // tous les labels livrés sont actifs, sauf `quibble` (§3.2)
     controller.dispose();
   });
 

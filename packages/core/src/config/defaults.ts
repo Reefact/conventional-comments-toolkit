@@ -96,11 +96,14 @@ export function defaultConfig(): EffectiveConfig {
       label('thought', '\u{1F4AD}', '#9368E3', false, true),
       label('chore', '\u{1F9F9}', '#A97735', true, false),
       label('note', '\u{1F4DD}', '#1F8E96', false, true),
-      // `typo`, `polish`, `quibble` : de Conventional Comments, longtemps livrés désactivés,
-      // actifs comme tous les autres (§3.2) — une équipe désactive ceux qu'elle ne veut pas.
+      // `typo`, `polish`, `quibble` : de Conventional Comments. Les deux premiers sont actifs
+      // comme tous les autres (§3.2). `quibble` est LIVRÉ — on reste fidèle à la liste de
+      // l'amont — mais désactivé : conventionalcomments.org le définit lui-même comme un
+      // `nitpick` sous un autre nom, et deux boutons pour un même sens ne laissent qu'un choix
+      // arbitraire. Un dépôt qui y tient l'active d'une entrée.
       label('typo', '\u{1F524}', '#CC549C', false, false),
       label('polish', '\u{2728}', '#0C8E9A', false, false),
-      label('quibble', '\u{1FAB6}', '#61896C', false, false),
+      label('quibble', '\u{1FAB6}', '#61896C', false, false, false),
       // Labels ajoutés (§3.2) — une extension propre à cette boîte à outils, absente de
       // Conventional Comments (§3.1), livrée activée ; un dépôt qui veut s'en tenir à la liste de
       // l'amont les désactive. L'ordre de cette liste EST l'ordre par défaut des boutons (§5.1) :

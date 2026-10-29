@@ -14,7 +14,7 @@ const resolved = (doc: object): EffectiveConfig =>
   resolveConfig(null, { status: 'absent' }, { status: 'found', text: JSON.stringify(doc) }, null, false).config;
 const ids = (zone: { id: string }[]) => zone.map((l) => l.id);
 
-const REMARK = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'quibble', 'reviewed'];
+const REMARK = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'reviewed'];
 const REPLY = ['thanks', 'done', 'ack', 'decision', 'disagree'];
 
 describe('CA-50 — ordre des boutons', () => {
@@ -32,7 +32,7 @@ describe('CA-50 — ordre des boutons', () => {
 
   it('la liste passe en tête de CHAQUE zone, le reste suit dans l’ordre par défaut', () => {
     const zones = labelsByZone(defaultConfig(), parseLabelOrder('suggestion,nitpick,disagree,praise,ack').order);
-    expect(ids(zones.remark)).toEqual(['suggestion', 'nitpick', 'praise', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'quibble', 'reviewed']);
+    expect(ids(zones.remark)).toEqual(['suggestion', 'nitpick', 'praise', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'reviewed']);
     expect(ids(zones.reply)).toEqual(['disagree', 'ack', 'thanks', 'done', 'decision']);
   });
 

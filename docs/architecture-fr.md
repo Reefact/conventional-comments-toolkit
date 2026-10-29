@@ -59,9 +59,9 @@ jamais (§9.2.4).
 
 ## Ce que `core/` attend d'un vérificateur (§6.4, §9.2.4)
 
-Le composant B n'est plus dans l'arbre, mais le contrat qu'il doit honorer, si : c'est lui
-que `packages/core/` expose, et il tient en une phrase — **le verdict est une fonction pure
-de l'état courant de la PR**.
+Le composant B n'est plus dans l'arbre, mais `packages/core/` expose déjà le contrat que le
+futur vérificateur devra respecter : **le verdict est une fonction pure de l'état courant de
+la PR**.
 
 - `resolveConfig(plancher, organisation, dépôt)` est pure et relit tout à chaque appel. Un
   seul des deux composants met ces lectures en cache, et c'est l'extension.

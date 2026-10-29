@@ -8,12 +8,17 @@ partie d'aucune convention du chantier.
 
 ## En une phrase
 
-Le **code** de toute la spécification est écrit, testé (1 159 tests automatisés) et vérifié
-par plusieurs revues contradictoires. Ce qui **manque** n'est pas du code non écrit, mais
-des étapes humaines : essayer l'extension en vrai, poser les deux fichiers de workflow sur
-un dépôt pilote, et mener une phase de mesure (P0) qui ne peut se faire qu'avant tout
-déploiement. **Il n'y a plus rien à héberger** — et, pour l'instant, plus rien qui bloque
-une PR non plus : le compagnon serveur est retiré, son remplacement reste à écrire.
+**L'extension est écrite, testée (1 184 tests automatisés) et passée par plusieurs revues
+contradictoires. Le vérificateur, lui, n'existe pas.** Le compagnon serveur a été retiré —
+il demandait un hébergement et un stockage que le §6.4 ne veut plus, et personne ne l'avait
+jamais déployé —, et son remplacement reste à écrire (#56).
+
+Ce qui manque est donc de deux natures, qu'il vaut mieux ne pas confondre :
+
+- **du code**, et un seul morceau : le vérificateur, sans lequel aucune PR n'est bloquée —
+  ce qui était déjà le cas en pratique ;
+- **des étapes humaines** : essayer l'extension en vrai, et mener la phase de mesure (P0)
+  qui ne peut se faire qu'avant tout déploiement.
 
 ## 1. Deux composants, deux niveaux de préparation très différents
 

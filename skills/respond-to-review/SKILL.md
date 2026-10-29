@@ -31,6 +31,19 @@ Follow https://conventionalcomments.org/ and the extensions of the Conventional 
 root, if it exists. A reply label it disables does not exist for this repository: answer with
 what it leaves enabled, or in plain text where replies need no label.
 
+**That file is not the whole configuration.** The labels in force come from three levels, merged
+in this order: the toolkit's defaults, then the **organisation's configuration**, then the
+repository's file, each overriding the previous one label by label; an **enterprise floor** can
+then force some labels on. The organisation's configuration and the floor reach the extension
+through the browser's enterprise policy, so you usually cannot see them. Therefore:
+
+- if the person you work for gives you the organisation's configuration, apply it before the
+  repository's file;
+- otherwise, use only labels you can confirm: those the repository's file declares or enables, and
+  the toolkit's defaults it does not disable — never one the file disables. Do not guess an
+  organisation's custom labels;
+- say in your report that the organisation's configuration was not visible to you, if it was not.
+
 Every reply starts with:
 
 `<label>: <subject>`

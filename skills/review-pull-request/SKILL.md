@@ -14,6 +14,20 @@ as long as a problem remains.
 You never approve a pull request, never merge it and never change its code. Approval and merge
 are human decisions; your review informs them.
 
+## 0. Language
+
+**Write every comment in the language the repository requires.** Look for it before posting:
+`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, or any other contribution guide the repository keeps.
+A rule there wins over everything else — including the language of the pull request, of the
+person who asked for the review, and of this skill. Without such a rule, write in the language of
+the pull request's title and description.
+
+Only the prose follows that language. Labels, decorations and identifiers (`issue`, `(blocking)`,
+`reviewed`, a function name) are never translated.
+
+When the repository sets a language for pull request titles and descriptions, a title or
+description in another language is a defect to report (section 3).
+
 ## 1. Conventional Comments
 
 Follow https://conventionalcomments.org/ and the extensions of the Conventional Comments Toolkit
@@ -87,7 +101,8 @@ Group findings only when they concern exactly the same subject or location.
 
 ## 3. Pull request title and description
 
-**Always start with the title and the description.** Check spelling, grammar, fluency, idiom,
+**Always start with the title and the description.** Check that they are written in the language
+the repository requires (section 0), then spelling, grammar, fluency, idiom,
 technical accuracy and consistent terminology. Detect literal translations, even grammatically
 acceptable ones.
 
@@ -176,11 +191,18 @@ Before posting it, check that:
 
 Otherwise, post what is needed **without `reviewed`**, and carry on at the next pass.
 
-When every condition holds, post a general comment:
+When every condition holds, post a general comment starting with `reviewed:`. **Write its
+subject yourself, for this pull request**: a short, natural sentence in the repository's
+language, saying what you are closing on — not a fixed formula repeated on every pull request.
+It may name what you checked last, or what the final fixes settled. For example:
 
 ```text
-reviewed: Review complete, no remaining problem identified.
+reviewed: fixes verified, the null case is now covered by a test
+reviewed: nothing left on my side, the new parser reads well
+reviewed: last pass on the migration is clean, all threads settled
 ```
+
+Never copy one of these examples as is, and never let the sentence claim more than you checked.
 
 `reviewed` covers only the state of the pull request you examined. Any later change reopens your
 review: examine the new changes, and post a new `reviewed` only once every closing condition

@@ -9,6 +9,19 @@ You are the author of the pull request: you wrote its code, and you are answerin
 Every comment a reviewer posts gets an answer, in its own thread, and the answer says what you
 did about it.
 
+## 0. Language
+
+**Write every reply in the language the repository requires.** Look for it before posting:
+`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, or any other contribution guide the repository keeps.
+A rule there wins over everything else — including the language the reviewer wrote in, and the
+language of this skill. Without such a rule, answer in the language of the comment you reply to.
+
+The same rule applies to everything else you write on the pull request: its title, its
+description, and your commit messages, which a repository often constrains separately.
+
+Only the prose follows that language. Labels and identifiers (`done`, `disagree`, a function
+name) are never translated.
+
 ## 1. Conventional Comments
 
 Follow https://conventionalcomments.org/ and the extensions of the Conventional Comments Toolkit

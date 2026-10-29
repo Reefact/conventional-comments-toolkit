@@ -8,6 +8,14 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
 extension installed.
 
+## 1.0.0-beta.17 — October 29, 2026
+
+_Two fields of the settings page no longer show up white in the dark theme._
+
+### 🐛 Bug fixes
+
+- **The "Button order" field and the configuration block of the added labels now follow the dark theme.** Both stayed white on a dark settings page, which made them hard to read and out of place next to the other fields. They now look like the rest of the page.
+
 ## 1.0.0-beta.16 — October 29, 2026
 
 _The settings page tells you which version you are running, and the GitHub adapter reads a pull request's merge button and resolved conversations correctly again._

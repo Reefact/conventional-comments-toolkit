@@ -392,12 +392,19 @@ const en: Record<string, string> = {
   'options.tour.replay.title': 'Replay the guided tour',
 };
 
-/** Infobulle d'un label : définition, puis exemple quand le catalogue en porte un (§5.1, §5.5).
- * `null` pour un label qu'aucun catalogue ne décrit — un label créé par une organisation ou un
- * dépôt n'a pas de description (`labels[]` n'en déclare pas) : sans ce garde, `ui()` rendait la
- * CLÉ elle-même, et l'infobulle d'un label `risk` affichait « label.risk ». Partagée par la barre
- * d'outils et les badges, pour que les deux disent la même chose du même label. */
-export function labelTooltip(lang: string, id: string): string | null {
+/** Infobulle d'un label (§5.1, §5.5), partagée par la barre d'outils et les badges pour que les
+ * deux disent la même chose du même label.
+ *
+ * - `description` écrite par la configuration (§8.2) : elle EST l'infobulle, sans l'exemple du
+ *   catalogue, qui illustrait une définition qu'elle vient de remplacer. Vide, aucune infobulle :
+ *   c'est ce que l'équipe a écrit.
+ * - absente : la définition du catalogue, puis son exemple quand il en porte un ;
+ * - absente, et aucun catalogue ne décrit le label (un label créé par une organisation ou un
+ *   dépôt) : `null`. Sans ce garde, `ui()` rendait la CLÉ elle-même, et l'infobulle d'un label
+ *   `risk` affichait « label.risk ». */
+export function labelTooltip(lang: string, label: { id: string; description?: string }): string | null {
+  if (label.description !== undefined) return label.description === '' ? null : label.description;
+  const id = label.id;
   const key = `label.${id}`;
   const description = ui(lang, key);
   if (description === key) return null;

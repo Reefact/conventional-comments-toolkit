@@ -193,6 +193,11 @@ export interface LabelConfig {
   kind: LabelKind;
   icon?: string;
   color?: string;
+  /** Définition affichée en infobulle sur le bouton et le badge (§5.1, §5.5, §8.2). Absente,
+   * l'interface rend celle de son catalogue, s'il en a une ; écrite, elle la REMPLACE, et une
+   * chaîne vide retire toute infobulle. Ne change aucun verdict, et n'entre donc pas dans
+   * l'empreinte (§9.2.2). */
+  description?: string;
   aliases: string[];
 }
 

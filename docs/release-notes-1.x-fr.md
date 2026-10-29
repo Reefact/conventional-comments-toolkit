@@ -4,14 +4,23 @@ Ce qui change pour vous, version après version. Pour le relevé complet — cha
 cas limite, chaque section de la spécification sur laquelle une entrée s'appuie — voir
 [CHANGELOG.md](https://github.com/Reefact/conventional-comments-toolkit/blob/main/CHANGELOG.md).
 
-L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. La
-source de vérité sur la conformité reste le compagnon serveur (composant B).
+L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. Aucun
+vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
+navigateur de qui a installé l'extension.
 
-## 1.0.0-beta.13 — 8 septembre 2026
+## 1.0.0-beta.13 — 29 octobre 2026
 
-_Le journal de la section « État » dit désormais sur quelle page chaque sélecteur a échoué, et s'efface d'un clic pour refaire une mesure propre._
+_Des labels pour répondre à une revue, tous les labels livrés activés par défaut, la zone de commentaire de GitHub de nouveau reconnue sur ses pages actuelles — et le compagnon serveur retiré, sans vérificateur pour le remplacer à ce jour._
 
 ### ✨ Nouveautés
+
+- **Des labels pour répondre à une revue.** `thanks`, `done`, `ack` et `disagree` répondent à un point ; `reviewed` clôt votre propre revue et n'approuve rien. Ils sont un ajout de l'outil, pas de Conventional Comments, et ne bloquent jamais. `fixed` est accepté pour `done`, `acknowledged` pour `ack` et `thx` pour `thanks` ; `?thx` se déplie en `thanks: ` et `?r` en `reviewed: `. Ils ne rendent pas le label obligatoire dans les réponses. Un dépôt qui veut s'en tenir à Conventional Comments les désactive chacun par une entrée `labels[]` : la page d'options affiche ce bloc et le copie pour vous.
+
+- **La barre d'outils met les réponses sur une ligne à part.** Les labels qui soulèvent un point viennent d'abord ; sous un trait fin suivent ceux qui y répondent — `thanks`, `done`, `ack`, `decision`, `disagree`, du plus chaleureux au plus ferme. Un double trait fin sépare les labels des décorations.
+
+- **Vous choisissez l'ordre des boutons de labels.** « Ordre des boutons », dans les options, prend une liste séparée par des virgules : les labels cités passent en tête, les autres suivent dans l'ordre par défaut, et la liste de complétion suit le même ordre. C'est une préférence personnelle.
+
+- **Un label peut dire s'il soulève un point ou y répond**, avec `labels[].kind` (`"remark"` ou `"reply"`). Un label que vous déclarez est `"remark"` sauf mention contraire. Cela ne change aucun verdict.
 
 - **Chaque ligne du journal dit de quelle page elle vient.** Il indiquait quel sélecteur avait échoué et quand, jamais où : devant quatre lignes horodatées à la même seconde, rien ne permettait de savoir si elles venaient d'une seule page ou de quatre. Chaque ligne commence désormais par une marque de six caractères — même marque, même page — ; un clic ouvre l'adresse exacte relevée dans un nouvel onglet. Cette adresse reste sur votre appareil : lorsque vous l'avez autorisée, la télémétrie ne transmet toujours que le nom du sélecteur. La mise à jour conserve toutefois les lignes déjà présentes : comme leur adresse n'était pas enregistrée, elles affichent une marque neutre jusqu'à ce que le sélecteur correspondant échoue de nouveau ou que vous effaciez le journal.
 
@@ -19,7 +28,31 @@ _Le journal de la section « État » dit désormais sur quelle page chaque sél
 
 - **La page d'options porte l'icône de l'extension**, devant son titre. Le bouton de la visite guidée s'appelle désormais « Visite guidée », son intitulé complet passant en infobulle.
 
+### 🔧 Changements
+
+- **Tous les labels livrés par l'outil sont activés par défaut**, `typo`, `polish` et `quibble` de Conventional Comments compris. Un dépôt désactive ceux dont il ne veut pas.
+
+- **Si votre configuration définit déjà `thanks`, `done`, `ack`, `disagree` ou `reviewed`, il lui faut une propriété pour fonctionner comme avant.** Votre label fusionne désormais avec celui de l'outil et devient toujours non bloquant, si bien que `done (blocking):` est refusé. Ajoutez `"alwaysNonBlocking": false` pour le rétablir.
+
+- **Nouvelles icônes :** `praise` devient 👏, `decision` ⚖️, et 🎉 passe à `reviewed`.
+
+- **Le contrôle renvoie par défaut à la page des labels de l'outil**, https://conventionalcomments.io/docs/labels/, au lieu de conventionalcomments.org, qui ne documente aucun des labels ajoutés. Un `docUrl` que vous avez fixé est conservé.
+
+- **Deux labels actifs ne peuvent plus porter le même nom.** Un alias qui reprend le nom d'un autre label actif est retiré, et ce retrait est signalé. Auparavant, l'ordre de la liste des labels décidait duquel parlait un commentaire.
+
+- **Un plancher d'entreprise ne rend plus `decision` bloquant.** Le citer sous `labels.minimum` le forçait bloquant : un simple `decision:` ouvrait un fil bloquant, tandis que `decision (blocking):` était refusé. Le plancher ne fait plus que le garder activé.
+
+- **Une abréviation livrée ne se déplie plus que vers un label activé.** `?ty`, `?po` et `?qui` inséraient le préfixe d'un label désactivé, que la validation refusait ensuite. Une abréviation définie par votre dépôt n'est pas concernée.
+
+- **Sur Azure DevOps, le préfixe du label n'est plus masqué ni le sujet mis en valeur.** Personne n'a encore mesuré comment Azure DevOps rend le corps d'un commentaire, et l'extension a cessé de supposer qu'il le rend comme GitHub. Les badges restent, et le corps s'affiche entier.
+
+- **Le compagnon serveur est retiré, et aucun vérificateur n'est livré à sa place.** Il n'a jamais été déployé. La spécification demande désormais un vérificateur qui s'exécute dans la plateforme et ne garde aucun état, et [l'issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56) suit sa construction pour GitHub. D'ici là, rien ne vérifie les commentaires après coup et aucun statut n'est publié : `enforce` bloque toujours un envoi dans l'extension, ce que contourne quiconque ne l'a pas. Les blocs de configuration `server` et `exemptionLog` sont désormais ignorés, avec un avertissement.
+
 ### 🐛 Corrections
+
+- **La vue « Files changed » de GitHub est de nouveau reconnue.** Sur les pages telles que github.com les sert aujourd'hui, l'extension ne trouvait aucun bouton de publication, si bien qu'en mode `enforce` un commentaire non conforme pouvait y être publié quand même. Elle prenait aussi la modification d'un commentaire pour l'écriture d'un nouveau, traitait le résumé de revue comme un commentaire de ligne pouvant bloquer la pull request, et n'affichait aucun badge sur les fils. Sur l'onglet « Conversation », modifier un commentaire publié était aussi traité comme un commentaire de ligne pouvant bloquer. « Cancel » n'est toujours jamais intercepté.
+
+- **GitHub : la date de création de la pull request est lue sur la pull request elle-même.** Cette date décide si une pull request est antérieure à `activatedAt`, donc si l'extension peut bloquer dessus. C'était la première date de la page — sur une pull request fusionnée, la date de fusion, si bien que la même pull request pouvait afficher deux dates selon l'onglet. Quand la date ne peut pas être lue, l'extension ne bloque pas.
 
 - **La politique de confidentialité décrivait un historique que l'extension ne garde pas.** Elle annonçait « les 50 dernières fois » où un élément n'a pas été reconnu, alors que le journal ne conserve qu'une ligne par règle de sélection — cinquante au plus, chacune avec son dernier relevé. Elle décrit maintenant ce qui est réellement conservé, adresse de la page comprise.
 

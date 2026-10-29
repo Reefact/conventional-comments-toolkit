@@ -12,7 +12,74 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
-## [Unreleased]
+## [1.0.0-beta.13] - 2026-10-29
+
+### Added
+
+- **Four response labels, `thanks`, `done`, `ack`, `disagree`, and a `reviewed` label** (§3.2).
+  Conventional Comments has a vocabulary for review feedback and none for replying to it.
+  These labels are the toolkit's own addition, not part of Conventional Comments, and ship
+  **enabled**: a repository that wants to stick to Conventional Comments disables them with one
+  `labels[]` entry each. `reviewed` closes your own review — the label people reached for when
+  they wrote `praise: review done` — and approves nothing; it answers no point, so it is not a
+  response label. `thanks` says thank you without taking a position, where a plain "thanks!"
+  reply used to need `note:`; `thx` is accepted for it, and `?thx` expands to it. `fixed` is accepted for `done`, `acknowledged`
+  for `ack`. They are ordinary labels — same parser, same diagnostics, never blocking — and
+  they do not make replies require a label, which remains `scope.validateReplies`. `?r` expands
+  to `reviewed: `. See the README for the configuration and the upgrade note.
+- **The toolbar puts the response labels on a line of their own** (§5.1). Labels that raise a
+  point come first, `reviewed` among them; then, under a thin horizontal rule, the labels that
+  answer one — `thanks`, `done`, `ack`, `decision`, `disagree`, from the warmest to the firmest.
+  `decision` now counts as a reply, since it answers a point. The replies keep the same place
+  at every width. A thin double rule separates the labels from the decorations.
+- **A label can say which group it belongs to: `labels[].kind`** (§3.2, §8.2). `"remark"` raises
+  a point, `"reply"` does not. A label you declare is `"remark"` unless you say otherwise.
+  It changes no verdict.
+- **You can choose the order of the label buttons** (§5.1, §5.2). *Button order*, in the
+  options, takes a comma-separated list; the labels you list come first in their own group, the
+  others follow in the default order, which is conventionalcomments.org's. The completion list
+  follows the same order. It is a personal preference and applies to the next comment box.
+- **The options page presents the added labels and copies the block that disables them**
+  (§8.2). The page cannot disable them, since the configuration lives in the repository, so it
+  shows the block to paste into `.conventional-comments.json` and copies it to the clipboard.
+  If the clipboard refuses, the block is selected for a manual copy, and the page says so
+  rather than claiming it copied.
+
+- Three guards, because none of the above was visible to any test. `check:platform-isolation`
+  refuses a platform identifier in code every platform runs, and also enforces §9.4's "a single
+  file per adapter": it derives both the forbidden vocabulary and that count from the adapters'
+  own candidate arrays rather than from a list of names — a GitLab adapter will be covered
+  without touching it, and the central file's name is free. `check:style-isolation` measures the
+  stylesheet split in a real Chromium: no regression off GitHub, a value injected into the
+  GitHub layer reaching pages that carry the platform marker and none that do not, and every
+  rule bearing a token reached by an element the fixture really styles. `check:extension-css`
+  now covers every delivered sheet instead of one hardcoded path.
+
+- **The isolation guard now covers the stylesheets too, not only the TypeScript.** It walked
+  `.ts` files alone, so putting a Primer token back into the sheet every platform receives left
+  every guard green — measured by doing it, not deduced. The other two could not catch it:
+  `check:github-theme-vars` reads only GitHub's own sheet, and the permanent invariants of
+  `check:style-isolation` compare the shared sheet to itself, which measures scoping rather than
+  where a token came from. The criterion is unchanged, only applied in the other language: a
+  variable that is not `--cct-*` and appears in a platform sheet belongs to that platform. Its
+  corollary is enforced too, since moving a value out of the shared sheet can only be safe if
+  someone else supplies it: `var(--cct-x)` without a fallback is a question put to the platform,
+  `var(--cct-x, …)` a value the shared sheet is willing to supply itself, and every platform
+  sheet must answer every question of the first kind. Left unanswered, the declaration turns
+  invalid and the property falls back to its initial value — a layout loss nothing reports.
+
+- **A named composer chrome that matches nothing is now recorded, instead of passing silently.**
+  Where the adapter names the container it decorates and no longer finds it, that failure joins
+  the selector log the extension already keeps (§9.4, `CA-11`); where a surface names none — the
+  legacy generation, the changed-files view — nothing is logged, since finding no name there is
+  the normal case. The log says what was looked for and not found, and stops there: a selector
+  that matches nothing is not by itself evidence that the platform changed anything.
+
+- **Every line of the selector journal says which page its degradation came from** (§9.4). The journal recorded which selector chain failed and when, never where: four lines stamped within the same second gave no way to tell one page from four. Each entry now carries the page address, read at the moment of the degradation rather than at injection — GitHub navigates in place, so the URL a content script saw when it loaded is not the page the chain failed on, and a chain is re-reported when the tab changes pull request. The options page renders that address as a six-character mark computed on the normalised page — origin, path, and the query parameters that name a view — so `?diff=split` and `#discussion_r1` do not turn one page into three, while Azure DevOps's `?_a=files` and `?_a=overview` stay two: same mark, same page. The mark links to the exact address recorded, fragment included, and opens it in a new tab. That address stays on the device: telemetry still carries only the chain's name (§10). Entries written before this version have no address — an upgrade keeps the journal — and render as a neutral mark of the same width, saying so on hover, until their chain is reported again or the journal is cleared: an address cannot be invented for a degradation observed before it was recorded.
+
+- **The journal can be emptied from the options page, and open tabs start measuring again** (§9.4). It had no way to be cleared, and its entries survived reloads and tabs. Clearing also tells the content scripts to forget which chains they have already reported: a chain is reported once per tab, so without that, reproducing a failure on the very page where it had just been seen wrote nothing. The section follows the storage now instead of reading it once at load, so what a tab records appears without reloading the screen.
+
+- **The options page carries the extension's icon before its title**, at the height of the title and its subtitle together. The guided tour's button reads *Guided tour*, with *Replay the guided tour* as its tooltip, and sits slightly lighter than the page's other buttons — at that icon size the header would otherwise no longer fit on one line.
 
 ### Changed
 
@@ -118,66 +185,9 @@ and what a reader needs from them is the behaviour, not the thirteen.
   and the body renders whole: an incomplete rendering gets fixed, a wrong one gets noticed later.
   Reinstating both takes one measurement on a real tenant, recorded as an open task.
 
-### Added
+### Removed
 
-- **Four response labels, `thanks`, `done`, `ack`, `disagree`, and a `reviewed` label** (§3.2).
-  Conventional Comments has a vocabulary for review feedback and none for replying to it.
-  These labels are the toolkit's own addition, not part of Conventional Comments, and ship
-  **enabled**: a repository that wants to stick to Conventional Comments disables them with one
-  `labels[]` entry each. `reviewed` closes your own review — the label people reached for when
-  they wrote `praise: review done` — and approves nothing; it answers no point, so it is not a
-  response label. `thanks` says thank you without taking a position, where a plain "thanks!"
-  reply used to need `note:`; `thx` is accepted for it, and `?thx` expands to it. `fixed` is accepted for `done`, `acknowledged`
-  for `ack`. They are ordinary labels — same parser, same diagnostics, never blocking — and
-  they do not make replies require a label, which remains `scope.validateReplies`. `?r` expands
-  to `reviewed: `. See the README for the configuration and the upgrade note.
-- **The toolbar puts the response labels on a line of their own** (§5.1). Labels that raise a
-  point come first, `reviewed` among them; then, under a thin horizontal rule, the labels that
-  answer one — `thanks`, `done`, `ack`, `decision`, `disagree`, from the warmest to the firmest.
-  `decision` now counts as a reply, since it answers a point. The replies keep the same place
-  at every width. A thin double rule separates the labels from the decorations.
-- **A label can say which group it belongs to: `labels[].kind`** (§3.2, §8.2). `"remark"` raises
-  a point, `"reply"` does not. A label you declare is `"remark"` unless you say otherwise.
-  It changes no verdict.
-- **You can choose the order of the label buttons** (§5.1, §5.2). *Button order*, in the
-  options, takes a comma-separated list; the labels you list come first in their own group, the
-  others follow in the default order, which is conventionalcomments.org's. The completion list
-  follows the same order. It is a personal preference and applies to the next comment box.
-- **The options page presents the added labels and copies the block that disables them**
-  (§8.2). The page cannot disable them, since the configuration lives in the repository, so it
-  shows the block to paste into `.conventional-comments.json` and copies it to the clipboard.
-  If the clipboard refuses, the block is selected for a manual copy, and the page says so
-  rather than claiming it copied.
-
-- Three guards, because none of the above was visible to any test. `check:platform-isolation`
-  refuses a platform identifier in code every platform runs, and also enforces §9.4's "a single
-  file per adapter": it derives both the forbidden vocabulary and that count from the adapters'
-  own candidate arrays rather than from a list of names — a GitLab adapter will be covered
-  without touching it, and the central file's name is free. `check:style-isolation` measures the
-  stylesheet split in a real Chromium: no regression off GitHub, a value injected into the
-  GitHub layer reaching pages that carry the platform marker and none that do not, and every
-  rule bearing a token reached by an element the fixture really styles. `check:extension-css`
-  now covers every delivered sheet instead of one hardcoded path.
-
-- **The isolation guard now covers the stylesheets too, not only the TypeScript.** It walked
-  `.ts` files alone, so putting a Primer token back into the sheet every platform receives left
-  every guard green — measured by doing it, not deduced. The other two could not catch it:
-  `check:github-theme-vars` reads only GitHub's own sheet, and the permanent invariants of
-  `check:style-isolation` compare the shared sheet to itself, which measures scoping rather than
-  where a token came from. The criterion is unchanged, only applied in the other language: a
-  variable that is not `--cct-*` and appears in a platform sheet belongs to that platform. Its
-  corollary is enforced too, since moving a value out of the shared sheet can only be safe if
-  someone else supplies it: `var(--cct-x)` without a fallback is a question put to the platform,
-  `var(--cct-x, …)` a value the shared sheet is willing to supply itself, and every platform
-  sheet must answer every question of the first kind. Left unanswered, the declaration turns
-  invalid and the property falls back to its initial value — a layout loss nothing reports.
-
-- **A named composer chrome that matches nothing is now recorded, instead of passing silently.**
-  Where the adapter names the container it decorates and no longer finds it, that failure joins
-  the selector log the extension already keeps (§9.4, `CA-11`); where a surface names none — the
-  legacy generation, the changed-files view — nothing is logged, since finding no name there is
-  the normal case. The log says what was looked for and not found, and stops there: a selector
-  that matches nothing is not by itself evidence that the platform changed anything.
+- **The companion server is gone, and no verifier ships in its place** (§6.4). `packages/server` was never deployed. The specification now requires a verifier that runs inside the platform and keeps no state; [#56](https://github.com/Reefact/conventional-comments-toolkit/issues/56) tracks building one for GitHub. Until it exists, nothing checks comments after the fact and no status check is published, so objective O3 is enforced nowhere: `enforce` still blocks a send in the extension, which anyone without it bypasses. The `server` and `exemptionLog` configuration blocks went with it; a repository that still carries them gets an "unknown configuration key ignored" warning.
 
 ### Fixed
 
@@ -205,18 +215,6 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
   Each new selector is checked against these captured pages. *Cancel* is still never
   intercepted.
-
-## [1.0.0-beta.13] - 2026-09-08
-
-### Added
-
-- **Every line of the selector journal says which page its degradation came from** (§9.4). The journal recorded which selector chain failed and when, never where: four lines stamped within the same second gave no way to tell one page from four. Each entry now carries the page address, read at the moment of the degradation rather than at injection — GitHub navigates in place, so the URL a content script saw when it loaded is not the page the chain failed on, and a chain is re-reported when the tab changes pull request. The options page renders that address as a six-character mark computed on the normalised page — origin, path, and the query parameters that name a view — so `?diff=split` and `#discussion_r1` do not turn one page into three, while Azure DevOps's `?_a=files` and `?_a=overview` stay two: same mark, same page. The mark links to the exact address recorded, fragment included, and opens it in a new tab. That address stays on the device: telemetry still carries only the chain's name (§10). Entries written before this version have no address — an upgrade keeps the journal — and render as a neutral mark of the same width, saying so on hover, until their chain is reported again or the journal is cleared: an address cannot be invented for a degradation observed before it was recorded.
-
-- **The journal can be emptied from the options page, and open tabs start measuring again** (§9.4). It had no way to be cleared, and its entries survived reloads and tabs. Clearing also tells the content scripts to forget which chains they have already reported: a chain is reported once per tab, so without that, reproducing a failure on the very page where it had just been seen wrote nothing. The section follows the storage now instead of reading it once at load, so what a tab records appears without reloading the screen.
-
-- **The options page carries the extension's icon before its title**, at the height of the title and its subtitle together. The guided tour's button reads *Guided tour*, with *Replay the guided tour* as its tooltip, and sits slightly lighter than the page's other buttons — at that icon size the header would otherwise no longer fit on one line.
-
-### Fixed
 
 - **The privacy policy described a journal nobody keeps** (§9.4, §10). Both languages announced "the last 50 times" the extension failed to recognise an element, while the journal is deduplicated by selector chain: fifty rules at most, each holding only its most recent observation — a rule that fails a thousand times still occupies one line. `docs/store-permissions-justification-fr.md` carried the same wording, contradicted it a line later, and still claimed that nothing writes `selectorFailures`. All three now describe the data that exists, including the page address this release adds to it, and both policy headers carry the date of that revision.
 

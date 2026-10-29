@@ -4,14 +4,23 @@ What changed for you, release by release. For the full record — every constrai
 every section of the specification an entry rests on — see
 [CHANGELOG.md](https://github.com/Reefact/conventional-comments-toolkit/blob/main/CHANGELOG.md).
 
-The extension starts in `assist` mode: it helps and it flags, it never blocks a submission. The
-source of truth for conformance stays the server companion (component B).
+The extension starts in `assist` mode: it helps and it flags, it never blocks a submission. No
+verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
+extension installed.
 
-## 1.0.0-beta.13 — September 8, 2026
+## 1.0.0-beta.13 — October 29, 2026
 
-_The journal in the "Status" section now says which page each selector failed on, and clears in one click so you can measure again._
+_Labels for replying to a review, every shipped label enabled by default, GitHub's comment box recognised again on today's pages — and the companion server retired, with no verifier in its place yet._
 
 ### ✨ Features
+
+- **Labels for replying to a review.** `thanks`, `done`, `ack` and `disagree` answer a point; `reviewed` closes your own review and approves nothing. They are the toolkit's own addition, not part of Conventional Comments, and they never block. `fixed` is accepted for `done`, `acknowledged` for `ack` and `thx` for `thanks`; `?thx` expands to `thanks: ` and `?r` to `reviewed: `. They do not make replies require a label. A repository that wants to stick to Conventional Comments disables each of them with one `labels[]` entry: the options page shows that block and copies it for you.
+
+- **The toolbar puts the replies on a line of their own.** Labels that raise a point come first; under a thin rule follow those that answer one — `thanks`, `done`, `ack`, `decision`, `disagree`, from the warmest to the firmest. A thin double rule separates the labels from the decorations.
+
+- **You choose the order of the label buttons.** "Button order", in the options, takes a comma-separated list: the labels you list come first, the others follow in the default order, and the completion list follows the same order. It is a personal preference.
+
+- **A label can say whether it raises a point or answers one**, with `labels[].kind` (`"remark"` or `"reply"`). A label you declare is `"remark"` unless you say otherwise. It changes no verdict.
 
 - **Every line of the journal says which page it came from.** It recorded which selector failed and when, never where: faced with four lines stamped within the same second, nothing told you whether they came from one page or four. Each line now starts with a six-character mark — same mark, same page — and clicking it opens the exact recorded address in a new tab. That address stays on your device: when you have allowed telemetry, it still sends nothing but the selector's name. Lines already in the journal before this update have no address — it was not being recorded — and carry a neutral mark until their selector fails again, or until you clear the journal.
 
@@ -19,7 +28,31 @@ _The journal in the "Status" section now says which page each selector failed on
 
 - **The options page carries the extension's icon** before its title. The guided tour's button now reads "Guided tour", its full wording moving to the tooltip.
 
+### 🔧 Changed
+
+- **Every label the toolkit ships is enabled by default**, Conventional Comments' `typo`, `polish` and `quibble` included. A repository disables the ones it does not want.
+
+- **If your configuration already defines `thanks`, `done`, `ack`, `disagree` or `reviewed`, it needs one property to keep working as before.** Your label now merges into the shipped one and becomes always non-blocking, so `done (blocking):` is refused. Add `"alwaysNonBlocking": false` to restore it.
+
+- **New icons:** `praise` is now 👏, `decision` is ⚖️, and 🎉 goes to `reviewed`.
+
+- **The check links to the toolkit's labels page by default**, https://conventionalcomments.io/docs/labels/, instead of conventionalcomments.org, which documents none of the labels the toolkit adds. A `docUrl` you set yourself is kept.
+
+- **Two active labels can no longer share a name.** An alias that repeats another active label's name is removed, and the removal is reported. Before, the order of the label list decided which label a comment meant.
+
+- **An enterprise floor no longer makes `decision` blocking.** Listing it under `labels.minimum` used to force it blocking, so a bare `decision:` opened a blocking thread while `decision (blocking):` was refused. The floor now only keeps it enabled.
+
+- **A shipped abbreviation only expands to an enabled label.** `?ty`, `?po` and `?qui` used to insert the prefix of a disabled label, which validation then rejected. An abbreviation your repository defines itself is unaffected.
+
+- **On Azure DevOps, the label prefix is no longer hidden and the subject no longer emphasised.** Nobody has yet measured how Azure DevOps renders a comment body, and the extension stopped assuming it renders like GitHub's. Badges stay, and the body shows whole.
+
+- **The companion server is retired, and no verifier ships in its place.** It was never deployed. The specification now calls for a verifier that runs inside the platform and keeps no state, and [issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56) tracks building one for GitHub. Until it exists, nothing checks comments after the fact and no status check is published: `enforce` still blocks a send in the extension, which anyone without it bypasses. The `server` and `exemptionLog` configuration blocks are now ignored, with a warning.
+
 ### 🐛 Bug fixes
+
+- **GitHub's "Files changed" view is recognised again.** On pages as github.com serves them today, the extension found no button that publishes a comment, so under `enforce` a non-conforming comment could still be published there. It also treated editing a comment as writing a new one, treated the review summary as a line comment that can block the pull request, and gave no badges to threads. On the "Conversation" tab, editing a published comment was also treated as a line comment that can block. "Cancel" is still never intercepted.
+
+- **GitHub: the pull request's creation date is read from the pull request itself.** That date decides whether a pull request predates `activatedAt`, and so whether the extension may block on it. It used to be the first date on the page — on a merged pull request, the merge date, so the same pull request could read two dates depending on the tab. When the date cannot be read, the extension does not block.
 
 - **The privacy policy described a history the extension does not keep.** It announced "the last 50 times" an element was not recognised, while the journal keeps only one line per selection rule — fifty at most, each with its most recent observation. It now describes what is actually kept, the page address included.
 

@@ -75,8 +75,9 @@ Conventional Comments gives review **feedback** a vocabulary and says nothing ab
 to it. The toolkit adds four response labels of its own, plus `reviewed` to close your review.
 These five **added labels** are **not part of Conventional Comments**: an extension of this tool,
 shipped enabled, that a repository can turn off (§3.1, §3.2). Every label the toolkit ships is
-enabled by default, including Conventional Comments' `typo`, `polish` and `quibble`; disable the
-ones you don't want.
+enabled by default, including Conventional Comments' `typo` and `polish`; disable the ones you
+don't want. The one exception is `quibble`, shipped but disabled: Conventional Comments itself
+defines it as a `nitpick` under another name. Enable it with `{ "id": "quibble", "enabled": true }`.
 
 | Label | Meaning | Also accepted |
 |---|---|---|

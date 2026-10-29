@@ -16,7 +16,7 @@ describe('page d’options — le bloc des labels de réponse', () => {
     for (const r of ADDED_LABELS) expect(active, r.id).not.toContain(r.id);
     // Rien d'autre ne change : Conventional Comments, et `decision`.
     expect(active).toEqual([
-      'praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'quibble',
+      'praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish',
       'decision',
     ]);
     expect(notices).toEqual([]);

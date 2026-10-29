@@ -11,7 +11,7 @@ const found = (o: object): ConfigRead => ({ status: 'found', text: JSON.stringif
 const foundText = (t: string): ConfigRead => ({ status: 'found', text: t });
 
 describe('§8.2 — valeurs par défaut du produit', () => {
-  it('dix-huit labels, tous actifs — Conventional Comments, `decision` et les cinq labels ajoutés — et les décorations du §3.3', () => {
+  it('dix-huit labels, tous actifs — Conventional Comments, `decision` et les labels ajoutés — et les décorations du §3.3', () => {
     const c = defaultConfig();
     expect(c.labels).toHaveLength(18);
     expect(c.labels.filter((l) => !l.enabled)).toEqual([]);

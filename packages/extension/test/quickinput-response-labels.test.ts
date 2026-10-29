@@ -6,7 +6,7 @@
 // que la liste de complétion, elle, ne montre que les labels actifs.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { defaultConfig, resolveConfig, type EffectiveConfig } from '@cct/core';
+import { ADDED_LABELS, defaultConfig, resolveConfig, type EffectiveConfig } from '@cct/core';
 import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
 import { attachQuickInput } from '../src/ui/quickinput.js';
 
@@ -41,20 +41,29 @@ function tabAfter(typed: string, config: EffectiveConfig): { value: string; cons
 const resolving = (doc: object) =>
   resolveConfig(null, { status: 'absent' }, { status: 'found', text: JSON.stringify(doc) }, null, false).config;
 
+/** Les abréviations livrées pour les labels ajoutés — lues dans la table, jamais recopiées :
+ * une liste écrite ici a déjà oublié `?tha` (revue Reefact, PR #91). */
+const SHIPPED = Object.entries(defaultConfig().shortcuts.abbreviations)
+  .filter(([, expansion]) => ADDED_LABELS.some((l) => expansion === `${l.id}: `))
+  .map(([abbr]) => abbr);
+
 describe('CA-47 — une abréviation livrée ne se déplie que vers un label actif', () => {
+  it('chaque label ajouté a son abréviation livrée', () => {
+    expect(SHIPPED).toHaveLength(ADDED_LABELS.length);
+    expect(SHIPPED).toContain('?tha');
+  });
+
   it('famille désactivée : `?do` ne compose pas `done: `, et Tab garde son rôle', () => {
-    const off = resolving({ labels: ['ack', 'done', 'disagree', 'reviewed'].map((id) => ({ id, enabled: false })) });
-    for (const abbr of ['?a', '?do', '?di', '?r']) {
+    const off = resolving({ labels: ADDED_LABELS.map((l) => ({ id: l.id, enabled: false })) });
+    for (const abbr of SHIPPED) {
       const r = tabAfter(abbr, off);
       expect(r, abbr).toEqual({ value: abbr, consumed: false });
     }
   });
 
-  it('famille active — le défaut : les quatre se déplient', () => {
-    expect(tabAfter('?a', defaultConfig()).value).toBe('ack: ');
-    expect(tabAfter('?do', defaultConfig()).value).toBe('done: ');
-    expect(tabAfter('?di', defaultConfig()).value).toBe('disagree: ');
-    expect(tabAfter('?r', defaultConfig()).value).toBe('reviewed: ');
+  it('famille active — le défaut : toutes se déplient', () => {
+    const table = defaultConfig().shortcuts.abbreviations;
+    for (const abbr of SHIPPED) expect(tabAfter(abbr, defaultConfig()).value, abbr).toBe(table[abbr]);
   });
 
   it('contre-épreuve sur le défaut antérieur : `?ty`, `?po`, `?qui`, labels de Conventional Comments désactivés', () => {

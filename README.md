@@ -133,9 +133,10 @@ thread blocking. `decision` is unchanged and remains the only reply that can clo
 thread on someone else's behalf (§6.1.1); `disagree` is an opinion and resolves nothing.
 
 The check links to the toolkit's labels page by default (`docUrl`:
-https://conventionalcomments.io/docs/labels/), which documents every label it ships and says
-which ones are not part of Conventional Comments. If your team documents its own variant, point
-`docUrl` there.
+https://conventionalcomments.io/docs/labels/). That page is the place for every label the
+toolkit ships, saying which ones are not part of Conventional Comments; its update for the added
+labels is tracked in Reefact/conventionalcomments.io#42. If your team documents its own variant,
+point `docUrl` there.
 
 **Upgrading with a label already called `thanks`, `done`, `ack`, `disagree` or `reviewed`.** Your entry
 now merges into the shipped one (§8.1.4) and inherits `alwaysNonBlocking: true`, so

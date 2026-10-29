@@ -25,6 +25,10 @@ and what a reader needs from them is the behaviour, not the thirteen.
   an unknown word for the previous one. While the extension and the verifier run different
   versions, the extension reports the mismatch and stops blocking the send. Update both together.
 - **New icons:** `praise` is now 👏, `decision` is ⚖️, and 🎉 goes to `reviewed`.
+- **The check links to the toolkit's labels page by default** (§8.2). `docUrl` now defaults to
+  https://conventionalcomments.io/docs/labels/ instead of conventionalcomments.org, which
+  documents none of the labels the toolkit adds and enables by default. A team that set its
+  own `docUrl` keeps it.
 - **Every label the toolkit ships is enabled by default** (§3.2), Conventional Comments'
   `typo`, `polish` and `quibble` included. A repository disables the ones it does not want.
 - **Two active labels can no longer share a name** (§8.2). An alias that repeats another active

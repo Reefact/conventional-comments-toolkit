@@ -41,6 +41,8 @@ describe('§8.2 — valeurs par défaut du produit', () => {
     expect(c.decorations.allowFree).toBe(true);
     expect(c.scope).toEqual({ validateReplies: false, validateReviewSummary: true });
     expect(c.resolverOverrideGroup).toEqual([]);
+    // La page des labels de l'outil, qui documente aussi les labels ajoutés (§8.2, `docUrl`).
+    expect(c.docUrl).toBe('https://conventionalcomments.io/docs/labels/');
   });
 
   it('abréviations : uniques au moment du Tab, ?que/?qui séparés (§5.2)', () => {

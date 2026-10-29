@@ -132,8 +132,10 @@ all unless you turn it on (§4.1). They do not change the mode, and none of the 
 thread blocking. `decision` is unchanged and remains the only reply that can close a blocking
 thread on someone else's behalf (§6.1.1); `disagree` is an opinion and resolves nothing.
 
-If you point `docUrl` at your own documentation, it is worth doing: its default,
-conventionalcomments.org, documents none of these labels.
+The check links to the toolkit's labels page by default (`docUrl`:
+https://conventionalcomments.io/docs/labels/), which documents every label it ships and says
+which ones are not part of Conventional Comments. If your team documents its own variant, point
+`docUrl` there.
 
 **Upgrading with a label already called `thanks`, `done`, `ack`, `disagree` or `reviewed`.** Your entry
 now merges into the shipped one (§8.1.4) and inherits `alwaysNonBlocking: true`, so

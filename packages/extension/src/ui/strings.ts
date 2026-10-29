@@ -96,6 +96,7 @@ const fr: Record<string, string> = {
   // ne transporte que du texte — voir `options/i18n.ts`.
   'options.title': 'Conventional Comments Toolkit',
   'options.subtitle': 'Réglages de l’extension.',
+  'options.version.title': 'Version de l’extension',
   'options.hosts.heading': 'Domaines autorisés',
   'options.hosts.sub': 'Accès de l’extension aux plateformes de revue de code.',
   'options.known.heading': 'Domaines connus',
@@ -307,6 +308,7 @@ const en: Record<string, string> = {
   // are split into numbered segments.
   'options.title': 'Conventional Comments Toolkit',
   'options.subtitle': 'Extension settings.',
+  'options.version.title': 'Extension version',
   'options.hosts.heading': 'Allowed domains',
   'options.hosts.sub': 'The extension’s access to code review platforms.',
   'options.known.heading': 'Known domains',

@@ -164,7 +164,9 @@ export function defaultConfig(): EffectiveConfig {
         '?qui': 'quibble: ',
       },
     },
-    docUrl: 'https://conventionalcomments.org/',
+    // La page des labels du site de l'outil, et non conventionalcomments.org : celle-ci ne
+    // documente aucun des labels ajoutés, actifs par défaut (§8.2, `docUrl`).
+    docUrl: 'https://conventionalcomments.io/docs/labels/',
     server: {
       coalesceWindowSeconds: 10,
       gracePeriodSeconds: 900,

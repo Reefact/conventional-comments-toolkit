@@ -123,7 +123,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
   `labels[]` entry each. `reviewed` closes your own review — the label people reached for when
   they wrote `praise: review done` — and approves nothing; it answers no point, so it is not a
   response label. `thanks` says thank you without taking a position, where a plain "thanks!"
-  reply used to need `note:`; `thx` is accepted for it, and `?tha` expands to it. `fixed` is accepted for `done`, `acknowledged`
+  reply used to need `note:`; `thx` is accepted for it, and `?thx` expands to it. `fixed` is accepted for `done`, `acknowledged`
   for `ack`. They are ordinary labels — same parser, same diagnostics, never blocking — and
   they do not make replies require a label, which remains `scope.validateReplies`. `?r` expands
   to `reviewed: `. See the README for the configuration and the upgrade note.

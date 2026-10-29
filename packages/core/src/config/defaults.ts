@@ -148,7 +148,7 @@ export function defaultConfig(): EffectiveConfig {
         '?do': 'done: ',
         '?di': 'disagree: ',
         '?r': 'reviewed: ',
-        '?tha': 'thanks: ', // `?th` est `thought` et ne se redéfinit pas (§5.2)
+        '?thx': 'thanks: ', // comme l'alias `thx` ; `?th` est `thought` et ne se redéfinit pas (§5.2)
         '?ib': 'issue (blocking): ',
         '?su': 'suggestion: ',
         '?ni': 'nitpick: ',

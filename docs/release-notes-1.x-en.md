@@ -8,6 +8,18 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
 extension installed.
 
+## 1.0.0-beta.15 — October 29, 2026
+
+_A label's badge now tells the reader what a comment means, and its button tells the writer when to use it._
+
+### 🔧 Changed
+
+- **The badge and the button no longer show the same tooltip.** Hovering the label badge of a published comment tells you what the comment means, without an example: `issue` reads "A problem spotted in this code; the comment explains which one." Hovering the label's toolbar button tells you when to use it, then gives an example: "Flag a problem to fix, ideally with a lead." Every shipped label has both texts, in English and French. A badge text never claims more than the label says: whether a point blocks is still shown by the decoration badge next to it.
+
+### ✨ Features
+
+- **A team can write each text: `labels[].usage` for the button.** In `.conventional-comments.json`, `description` now goes to the badge and `usage` to the button. Written, each replaces the shipped text; written empty (`""`), it removes that tooltip. Without `usage`, the button shows `description`, so a configuration written for 1.0.0-beta.14 keeps showing the same text on both.
+
 ## 1.0.0-beta.14 — October 29, 2026
 
 _Labels explain themselves where you read them: a hover on a badge shows its definition, and a team can write its own. `quibble` steps aside for `nitpick`, and two skills let AI agents review the toolkit's way._

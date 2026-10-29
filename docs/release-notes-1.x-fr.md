@@ -8,6 +8,18 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
 navigateur des personnes ayant installé l'extension.
 
+## 1.0.0-beta.15 — 29 octobre 2026
+
+_Le badge d'un label dit désormais au lecteur ce que signifie un commentaire, et son bouton dit au rédacteur quand l'employer._
+
+### 🔧 Changements
+
+- **Le badge et le bouton n'affichent plus la même infobulle.** Au survol du badge de label d'un commentaire publié, vous lisez ce que le commentaire signifie, sans exemple : `issue` affiche « Un problème repéré dans ce code ; le commentaire explique lequel. » Au survol du bouton du label dans la barre d'outils, vous lisez quand l'employer, suivi d'un exemple : « Signaler un problème à corriger, idéalement avec une piste. » Chaque label livré a ses deux textes, en français et en anglais. Le texte d'un badge n'affirme jamais plus que ce que dit le label : le caractère bloquant d'un point reste indiqué par le badge de décoration voisin.
+
+### ✨ Nouveautés
+
+- **Une équipe peut écrire chaque texte : `labels[].usage` pour le bouton.** Dans `.conventional-comments.json`, `description` va désormais au badge et `usage` au bouton. Écrit, chacun remplace le texte livré ; écrit vide (`""`), il retire l'infobulle correspondante. Sans `usage`, le bouton affiche `description` : une configuration écrite pour la 1.0.0-beta.14 continue d'afficher le même texte sur les deux.
+
 ## 1.0.0-beta.14 — 29 octobre 2026
 
 _Les labels s'expliquent là où on les lit : le survol d'un badge affiche sa définition, et une équipe peut écrire la sienne. `quibble` s'efface devant `nitpick`, et deux skills permettent à des agents IA de relire à la façon de l'outil._

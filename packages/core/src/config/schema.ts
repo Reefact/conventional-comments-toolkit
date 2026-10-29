@@ -142,7 +142,7 @@ export function parseConfigDocument(
               } else label[flag] = e[flag];
             }
           }
-          for (const s of ['icon', 'color', 'description'] as const) {
+          for (const s of ['icon', 'color', 'description', 'usage'] as const) {
             if (s in e) {
               if (typeof e[s] !== 'string') {
                 bad(key, `"${s}" of label "${e['id']}" must be a string`);
@@ -163,7 +163,7 @@ export function parseConfigDocument(
             } else label['aliases'] = e['aliases'];
           }
           for (const k of Object.keys(e)) {
-            if (!['id', 'enabled', 'blockingByDefault', 'alwaysNonBlocking', 'kind', 'icon', 'color', 'description', 'aliases'].includes(k)) {
+            if (!['id', 'enabled', 'blockingByDefault', 'alwaysNonBlocking', 'kind', 'icon', 'color', 'description', 'usage', 'aliases'].includes(k)) {
               notices.push(warning(`unknown key "labels[].${k}" ignored`, `labels[].${k}`));
             }
           }

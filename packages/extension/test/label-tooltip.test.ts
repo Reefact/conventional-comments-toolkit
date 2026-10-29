@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 //
-// L'INFOBULLE D'UN LABEL : SUR LE BOUTON ET SUR LE BADGE, LA MÊME.
+// L'INFOBULLE D'UN LABEL : DEUX QUESTIONS, DEUX TEXTES.
 //
-// Le §5.1 la demandait au bouton de la barre d'outils ; le badge d'un commentaire publié (§5.5)
-// est pourtant l'endroit où un lecteur rencontre un label qu'il ne connaît pas — `ack`,
-// `polish` —, bien plus souvent qu'en écrivant. Les deux passent par `labelTooltip()`, et ce
-// fichier les tient ensemble, pour que l'une ne change pas sans l'autre.
+// Le bouton répond à qui écrit — « quand employer ce label ? » : une consigne d'emploi, puis
+// l'exemple (§5.1). Le badge répond à qui lit — « que me dit ce commentaire ? » : une
+// signification, sans exemple, puisque le commentaire est sous ses yeux (§5.5). Les deux passent
+// par `labelTooltip()`, et ce fichier les tient ensemble.
 //
 // Le curseur du badge est une affirmation de CSS : lue dans le texte de styles.css, comme le
 // fait badge-sizing.test.ts, et non dans un `getComputedStyle` happy-dom.
@@ -55,76 +55,94 @@ function buttonOf(id: string, config: EffectiveConfig, lang: string): HTMLButton
   return button;
 }
 
-describe('infobulle d’un label — badge et bouton disent la même chose (§5.1, §5.5)', () => {
+describe('infobulle d’un label — le bouton dit quand l’employer, le badge ce qu’il signifie (§5.1, §5.5)', () => {
   afterEach(() => {
     document.body.innerHTML = '';
   });
 
-  it('le badge d’un label livré porte sa définition et son exemple, dans la langue de l’interface', () => {
+  it('le badge d’un label livré porte sa signification, sans exemple, dans la langue de l’interface', () => {
     const fr = badgeOf('ack: bien noté', defaultConfig(), 'fr');
-    expect(fr.title).toBe(labelTooltip('fr', { id: 'ack' }));
-    expect(fr.title).toContain(ui('fr', 'label.ack'));
-    expect(fr.title).toContain(ui('fr', 'label.example', { example: ui('fr', 'example.ack') }));
-
-    const en = badgeOf('ack: noted', defaultConfig(), 'en');
-    expect(en.title).toContain(ui('en', 'label.ack'));
+    expect(fr.title).toBe(ui('fr', 'badge.label.ack'));
+    expect(fr.title).not.toContain(ui('fr', 'example.ack'));
+    expect(badgeOf('ack: noted', defaultConfig(), 'en').title).toBe(ui('en', 'badge.label.ack'));
   });
 
-  it('le badge et le bouton d’un même label portent exactement la même infobulle', () => {
-    for (const id of ['issue', 'reviewed', 'thanks']) {
-      expect(badgeOf(`${id}: x y z`, defaultConfig(), 'fr').title).toBe(buttonOf(id, defaultConfig(), 'fr').title);
+  it('le bouton d’un label livré porte sa consigne d’emploi, puis l’exemple', () => {
+    const title = buttonOf('ack', defaultConfig(), 'fr').title;
+    expect(title).toBe(`${ui('fr', 'label.ack')}\n${ui('fr', 'label.example', { example: ui('fr', 'example.ack') })}`);
+  });
+
+  it('chaque label livré a ses deux textes, distincts, dans les deux langues', () => {
+    for (const lang of ['fr', 'en']) {
+      for (const { id } of defaultConfig().labels) {
+        const badge = labelTooltip(lang, { id }, 'badge');
+        const button = labelTooltip(lang, { id }, 'button');
+        expect(badge, `${lang} ${id}`).not.toBeNull();
+        expect(button, `${lang} ${id}`).not.toBeNull();
+        expect(badge, `${lang} ${id}`).not.toBe(button);
+        expect(badge, `${lang} ${id}`).not.toContain(`badge.label.${id}`);
+      }
     }
   });
 
-  it('un label qu’aucun catalogue ne décrit n’a pas d’infobulle — jamais la clé « label.risk »', () => {
+  it('un label qu’aucune source ne décrit n’a pas d’infobulle — jamais la clé « label.risk »', () => {
     const config = withCustomLabel();
-    expect(labelTooltip('fr', { id: 'risk' })).toBeNull();
+    expect(labelTooltip('fr', { id: 'risk' }, 'badge')).toBeNull();
+    expect(labelTooltip('fr', { id: 'risk' }, 'button')).toBeNull();
     expect(badgeOf('risk: le nom est ambigu', config, 'fr').hasAttribute('title')).toBe(false);
     expect(buttonOf('risk', config, 'fr').hasAttribute('title')).toBe(false);
   });
-
-  it('un label livré sans exemple garde sa définition seule', () => {
-    expect(labelTooltip('fr', { id: 'issue' })).toContain(ui('fr', 'label.issue'));
-    // Le garde porte sur la présence de l’exemple, pas sur la définition : une clé d’exemple
-    // absente ne doit pas apparaître telle quelle.
-    expect(labelTooltip('fr', { id: 'issue' })).not.toContain('example.issue');
-  });
 });
 
-describe('`labels[].description` — la définition que la configuration écrit (§8.2)', () => {
+describe('`labels[].description` et `labels[].usage` — ce que la configuration écrit (§8.2)', () => {
   afterEach(() => {
     document.body.innerHTML = '';
   });
 
-  function described(id: string, description: string): EffectiveConfig {
+  function written(id: string, fields: { description?: string; usage?: string }): EffectiveConfig {
     const config = id === 'risk' ? withCustomLabel() : defaultConfig();
-    config.labels.find((l) => l.id === id)!.description = description;
+    Object.assign(config.labels.find((l) => l.id === id)!, fields);
     return config;
   }
 
-  it('un label créé par un dépôt affiche la description qu’il déclare, sur le badge comme sur le bouton', () => {
-    const config = described('risk', 'Risque de régression à évaluer avant fusion.');
+  it('`description` seule sert aux deux surfaces — le comportement de 1.0.0-beta.14', () => {
+    const config = written('risk', { description: 'Risque de régression à évaluer avant fusion.' });
     expect(badgeOf('risk: le cache change de clé', config, 'fr').title).toBe('Risque de régression à évaluer avant fusion.');
     expect(buttonOf('risk', config, 'fr').title).toBe('Risque de régression à évaluer avant fusion.');
   });
 
-  it('écrite sur un label livré, elle REMPLACE la définition du catalogue, exemple compris', () => {
-    const config = described('issue', 'Chez nous : un défaut qui casse un test ou un contrat.');
-    for (const title of [badgeOf('issue: x y z', config, 'fr').title, buttonOf('issue', config, 'fr').title]) {
-      expect(title).toBe('Chez nous : un défaut qui casse un test ou un contrat.');
-      expect(title).not.toContain(ui('fr', 'label.issue'));
-    }
+  it('`usage` va au bouton, `description` au badge', () => {
+    const config = written('risk', { description: 'Un risque de régression relevé.', usage: 'Signaler un risque de régression.' });
+    expect(badgeOf('risk: le cache change de clé', config, 'fr').title).toBe('Un risque de régression relevé.');
+    expect(buttonOf('risk', config, 'fr').title).toBe('Signaler un risque de régression.');
   });
 
-  it('vide, elle retire l’infobulle — même d’un label que le catalogue décrit', () => {
-    const config = described('ack', '');
-    expect(badgeOf('ack: bien noté', config, 'fr').hasAttribute('title')).toBe(false);
-    expect(buttonOf('ack', config, 'fr').hasAttribute('title')).toBe(false);
+  it('écrites sur un label livré, elles REMPLACENT le catalogue, exemple compris', () => {
+    const config = written('issue', { description: 'Chez nous : un défaut qui casse un contrat.', usage: 'Signaler un contrat cassé.' });
+    expect(badgeOf('issue: x y z', config, 'fr').title).toBe('Chez nous : un défaut qui casse un contrat.');
+    expect(buttonOf('issue', config, 'fr').title).toBe('Signaler un contrat cassé.');
   });
 
-  it('absente, le label livré garde la définition du catalogue', () => {
-    expect(defaultConfig().labels.every((l) => l.description === undefined)).toBe(true);
-    expect(badgeOf('issue: x y z', defaultConfig(), 'fr').title).toBe(labelTooltip('fr', { id: 'issue' }));
+  it('`usage` seule ne touche que le bouton : le badge garde la signification du catalogue', () => {
+    const config = written('issue', { usage: 'Signaler un contrat cassé.' });
+    expect(buttonOf('issue', config, 'fr').title).toBe('Signaler un contrat cassé.');
+    expect(badgeOf('issue: x y z', config, 'fr').title).toBe(ui('fr', 'badge.label.issue'));
+  });
+
+  it('vide, chacune retire l’infobulle de sa surface — même d’un label que le catalogue décrit', () => {
+    const noBadge = written('ack', { description: '' });
+    expect(badgeOf('ack: bien noté', noBadge, 'fr').hasAttribute('title')).toBe(false);
+    // `description` vide, sans `usage` : le bouton la prend en repli, et n'a donc rien non plus.
+    expect(buttonOf('ack', noBadge, 'fr').hasAttribute('title')).toBe(false);
+
+    const noButton = written('ack', { usage: '' });
+    expect(buttonOf('ack', noButton, 'fr').hasAttribute('title')).toBe(false);
+    expect(badgeOf('ack: bien noté', noButton, 'fr').title).toBe(ui('fr', 'badge.label.ack'));
+  });
+
+  it('absentes, le label livré garde les textes du catalogue', () => {
+    expect(defaultConfig().labels.every((l) => l.description === undefined && l.usage === undefined)).toBe(true);
+    expect(badgeOf('issue: x y z', defaultConfig(), 'fr').title).toBe(ui('fr', 'badge.label.issue'));
   });
 
   it('un changement de description en direct rafraîchit le badge déjà posé', () => {
@@ -132,10 +150,10 @@ describe('`labels[].description` — la définition que la configuration écrit 
     el.textContent = 'issue: x y z';
     document.body.append(el);
     decorateWithHtmlShape(el, 'issue: x y z', defaultConfig(), profile, 'fr');
-    decorateWithHtmlShape(el, 'issue: x y z', described('issue', 'Autre définition.'), profile, 'fr');
+    decorateWithHtmlShape(el, 'issue: x y z', written('issue', { description: 'Autre signification.' }), profile, 'fr');
     const badges = el.querySelectorAll<HTMLElement>('.cct-badge-label');
     expect(badges).toHaveLength(1);
-    expect(badges[0]!.title).toBe('Autre définition.');
+    expect(badges[0]!.title).toBe('Autre signification.');
   });
 });
 

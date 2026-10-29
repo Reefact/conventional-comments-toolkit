@@ -109,18 +109,23 @@ closes their own. What the pull request needs to be merged — approvals, requir
 stays with the platform: the toolkit does not count `reviewed`, and no number of them amounts to
 an approval. This is a convention the toolkit states, not one it checks (§3.2).
 
-**Describe a label: `labels[].description`.** The tooltip of a label's button and badge shows its
-definition. A repository or an organisation can write its own, for a label it creates or for a
-shipped one:
+**Describe a label: `labels[].description` and `labels[].usage`.** A label's two tooltips answer
+two questions. The **badge** of a published comment tells whoever reads it what the comment
+means; the **toolbar button** tells whoever writes when to use the label, followed by an example.
+A repository or an organisation can write its own texts, for a label it creates or for a shipped
+one:
 
 ```json
-{ "labels": [ { "id": "risk", "description": "A regression risk to assess before merging." },
+{ "labels": [ { "id": "risk",
+                "description": "A regression risk raised by the reviewer.",
+                "usage": "Flag a regression risk to assess before merging." },
               { "id": "issue", "description": "Here: a defect that breaks a test or a contract." } ] }
 ```
 
-Written, it replaces the shipped definition and its example; written empty (`""`), it removes the
-tooltip; left out, a shipped label keeps its definition. It is shown as written, whatever the
-interface language, and changes no verdict.
+`description` goes to the badge, `usage` to the button; without `usage`, the button shows
+`description`. Written, each replaces the shipped text (and, on the button, its example); written
+empty (`""`), it removes that tooltip; left out, a shipped label keeps its texts. They are shown
+as written, whatever the interface language, and change no verdict.
 
 Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` does not. The
 toolbar shows the remark labels first — `reviewed` among them —, then, always on a line of their

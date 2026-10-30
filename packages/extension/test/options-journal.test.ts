@@ -467,11 +467,14 @@ describe('§9.4 — une ligne dit le problème, avec son niveau', () => {
     expect(rows()[2]).not.toContain('options.journal.problem'); // jamais la clé brute
   });
 
-  it('une exception se dit par son message, au niveau ERROR', async () => {
+  it('une exception se dit par une phrase fonctionnelle, jamais par son message technique', async () => {
     installPage({ selectorFailures: MIXED });
     await loadOptions();
 
-    expect(rows()[3]).toContain(ui('fr', 'options.journal.error', { message: 'TypeError: x is undefined' }));
+    expect(rows()[3]).toContain(ui('fr', 'options.journal.error'));
+    // Le message technique est dans le rapport copié : le lire ici ne dit rien à la personne.
+    expect(rows()[3]).not.toContain('TypeError');
+    expect(rows()[3]).not.toContain('x is undefined');
     expect(tags().map((t) => t.textContent)).toEqual(['WARN', 'WARN', 'WARN', 'ERROR']);
     expect(tags()[3]!.classList.contains('lvl-error')).toBe(true);
     expect(tags()[0]!.classList.contains('lvl-warn')).toBe(true);
@@ -507,6 +510,8 @@ describe('§9.4 — une ligne dit le problème, avec son niveau', () => {
     delete (navigator as { clipboard?: unknown }).clipboard;
 
     expect(written[0]).toContain('"kind": "error"');
+    // Ce que l'écran ne montre plus, la copie le garde : message technique ET pile.
+    expect(written[0]).toContain('TypeError: x is undefined');
     expect(written[0]).toContain('at f (content.js:1:1)');
   });
 });

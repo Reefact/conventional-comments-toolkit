@@ -133,7 +133,7 @@ describe('§9.4 / CA-11 — la marque répond « quelle page »', () => {
 
     const legacy = marks()[4]!;
     expect(legacy.tagName).toBe('SPAN'); // pas un lien : il n'y a nulle part où aller
-    expect(legacy.textContent).toHaveLength(6); // même largeur, sinon la colonne se décale
+    expect(legacy.textContent).toHaveLength(6); // même forme de ligne : `(······)` pour `(m4rtqv)`
     expect(legacy.title).toBe(ui('fr', 'options.status.selectors.page.unknown'));
   });
 
@@ -148,14 +148,17 @@ describe('§9.4 / CA-11 — la marque répond « quelle page »', () => {
     expect(document.querySelector('#selector-log-detail a')).toBeNull();
   });
 
-  it('la ligne garde son horodatage et son nom de chaîne', async () => {
+  it('une ligne se lit « quand — quoi (où) », la marque entre parenthèses', async () => {
     installPage({ selectorFailures: SEEDED });
     await loadOptions();
 
-    // La marque PRÉFIXE la ligne, elle ne la remplace pas.
-    const text = document.querySelector('#selector-log-detail pre')?.textContent ?? '';
-    expect(text).toContain('2026-09-08T11:49:08.072Z — merge-button');
-    expect(text.split('\n')).toHaveLength(SEEDED.length);
+    // La marque CLÔT la ligne, elle ne la remplace pas : le bouton d'icône ouvre la ligne, puis
+    // l'horodatage, la chaîne, et la page entre parenthèses.
+    const first = document.querySelector('#selector-log-detail pre')!.textContent!.split('\n')[0]!;
+    expect(first).toBe(`2026-09-08T11:49:08.072Z — merge-button (${pageMark(`${PR}/files`)})`);
+    expect(document.querySelector('#selector-log-detail pre')!.textContent!.split('\n')).toHaveLength(
+      SEEDED.length
+    );
   });
 });
 
@@ -313,6 +316,44 @@ describe('§9.4 — copier pour le débogage', () => {
     await flush();
 
     expect(payload(written[0]!)['selectorFailures']).toEqual(RICH);
+  });
+
+  it('le bouton de ligne est l’icône qui ouvre la ligne, et il passe en coche une fois copié', async () => {
+    installClipboard();
+    installPage({ selectorFailures: RICH });
+    await loadOptions();
+
+    const pre = document.querySelector('#selector-log-detail pre')!;
+    expect(pre.firstElementChild).toBe(rowButtons()[0]); // la puce, avant l'horodatage
+    expect(rowButtons()[0]!.textContent).toBe(''); // une icône, aucun libellé : le nom est l'aria-label
+    expect(rowButtons()[0]!.classList.contains('copied')).toBe(false);
+
+    rowButtons()[0]!.click();
+    await flush();
+
+    expect(rowButtons()[0]!.classList.contains('copied')).toBe(true);
+    expect(rowButtons()[1]!.classList.contains('copied')).toBe(false);
+  });
+
+  it('un presse-papiers qui refuse ne met pas la coche', async () => {
+    installClipboard(true);
+    installPage({ selectorFailures: RICH });
+    await loadOptions();
+
+    rowButtons()[0]!.click();
+    await flush();
+
+    expect(rowButtons()[0]!.classList.contains('copied')).toBe(false);
+  });
+
+  it('les deux boutons du journal reprennent les variantes de la page', async () => {
+    installPage({ selectorFailures: RICH });
+    await loadOptions();
+
+    // `btn-p` : « Copier la configuration » ; `btn-quiet` : « Retirer » un hôte. Aucun style
+    // propre à cette section pour ses deux actions.
+    expect(copyAllButton()!.className).toBe('btn btn-p');
+    expect(clearButton()!.className).toBe('btn btn-quiet');
   });
 
   it('la page dit « copié » une fois le presse-papiers servi', async () => {

@@ -171,7 +171,6 @@ const fr: Record<string, string> = {
   'options.status.selectors.legend':
     'Même marque = même page. Un clic ouvre l’adresse relevée dans un nouvel onglet.',
   'options.status.selectors.page.unknown': 'Page non enregistrée.',
-  'options.status.selectors.copy': 'Copier',
   'options.status.selectors.copy.aria': 'Copier le détail de « {chain} » pour le débogage',
   'options.status.selectors.copyAll': 'Copier tout le journal (débogage)',
   'options.status.selectors.copied': 'Copié dans le presse-papiers.',
@@ -389,7 +388,6 @@ const en: Record<string, string> = {
   'options.status.selectors.legend':
     'Same mark = same page. Click one to open the recorded address in a new tab.',
   'options.status.selectors.page.unknown': 'Page not recorded.',
-  'options.status.selectors.copy': 'Copy',
   'options.status.selectors.copy.aria': 'Copy the details of “{chain}” for debugging',
   'options.status.selectors.copyAll': 'Copy the whole log (debug)',
   'options.status.selectors.copied': 'Copied to the clipboard.',

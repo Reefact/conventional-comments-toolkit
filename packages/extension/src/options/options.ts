@@ -133,6 +133,19 @@ function platformGlyph(platform: HostPlatform | null): Node {
   return document.createTextNode('?');
 }
 
+/** Deux carrés superposés : l'icône « copier » que tout le monde reconnaît. */
+function copyIcon(): SVGElement {
+  return svg(
+    '0 0 24 24',
+    { d: 'M11 9h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z', stroke: true },
+    { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1', stroke: true }
+  );
+}
+
+function checkIcon(): SVGElement {
+  return svg('0 0 24 24', { d: 'M5 12l5 5L20 7', stroke: true });
+}
+
 function lockIcon(): SVGElement {
   return svg('0 0 24 24', { d: 'M5 11h14v9H5zM8 11V7a4 4 0 0 1 8 0v4', stroke: true });
 }
@@ -738,9 +751,11 @@ function refreshStatus(): void {
         const actions = document.createElement('div');
         actions.className = 'status-actions';
         actions.append(
-          makeButton(ui(lang, 'options.status.selectors.copyAll'), 'btn btn-s', () =>
-            copyReport(journalReport(failures, environment()), feedback)
-          ),
+          // Les variantes que la page emploie déjà : « Copier la configuration » est un `btn-p`,
+          // une action destructive (retirer un hôte) un `btn-quiet`.
+          makeButton(ui(lang, 'options.status.selectors.copyAll'), 'btn btn-p', () => {
+            void copyReport(journalReport(failures, environment()), feedback);
+          }),
           renderSelectorClear()
         );
         detail.append(
@@ -769,19 +784,32 @@ function refreshStatus(): void {
  * `createElement` + `textContent`, jamais d'`innerHTML` : ces valeurs viennent du stockage. */
 function renderSelectorJournal(
   failures: SelectorFailure[],
-  onCopy: (entry: SelectorFailure) => void
+  onCopy: (entry: SelectorFailure) => Promise<'copied' | 'manual'>
 ): HTMLElement {
   const pre = document.createElement('pre');
   failures.forEach((f, i) => {
-    // Le bouton OUVRE la ligne : un libellé de largeur constante garde la colonne des marques
-    // alignée, là où un bouton posé après un nom de chaîne de longueur variable la dispersait.
-    // Il copie le rapport de DÉBOGAGE de la ligne, pas le texte affiché : la ligne reste
-    // lisible par une personne, le rapport est fait pour un développeur (`diagnostic-report.ts`).
-    const copy = makeButton(ui(lang, 'options.status.selectors.copy'), 'btn btn-copy btn-inline', () =>
-      onCopy(f)
-    );
-    copy.setAttribute('aria-label', ui(lang, 'options.status.selectors.copy.aria', { chain: f.chain }));
-    pre.append(copy, renderPageMark(f.url), document.createTextNode(`  ${f.at} — ${f.chain}`));
+    // Une ligne se lit « quand / quoi / où », précédée de son bouton : l'icône est à la fois la
+    // puce et l'action, et sa largeur constante garde les horodatages alignés. Il copie le
+    // rapport de DÉBOGAGE de la ligne, pas le texte affiché : la ligne reste lisible par une
+    // personne, le rapport est fait pour un développeur (`diagnostic-report.ts`).
+    const label = ui(lang, 'options.status.selectors.copy.aria', { chain: f.chain });
+    const copy = makeButton('', 'btn-icon', () => {
+      void onCopy(f).then((outcome) => {
+        // Le message d'état vit sous le journal, hors de l'écran dès que la ligne est loin : le
+        // bouton lui-même dit que ça a marché, un instant, puis redevient ce qu'il était.
+        if (outcome !== 'copied') return;
+        copy.classList.add('copied');
+        copy.replaceChildren(checkIcon());
+        setTimeout(() => {
+          copy.classList.remove('copied');
+          copy.replaceChildren(copyIcon());
+        }, 1500);
+      });
+    });
+    copy.append(copyIcon());
+    copy.setAttribute('aria-label', label);
+    copy.title = label;
+    pre.append(copy, document.createTextNode(`${f.at} — ${f.chain} (`), renderPageMark(f.url), document.createTextNode(')'));
     if (i < failures.length - 1) pre.append(document.createTextNode('\n'));
   });
   return pre;
@@ -790,26 +818,26 @@ function renderSelectorJournal(
 /** Met un rapport dans le presse-papiers et DIT ce qui s'est passé. Quand le navigateur refuse,
  * le texte est affiché, sélectionné, sous le message : la page ne prétend pas avoir copié ce
  * qu'elle n'a pas copié (même contrat que le bloc de labels, `copySnippet`). */
-function copyReport(text: string, feedback: HTMLElement): void {
+function copyReport(text: string, feedback: HTMLElement): Promise<'copied' | 'manual'> {
   const area = document.createElement('textarea');
   area.readOnly = true;
   area.className = 'report-fallback';
   area.rows = 8;
   area.value = text;
-  void copySnippet(text, navigator.clipboard, () => {
+  return copySnippet(text, navigator.clipboard, () => {
     feedback.replaceChildren(ui(lang, 'options.status.selectors.copy.manual'), area);
     area.focus();
     area.select();
   }).then((outcome) => {
     if (outcome === 'copied') feedback.textContent = ui(lang, 'options.status.selectors.copied');
+    return outcome;
   });
 }
 
 /** La marque d'une entrée : un lien vers l'adresse relevée, ou un remplissage neutre.
  *
- * Le remplissage fait SIX caractères comme les marques, sinon la colonne se désaligne
- * exactement là où elle doit rester lisible — sur les entrées écrites avant que l'adresse ne
- * soit enregistrée.
+ * Le remplissage fait SIX caractères comme les marques : une entrée écrite avant que l'adresse
+ * ne soit enregistrée garde la même forme de ligne, `(······)` à la place de `(m4rtqv)`.
  *
  * `pageKey` rend `null` sur tout ce qui n'est pas `http(s)` : c'est la liste blanche des
  * schémas, et elle vaut ici pour la fabrication du `href`. Un script de contenu ne s'exécute

@@ -312,20 +312,21 @@
          même bord que le journal et sa légende, pas sur celui de sa propre boîte. */
       .status-detail .btn { margin-left: -0.5rem; }
       .status-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-      /* Le bouton contouré porte sa propre bordure : la gouttière négative, faite pour un
-         libellé sans cadre, la décalerait hors de la colonne. */
-      .status-actions .btn-s { margin-left: 0; }
-      /* Copier n'est pas détruire : `btn-quiet` est le rouge de « Effacer », cette action-ci
-         prend la couleur des liens de la section (la marque de page). */
-      .btn-copy { background: transparent; color: var(--accent); border-color: transparent; font-weight: 500; }
-      .btn-copy:hover { background: var(--accent-soft); }
-      /* Le bouton de ligne vit DANS le journal (`pre`) : une boîte serrée, pour ne pas grossir
-         la ligne, et la gouttière de son padding reprise à gauche pour que son libellé tombe
-         sur le bord du journal. */
-      .status-detail pre .btn-inline {
-        margin: 0 0.3rem 0 -0.4rem; padding: 0 0.4rem; font-size: 0.72rem; line-height: 1.4;
-        vertical-align: baseline;
+      /* Deux boutons côte à côte : la gouttière négative de `.status-detail .btn`, faite pour un
+         libellé sans cadre seul sur sa ligne, ferait chevaucher le second sur le premier. */
+      .status-actions .btn { margin-left: 0; }
+      /* L'icône de ligne est la puce ET le bouton : une boîte carrée de largeur constante, de
+         sorte que les horodatages restent alignés. Sa gouttière est reprise à gauche pour que
+         l'icône tombe sur le bord du journal et de sa légende. */
+      .status-detail pre .btn-icon {
+        display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem; padding: 0;
+        margin: 0 0.4rem 0 -0.25rem; vertical-align: middle; cursor: pointer;
+        background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--fg-faint);
       }
+      .btn-icon svg { width: 0.9rem; height: 0.9rem; }
+      .btn-icon:hover { color: var(--accent); background: var(--accent-soft); }
+      .btn-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .btn-icon.copied { color: var(--pass); }
       .status-detail .report-fallback {
         box-sizing: border-box; width: 100%; margin-top: 0.3rem; font-family: var(--font-mono);
         font-size: 0.72rem; color: var(--fg-muted); background: var(--bg-sunken);

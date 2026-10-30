@@ -836,11 +836,16 @@ function renderSelectorJournal(
 
 /** Ce que la ligne DIT du problème, dans la langue de la page : la phrase de sa clé de
  * description, ou, faute de clé (une ligne écrite avant elles, une chaîne qui n'en déclare pas),
- * le nom de la chaîne — ce que le journal affichait seul jusque-là. Une exception se dit par son
- * message. `ui()` rend la clé elle-même quand le catalogue ne la connaît pas : c'est ce qui sert
- * ici à reconnaître une clé inconnue, au lieu de l'afficher telle quelle. */
+ * le nom de la chaîne — ce que le journal affichait seul jusque-là. `ui()` rend la clé elle-même
+ * quand le catalogue ne la connaît pas : c'est ce qui sert ici à reconnaître une clé inconnue, au
+ * lieu de l'afficher telle quelle.
+ *
+ * Une exception se dit par une phrase FONCTIONNELLE, comme les autres lignes, jamais par son
+ * message technique : `TypeError: Cannot read properties of undefined` ne dit rien à qui lit la
+ * page d'options. Ce que l'on sait d'elle sans mentir, c'est qu'une fonction s'est interrompue ;
+ * le message et la pile, eux, vivent dans l'entrée et dans le rapport copié. */
 function describeEntry(entry: JournalEntry): string {
-  if (entry.kind === 'error') return ui(lang, 'options.journal.error', { message: entry.message });
+  if (entry.kind === 'error') return ui(lang, 'options.journal.error');
   if (entry.problem) {
     const key = `options.journal.problem.${entry.problem}`;
     const text = ui(lang, key);

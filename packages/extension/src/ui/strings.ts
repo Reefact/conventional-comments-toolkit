@@ -167,7 +167,7 @@ const fr: Record<string, string> = {
   'options.status.ok': 'Configuration lue normalement.',
   'options.status.selectors.none': 'Aucune entrée au journal.',
   'options.status.selectors.some': '{count} entrée(s) au journal.',
-  'options.journal.error': 'Exception : {message}',
+  'options.journal.error': 'Erreur inattendue : une fonction de l’extension s’est interrompue',
   'options.journal.problem.editor-field':
     'Champ de saisie non reconnu : ni barre d’outils ni validation dessus',
   'options.journal.problem.editor-frame':
@@ -403,7 +403,7 @@ const en: Record<string, string> = {
   'options.status.ok': 'Configuration read normally.',
   'options.status.selectors.none': 'No journal entry.',
   'options.status.selectors.some': '{count} journal entry(ies).',
-  'options.journal.error': 'Exception: {message}',
+  'options.journal.error': 'Unexpected error: an extension function was interrupted',
   'options.journal.problem.editor-field':
     'Input field not recognised: no toolbar or validation on it',
   'options.journal.problem.editor-frame':

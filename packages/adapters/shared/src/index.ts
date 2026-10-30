@@ -229,7 +229,16 @@ export interface ClientAdapterOptions {
   /** Journal des dégradations de sélecteurs (§9.4), partagé avec le code qui l'exploite ; un
    * journal neuf à défaut. */
   log?: SelectorLog;
+  /** Enrobe les POINTS D'ENTRÉE de l'adaptateur — un rappel d'observateur, un écouteur — pour que
+   * ce qu'ils lèvent soit relevé avec ce que le code faisait (§9.4, `error-capture.ts`). Le
+   * code partagé l'injecte, comme `log` : un adaptateur ne peut pas importer l'extension, et ne
+   * sait pas ce que « relever » veut dire. Absent — hors extension, tests —, c'est l'identité. */
+  guardEntry?: EntryGuard;
 }
+
+/** Une fonction qui rend la même fonction, enrobée. Elle ne doit rien changer à ce que l'enrobée
+ * rend ni à ce qu'elle lève : elle relève, puis relance. */
+export type EntryGuard = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A) => R;
 
 export interface PlatformAdapter {
   /** §2, §6.2.3 — la PR que la page AFFICHE à cet instant, lue dans l'URL et le DOM ; `null`

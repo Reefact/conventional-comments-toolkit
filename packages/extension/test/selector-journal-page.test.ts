@@ -13,6 +13,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PrRef } from '@cct/core';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
+import type { EntryGuard } from '@cct/adapter-shared';
 import type { ErrorEntry, JournalEntry, SelectorFailure } from '../src/journal-entry.js';
 import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
@@ -69,6 +70,7 @@ function installChrome(): { written: Record<string, unknown>; clear: () => void 
 
 type Captured = {
   dispose?: () => void;
+  guardEntry?: EntryGuard;
   log?: {
     degraded: (chain: { name: string; candidates: string[] }) => void;
     forgetSeen: () => void;
@@ -412,6 +414,26 @@ describe('§9.4 — les exceptions de l’extension vont au même journal', () =
     // Une ligne, mais relevée sur deux pages : c'est ce que `count` dit.
     expect(journal(written)).toHaveLength(1);
     expect((journal(written)[0] as ErrorEntry).count).toBe(2);
+
+    captured.dispose?.();
+    clearFakeAdapters();
+  });
+
+  // Le balayage des champs vit dans l'ADAPTATEUR, qui ne sait pas relever : le code partagé lui
+  // injecte `guardEntry`, et ce qu'il enrobe est relevé « pendant la détection des champs ».
+  it('l’adaptateur reçoit un `guardEntry` qui relève avec le contexte `editor-detection`', async () => {
+    const { written } = installChrome();
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    expect(typeof captured.guardEntry).toBe('function');
+    const scan = captured.guardEntry!(() => {
+      throw new Error('scan failed');
+    });
+    expect(() => scan()).toThrow('scan failed'); // relevée, puis relancée
+    await settle();
+
+    const errors = journal(written).filter((e): e is ErrorEntry => e.kind === 'error');
+    expect(errors.map((e) => [e.context, e.message])).toEqual([['editor-detection', 'Error: scan failed']]);
 
     captured.dispose?.();
     clearFakeAdapters();

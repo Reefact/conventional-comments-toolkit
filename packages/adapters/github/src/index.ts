@@ -23,6 +23,7 @@ import {
   writeToTextField,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
+  type EntryGuard,
   type ClientAdapterOptions,
   type EditorChrome,
   type RenderedBodyShape,
@@ -61,6 +62,7 @@ export class GithubClientAdapter implements PlatformAdapter {
   #doc: Document;
   #readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
   readonly log: SelectorLog;
+  #guardEntry: EntryGuard;
   #editorSeq = 0;
   // QUELLE SURFACE a ramené ce champ. Sert à une seule question, celle que `getEditorChrome`
   // ne pouvait pas poser : un châssis absent est-il le cas nominal ou une rupture ? Sans cette
@@ -75,6 +77,7 @@ export class GithubClientAdapter implements PlatformAdapter {
     this.#doc = opts.documentRef ?? document;
     this.#readOrgConfig = opts.readOrgConfig;
     this.log = opts.log ?? new SelectorLog();
+    this.#guardEntry = opts.guardEntry ?? ((fn) => fn);
   }
 
   platformProfile(): PlatformProfile {
@@ -240,7 +243,10 @@ export class GithubClientAdapter implements PlatformAdapter {
    * d'événement Turbo (§A.3). */
   observeEditors(cb: (editor: EditorHandle) => void): Disposable {
     const seen = new WeakSet<Element>();
-    const scan = () => {
+    // Le balayage est le POINT D'ENTRÉE des trois déclencheurs — le premier appel, l'observateur
+    // de mutations, les événements Turbo — : l'enrober ici les couvre tous, et une exception du
+    // balayage est relevée « pendant la détection des champs » au lieu de rester sans contexte.
+    const scan = this.#guardEntry(() => {
       // L'UNION des surfaces, et non une chaîne unique : `/pull/N/changes` affiche des fils
       // hérités à côté de son propre composeur React, et une chaîne rend les éléments du
       // PREMIER candidat qui matche — l'autre composeur devenait invisible (surfaces.ts).
@@ -301,7 +307,7 @@ export class GithubClientAdapter implements PlatformAdapter {
         seen.add(el);
         cb(handle);
       }
-    };
+    });
     scan();
     const observer = new MutationObserver(() => scan());
     observer.observe(this.#doc.documentElement, { childList: true, subtree: true });

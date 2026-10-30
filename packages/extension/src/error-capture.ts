@@ -38,14 +38,16 @@ export interface CapturedError {
 }
 
 /** Ce que le code FAISAIT quand il a levé : un vocabulaire fermé, que la page d'options dit dans
- * la langue de la personne (`options.journal.error.<id>`). Quatre, parce que ce sont les quatre
+ * la langue de la personne (`options.journal.error.<id>`). Cinq, parce que ce sont les cinq
  * choses distinctes que le script de contenu fait, et qu'on sait les nommer sans mentir :
  *   • `render`    — afficher la page : bandeau, badges, filtre de fils ;
  *   • `config`    — lire la configuration effective ;
  *   • `editor`    — gérer un champ de commentaire : barre d'outils, validation, contrôle de l'envoi ;
+ *   • `editor-detection` — repérer les champs de commentaire dans la page (le balayage de
+ *     l'adaptateur, injecté par `guardEntry`) ;
  *   • `telemetry` — vidanger les compteurs.
  * « Pendant » et non « à cause de » : le contexte dit où l'on était, jamais la cause. */
-export const ERROR_CONTEXTS = ['render', 'config', 'editor', 'telemetry'] as const;
+export const ERROR_CONTEXTS = ['render', 'config', 'editor', 'editor-detection', 'telemetry'] as const;
 export type ErrorContext = (typeof ERROR_CONTEXTS)[number];
 
 /** Le contexte de l'extension est-il INVALIDÉ — l'extension rechargée ou mise à jour sous un

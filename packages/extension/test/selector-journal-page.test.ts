@@ -13,6 +13,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PrRef } from '@cct/core';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
+import type { SelectorFailure } from '../src/selector-failure.js';
 import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
 afterEach(() => {
@@ -56,7 +57,12 @@ function installChrome(): { written: Record<string, unknown>; clear: () => void 
   return { written, clear };
 }
 
-type Captured = { log?: { degraded: (chain: { name: string; candidates: string[] }) => void } };
+type Captured = {
+  log?: {
+    degraded: (chain: { name: string; candidates: string[] }) => void;
+    forgetSeen: () => void;
+  };
+};
 
 /** Amarre le journal à un adaptateur mocké, comme le fait `telemetry.test.ts` : c'est le
  * seul moyen de déclencher une dégradation sans page réelle. */
@@ -126,8 +132,8 @@ function setLocation(url: string): void {
   Object.defineProperty(document, 'location', { value: new URL(url), configurable: true });
 }
 
-function journal(written: Record<string, unknown>): { chain: string; at: string; url?: string }[] {
-  return (written['selectorFailures'] as { chain: string; at: string; url?: string }[] | undefined) ?? [];
+function journal(written: Record<string, unknown>): SelectorFailure[] {
+  return (written['selectorFailures'] as SelectorFailure[] | undefined) ?? [];
 }
 
 /** L'écriture passe par une lecture-modification-écriture asynchrone : lui laisser un tour
@@ -230,19 +236,59 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     clearFakeAdapters();
   });
 
-  it('l’entrée porte trois champs, et rien d’autre', async () => {
+  it('l’entrée porte ses champs de diagnostic, et rien d’autre', async () => {
     const { written } = installChrome();
     const captured = await bootstrapWith('https://github.com/acme/demo/pull/42?view=1');
 
-    captured.log!.degraded({ name: 'merge-button', candidates: ['button'] });
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a', 'button.b'] });
     await settle();
 
     // Ce que ce test dit : la forme de l'entrée LOCALE. Ce qu'il ne dit pas, et qu'il ne
     // faut pas lui faire dire : ce qui part au collecteur — cela se mesure là où la charge
     // est construite, dans `degradation.test.ts` (égalité exacte sur l'événement
     // `{ kind, chain }`) et `telemetry.test.ts` (égalité exacte sur le corps émis).
-    expect(Object.keys(journal(written)[0]!).sort()).toEqual(['at', 'chain', 'url']);
-    expect(journal(written)[0]!.url).toContain('?view=1');
+    const entry = journal(written)[0]!;
+    expect(Object.keys(entry).sort()).toEqual([
+      'at',
+      'candidates',
+      'chain',
+      'count',
+      'firstAt',
+      'platform',
+      'url',
+    ]);
+    expect(entry.url).toContain('?view=1');
+    // Les candidats DANS L'ORDRE où la chaîne les a essayés : c'est ce qu'un développeur ouvre
+    // dans les outils du navigateur pour comprendre pourquoi aucun n'a répondu.
+    expect(entry.candidates).toEqual(['button.a', 'button.b']);
+    expect(entry.platform).toBe('github');
+    expect(entry.count).toBe(1);
+    expect(entry.firstAt).toBe(entry.at);
+
+    clearFakeAdapters();
+  });
+
+  it('une visite de plus fusionne dans la ligne : première date conservée, relevés comptés', async () => {
+    const { written } = installChrome();
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    await settle();
+    const first = journal(written)[0]!;
+
+    // La page suivante : `forgetSeen()` est ce que fait l'onglet en changeant de PR.
+    await new Promise((r) => setTimeout(r, 2));
+    captured.log!.forgetSeen();
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    for (let i = 0; i < 4; i++) await settle();
+
+    // Une seule ligne — la borne du journal n'a pas bougé —, mais elle sait qu'elle a été
+    // relevée deux fois, et depuis quand.
+    expect(journal(written)).toHaveLength(1);
+    const merged = journal(written)[0]!;
+    expect(merged.count).toBe(2);
+    expect(merged.firstAt).toBe(first.at);
+    expect(merged.at).not.toBe(first.at);
 
     clearFakeAdapters();
   });

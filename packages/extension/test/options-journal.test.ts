@@ -44,6 +44,8 @@ function installPage(local: Record<string, unknown>, language = 'fr'): Record<st
   };
 
   (globalThis as { chrome?: unknown }).chrome = {
+    // Le manifeste que la page lit pour afficher sa version : le rapport de débogage la reprend.
+    runtime: { getManifest: () => ({ version: '1.0.0', version_name: '1.0.0-beta.17' }) },
     permissions: { getAll: (cb: (p: { origins?: string[] }) => void) => cb({ origins: [] }) },
     storage: {
       local: {
@@ -86,8 +88,12 @@ const marks = (): HTMLElement[] => [
 ];
 const statusText = (): string =>
   document.querySelector('#selector-log .status-text')?.textContent ?? '';
-const clearButton = (): HTMLButtonElement | null =>
-  document.querySelector('#selector-log-detail button');
+// Retrouvé par son LIBELLÉ : le journal porte désormais un bouton « Copier » par ligne, et « le
+// premier bouton » n'est plus celui qui efface.
+const clearButton = (language = 'fr'): HTMLButtonElement | null =>
+  [...document.querySelectorAll<HTMLButtonElement>('#selector-log-detail button')].find(
+    (b) => b.textContent === ui(language, 'options.status.selectors.clear')
+  ) ?? null;
 
 afterEach(() => {
   vi.resetModules();
@@ -213,7 +219,157 @@ describe('§9.4 — effacer le journal', () => {
     installPage({ selectorFailures: SEEDED }, 'en');
     await loadOptions();
 
-    expect(clearButton()?.textContent).toBe(ui('en', 'options.status.selectors.clear'));
+    expect(clearButton('en')?.textContent).toBe(ui('en', 'options.status.selectors.clear'));
     expect(marks()[4]!.title).toBe(ui('en', 'options.status.selectors.page.unknown'));
+  });
+});
+
+// Le rapport pour un développeur (§9.4) : ce qu'un bouton met dans le presse-papiers.
+//
+// Le presse-papiers est un FAUX qui garde ce qu'on lui écrit — et qui peut refuser, comme le
+// navigateur le fait sans geste de l'utilisateur ou hors contexte sécurisé. Un faux qui
+// accepterait toujours ne pourrait pas exprimer le repli manuel.
+describe('§9.4 — copier pour le débogage', () => {
+  const RICH = [
+    {
+      chain: 'merge-button',
+      at: '2026-09-08T11:49:08.072Z',
+      url: `${PR}/files`,
+      candidates: ['button.merge-a', '[data-variant="primary"]'],
+      platform: 'github',
+      firstAt: '2026-09-01T08:00:00.000Z',
+      count: 4,
+    },
+    { chain: 'editors', at: '2026-09-08T11:49:08.342Z', url: `${PR}/files?diff=split` },
+  ];
+
+  function installClipboard(refuse = false): string[] {
+    const written: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (text: string) =>
+          refuse ? Promise.reject(new Error('NotAllowedError')) : (written.push(text), Promise.resolve()),
+      },
+    });
+    return written;
+  }
+
+  /** Le JSON du bloc : la clôture est du Markdown, le contenu doit être du JSON valide. */
+  function payload(report: string): Record<string, unknown> {
+    const match = /^(`{3,})json\n([\s\S]*)\n\1$/.exec(report);
+    expect(match, 'un bloc de code json, clôture comprise').not.toBeNull();
+    return JSON.parse(match![2]!) as Record<string, unknown>;
+  }
+
+  const rowButtons = (): HTMLButtonElement[] => [
+    ...document.querySelectorAll<HTMLButtonElement>('#selector-log-detail pre button'),
+  ];
+  const copyAllButton = (): HTMLButtonElement | undefined =>
+    [...document.querySelectorAll<HTMLButtonElement>('#selector-log-detail button')].find(
+      (b) => b.textContent === ui('fr', 'options.status.selectors.copyAll')
+    );
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  afterEach(() => {
+    delete (navigator as { clipboard?: unknown }).clipboard;
+  });
+
+  it('chaque ligne a son bouton, et il nomme la chaîne pour un lecteur d’écran', async () => {
+    installPage({ selectorFailures: RICH });
+    await loadOptions();
+
+    expect(rowButtons()).toHaveLength(RICH.length);
+    expect(rowButtons()[1]!.getAttribute('aria-label')).toBe(
+      ui('fr', 'options.status.selectors.copy.aria', { chain: 'editors' })
+    );
+  });
+
+  it('le bouton d’une ligne copie CETTE ligne, avec l’environnement', async () => {
+    const written = installClipboard();
+    installPage({ selectorFailures: RICH, degradedState: 'config-unreachable' });
+    await loadOptions();
+
+    rowButtons()[0]!.click();
+    await flush();
+
+    expect(written).toHaveLength(1);
+    const report = payload(written[0]!);
+    expect(report['selectorFailure']).toEqual(RICH[0]);
+    expect(report['extension']).toBe('v1.0.0-beta.17');
+    expect(report['degradedState']).toBe('config-unreachable');
+    expect(report['browser']).toBe(navigator.userAgent);
+    expect(report['language']).toBe('fr');
+    // L'autre ligne n'y est pas : le bouton de ligne ne copie pas le journal.
+    expect(written[0]).not.toContain('"editors"');
+  });
+
+  it('le bouton du journal copie TOUTES les lignes, dans l’ordre affiché', async () => {
+    const written = installClipboard();
+    installPage({ selectorFailures: RICH });
+    await loadOptions();
+
+    copyAllButton()!.click();
+    await flush();
+
+    expect(payload(written[0]!)['selectorFailures']).toEqual(RICH);
+  });
+
+  it('la page dit « copié » une fois le presse-papiers servi', async () => {
+    installClipboard();
+    installPage({ selectorFailures: RICH });
+    await loadOptions();
+
+    rowButtons()[0]!.click();
+    await flush();
+
+    expect(document.querySelector('#selector-log-detail [role="status"]')?.textContent).toBe(
+      ui('fr', 'options.status.selectors.copied')
+    );
+  });
+
+  it('un presse-papiers qui refuse n’est pas annoncé « copié » : le texte est offert, sélectionné', async () => {
+    installClipboard(true);
+    installPage({ selectorFailures: RICH });
+    await loadOptions();
+
+    rowButtons()[0]!.click();
+    await flush();
+
+    const status = document.querySelector('#selector-log-detail [role="status"]')!;
+    expect(status.textContent).toContain(ui('fr', 'options.status.selectors.copy.manual'));
+    expect(status.textContent).not.toContain(ui('fr', 'options.status.selectors.copied'));
+    const area = status.querySelector('textarea')!;
+    expect(payload(area.value)['selectorFailure']).toEqual(RICH[0]);
+    expect(area.readOnly).toBe(true);
+  });
+
+  it('le rapport tient quand une valeur contient une clôture Markdown', async () => {
+    const written = installClipboard();
+    installPage({
+      selectorFailures: [{ chain: 'x', at: 'y', candidates: ['a[title="```"]'] }],
+    });
+    await loadOptions();
+
+    rowButtons()[0]!.click();
+    await flush();
+
+    // Une clôture de trois accents refermerait le bloc au milieu du JSON.
+    expect(payload(written[0]!)['selectorFailure']).toEqual({
+      chain: 'x',
+      at: 'y',
+      candidates: ['a[title="```"]'],
+    });
+  });
+
+  it('les lignes d’avant ces champs se copient aussi', async () => {
+    const written = installClipboard();
+    installPage({ selectorFailures: SEEDED });
+    await loadOptions();
+
+    rowButtons()[4]!.click(); // l'entrée sans adresse
+    await flush();
+
+    expect(payload(written[0]!)['selectorFailure']).toEqual(SEEDED[4]);
   });
 });

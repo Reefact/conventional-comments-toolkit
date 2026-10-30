@@ -20,6 +20,8 @@ import { pageKey, pageMark } from '../page-mark.js';
 import { ui } from '../ui/strings.js';
 import { applyStaticStrings, currentLanguage } from './i18n.js';
 import { displayVersion } from './version.js';
+import { entryReport, journalReport, type ReportEnvironment } from './diagnostic-report.js';
+import type { SelectorFailure } from '../selector-failure.js';
 import { maybeStartTour, startTour } from './tour.js';
 import { copySnippet, responseLabelsSnippet } from './response-labels.js';
 import { LABEL_ORDER_KEY, normalizeStoredOrder, parseLabelOrder } from '../ui/label-order.js';
@@ -702,7 +704,7 @@ function refreshStatus(): void {
     );
 
     const failures =
-      (items['selectorFailures'] as { chain: string; at: string; url?: string }[] | undefined) ?? [];
+      (items['selectorFailures'] as SelectorFailure[] | undefined) ?? [];
     const log = document.getElementById('selector-log');
     renderStatus(
       log,
@@ -723,7 +725,32 @@ function refreshStatus(): void {
     if (detail) {
       while (detail.firstChild) detail.removeChild(detail.firstChild);
       if (failures.length > 0) {
-        detail.append(renderSelectorJournal(failures), renderSelectorLegend(), renderSelectorClear());
+        const feedback = document.createElement('div');
+        feedback.setAttribute('role', 'status');
+        feedback.className = 'status-hint';
+        const environment = (): ReportEnvironment => ({
+          extension: displayVersion(chrome?.runtime?.getManifest?.()),
+          browser: navigator.userAgent,
+          language: lang,
+          degradedState: degradedState ? String(degradedState) : null,
+          generatedAt: new Date().toISOString(),
+        });
+        const actions = document.createElement('div');
+        actions.className = 'status-actions';
+        actions.append(
+          makeButton(ui(lang, 'options.status.selectors.copyAll'), 'btn btn-s', () =>
+            copyReport(journalReport(failures, environment()), feedback)
+          ),
+          renderSelectorClear()
+        );
+        detail.append(
+          renderSelectorJournal(failures, (entry) =>
+            copyReport(entryReport(entry, environment()), feedback)
+          ),
+          renderSelectorLegend(),
+          actions,
+          feedback
+        );
       }
     }
   });
@@ -740,13 +767,42 @@ function refreshStatus(): void {
  * donc celle du dernier relevé de cette chaîne, jamais « la seule page où elle a échoué ».
  *
  * `createElement` + `textContent`, jamais d'`innerHTML` : ces valeurs viennent du stockage. */
-function renderSelectorJournal(failures: { chain: string; at: string; url?: string }[]): HTMLElement {
+function renderSelectorJournal(
+  failures: SelectorFailure[],
+  onCopy: (entry: SelectorFailure) => void
+): HTMLElement {
   const pre = document.createElement('pre');
   failures.forEach((f, i) => {
-    pre.append(renderPageMark(f.url), document.createTextNode(`  ${f.at} — ${f.chain}`));
+    // Le bouton OUVRE la ligne : un libellé de largeur constante garde la colonne des marques
+    // alignée, là où un bouton posé après un nom de chaîne de longueur variable la dispersait.
+    // Il copie le rapport de DÉBOGAGE de la ligne, pas le texte affiché : la ligne reste
+    // lisible par une personne, le rapport est fait pour un développeur (`diagnostic-report.ts`).
+    const copy = makeButton(ui(lang, 'options.status.selectors.copy'), 'btn btn-copy btn-inline', () =>
+      onCopy(f)
+    );
+    copy.setAttribute('aria-label', ui(lang, 'options.status.selectors.copy.aria', { chain: f.chain }));
+    pre.append(copy, renderPageMark(f.url), document.createTextNode(`  ${f.at} — ${f.chain}`));
     if (i < failures.length - 1) pre.append(document.createTextNode('\n'));
   });
   return pre;
+}
+
+/** Met un rapport dans le presse-papiers et DIT ce qui s'est passé. Quand le navigateur refuse,
+ * le texte est affiché, sélectionné, sous le message : la page ne prétend pas avoir copié ce
+ * qu'elle n'a pas copié (même contrat que le bloc de labels, `copySnippet`). */
+function copyReport(text: string, feedback: HTMLElement): void {
+  const area = document.createElement('textarea');
+  area.readOnly = true;
+  area.className = 'report-fallback';
+  area.rows = 8;
+  area.value = text;
+  void copySnippet(text, navigator.clipboard, () => {
+    feedback.replaceChildren(ui(lang, 'options.status.selectors.copy.manual'), area);
+    area.focus();
+    area.select();
+  }).then((outcome) => {
+    if (outcome === 'copied') feedback.textContent = ui(lang, 'options.status.selectors.copied');
+  });
 }
 
 /** La marque d'une entrée : un lien vers l'adresse relevée, ou un remplissage neutre.

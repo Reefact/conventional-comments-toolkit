@@ -1,4 +1,4 @@
-// Le rapport de débogage de la page d'options (§9.4) : sa forme, indépendamment de la page qui
+// Le rapport de débogage de la page d'options (§9.4, CA-11) : sa forme, indépendamment de la page qui
 // le fabrique. Le câblage des boutons est mesuré dans `options-journal.test.ts`.
 
 import { describe, expect, it } from 'vitest';

@@ -81,10 +81,20 @@ function describe(reason: unknown): CapturedError {
  * script de contenu — `captureErrors` s'y inscrit, `stop()` l'en retire. */
 let active: ((reason: unknown, context?: ErrorContext) => void) | null = null;
 
-/** Les exceptions déjà relevées PAR UN POINT D'ENTRÉE : le gestionnaire global les revoit — un
- * enrobage relance l'erreur, pour que la console et le comportement restent ce qu'ils étaient — et
- * ne doit pas les compter une seconde fois, sans contexte. */
-const reported = new WeakSet<object>();
+/** Les exceptions déjà relevées PAR UN POINT D'ENTRÉE, et la VISITE où elles l'ont été : le
+ * gestionnaire global les revoit — un enrobage relance l'erreur, pour que la console et le
+ * comportement restent ce qu'ils étaient — et ne doit pas les compter une seconde fois, sans
+ * contexte ; un enrobage extérieur non plus.
+ *
+ * Une marque vaut pour une visite, pas pour l'identité de l'objet à vie. Une même instance
+ * d'`Error` peut être relancée à chaque visite — une promesse mémoïsée qui rejette, une erreur
+ * gardée en constante : un `WeakSet` permanent la tenait pour relevée une fois pour toutes, et
+ * la visite suivante ne la voyait plus (revue Reefact, PR #108), contredisant `forgetSeen()`.
+ * `generation` avance à chaque oubli et à chaque (re)démarrage de la capture : la marque d'une
+ * visite d'avant ne supprime plus rien. Dans une visite, relever la même instance deux fois
+ * n'aurait de toute façon rien changé — `seen` la dédoublonne par contexte et message. */
+const reported = new WeakMap<object, number>();
+let generation = 0;
 
 const isObject = (value: unknown): value is object =>
   (typeof value === 'object' && value !== null) || typeof value === 'function';
@@ -105,8 +115,8 @@ export function guarded<A extends unknown[], R>(
 ): (...args: A) => R {
   const report = (error: unknown): void => {
     if (isObject(error)) {
-      if (reported.has(error)) return; // déjà relevée, par un enrobage plus proche
-      reported.add(error);
+      if (reported.get(error) === generation) return; // déjà relevée, par un enrobage plus proche
+      reported.set(error, generation);
     }
     active?.(error, context);
   };
@@ -171,7 +181,7 @@ export function captureErrors(win: Window, record: (error: CapturedError) => voi
   // Le filet : ce qui a échappé à tout point d'entrée enrobé, donc sans contexte. Une exception
   // que `guarded` a déjà relevée y repasse (il la relance) et n'est pas comptée deux fois.
   const fromGlobal = (reason: unknown): void => {
-    if (isObject(reason) && reported.has(reason)) return;
+    if (isObject(reason) && reported.get(reason) === generation) return;
     handle(reason);
   };
   const onError = (event: ErrorEvent): void => fromGlobal(event.error ?? event.message);
@@ -180,13 +190,18 @@ export function captureErrors(win: Window, record: (error: CapturedError) => voi
   win.addEventListener('unhandledrejection', onRejection);
   const mine = (reason: unknown, context?: ErrorContext): void => handle(reason, context);
   active = mine;
+  generation += 1; // une nouvelle capture est une nouvelle visite : rien de ce qui précède n'y compte
 
   return {
     stop: () => {
       win.removeEventListener('error', onError);
       win.removeEventListener('unhandledrejection', onRejection);
       if (active === mine) active = null;
+      generation += 1;
     },
-    forgetSeen: () => seen.clear(),
+    forgetSeen: () => {
+      seen.clear();
+      generation += 1; // les marques de la visite qui s'achève ne valent plus pour la suivante
+    },
   };
 }

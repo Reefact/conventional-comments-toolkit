@@ -8,6 +8,24 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
 navigateur des personnes ayant installé l'extension.
 
+## 1.0.0-beta.18 — 30 octobre 2026
+
+_Le journal de la page de réglages dit en une phrase ce qui s'est mal passé, enregistre les erreurs de l'extension et se copie pour un rapport de bug ; le filtre des fils par label fonctionne de nouveau sur GitHub._
+
+### ✨ Nouveautés
+
+- **Le journal de la page de réglages se copie pour un rapport de bug.** Chaque ligne a une icône de copie, et un bouton copie tout le journal. Ce que vous collez dans une issue porte la version de l'extension, votre navigateur et ce dont un développeur a besoin pour rouvrir le problème, mais aucun contenu des pages que vous relisiez. L'adresse de la page en fait partie : relisez-la avant de coller dans une issue publique.
+
+- **Chaque ligne du journal dit en une phrase ce qui s'est mal passé.** « Bouton de fusion introuvable : impossible de le griser » au lieu de `merge-button`, avec un niveau, `WARN` ou `ERROR`. Le nom technique reste dans la copie.
+
+- **L'extension enregistre maintenant ses propres erreurs.** Un plantage ne laissait aucune trace. Il apparaît désormais comme une ligne `ERROR` qui dit ce que l'extension faisait, et le détail est dans la copie. Elles restent sur votre appareil.
+
+### 🐛 Corrections
+
+- **Le filtre des fils par label les masque de nouveau sur GitHub.** GitHub forçait chaque fil à rester visible : un fil filtré restait à l'écran. Choisir `praise` ne laisse plus un fil `issue` affiché.
+
+- **Effacer le filtre rend à un fil son affichage d'origine.** Un fil qui avait déjà un réglage d'affichage forcé le perdait une fois le filtre effacé, et le style propre à GitHub pouvait de nouveau l'écraser.
+
 ## 1.0.0-beta.17 — 29 octobre 2026
 
 _Deux champs de la page de réglages ne s'affichent plus en blanc dans le thème sombre._

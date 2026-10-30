@@ -8,6 +8,24 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
 extension installed.
 
+## 1.0.0-beta.18 — October 30, 2026
+
+_The settings page's journal says what went wrong in a sentence, records the extension's own errors and can be copied for a bug report; filtering threads by label works on GitHub again._
+
+### ✨ Features
+
+- **The journal on the settings page can be copied for a bug report.** Each line has a copy icon, and a button copies the whole journal. What you paste into an issue carries the extension version, your browser and what a developer needs to reopen the problem, and none of the content of the pages you were reviewing. The address of the page is part of it, so look at it before you paste it into a public issue.
+
+- **Each journal line says what went wrong in a sentence.** "Merge button not found: it cannot be greyed out" instead of `merge-button`, with a level, `WARN` or `ERROR`. The technical name stays in the copy.
+
+- **The extension now records its own errors.** A crash used to leave no trace. It now shows up as an `ERROR` line that says what the extension was doing, and the details are in the copy. They stay on your device.
+
+### 🐛 Bug fixes
+
+- **Filtering threads by label hides them on GitHub again.** GitHub forced every thread to stay visible, so a thread you had filtered out stayed on screen. Selecting `praise` no longer leaves an `issue` thread showing.
+
+- **Clearing the filter gives a thread its original display back.** A thread that already had a forced display setting lost it once the filter was cleared, and GitHub's own styling could override it again.
+
 ## 1.0.0-beta.17 — October 29, 2026
 
 _Two fields of the settings page no longer show up white in the dark theme._

@@ -12,6 +12,22 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [1.0.0-beta.18] - 2026-10-30
+
+### Added
+
+- **The settings page's journal can be copied for debugging, line by line or whole.** Every line opens with a copy icon that is both its bullet and its button, and a "Copy the whole log (debug)" button copies everything. What reaches the clipboard is JSON in a Markdown code block, ready to paste into an issue: the entry or entries, plus the extension version, the browser, the language, the configuration state and the time of the copy. When the browser refuses the clipboard, the text is shown selected and the page does not claim to have copied it; after a successful copy the icon turns into a check for a moment. The copy keeps what the screen does not show: the chain's name, the candidates it tried, the platform, the first observation and on how many page visits it was recorded, and for an exception its message and stack. It holds no content of the page, but it does hold the page's address, which on an enterprise server names a repository and a review, and the truncated message of an exception can quote what the code was handling (§9.4, CA-11).
+
+- **Each journal line has a level and says the problem in a sentence.** A line reads `<level>, <when> — <what> (<where>)`, with `WARN` for a selector that found nothing and `ERROR` for an exception; the level is derived from the kind of line, never stored. "What" is a sentence in the language of the page, such as "Merge button not found: it cannot be greyed out" or "PR creation date not found: PR treated as out of scope, nothing is blocked". A selector chain declares what it is for with a key from a closed, platform-neutral vocabulary of nine identifiers, so that the shared code never names a platform; a chain without a key, and a line written before keys existed, keep showing the chain's name. The header of the Status section now counts entries instead of "selector degradations". Eleven of the 47 chains can reach the journal, and a test per adapter reads its journaling calls and requires a key on each, so a call added later without one fails instead of showing a platform name.
+
+- **The extension's own exceptions now reach the journal.** They used to go to the page's console and nowhere else, so a crash left the journal empty. An uncaught exception or rejected promise of the extension's code becomes an `ERROR` line, recorded once per message and page visit, with its message and stack truncated. Its sentence says what the code was doing: displaying the page, reading the configuration, handling a comment field, detecting comment fields, or sending the telemetry counters. An exception that escapes every one of those entry points is still recorded, and reads "Unexpected error (function not identified)" rather than naming a function. The technical message and the stack are in the copy, never on screen. Exceptions raised by the page itself and those the extension catches are not recorded, nor are the errors of an extension reloaded under an open tab. They never leave the device, whether telemetry is on or off, and `PRIVACY.md` lists them.
+
+### Fixed
+
+- **Filtering the threads by label hides them on GitHub again.** GitHub gives every review thread `display: block !important`, which beats the plain inline `display: none` the filter used: the thread was marked hidden and stayed on screen, collapsed or expanded alike, so selecting `praise` still showed an `issue` thread. The filter now sets the inline declaration with the `important` priority (§5.5).
+
+- **A thread that already carried a forced inline `display` gets it back unchanged when the filter is cleared.** The filter restored only the value, which dropped the `!important` and let a platform class such as `d-block` override it again.
+
 ## [1.0.0-beta.17] - 2026-10-29
 
 ### Fixed
@@ -697,6 +713,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[1.0.0-beta.18]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.17...v1.0.0-beta.18
 [1.0.0-beta.17]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.16...v1.0.0-beta.17
 [1.0.0-beta.16]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.15...v1.0.0-beta.16
 [1.0.0-beta.15]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.14...v1.0.0-beta.15

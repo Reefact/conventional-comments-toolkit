@@ -24,8 +24,10 @@ const known = (chain: SelectorChain | undefined): chain is SelectorChain =>
   chain !== undefined && (SELECTOR_PROBLEMS as readonly string[]).includes(chain.problem ?? '');
 
 describe('§9.4 — GitHub : chaque chaîne journalisée dit à quoi elle sert', () => {
-  // `this.log.degraded(selectors.mergeButton)`, `this.log.degraded(ALL_EDITORS)`…
-  const calls = [...SOURCE.matchAll(/\.log\.degraded\(\s*([A-Za-z_.]+)\s*\)/g)].map((m) => m[1]!);
+  // `this.#degraded(selectors.mergeButton)`, `this.#degraded(ALL_EDITORS, this.#doc, { … })`…
+  // — et l'appel à `log.degraded(chain, …)` que fait `#degraded` lui-même, par variable. Les
+  // arguments qui suivent la chaîne (racine, relevé) ne changent rien à ce qui est journalisé.
+  const calls = [...SOURCE.matchAll(/(?:\.log\.degraded|this\.#degraded)\(\s*([A-Za-z_.]+)\s*[,)]/g)].map((m) => m[1]!);
 
   /** L'expression passée à `degraded()`, résolue vers la chaîne qu'elle désigne. */
   const resolve = (expression: string): SelectorChain | undefined => {
@@ -47,8 +49,8 @@ describe('§9.4 — GitHub : chaque chaîne journalisée dit à quoi elle sert',
     expect(known(resolve(expression)), expression).toBe(true);
   });
 
-  // `degraded(chain)` sur une variable : la seule, aujourd'hui, parcourt les châssis de chaque
-  // surface. L'attendre ici nomme ce que ce test ne lit pas dans les appels — et si un autre
+  // `degraded(chain)` sur une variable : `#degraded` lui-même, qui relaie la chaîne qu'on lui
+  // passe, et la boucle sur les châssis de chaque surface — les deux sous le même nom. L'attendre ici nomme ce que ce test ne lit pas dans les appels — et si un autre
   // appel par variable apparaît, la liste des inconnus change et ce test échoue avec lui.
   it('les appels par variable sont connus, et leurs chaînes aussi', () => {
     const byVariable = [...new Set(calls)].filter((expression) => resolve(expression) === undefined);

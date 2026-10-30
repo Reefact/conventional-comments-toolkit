@@ -92,5 +92,6 @@ export const SURFACES: readonly GithubSurface[] = [
  * toujours par diverger de celle qui sert. */
 export const ALL_EDITORS: SelectorChain = {
   name: 'editors',
+  problem: 'editor-field',
   candidates: SURFACES.flatMap((s) => s.editors.candidates),
 };

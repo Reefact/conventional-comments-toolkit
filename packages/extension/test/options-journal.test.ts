@@ -86,6 +86,9 @@ async function loadOptions(): Promise<void> {
 const marks = (): HTMLElement[] => [
   ...document.querySelectorAll<HTMLElement>('#selector-log-detail .page-mark, #selector-log-detail .page-mark-none'),
 ];
+// Une ligne par ENTRÉE : c'est un élément, pas un saut de ligne — la ligne se replie sous son niveau.
+const journalRows = (): string[] =>
+  [...document.querySelectorAll('#selector-log-detail pre .journal-row')].map((r) => r.textContent ?? '');
 const statusText = (): string =>
   document.querySelector('#selector-log .status-text')?.textContent ?? '';
 // Retrouvé par son LIBELLÉ : le journal porte désormais un bouton « Copier » par ligne, et « le
@@ -148,17 +151,15 @@ describe('§9.4 / CA-11 — la marque répond « quelle page »', () => {
     expect(document.querySelector('#selector-log-detail a')).toBeNull();
   });
 
-  it('une ligne se lit « quand — quoi (où) », la marque entre parenthèses', async () => {
+  it('une ligne se lit « niveau, quand — quoi (où) », la marque entre parenthèses', async () => {
     installPage({ selectorFailures: SEEDED });
     await loadOptions();
 
     // La marque CLÔT la ligne, elle ne la remplace pas : le bouton d'icône ouvre la ligne, puis
-    // l'horodatage, la chaîne, et la page entre parenthèses.
-    const first = document.querySelector('#selector-log-detail pre')!.textContent!.split('\n')[0]!;
-    expect(first).toBe(`2026-09-08T11:49:08.072Z — merge-button (${pageMark(`${PR}/files`)})`);
-    expect(document.querySelector('#selector-log-detail pre')!.textContent!.split('\n')).toHaveLength(
-      SEEDED.length
-    );
+    // le niveau, l'horodatage, la chaîne, et la page entre parenthèses.
+    const lines = journalRows();
+    expect(lines[0]).toBe(`WARN  2026-09-08T11:49:08.072Z — merge-button (${pageMark(`${PR}/files`)})`);
+    expect(lines).toHaveLength(SEEDED.length); // une ligne par entrée
   });
 });
 
@@ -284,7 +285,7 @@ describe('§9.4 — copier pour le débogage', () => {
 
     expect(rowButtons()).toHaveLength(RICH.length);
     expect(rowButtons()[1]!.getAttribute('aria-label')).toBe(
-      ui('fr', 'options.status.selectors.copy.aria', { chain: 'editors' })
+      ui('fr', 'options.status.selectors.copy.aria', { what: 'editors' })
     );
   });
 
@@ -298,7 +299,7 @@ describe('§9.4 — copier pour le débogage', () => {
 
     expect(written).toHaveLength(1);
     const report = payload(written[0]!);
-    expect(report['selectorFailure']).toEqual(RICH[0]);
+    expect(report['entry']).toEqual(RICH[0]);
     expect(report['extension']).toBe('v1.0.0-beta.17');
     expect(report['degradedState']).toBe('config-unreachable');
     expect(report['browser']).toBe(navigator.userAgent);
@@ -315,7 +316,7 @@ describe('§9.4 — copier pour le débogage', () => {
     copyAllButton()!.click();
     await flush();
 
-    expect(payload(written[0]!)['selectorFailures']).toEqual(RICH);
+    expect(payload(written[0]!)['entries']).toEqual(RICH);
   });
 
   it('le bouton de ligne est l’icône qui ouvre la ligne, et il passe en coche une fois copié', async () => {
@@ -323,8 +324,8 @@ describe('§9.4 — copier pour le débogage', () => {
     installPage({ selectorFailures: RICH });
     await loadOptions();
 
-    const pre = document.querySelector('#selector-log-detail pre')!;
-    expect(pre.firstElementChild).toBe(rowButtons()[0]); // la puce, avant l'horodatage
+    const row = document.querySelector('#selector-log-detail pre .journal-row')!;
+    expect(row.firstElementChild).toBe(rowButtons()[0]); // la puce, avant le niveau et l'horodatage
     expect(rowButtons()[0]!.textContent).toBe(''); // une icône, aucun libellé : le nom est l'aria-label
     expect(rowButtons()[0]!.classList.contains('copied')).toBe(false);
 
@@ -381,7 +382,7 @@ describe('§9.4 — copier pour le débogage', () => {
     expect(status.textContent).toContain(ui('fr', 'options.status.selectors.copy.manual'));
     expect(status.textContent).not.toContain(ui('fr', 'options.status.selectors.copied'));
     const area = status.querySelector('textarea')!;
-    expect(payload(area.value)['selectorFailure']).toEqual(RICH[0]);
+    expect(payload(area.value)['entry']).toEqual(RICH[0]);
     expect(area.readOnly).toBe(true);
   });
 
@@ -405,7 +406,7 @@ describe('§9.4 — copier pour le débogage', () => {
     await flush();
 
     // Une clôture de trois accents refermerait le bloc au milieu du JSON.
-    expect(payload(written[0]!)['selectorFailure']).toEqual({
+    expect(payload(written[0]!)['entry']).toEqual({
       chain: 'x',
       at: 'y',
       candidates: ['a[title="```"]'],
@@ -420,6 +421,93 @@ describe('§9.4 — copier pour le débogage', () => {
     rowButtons()[4]!.click(); // l'entrée sans adresse
     await flush();
 
-    expect(payload(written[0]!)['selectorFailure']).toEqual(SEEDED[4]);
+    expect(payload(written[0]!)['entry']).toEqual(SEEDED[4]);
   });
 });
+
+// Le journal dit le PROBLÈME, pas le nom de la chaîne (§9.4) : une phrase courte dans la langue
+// de la page, un niveau (WARN pour un sélecteur, ERROR pour une exception), le nom de la chaîne
+// et le détail restant dans le rapport copié.
+describe('§9.4 — une ligne dit le problème, avec son niveau', () => {
+  const MIXED = [
+    { chain: 'merge-button', problem: 'completion-control', at: '2026-10-30T08:35:55.958Z', url: `${PR}/files` },
+    // Écrite avant les clés de description : le nom reste ce que la ligne dit.
+    { chain: 'legacy-chain', at: '2026-10-30T07:56:08.497Z', url: `${PR}/files` },
+    // Une clé que CETTE version ne connaît pas : jamais affichée telle quelle.
+    { chain: 'future-chain', problem: 'inconnue-de-cette-version', at: '2026-10-30T07:56:09.000Z' },
+    { kind: 'error', message: 'TypeError: x is undefined', at: '2026-10-30T09:02:00.000Z', url: `${PR}/files` },
+  ];
+
+  const rows = journalRows;
+  const tags = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('#selector-log-detail .lvl')];
+
+  it('une chaîne qui déclare sa fonction s’affiche par la phrase de cette fonction', async () => {
+    installPage({ selectorFailures: MIXED });
+    await loadOptions();
+
+    expect(rows()[0]).toContain(ui('fr', 'options.journal.problem.completion-control'));
+    // Le nom de la chaîne est un mot de plateforme : il vit dans le rapport copié.
+    expect(rows()[0]).not.toContain('merge-button');
+  });
+
+  it('la phrase suit la langue de la page', async () => {
+    installPage({ selectorFailures: MIXED }, 'en');
+    await loadOptions();
+
+    expect(rows()[0]).toContain(ui('en', 'options.journal.problem.completion-control'));
+    expect(rows()[0]).not.toContain(ui('fr', 'options.journal.problem.completion-control'));
+  });
+
+  it('sans clé, ou avec une clé inconnue, la ligne garde le nom de la chaîne', async () => {
+    installPage({ selectorFailures: MIXED });
+    await loadOptions();
+
+    expect(rows()[1]).toContain('legacy-chain');
+    expect(rows()[2]).toContain('future-chain');
+    expect(rows()[2]).not.toContain('options.journal.problem'); // jamais la clé brute
+  });
+
+  it('une exception se dit par son message, au niveau ERROR', async () => {
+    installPage({ selectorFailures: MIXED });
+    await loadOptions();
+
+    expect(rows()[3]).toContain(ui('fr', 'options.journal.error', { message: 'TypeError: x is undefined' }));
+    expect(tags().map((t) => t.textContent)).toEqual(['WARN', 'WARN', 'WARN', 'ERROR']);
+    expect(tags()[3]!.classList.contains('lvl-error')).toBe(true);
+    expect(tags()[0]!.classList.contains('lvl-warn')).toBe(true);
+  });
+
+  it('le niveau reste WARN / ERROR dans toutes les langues : c’est un identifiant', async () => {
+    installPage({ selectorFailures: MIXED }, 'en');
+    await loadOptions();
+
+    expect(tags().map((t) => t.textContent)).toEqual(['WARN', 'WARN', 'WARN', 'ERROR']);
+  });
+
+  it('l’en-tête compte des ENTRÉES : il n’accuse plus les seuls sélecteurs', async () => {
+    installPage({ selectorFailures: MIXED });
+    await loadOptions();
+
+    expect(statusText()).toBe(ui('fr', 'options.status.selectors.some', { count: MIXED.length }));
+    expect(statusText()).not.toContain('sélecteur');
+  });
+
+  it('la copie d’une ligne d’erreur porte le message et la pile, pas la phrase affichée', async () => {
+    const written: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (t: string) => (written.push(t), Promise.resolve()) },
+    });
+    const withStack = { kind: 'error', message: 'TypeError: x is undefined', stack: 'at f (content.js:1:1)', at: 'x' };
+    installPage({ selectorFailures: [withStack] });
+    await loadOptions();
+
+    document.querySelector<HTMLButtonElement>('#selector-log-detail pre button')!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    delete (navigator as { clipboard?: unknown }).clipboard;
+
+    expect(written[0]).toContain('"kind": "error"');
+    expect(written[0]).toContain('at f (content.js:1:1)');
+  });
+});
+

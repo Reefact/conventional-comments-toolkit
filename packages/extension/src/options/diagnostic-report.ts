@@ -1,12 +1,12 @@
 // Le texte que la page d'options met dans le presse-papiers pour un développeur : une ligne du
-// journal de dégradation de sélecteurs (§9.4), ou le journal entier, avec de quoi le situer
+// journal (§9.4), ou le journal entier, avec de quoi le situer
 // (version, navigateur, état de configuration).
 //
 // Du JSON dans un bloc de code Markdown : il se colle tel quel dans une issue, et un outil le lit
 // sans rien deviner. Tout vient du journal local et du navigateur — jamais du contenu de la page,
 // que ce journal ne garde pas.
 
-import type { SelectorFailure } from '../selector-failure.js';
+import type { JournalEntry } from '../journal-entry.js';
 
 export interface ReportEnvironment {
   /** `v1.0.0-beta.17`, ou null si le navigateur ne donne pas de manifeste. */
@@ -44,11 +44,11 @@ function header(env: ReportEnvironment): Record<string, unknown> {
 }
 
 /** Une ligne, avec l'environnement : ce qu'on colle sous « ce sélecteur ne répond plus ». */
-export function entryReport(entry: SelectorFailure, env: ReportEnvironment): string {
-  return block({ ...header(env), selectorFailure: entry });
+export function entryReport(entry: JournalEntry, env: ReportEnvironment): string {
+  return block({ ...header(env), entry });
 }
 
 /** Tout le journal, dans l'ordre où la page l'affiche. */
-export function journalReport(entries: readonly SelectorFailure[], env: ReportEnvironment): string {
-  return block({ ...header(env), selectorFailures: entries });
+export function journalReport(entries: readonly JournalEntry[], env: ReportEnvironment): string {
+  return block({ ...header(env), entries });
 }

@@ -33,6 +33,7 @@ export const selectors = {
 
   completeButton: {
     name: 'complete-button',
+    problem: 'completion-control',
     candidates: ['button[data-testid*="complete"]', '#pull-request-complete-button', 'button[aria-label*="omplete"]'],
   } satisfies SelectorChain,
 
@@ -79,6 +80,7 @@ export const selectors = {
    * portent aussi « discussion-comment » dans leur classe. */
   renderedComment: {
     name: 'rendered-comment',
+    problem: 'rendered-comment-ancestor',
     candidates: ['.repos-discussion-comment', '[class*="discussion-comment"]:not([class*="editor"])'],
   } satisfies SelectorChain,
 

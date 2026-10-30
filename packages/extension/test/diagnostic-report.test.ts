@@ -26,7 +26,7 @@ describe('§9.4 — le rapport de débogage', () => {
       language: 'en',
       degradedState: null,
       generatedAt: '2026-10-30T10:00:00.000Z',
-      selectorFailure: ENTRY,
+      entry: ENTRY,
     });
   });
 
@@ -35,7 +35,7 @@ describe('§9.4 — le rapport de débogage', () => {
     const report = journalReport([ENTRY, second], ENV);
     const parsed = JSON.parse(report.slice('```json\n'.length, -'\n```'.length));
 
-    expect(parsed.selectorFailures).toEqual([ENTRY, second]);
+    expect(parsed.entries).toEqual([ENTRY, second]);
   });
 
   it('une version absente reste visible comme `null`, pas omise', () => {

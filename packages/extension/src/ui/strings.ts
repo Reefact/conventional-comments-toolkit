@@ -175,7 +175,7 @@ const fr: Record<string, string> = {
   'options.status.selectors.copyAll': 'Copier tout le journal (débogage)',
   'options.status.selectors.copied': 'Copié dans le presse-papiers.',
   'options.status.selectors.copy.manual':
-    'Copie automatique impossible : le texte est sélectionné ci-dessous, Ctrl+C pour le copier.',
+    'Copie automatique impossible : le texte est sélectionné ci-dessous, copiez-le avec Ctrl+C (⌘C sur Mac).',
   'options.platform.github': 'GitHub Enterprise Server / GHE Cloud',
   'options.platform.azdo': 'Azure DevOps Server ou organisation visualstudio.com',
   'options.platform.config': 'Hôte de configuration uniquement',
@@ -392,7 +392,7 @@ const en: Record<string, string> = {
   'options.status.selectors.copyAll': 'Copy the whole log (debug)',
   'options.status.selectors.copied': 'Copied to the clipboard.',
   'options.status.selectors.copy.manual':
-    'Automatic copy failed: the text is selected below, press Ctrl+C to copy it.',
+    'Automatic copy failed: the text is selected below, copy it with Ctrl+C (⌘C on Mac).',
   'options.platform.github': 'GitHub Enterprise Server / GHE Cloud',
   'options.platform.azdo': 'Azure DevOps Server or visualstudio.com organisation',
   'options.platform.config': 'Configuration host only',

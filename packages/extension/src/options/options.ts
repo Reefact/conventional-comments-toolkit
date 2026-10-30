@@ -842,10 +842,17 @@ function renderSelectorJournal(
  *
  * Une exception se dit par une phrase FONCTIONNELLE, comme les autres lignes, jamais par son
  * message technique : `TypeError: Cannot read properties of undefined` ne dit rien à qui lit la
- * page d'options. Ce que l'on sait d'elle sans mentir, c'est qu'une fonction s'est interrompue ;
- * le message et la pile, eux, vivent dans l'entrée et dans le rapport copié. */
+ * page d'options. La phrase est celle de ce que le code FAISAIT (`context`, posé par l'enrobage
+ * `guarded` du point d'entrée) — « pendant », jamais « à cause de ». Une exception qui a échappé
+ * à tout point d'entrée n'a pas de contexte : la phrase dit alors qu'on ne sait pas quelle
+ * fonction, plutôt que d'en inventer une. Le message et la pile vivent dans l'entrée et dans le
+ * rapport copié. */
 function describeEntry(entry: JournalEntry): string {
-  if (entry.kind === 'error') return ui(lang, 'options.journal.error');
+  if (entry.kind === 'error') {
+    const key = `options.journal.error.${entry.context ?? ''}`;
+    const text = entry.context ? ui(lang, key) : key;
+    return text !== key ? text : ui(lang, 'options.journal.error');
+  }
   if (entry.problem) {
     const key = `options.journal.problem.${entry.problem}`;
     const text = ui(lang, key);

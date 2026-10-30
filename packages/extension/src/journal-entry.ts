@@ -43,6 +43,10 @@ export interface ErrorEntry extends EntryBase {
   kind: 'error';
   message: string;
   stack?: string;
+  /** Ce que le code FAISAIT quand l'exception a été levée, dans un vocabulaire fermé
+   * (`ERROR_CONTEXTS`) : la page d'options en tire la phrase affichée. Absent, l'exception a
+   * échappé à tout point d'entrée connu — on sait qu'elle a eu lieu, pas pendant quoi. */
+  context?: string;
 }
 
 export type JournalEntry = SelectorFailure | ErrorEntry;
@@ -53,10 +57,11 @@ export function entryLevel(entry: JournalEntry): JournalLevel {
   return entry.kind === 'error' ? 'error' : 'warn';
 }
 
-/** Ce qui fait que deux lignes sont LA MÊME : la chaîne, ou le message d'une exception. Un nom
- * de chaîne ne peut pas commencer par `error:` — le préfixe suffit à séparer les deux espaces. */
+/** Ce qui fait que deux lignes sont LA MÊME : la chaîne, ou le contexte et le message d'une
+ * exception — le même message levé pendant deux choses différentes est deux lignes. Un nom de
+ * chaîne ne peut pas commencer par `error:` : le préfixe suffit à séparer les deux espaces. */
 export function entryKey(entry: JournalEntry): string {
-  return entry.kind === 'error' ? `error:${entry.message}` : entry.chain;
+  return entry.kind === 'error' ? `error:${entry.context ?? ''}:${entry.message}` : entry.chain;
 }
 
 /** La ligne écrite remplace la précédente de la même clé, mais lui reprend ce qu'elle sait.

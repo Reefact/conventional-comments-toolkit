@@ -5,6 +5,7 @@
 
 import { defaultConfig, enabledLabels, matchPrefix, resolveLabel, splitBody, type EffectiveConfig } from '@cct/core';
 import { labelsByZone } from './label-order.js';
+import { listen } from '../error-capture.js';
 import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
 
 export interface QuickInputOptions {
@@ -103,7 +104,7 @@ export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void
       li.setAttribute('role', 'option');
       li.setAttribute('aria-selected', i === selected ? 'true' : 'false');
       li.textContent = `${id}: `;
-      li.addEventListener('mousedown', (e) => {
+      listen('editor', li, 'mousedown', (e) => {
         e.preventDefault();
         accept(id);
       });
@@ -186,12 +187,12 @@ export function attachQuickInput(opts: QuickInputOptions): { dispose: () => void
     else closeList();
   };
 
-  element.addEventListener('keydown', onKeydown);
-  element.addEventListener('input', onInput);
+  const guardedKeydown = listen('editor', element, 'keydown', onKeydown);
+  const guardedInput = listen('editor', element, 'input', onInput);
   return {
     dispose: () => {
-      element.removeEventListener('keydown', onKeydown);
-      element.removeEventListener('input', onInput);
+      element.removeEventListener('keydown', guardedKeydown as EventListener);
+      element.removeEventListener('input', guardedInput as EventListener);
       closeList();
     },
   };

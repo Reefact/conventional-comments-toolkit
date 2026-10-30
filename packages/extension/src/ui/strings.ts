@@ -167,7 +167,13 @@ const fr: Record<string, string> = {
   'options.status.ok': 'Configuration lue normalement.',
   'options.status.selectors.none': 'Aucune entrée au journal.',
   'options.status.selectors.some': '{count} entrée(s) au journal.',
-  'options.journal.error': 'Erreur inattendue : une fonction de l’extension s’est interrompue',
+  'options.journal.error': 'Erreur inattendue (fonction non identifiée)',
+  'options.journal.error.render':
+    'Erreur pendant l’affichage de la page (bandeau, badges, filtre de fils)',
+  'options.journal.error.config': 'Erreur pendant la lecture de la configuration',
+  'options.journal.error.editor':
+    'Erreur pendant la gestion d’un champ de commentaire (barre d’outils, validation, envoi)',
+  'options.journal.error.telemetry': 'Erreur pendant l’envoi des compteurs de télémétrie',
   'options.journal.problem.editor-field':
     'Champ de saisie non reconnu : ni barre d’outils ni validation dessus',
   'options.journal.problem.editor-frame':
@@ -403,7 +409,13 @@ const en: Record<string, string> = {
   'options.status.ok': 'Configuration read normally.',
   'options.status.selectors.none': 'No journal entry.',
   'options.status.selectors.some': '{count} journal entry(ies).',
-  'options.journal.error': 'Unexpected error: an extension function was interrupted',
+  'options.journal.error': 'Unexpected error (function not identified)',
+  'options.journal.error.render':
+    'Error while displaying the page (banner, badges, thread filter)',
+  'options.journal.error.config': 'Error while reading the configuration',
+  'options.journal.error.editor':
+    'Error while handling a comment field (toolbar, validation, submission)',
+  'options.journal.error.telemetry': 'Error while sending the telemetry counters',
   'options.journal.problem.editor-field':
     'Input field not recognised: no toolbar or validation on it',
   'options.journal.problem.editor-frame':

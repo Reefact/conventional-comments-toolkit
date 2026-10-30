@@ -21,7 +21,11 @@ import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factori
 // serait alors relevée par autant d'onglets fantômes qu'il y a eu de tests avant elle.
 const bootstrapped: (() => void)[] = [];
 
+/** Ce que l'adaptateur de test doit casser, à la demande, UNE fois — remis à zéro après chaque test. */
+const behavior = { failRender: false };
+
 afterEach(() => {
+  behavior.failRender = false;
   for (const dispose of bootstrapped.splice(0)) dispose();
   vi.resetModules();
   delete (globalThis as { chrome?: unknown }).chrome;
@@ -100,6 +104,12 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
             return null;
           },
           getRenderedThreadElements() {
+            // UNE fois : une panne persistante traverserait aussi le rendu asynchrone, dont la chaîne
+            // de promesses n'a pas de `.catch` — un rejet non géré, qui ferait échouer toute la suite.
+            if (behavior.failRender) {
+              behavior.failRender = false;
+              throw new Error('render failed');
+            }
             return [];
           },
           getRenderedComments() {
@@ -406,5 +416,26 @@ describe('§9.4 — les exceptions de l’extension vont au même journal', () =
     captured.dispose?.();
     clearFakeAdapters();
   });
-});
 
+  // Le rendu de la page : `run()` est enrobé, et ce qu'il lève est relevé « pendant l'affichage ».
+  // Sans l'enrobage, la ligne existerait quand même — par le filet — mais sans contexte.
+  //
+  // La PREMIÈRE passe de `run()`, au `bootstrap` : sa lecture est synchrone, donc l'exception
+  // remonte jusqu'ici, où le test l'attend. Provoquée par une mutation, elle tomberait dans le
+  // rendu asynchrone, dont la chaîne de promesses n'a pas de `.catch` : un rejet non géré,
+  // que Vitest compte comme un échec de toute la suite. DERNIER test du fichier : le `bootstrap`
+  // avorté ne rend pas de `dispose`, ses écouteurs restent sur la `window` partagée.
+  it('une exception du rendu de la page est relevée avec le contexte `render`', async () => {
+    const { written } = installChrome();
+    const pr: PrRef = { platform: 'github', host: 'github.com', scope: ['acme', 'demo'], number: 42, createdAt: null };
+    behavior.failRender = true;
+
+    await expect(bootstrapWith('https://github.com/acme/demo/pull/42', [pr])).rejects.toThrow('render failed');
+    for (let i = 0; i < 4; i++) await settle();
+
+    const errors = journal(written).filter((e): e is ErrorEntry => e.kind === 'error');
+    expect(errors.map((e) => [e.context, e.message])).toEqual([['render', 'Error: render failed']]);
+
+    clearFakeAdapters();
+  });
+});

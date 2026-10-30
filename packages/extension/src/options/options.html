@@ -325,6 +325,24 @@
         margin: 0 0.4rem 0 -0.25rem; vertical-align: middle; cursor: pointer;
         background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--fg-faint);
       }
+      /* Le niveau du journal : un identifiant (`WARN`, `ERROR`), de largeur constante pour que les
+         horodatages restent alignés. La couleur double le mot, elle ne le remplace pas. */
+      .lvl { display: inline-block; min-width: 5ch; font-weight: 600; }
+      /* Une ligne du journal est un bloc à retrait SUSPENDU : la phrase, plus longue qu'un nom de
+         chaîne, se replie, et sa suite reprend sous le niveau plutôt que sous l'icône. Le
+         `break-all` du `pre` de la section était fait pour des sélecteurs ; il coupait les mots
+         des phrases. On ne coupe plus que ce qui ne tient pas autrement (un message d'exception
+         sans espace). Retrait = largeur de l'icône + sa marge, moins sa gouttière négative. */
+      .status-detail pre .journal-row {
+        display: block; padding-left: 1.55rem; text-indent: -1.55rem;
+        word-break: normal; overflow-wrap: anywhere;
+      }
+      /* `text-indent` est HÉRITÉ : sans cette remise à zéro, le texte de `.lvl` (une boîte en
+         ligne) se décalait de -1.55rem, par-dessus l'icône, et interceptait ses clics — le
+         bouton de copie n'était plus cliquable. Mesuré dans un vrai Chromium. */
+      .status-detail pre .journal-row > * { text-indent: 0; }
+      .lvl-warn { color: var(--warn); }
+      .lvl-error { color: var(--block); }
       .btn-icon svg { width: 0.9rem; height: 0.9rem; }
       .btn-icon:hover { color: var(--accent); background: var(--accent-soft); }
       .btn-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

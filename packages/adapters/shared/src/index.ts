@@ -431,10 +431,35 @@ export function shiftSelection(
 // Chaque adaptateur centralise ses sélecteurs dans un fichier unique, organisé en
 // chaînes : la génération la plus récente d'abord, puis les précédentes.
 
+/** Ce qu'une chaîne SERT À FAIRE, pour le journal de dégradation (§9.4) : un vocabulaire FERMÉ et
+ * NEUTRE, qui ne nomme aucune plateforme — `completion-control` est le bouton de fusion de GitHub
+ * comme le bouton d'achèvement d'Azure DevOps. La page d'options en tire la phrase que la personne
+ * lit, dans sa langue (`options.journal.problem.<id>`) : le nom de la chaîne, lui, est un mot de
+ * plateforme que le code partagé n'a pas le droit de connaître.
+ *
+ * Seules les chaînes que `SelectorLog.degraded()` peut recevoir en ont besoin : un test des deux
+ * adaptateurs le vérifie sur leurs appels, parce qu'une liste de chaînes « à annoter » vieillit.
+ * Chaque identifiant est une conséquence que le code qui consomme le résultat a tracée. */
+export const SELECTOR_PROBLEMS = [
+  'editor-field',
+  'editor-frame',
+  'repo-visibility-signal',
+  'completion-control',
+  'thread-permalink',
+  'rendered-comment-ancestor',
+  'comment-text',
+  'comment-writer',
+  'pr-creation-date',
+] as const;
+
+export type SelectorProblem = (typeof SELECTOR_PROBLEMS)[number];
+
 export interface SelectorChain {
   /** Nom stable, pour la journalisation de dégradation (§9.4). */
   name: string;
   candidates: string[];
+  /** Ce que la chaîne sert à faire — absent, le journal affiche le nom. */
+  problem?: SelectorProblem;
 }
 
 export interface SelectorOutcome {

@@ -13,10 +13,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PrRef } from '@cct/core';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
-import type { SelectorFailure } from '../src/selector-failure.js';
+import type { ErrorEntry, JournalEntry, SelectorFailure } from '../src/journal-entry.js';
 import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
+// Chaque `bootstrap()` pose ses écouteurs sur la `window` PARTAGÉE de happy-dom : un test qui
+// ne défait pas le sien laisse ses gestionnaires d'erreur aux suivants, et une seule exception
+// serait alors relevée par autant d'onglets fantômes qu'il y a eu de tests avant elle.
+const bootstrapped: (() => void)[] = [];
+
 afterEach(() => {
+  for (const dispose of bootstrapped.splice(0)) dispose();
   vi.resetModules();
   delete (globalThis as { chrome?: unknown }).chrome;
 });
@@ -58,6 +64,7 @@ function installChrome(): { written: Record<string, unknown>; clear: () => void 
 }
 
 type Captured = {
+  dispose?: () => void;
   log?: {
     degraded: (chain: { name: string; candidates: string[] }) => void;
     forgetSeen: () => void;
@@ -124,7 +131,11 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
     });
   const { bootstrap } = await import('../src/content-internal.js');
   setLocation(url);
-  await bootstrap(document, testFactories());
+  // En deux temps : `captured.dispose = await …` évalue `captured` AVANT l'attente, or le
+  // constructeur de l'adaptateur le réaffecte pendant elle — le résultat irait à l'ancien objet.
+  const dispose = await bootstrap(document, testFactories());
+  captured.dispose = dispose;
+  bootstrapped.push(dispose);
   return captured;
 }
 
@@ -132,8 +143,8 @@ function setLocation(url: string): void {
   Object.defineProperty(document, 'location', { value: new URL(url), configurable: true });
 }
 
-function journal(written: Record<string, unknown>): SelectorFailure[] {
-  return (written['selectorFailures'] as SelectorFailure[] | undefined) ?? [];
+function journal(written: Record<string, unknown>): JournalEntry[] {
+  return (written['selectorFailures'] as JournalEntry[] | undefined) ?? [];
 }
 
 /** L'écriture passe par une lecture-modification-écriture asynchrone : lui laisser un tour
@@ -240,7 +251,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     const { written } = installChrome();
     const captured = await bootstrapWith('https://github.com/acme/demo/pull/42?view=1');
 
-    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a', 'button.b'] });
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a', 'button.b'], problem: 'completion-control' });
     await settle();
 
     // Ce que ce test dit : la forme de l'entrée LOCALE. Ce qu'il ne dit pas, et qu'il ne
@@ -255,6 +266,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
       'count',
       'firstAt',
       'platform',
+      'problem',
       'url',
     ]);
     expect(entry.url).toContain('?view=1');
@@ -262,6 +274,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     // dans les outils du navigateur pour comprendre pourquoi aucun n'a répondu.
     expect(entry.candidates).toEqual(['button.a', 'button.b']);
     expect(entry.platform).toBe('github');
+    expect(entry.problem).toBe('completion-control');
     expect(entry.count).toBe(1);
     expect(entry.firstAt).toBe(entry.at);
 
@@ -293,3 +306,105 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     clearFakeAdapters();
   });
 });
+
+describe('§9.4 — les exceptions de l’extension vont au même journal', () => {
+  /** Ce que le navigateur fait quand le script de contenu laisse échapper une exception. */
+  const throwInExtension = (error: unknown) =>
+    window.dispatchEvent(new ErrorEvent('error', { error, message: String(error) }));
+
+  it('une exception relevée devient une ligne `error`, avec sa page et sa plateforme', async () => {
+    const { written } = installChrome();
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42/files');
+
+    throwInExtension(new TypeError('x is undefined'));
+    await settle();
+
+    const entry = journal(written)[0]!;
+    expect(entry.kind).toBe('error');
+    expect(entry).toMatchObject({
+      message: 'TypeError: x is undefined',
+      url: 'https://github.com/acme/demo/pull/42/files',
+      platform: 'github',
+      count: 1,
+    });
+    expect(typeof (entry as ErrorEntry).stack).toBe('string');
+
+    captured.dispose?.();
+    clearFakeAdapters();
+  });
+
+  it('la même exception, vingt fois, n’écrit qu’une ligne — pas une écriture par tour de boucle', async () => {
+    const { written } = installChrome();
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    for (let i = 0; i < 20; i++) throwInExtension(new Error('boom'));
+    for (let i = 0; i < 4; i++) await settle();
+
+    expect(journal(written)).toHaveLength(1);
+    expect((journal(written)[0] as ErrorEntry).count).toBe(1);
+
+    captured.dispose?.();
+    clearFakeAdapters();
+  });
+
+  // Mesuré dans un vrai Chromium : après un rechargement de l'extension, `chrome.runtime.id`
+  // devient `undefined` alors que `chrome.runtime` reste un objet — et l'erreur qui en découle
+  // est tantôt « Extension context invalidated. », tantôt un TypeError sur `chrome.storage`.
+  it('une extension rechargée sous l’onglet ne remplit pas le journal', async () => {
+    const { written } = installChrome();
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+    (globalThis as { chrome: { runtime?: unknown } }).chrome.runtime = {}; // plus d'`id`
+
+    throwInExtension(new TypeError("Cannot read properties of undefined (reading 'local')"));
+    throwInExtension(new Error('Extension context invalidated.'));
+    await settle();
+
+    expect(journal(written)).toHaveLength(0);
+
+    captured.dispose?.();
+    clearFakeAdapters();
+  });
+
+  it('retiré avec le reste : une fois l’onglet défait, plus rien ne s’écrit', async () => {
+    const { written } = installChrome();
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    captured.dispose?.();
+    throwInExtension(new Error('after dispose'));
+    await settle();
+
+    expect(journal(written)).toHaveLength(0);
+    clearFakeAdapters();
+  });
+
+  it('après un changement de PR, la même exception se relève', async () => {
+    const { written } = installChrome();
+    const pr = (number: number): PrRef => ({
+      platform: 'github',
+      host: 'github.com',
+      scope: ['acme', 'demo'],
+      number,
+      createdAt: null,
+    });
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42', [pr(42), pr(99)]);
+
+    throwInExtension(new Error('boom'));
+    await settle();
+    expect((journal(written)[0] as ErrorEntry).count).toBe(1);
+
+    setLocation('https://github.com/acme/demo/pull/99');
+    document.body.appendChild(document.createElement('span'));
+    for (let i = 0; i < 12; i++) await settle();
+
+    throwInExtension(new Error('boom'));
+    for (let i = 0; i < 4; i++) await settle();
+
+    // Une ligne, mais relevée sur deux pages : c'est ce que `count` dit.
+    expect(journal(written)).toHaveLength(1);
+    expect((journal(written)[0] as ErrorEntry).count).toBe(2);
+
+    captured.dispose?.();
+    clearFakeAdapters();
+  });
+});
+

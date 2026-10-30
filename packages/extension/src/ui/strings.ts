@@ -165,13 +165,32 @@ const fr: Record<string, string> = {
   'options.responses.manual': 'Le presse-papiers a refusé la copie : le bloc est sélectionné, copiez-le avec Ctrl+C (⌘C sur Mac).',
   'options.status.degraded': 'Configuration non lue ({reason}) : l’extension assiste sans bloquer.',
   'options.status.ok': 'Configuration lue normalement.',
-  'options.status.selectors.none': 'Aucune dégradation de sélecteur enregistrée.',
-  'options.status.selectors.some': '{count} dégradation(s) de sélecteur enregistrée(s).',
+  'options.status.selectors.none': 'Aucune entrée au journal.',
+  'options.status.selectors.some': '{count} entrée(s) au journal.',
+  'options.journal.error': 'Exception : {message}',
+  'options.journal.problem.editor-field':
+    'Champ de saisie non reconnu : ni barre d’outils ni validation dessus',
+  'options.journal.problem.editor-frame':
+    'Cadre du champ de saisie introuvable : mise en page approchée',
+  'options.journal.problem.repo-visibility-signal':
+    'Visibilité du dépôt illisible : la configuration du dépôt, introuvable, est tenue pour absente',
+  'options.journal.problem.completion-control':
+    'Bouton de fusion introuvable : impossible de le griser',
+  'options.journal.problem.thread-permalink':
+    'Ancre d’un fil introuvable : le lien du bandeau ne mène nulle part de précis',
+  'options.journal.problem.rendered-comment-ancestor':
+    'Commentaire en cours d’édition non retrouvé : traité comme une réponse',
+  'options.journal.problem.comment-text':
+    'Corps d’un commentaire illisible : fil écarté du décompte local du bandeau',
+  'options.journal.problem.comment-writer':
+    'Auteur d’un commentaire illisible : nom absent du bandeau, exemption par auteur impossible',
+  'options.journal.problem.pr-creation-date':
+    'Date de création de la PR introuvable : PR tenue hors périmètre, rien n’est bloqué',
   'options.status.selectors.clear': 'Effacer le journal',
   'options.status.selectors.legend':
     'Même marque = même page. Un clic ouvre l’adresse relevée dans un nouvel onglet.',
   'options.status.selectors.page.unknown': 'Page non enregistrée.',
-  'options.status.selectors.copy.aria': 'Copier le détail de « {chain} » pour le débogage',
+  'options.status.selectors.copy.aria': 'Copier le détail de « {what} » pour le débogage',
   'options.status.selectors.copyAll': 'Copier tout le journal (débogage)',
   'options.status.selectors.copied': 'Copié dans le presse-papiers.',
   'options.status.selectors.copy.manual':
@@ -382,13 +401,32 @@ const en: Record<string, string> = {
   'options.responses.manual': 'The clipboard refused the copy: the block is selected, copy it with Ctrl+C (⌘C on Mac).',
   'options.status.degraded': 'Configuration not read ({reason}): the extension assists without blocking.',
   'options.status.ok': 'Configuration read normally.',
-  'options.status.selectors.none': 'No selector degradation recorded.',
-  'options.status.selectors.some': '{count} selector degradation(s) recorded.',
+  'options.status.selectors.none': 'No journal entry.',
+  'options.status.selectors.some': '{count} journal entry(ies).',
+  'options.journal.error': 'Exception: {message}',
+  'options.journal.problem.editor-field':
+    'Input field not recognised: no toolbar or validation on it',
+  'options.journal.problem.editor-frame':
+    'Input field frame not found: layout approximated',
+  'options.journal.problem.repo-visibility-signal':
+    'Repository visibility unreadable: the missing repository configuration is treated as absent',
+  'options.journal.problem.completion-control':
+    'Merge button not found: it cannot be greyed out',
+  'options.journal.problem.thread-permalink':
+    'Thread anchor not found: the banner link points to no precise spot on the page',
+  'options.journal.problem.rendered-comment-ancestor':
+    'Comment being edited not found: treated as a reply',
+  'options.journal.problem.comment-text':
+    'Comment body unreadable: thread left out of the banner’s local count',
+  'options.journal.problem.comment-writer':
+    'Comment author unreadable: name missing from the banner, per-author exemption cannot apply',
+  'options.journal.problem.pr-creation-date':
+    'PR creation date not found: PR treated as out of scope, nothing is blocked',
   'options.status.selectors.clear': 'Clear the log',
   'options.status.selectors.legend':
     'Same mark = same page. Click one to open the recorded address in a new tab.',
   'options.status.selectors.page.unknown': 'Page not recorded.',
-  'options.status.selectors.copy.aria': 'Copy the details of “{chain}” for debugging',
+  'options.status.selectors.copy.aria': 'Copy the details of “{what}” for debugging',
   'options.status.selectors.copyAll': 'Copy the whole log (debug)',
   'options.status.selectors.copied': 'Copied to the clipboard.',
   'options.status.selectors.copy.manual':

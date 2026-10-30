@@ -87,6 +87,7 @@ export const selectors = {
    * emploie ; ils sont définis ici, comme tous les sélecteurs de cet adaptateur (§9.4). */
   composerFrame: {
     name: 'composer-frame',
+    problem: 'editor-frame',
     candidates: ['[data-testid*="comment-composer"]'],
   } satisfies SelectorChain,
 
@@ -97,6 +98,7 @@ export const selectors = {
    * la marque, qui n'est pas le parent direct. */
   composerFrameOnField: {
     name: 'composer-frame-on-field',
+    problem: 'editor-frame',
     candidates: ['[class*="CommentBox"]'],
   } satisfies SelectorChain,
 
@@ -151,6 +153,7 @@ export const selectors = {
    * indiscernable de « pas le droit ». */
   repositoryPublicMeta: {
     name: 'repository-public-meta',
+    problem: 'repo-visibility-signal',
     candidates: ['meta[name="octolytics-dimension-repository_public"]'],
   } satisfies SelectorChain,
 
@@ -269,6 +272,7 @@ export const selectors = {
    * porte que sur le bouton affiché à l'arrivée sur la page. */
   mergeButton: {
     name: 'merge-button',
+    problem: 'completion-control',
     candidates: [
       '[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-variant="primary"]', // MESURÉ
       '[data-testid="mergebox-partial"] button.btn-primary',
@@ -423,6 +427,7 @@ export const selectors = {
    * `a[href*="#"]` vient en dernier : un lien d'avatar le satisferait aussi. */
   threadAnchor: {
     name: 'thread-anchor',
+    problem: 'thread-permalink',
     candidates: [
       '[data-testid="permalink"]',
       'a[href*="#discussion_r"]',
@@ -510,6 +515,7 @@ export const selectors = {
    * d'une réponse (§4.1), et porter les badges (§5.5). */
   renderedComment: {
     name: 'rendered-comment',
+    problem: 'rendered-comment-ancestor',
     candidates: [
       '[data-testid="review-thread-comment"]',
       '.review-comment',
@@ -522,6 +528,7 @@ export const selectors = {
   /** Corps d'un commentaire rendu — badges du §5.5. */
   commentBody: {
     name: 'comment-body',
+    problem: 'comment-text',
     candidates: [
       '[data-testid="comment-body"]',
       '.comment-body',
@@ -590,6 +597,7 @@ export const selectors = {
   /** Auteur d'un commentaire rendu. */
   commentAuthor: {
     name: 'comment-author',
+    problem: 'comment-writer',
     candidates: [
       '[data-testid="comment-author"]',
       '.author',
@@ -631,6 +639,7 @@ export const selectors = {
    * candidat n'entre ici que s'il désigne une date identifiable comme celle de la création. */
   prCreatedAt: {
     name: 'pr-created-at',
+    problem: 'pr-creation-date',
     candidates: ['[id^="pullrequest-"] relative-time'],
   } satisfies SelectorChain,
 

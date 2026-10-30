@@ -11,7 +11,8 @@
 
 import type { ConfigRead, EffectiveConfig, Floor, PrRef, PublishedSummary } from '@cct/core';
 import { SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
-import { mergeSelectorFailure, type SelectorFailure } from './selector-failure.js';
+import { captureErrors } from './error-capture.js';
+import { entryKey, mergeJournalEntry, type JournalEntry } from './journal-entry.js';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage, type ResolvedClientConfig } from './config-resolver.js';
 import {
@@ -246,11 +247,13 @@ async function readTelemetryConsent(): Promise<TelemetryConsent | null> {
   });
 }
 
-/** Journal LOCAL des dégradations de sélecteurs (§9.4, CA-11). « Toujours », dit le CA —
- * sans condition, là où la remontée télémétrique, elle, est conditionnée. La page d'options
- * lisait déjà `selectorFailures` ; rien ne l'écrivait, et le journal y était donc
- * perpétuellement vide. Borné aux 50 dernières : c'est un journal de diagnostic, pas une
- * archive, et `chrome.storage.local` est une ressource partagée. */
+/** Journal LOCAL (§9.4, CA-11) : les dégradations de sélecteurs et les exceptions de
+ * l'extension, sous la même clé `selectorFailures` — la renommer imposerait une migration pour
+ * un nom que personne ne lit. « Toujours », dit le CA — sans condition, là où la remontée
+ * télémétrique, elle, est conditionnée. La page d'options lisait déjà cette clé ; rien ne
+ * l'écrivait, et le journal y était donc perpétuellement vide. Borné aux 50 dernières lignes :
+ * c'est un journal de diagnostic, pas une archive, et `chrome.storage.local` est une ressource
+ * partagée. */
 const SELECTOR_LOG_LIMIT = 50;
 
 /** Le point de collecte déclaré par la politique d'entreprise (§10).
@@ -288,13 +291,13 @@ export const TELEMETRY_FLUSH_MS = 5 * 60_000;
  * deux onglets s'effaçaient l'un l'autre — le « 50 dernières » annoncé n'était que les 50
  * dernières du dernier onglet à avoir écrit (revue Codex, PR #31). D'où le passage par
  * `appendToJournal`, qui relit avant d'écrire, et l'ajout de la SEULE entrée nouvelle. */
-function persistSelectorFailure(entry: SelectorFailure): void {
-  void appendToJournal(
+function persistJournalEntry(entry: JournalEntry): void {
+  void appendToJournal<JournalEntry>(
     'selectorFailures',
     [entry],
     SELECTOR_LOG_LIMIT,
-    (e) => e.chain,
-    mergeSelectorFailure
+    entryKey,
+    mergeJournalEntry
   );
 }
 
@@ -427,7 +430,26 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   // `teardown` est armé plus bas (`teardown = …`), après la construction de l'adaptateur : lui
   // affecter le retrait ICI le ferait écraser, et l'attribut survivrait précisément aux deux
   // transitions qu'il doit suivre. Il est donc COMPOSÉ à l'armement, pas assigné.
-  teardown = unstamp;
+  // Les exceptions que l'extension laisse échapper vont au MÊME journal que les sélecteurs
+  // (§9.4) : sans cela, un plantage ne laissait aucune trace chez la personne qui le subit.
+  // Armé ICI, une fois la plateforme retenue : avant, ce script ne fait rien qui puisse lever.
+  // `url` est relue à cet instant, pour la même raison que celle d'une dégradation de sélecteur.
+  const win = doc.defaultView;
+  const errors = win
+    ? captureErrors(win, (error) =>
+        persistJournalEntry({
+          kind: 'error',
+          ...error,
+          at: new Date().toISOString(),
+          url: doc.location.href,
+          platform,
+        })
+      )
+    : null;
+  teardown = () => {
+    unstamp();
+    errors?.stop();
+  };
 
   // Hors contexte d'extension (aucun `chrome.runtime`), il n'y a pas de relais à employer :
   // laisser l'adaptateur lire par lui-même, ce qui est le comportement correct partout où
@@ -493,11 +515,13 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   const log = new SelectorLog(
     (event) => void count(event),
     (chain) =>
-      persistSelectorFailure({
+      persistJournalEntry({
         chain: chain.name,
         at: new Date().toISOString(),
         url: doc.location.href,
         candidates: [...chain.candidates],
+        // Absent plutôt que `undefined` : une chaîne sans description ne laisse pas de clé vide.
+        ...(chain.problem ? { problem: chain.problem } : {}),
         platform,
       })
   );
@@ -772,7 +796,10 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     // seul son test a révélé.
     if (area === 'local' && 'selectorFailures' in changes) {
       const next = changes['selectorFailures']?.newValue;
-      if (!Array.isArray(next) || next.length === 0) log.forgetSeen();
+      if (!Array.isArray(next) || next.length === 0) {
+        log.forgetSeen();
+        errors?.forgetSeen();
+      }
     }
     const consentChanged = area === 'local' && TELEMETRY_CONSENT_KEY in changes;
     if (!consentChanged && area !== 'managed') return;
@@ -808,7 +835,10 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     // elles — l'entrée garderait indéfiniment la page où la chaîne a échoué en premier
     // (revue Codex, PR #70). La protection contre le bruit, elle, reste entière : une
     // dégradation par chaîne et par PR visitée, pas une par mutation du DOM.
-    if (changed) log.forgetSeen();
+    if (changed) {
+      log.forgetSeen();
+      errors?.forgetSeen();
+    }
     void armFor(pr, changed ? 'pr' : 'refresh');
     // Éditeurs DÉJÀ CONNUS (§5, revue Codex et Reefact, PR #39) : chacun garde la
     // configuration capturée à son propre `attach()` tant que rien ne la lui repousse —
@@ -864,6 +894,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   // de l'adaptateur précédent sur une page servie par un autre.
   teardown = () => {
     unstamp();
+    errors?.stop();
     revoke();
   };
   return disposeAll;

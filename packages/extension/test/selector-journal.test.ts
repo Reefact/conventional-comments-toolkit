@@ -26,7 +26,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SelectorLog } from '@cct/adapter-shared';
 import { appendToJournal } from '../src/storage.js';
-import { mergeSelectorFailure, type SelectorFailure } from '../src/selector-failure.js';
+import { mergeJournalEntry, entryKey, type SelectorFailure } from '../src/journal-entry.js';
 
 const chain = (name: string) => ({ name, candidates: ['.absent'] });
 
@@ -198,7 +198,7 @@ describe('§9.4 — le journal partagé garde une ligne par chaîne, celle écri
 
 describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () => {
   it('une première ligne compte pour un relevé, daté de lui-même', () => {
-    expect(mergeSelectorFailure(undefined, { chain: 'a', at: 't1' })).toEqual({
+    expect(mergeJournalEntry(undefined, { chain: 'a', at: 't1' })).toEqual({
       chain: 'a',
       at: 't1',
       firstAt: 't1',
@@ -207,7 +207,7 @@ describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () =>
   });
 
   it('une ligne écrite avant ces champs compte pour un relevé, daté de son `at`', () => {
-    const merged = mergeSelectorFailure({ chain: 'a', at: 'ancien' }, { chain: 'a', at: 't2' });
+    const merged = mergeJournalEntry({ chain: 'a', at: 'ancien' }, { chain: 'a', at: 't2' });
 
     expect(merged.firstAt).toBe('ancien');
     expect(merged.count).toBe(2);
@@ -215,7 +215,7 @@ describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () =>
   });
 
   it('le dernier relevé fournit le reste : page, candidats, plateforme', () => {
-    const merged = mergeSelectorFailure(
+    const merged = mergeJournalEntry(
       { chain: 'a', at: 't1', url: 'https://x/1', candidates: ['.old'], platform: 'github', firstAt: 't1', count: 3 },
       { chain: 'a', at: 't2', url: 'https://x/2', candidates: ['.new'], platform: 'github' }
     );
@@ -255,8 +255,8 @@ describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () =>
         'selectorFailures',
         [{ chain: 'merge-button', at: `t${i}` }],
         50,
-        (e) => e.chain,
-        mergeSelectorFailure
+        entryKey,
+        mergeJournalEntry
       );
     }
     delete (globalThis as { chrome?: unknown }).chrome;

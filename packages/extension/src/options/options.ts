@@ -1,6 +1,6 @@
 // Page d'options : demande d'optional_host_permissions (§A.4, §B.4), préférences locales
 // limitées (§8.1.2 — jamais le mode ni les labels), affichage de l'état dégradé (§5.4)
-// et du journal local de dégradation de sélecteurs (§9.4).
+// et du journal local, dégradations de sélecteurs et exceptions de l'extension (§9.4).
 //
 // L'écran des domaines tient en quatre zones, et l'ordre raconte le cycle de vie d'un accès :
 //   1. DOMAINES CONNUS — catalogue de domaines dont l'adresse ET la plateforme sont déjà
@@ -21,7 +21,7 @@ import { ui } from '../ui/strings.js';
 import { applyStaticStrings, currentLanguage } from './i18n.js';
 import { displayVersion } from './version.js';
 import { entryReport, journalReport, type ReportEnvironment } from './diagnostic-report.js';
-import type { SelectorFailure } from '../selector-failure.js';
+import { entryLevel, type JournalEntry } from '../journal-entry.js';
 import { maybeStartTour, startTour } from './tour.js';
 import { copySnippet, responseLabelsSnippet } from './response-labels.js';
 import { LABEL_ORDER_KEY, normalizeStoredOrder, parseLabelOrder } from '../ui/label-order.js';
@@ -717,7 +717,7 @@ function refreshStatus(): void {
     );
 
     const failures =
-      (items['selectorFailures'] as SelectorFailure[] | undefined) ?? [];
+      (items['selectorFailures'] as JournalEntry[] | undefined) ?? [];
     const log = document.getElementById('selector-log');
     renderStatus(
       log,
@@ -771,28 +771,30 @@ function refreshStatus(): void {
   });
 }
 
-/** Le journal, une ligne par entrée, précédée de la marque de sa page (§9.4).
+/** Le journal, une ligne par entrée : `niveau, quand — quoi (où)` (§9.4).
  *
  * La marque se calcule sur la page NORMALISÉE — `?diff=split` et `#discussion_r1` ne font pas
  * deux pages —, tandis que le lien et l'info-bulle portent l'adresse ENTIÈRE relevée : la
  * marque répond « laquelle », le lien y emmène.
  *
  * Ce que la marque ne dit pas, et qu'il ne faut pas lui faire dire : le journal ne garde
- * qu'une ligne par chaîne (`appendToJournal`, dédupliqué par `chain`). La page affichée est
- * donc celle du dernier relevé de cette chaîne, jamais « la seule page où elle a échoué ».
+ * qu'une ligne par chaîne, ou par message d'exception (`appendToJournal`, dédupliqué par
+ * `entryKey`). La page affichée est donc celle du dernier relevé de cette ligne, jamais « la
+ * seule page où elle a échoué ».
  *
  * `createElement` + `textContent`, jamais d'`innerHTML` : ces valeurs viennent du stockage. */
 function renderSelectorJournal(
-  failures: SelectorFailure[],
-  onCopy: (entry: SelectorFailure) => Promise<'copied' | 'manual'>
+  failures: JournalEntry[],
+  onCopy: (entry: JournalEntry) => Promise<'copied' | 'manual'>
 ): HTMLElement {
   const pre = document.createElement('pre');
-  failures.forEach((f, i) => {
-    // Une ligne se lit « quand / quoi / où », précédée de son bouton : l'icône est à la fois la
-    // puce et l'action, et sa largeur constante garde les horodatages alignés. Il copie le
-    // rapport de DÉBOGAGE de la ligne, pas le texte affiché : la ligne reste lisible par une
-    // personne, le rapport est fait pour un développeur (`diagnostic-report.ts`).
-    const label = ui(lang, 'options.status.selectors.copy.aria', { chain: f.chain });
+  failures.forEach((f) => {
+    // Une ligne se lit « niveau / quand / quoi / où », précédée de son bouton : l'icône est à la
+    // fois la puce et l'action, et sa largeur constante garde les niveaux alignés. Le bouton
+    // copie le rapport de DÉBOGAGE de la ligne, pas le texte affiché : la ligne reste lisible par
+    // une personne, le rapport est fait pour un développeur (`diagnostic-report.ts`).
+    const what = describeEntry(f);
+    const label = ui(lang, 'options.status.selectors.copy.aria', { what });
     const copy = makeButton('', 'btn-icon', () => {
       void onCopy(f).then((outcome) => {
         // Le message d'état vit sous le journal, hors de l'écran dès que la ligne est loin : le
@@ -809,10 +811,42 @@ function renderSelectorJournal(
     copy.append(copyIcon());
     copy.setAttribute('aria-label', label);
     copy.title = label;
-    pre.append(copy, document.createTextNode(`${f.at} — ${f.chain} (`), renderPageMark(f.url), document.createTextNode(')'));
-    if (i < failures.length - 1) pre.append(document.createTextNode('\n'));
+    // Le niveau est un IDENTIFIANT de journal (`WARN`, `ERROR`), jamais traduit — comme les
+    // labels. Sa couleur double le mot, elle ne le remplace pas.
+    const level = entryLevel(f);
+    const tag = document.createElement('span');
+    tag.className = `lvl lvl-${level}`;
+    tag.textContent = level.toUpperCase();
+    // Une LIGNE par élément, et non un texte coupé par des `\n` : une phrase qui se replie doit
+    // reprendre sous le niveau (retrait suspendu, voir `.journal-row`), ce qu'un saut de ligne
+    // dans un `<pre>` ne sait pas faire.
+    const row = document.createElement('span');
+    row.className = 'journal-row';
+    row.append(
+      copy,
+      tag,
+      document.createTextNode(`  ${f.at} — ${what} (`),
+      renderPageMark(f.url),
+      document.createTextNode(')')
+    );
+    pre.append(row);
   });
   return pre;
+}
+
+/** Ce que la ligne DIT du problème, dans la langue de la page : la phrase de sa clé de
+ * description, ou, faute de clé (une ligne écrite avant elles, une chaîne qui n'en déclare pas),
+ * le nom de la chaîne — ce que le journal affichait seul jusque-là. Une exception se dit par son
+ * message. `ui()` rend la clé elle-même quand le catalogue ne la connaît pas : c'est ce qui sert
+ * ici à reconnaître une clé inconnue, au lieu de l'afficher telle quelle. */
+function describeEntry(entry: JournalEntry): string {
+  if (entry.kind === 'error') return ui(lang, 'options.journal.error', { message: entry.message });
+  if (entry.problem) {
+    const key = `options.journal.problem.${entry.problem}`;
+    const text = ui(lang, key);
+    if (text !== key) return text;
+  }
+  return entry.chain;
 }
 
 /** Met un rapport dans le presse-papiers et DIT ce qui s'est passé. Quand le navigateur refuse,

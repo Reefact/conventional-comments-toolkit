@@ -70,6 +70,26 @@ describe('§5.5 — une barre de puces en tête des fils', () => {
     expect(praise.style.display).toBe('');
   });
 
+  it('masque en `!important`, et rend un display en ligne ordinaire sans priorité', () => {
+    // GitHub pose `d-block` (`display: block !important`) sur chaque fil : un `display: none`
+    // en ligne SANS priorité y perd contre la feuille, et le fil reste affiché alors que
+    // l'attribut dit « masqué » (constaté sur la PR #331, vues replié ET déplié). happy-dom ne
+    // sait pas rejouer ce duel de cascade ; ce test fige donc la seule chose qui le gagne —
+    // la priorité — et `spikes/thread-filter.mjs` mesure le duel dans un vrai Chromium.
+    const el = document.createElement('div');
+    el.style.display = 'grid';
+    const rendered = [{ id: 't1', element: el }];
+    const labels = new Map<string, string | null>([['t1', 'praise']]);
+
+    applyLabelFilter(rendered, labels, 'issue');
+    expect(el.style.display).toBe('none');
+    expect(el.style.getPropertyPriority('display')).toBe('important');
+
+    applyLabelFilter(rendered, labels, null);
+    expect(el.style.display).toBe('grid');
+    expect(el.style.getPropertyPriority('display')).toBe('');
+  });
+
   it('un fil sans label résolu n’est retenu par aucun filtre, mais revient sur « tous »', () => {
     // `analyze()` ne résout rien sur un préfixe non reconnu : le fil n'appartient à aucun
     // label, donc à aucune sélection — le masquer est la seule réponse cohérente, et il ne

@@ -68,7 +68,12 @@ export function applyLabelFilter(
     const visible = labelId === null || labelOfThread.get(id) === labelId;
     if (!visible) {
       if (el.dataset[FILTERED_MARKER] === undefined) el.dataset[FILTERED_MARKER] = el.style.display;
-      el.style.display = 'none';
+      // `important` : GitHub pose `d-block` (`display: block !important`) sur chaque fil, et un
+      // `display: none` en ligne sans priorité y perd — le fil restait affiché, attribut
+      // `data-cct-filtered` à l'appui (PR #331, replié comme déplié). Une déclaration en ligne
+      // `!important` bat une feuille `!important`. La restauration plus bas réaffecte
+      // `style.display`, ce qui remet la priorité à zéro : rien à défaire à part.
+      el.style.setProperty('display', 'none', 'important');
     } else if (el.dataset[FILTERED_MARKER] !== undefined) {
       // Seulement si CE filtre l'avait masqué : sinon, ne pas toucher à un `display` que la
       // plateforme porte pour ses propres raisons. Restaure la valeur D'ORIGINE, pas une

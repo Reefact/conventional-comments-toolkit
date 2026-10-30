@@ -71,10 +71,22 @@ export const selectors = {
    * Sans cette distinction, journaliser l'échec de `editors` serait pire que le silence :
    * sur une PR dont aucun composeur n'est ouvert, ne rien trouver est la NORME, et une entrée
    * par page noierait le journal comme `merge-button` le faisait sur une PR fermée (cf.
-   * `SelectorLog`, adapters/shared). */
+   * `SelectorLog`, adapters/shared).
+   *
+   * Un champ en est EXCLU : celui de « Reference in new issue ». MESURÉ le 2026-10-30 sur
+   * `test/fixtures/pages/06-conversation-modification-commentaire.html` —
+   * `textarea#convert-to-issue-body-<id>[name="issue[body]"]`, dans un `details-dialog` dont le
+   * formulaire poste vers `/comments/issues`. Il crée un TICKET, pas un commentaire de PR : aucune
+   * zone du §4.1, aucune chaîne `editors` n'a à le trouver. Il valait pourtant une entrée
+   * `editors` au journal — la seule de cette capture, et la seule de toutes les captures à le
+   * contenir, qui est aussi la seule où le menu « … » d'un commentaire a été ouvert (pour
+   * l'éditer). Que ce menu le charge à la demande n'est pas mesuré : à vérifier.
+   *
+   * Exclusion par le NOM du champ de formulaire, posé exprès, plutôt que par son `id` : ni le
+   * champ d'un nouveau commentaire, ni celui d'une édition (`issue_comment[body]`) ne le porte. */
   editingSurfaces: {
     name: 'editing-surfaces',
-    candidates: ['textarea', '[contenteditable="true"]'],
+    candidates: ['textarea:not([name="issue[body]"])', '[contenteditable="true"]'],
   } satisfies SelectorChain,
 
   /** Le CHÂSSIS du composeur React — le conteneur qui encadre ENSEMBLE l'en-tête natif, les

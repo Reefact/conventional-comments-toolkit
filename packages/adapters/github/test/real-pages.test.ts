@@ -283,6 +283,15 @@ describe('§4.1, §4.3 — Conversation : modification d\'un commentaire génér
     expect(submitLabels(page, editor)).toEqual(['Update comment']);
   });
 
+  it("ne prend pas le champ « Reference in new issue » pour un composeur pourri (§9.4)", () => {
+    // Journal reçu le 2026-10-30 : une entrée `editors` sur une PR où rien n'avait pourri. Sur
+    // cette capture, le seul champ que ni `editors` ni la sonde ne connaissaient était celui du
+    // dialogue qui crée un ticket à partir d'un commentaire — hors de toute zone du §4.1.
+    expect(page.doc.getElementById('convert-to-issue-body-6442405642')).not.toBeNull();
+    expect(page.editors.map((e) => e.element.id)).not.toContain('convert-to-issue-body-6442405642');
+    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('editors');
+  });
+
   it('laisse le champ de nouveau commentaire en composition', () => {
     const editor = editorOf(page, page.doc.getElementById('new_comment_field'));
     expect(editor.context).toMatchObject({ zone: 'conversation', action: 'compose' });

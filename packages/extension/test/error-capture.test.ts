@@ -134,6 +134,73 @@ describe('§9.4 — deux étages, une seule ligne par exception', () => {
   });
 });
 
+// Revue PR #108 : le marquage « déjà relevée » est une affaire de PROPAGATION, pas d'identité à
+// vie. Une même instance d'`Error` peut être relancée à chaque visite — une promesse mémoïsée qui
+// rejette, une erreur gardée en constante — et chaque visite doit la relever de nouveau, comme
+// `forgetSeen()` le promet pour les chaînes de sélecteurs.
+describe('§9.4 — la même instance, relancée, est relevée de nouveau à chaque nouvelle visite', () => {
+  const throwThrough = (context: 'render' | 'editor', error: Error): void => {
+    try {
+      guarded(context, () => {
+        throw error;
+      })();
+    } catch {
+      // relancée : seule la ligne relevée nous intéresse
+    }
+  };
+
+  it('après `forgetSeen()` — changement de PR, ou journal effacé', () => {
+    const boom = new Error('memoized failure');
+
+    throwThrough('render', boom);
+    capture!.forgetSeen();
+    throwThrough('render', boom);
+
+    expect(recorded.map((e) => e.context)).toEqual(['render', 'render']);
+  });
+
+  it('après le redémarrage de la capture', () => {
+    const boom = new Error('memoized failure');
+
+    throwThrough('render', boom);
+    capture!.stop();
+    capture = captureErrors(window, (error) => recorded.push(error));
+    throwThrough('render', boom);
+
+    expect(recorded).toHaveLength(2);
+  });
+
+  it('par le filet aussi : la même instance, sans enrobage, après `forgetSeen()`', () => {
+    const boom = new Error('escaped twice');
+
+    escapes(boom);
+    capture!.forgetSeen();
+    escapes(boom);
+
+    expect(recorded).toHaveLength(2);
+  });
+
+  it('dans une même visite, elle ne fait toujours qu’une ligne', () => {
+    const boom = new Error('thrown again and again');
+
+    for (let i = 0; i < 5; i++) throwThrough('render', boom);
+
+    expect(recorded).toHaveLength(1);
+  });
+
+  it('une exception qui traverse deux enrobages imbriqués n’est relevée qu’une fois, au contexte le plus proche', () => {
+    const boom = new Error('through two wrappers');
+    const inner = guarded('editor', () => {
+      throw boom;
+    });
+    const outer = guarded('render', () => inner());
+
+    expect(() => outer()).toThrow(boom);
+
+    expect(recorded.map((e) => e.context)).toEqual(['editor']);
+  });
+});
+
 describe('§9.4 — `listen` pose un écouteur enrobé, et rend celui qu’il faut retirer', () => {
   it('une exception de l’écouteur est relevée avec son contexte', () => {
     const button = document.createElement('button');

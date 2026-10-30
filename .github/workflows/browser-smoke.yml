@@ -122,6 +122,13 @@ jobs:
       - name: Visite guidée de la page d'options, parcourue au clic (§10)
         run: npm run check:options-tour
 
+      # Une ligne du journal est, elle aussi, une affirmation de MISE EN PAGE. Deux défauts de sa
+      # première version étaient invisibles à happy-dom : le bouton de copie recouvert par le
+      # libellé du niveau (un `text-indent` négatif est hérité), et des phrases coupées au milieu
+      # des mots. Le bouton est cliqué pour de vrai, chaque mot mesuré sur ses rectangles.
+      - name: Journal de la page d'options — boutons cliquables, mots entiers (§9.4)
+        run: npm run check:options-journal
+
       # Une indirection de jetons ne se lit pas : la cascade, la spécificité et la substitution
       # des `var()` se répondent d'une façon qu'aucune relecture ne tranche. Ce garde mesure les
       # deux promesses de la scission par plateforme — hors GitHub, rien n'a changé depuis la

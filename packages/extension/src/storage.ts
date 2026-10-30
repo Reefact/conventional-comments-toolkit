@@ -70,7 +70,8 @@ export function appendToJournal<T>(
   key: string,
   entries: readonly T[],
   limit: number,
-  dedupeBy?: (entry: T) => string
+  dedupeBy?: (entry: T) => string,
+  merge?: (previous: T | undefined, next: T) => T
 ): Promise<void> {
   const next = journalQueue.then(
     () =>
@@ -97,7 +98,14 @@ export function appendToJournal<T>(
               const kept = dedupeBy
                 ? existing.filter((e) => !entries.some((n) => dedupeBy(n) === dedupeBy(e)))
                 : existing;
-              area.set!({ [key]: [...kept, ...entries].slice(-limit) }, () => resolve());
+              // `merge` : la ligne remplacée peut transmettre ce qu'elle savait — première
+              // apparition, nombre de relevés. Elle reste à la fin, donc la plus récente ; seul
+              // son contenu change, jamais la borne ni l'ordre.
+              const written =
+                dedupeBy && merge
+                  ? entries.map((n) => merge(existing.find((e) => dedupeBy(e) === dedupeBy(n)), n))
+                  : entries;
+              area.set!({ [key]: [...kept, ...written].slice(-limit) }, () => resolve());
             } catch {
               resolve(); // contexte invalidé entre la lecture et l'écriture
             }

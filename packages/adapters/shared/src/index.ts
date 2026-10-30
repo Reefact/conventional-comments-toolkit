@@ -539,8 +539,18 @@ export class SelectorLog {
   // d'enfler pour la même raison.
   #seen = new Set<string>();
 
-  constructor(telemetry: ((event: { kind: 'selector-degradation'; chain: string }) => void) | null = null) {
+  // Le rappel LOCAL reçoit la chaîne ENTIÈRE, candidats compris — ce que l'événement
+  // télémétrique, réduit à `{ kind, chain }` par construction, ne doit jamais porter (§10).
+  // Deux rappels plutôt qu'un événement élargi : élargir l'événement mettrait les candidats à
+  // un champ de l'émetteur, là où ce rappel-ci ne peut mener qu'au journal du navigateur.
+  #local: ((chain: SelectorChain) => void) | null;
+
+  constructor(
+    telemetry: ((event: { kind: 'selector-degradation'; chain: string }) => void) | null = null,
+    local: ((chain: SelectorChain) => void) | null = null
+  ) {
     this.#telemetry = telemetry;
+    this.#local = local;
   }
 
   /** Oublie ce qui a déjà été signalé, pour que la page SUIVANTE puisse l'être à son tour.
@@ -580,6 +590,7 @@ export class SelectorLog {
     else this.failures.push({ chain: chain.name, at });
     // Remontée télémétrique agrégée uniquement si la télémétrie est activée (§10, CA-11).
     this.#telemetry?.({ kind: 'selector-degradation', chain: chain.name });
+    this.#local?.(chain);
   }
 }
 

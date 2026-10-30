@@ -26,6 +26,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SelectorLog } from '@cct/adapter-shared';
 import { appendToJournal } from '../src/storage.js';
+import { mergeSelectorFailure, type SelectorFailure } from '../src/selector-failure.js';
 
 const chain = (name: string) => ({ name, candidates: ['.absent'] });
 
@@ -70,6 +71,30 @@ describe('§9.4 — un onglet ne journalise qu’une fois par chaîne', () => {
     log.degraded(chain('merge-button'));
 
     expect(log.failures.map((f) => f.chain)).toEqual(['merge-button', 'repository-public-meta']);
+  });
+});
+
+describe('§9.4 — le rappel local reçoit la chaîne entière', () => {
+  it('candidats compris, alors que l’événement télémétrique reste réduit à { kind, chain }', () => {
+    const telemetry = vi.fn();
+    const local = vi.fn();
+    const log = new SelectorLog(telemetry, local);
+    const c = { name: 'merge-button', candidates: ['.a', '.b'] };
+
+    log.degraded(c);
+
+    expect(local).toHaveBeenCalledWith(c);
+    // Égalité exacte : un candidat qui se glisserait dans l'événement atteindrait le collecteur.
+    expect(telemetry).toHaveBeenCalledWith({ kind: 'selector-degradation', chain: 'merge-button' });
+  });
+
+  it('un onglet ne le déclenche qu’une fois par chaîne, comme la télémétrie', () => {
+    const local = vi.fn();
+    const log = new SelectorLog(null, local);
+
+    for (let i = 0; i < 20; i++) log.degraded(chain('merge-button'));
+
+    expect(local).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -170,3 +195,76 @@ describe('§9.4 — le journal partagé garde une ligne par chaîne, celle écri
     ]);
   });
 });
+
+describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () => {
+  it('une première ligne compte pour un relevé, daté de lui-même', () => {
+    expect(mergeSelectorFailure(undefined, { chain: 'a', at: 't1' })).toEqual({
+      chain: 'a',
+      at: 't1',
+      firstAt: 't1',
+      count: 1,
+    });
+  });
+
+  it('une ligne écrite avant ces champs compte pour un relevé, daté de son `at`', () => {
+    const merged = mergeSelectorFailure({ chain: 'a', at: 'ancien' }, { chain: 'a', at: 't2' });
+
+    expect(merged.firstAt).toBe('ancien');
+    expect(merged.count).toBe(2);
+    expect(merged.at).toBe('t2');
+  });
+
+  it('le dernier relevé fournit le reste : page, candidats, plateforme', () => {
+    const merged = mergeSelectorFailure(
+      { chain: 'a', at: 't1', url: 'https://x/1', candidates: ['.old'], platform: 'github', firstAt: 't1', count: 3 },
+      { chain: 'a', at: 't2', url: 'https://x/2', candidates: ['.new'], platform: 'github' }
+    );
+
+    expect(merged).toEqual({
+      chain: 'a',
+      at: 't2',
+      url: 'https://x/2',
+      candidates: ['.new'],
+      platform: 'github',
+      firstAt: 't1',
+      count: 4,
+    });
+  });
+
+  // La borne ne doit pas bouger : `merge` change le CONTENU de la ligne, pas leur nombre.
+  it('cinquante visites de la même chaîne : une ligne, cinquante relevés, la vraie dégradation intacte', async () => {
+    const store: Record<string, unknown> = { selectorFailures: [{ chain: 'thread-container', at: 'ancien' }] };
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (keys: string[], cb: (items: Record<string, unknown>) => void) => {
+            const out: Record<string, unknown> = {};
+            for (const k of keys) if (k in store) out[k] = store[k];
+            cb(out);
+          },
+          set: (items: Record<string, unknown>, cb?: () => void) => {
+            Object.assign(store, items);
+            cb?.();
+          },
+        },
+      },
+    };
+
+    for (let i = 0; i < 50; i++) {
+      await appendToJournal<SelectorFailure>(
+        'selectorFailures',
+        [{ chain: 'merge-button', at: `t${i}` }],
+        50,
+        (e) => e.chain,
+        mergeSelectorFailure
+      );
+    }
+    delete (globalThis as { chrome?: unknown }).chrome;
+
+    const entries = store['selectorFailures'] as SelectorFailure[];
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toEqual({ chain: 'thread-container', at: 'ancien' });
+    expect(entries[1]).toMatchObject({ chain: 'merge-button', at: 't49', firstAt: 't0', count: 50 });
+  });
+});
+

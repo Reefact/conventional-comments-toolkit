@@ -311,6 +311,26 @@
       /* La gouttière du bouton le décalerait de la colonne : son libellé doit tomber sur le
          même bord que le journal et sa légende, pas sur celui de sa propre boîte. */
       .status-detail .btn { margin-left: -0.5rem; }
+      .status-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      /* Le bouton contouré porte sa propre bordure : la gouttière négative, faite pour un
+         libellé sans cadre, la décalerait hors de la colonne. */
+      .status-actions .btn-s { margin-left: 0; }
+      /* Copier n'est pas détruire : `btn-quiet` est le rouge de « Effacer », cette action-ci
+         prend la couleur des liens de la section (la marque de page). */
+      .btn-copy { background: transparent; color: var(--accent); border-color: transparent; font-weight: 500; }
+      .btn-copy:hover { background: var(--accent-soft); }
+      /* Le bouton de ligne vit DANS le journal (`pre`) : une boîte serrée, pour ne pas grossir
+         la ligne, et la gouttière de son padding reprise à gauche pour que son libellé tombe
+         sur le bord du journal. */
+      .status-detail pre .btn-inline {
+        margin: 0 0.3rem 0 -0.4rem; padding: 0 0.4rem; font-size: 0.72rem; line-height: 1.4;
+        vertical-align: baseline;
+      }
+      .status-detail .report-fallback {
+        box-sizing: border-box; width: 100%; margin-top: 0.3rem; font-family: var(--font-mono);
+        font-size: 0.72rem; color: var(--fg-muted); background: var(--bg-sunken);
+        border: 1px solid var(--line-strong); border-radius: 4px; padding: 0.4rem;
+      }
       .status-row pre {
         margin: 0.3rem 0 0; font-family: var(--font-mono); font-size: 0.76rem;
         color: var(--fg-muted); white-space: pre-wrap; word-break: break-all;

@@ -12,7 +12,7 @@
 import type { ConfigRead, EffectiveConfig, Floor, PrRef, PublishedSummary } from '@cct/core';
 import { SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
 import { captureErrors, guarded } from './error-capture.js';
-import { entryKey, mergeJournalEntry, type JournalEntry } from './journal-entry.js';
+import { entryKey, markRecovered, mergeJournalEntry, type JournalEntry } from './journal-entry.js';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage, type ResolvedClientConfig } from './config-resolver.js';
 import {
@@ -32,7 +32,7 @@ import {
   type TelemetryConsent,
   type TelemetryEvent,
 } from './telemetry.js';
-import { appendToJournal, writeCurrentState } from './storage.js';
+import { appendToJournal, updateJournalEntry, writeCurrentState } from './storage.js';
 import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
 import { clearCommentDecorations, decorateComment } from './ui/badges.js';
@@ -301,6 +301,16 @@ function persistJournalEntry(entry: JournalEntry): void {
   );
 }
 
+/** La chaîne journalisée pendant cette visite a fini par trouver son élément : la ligne le dit
+ * (`recoveredVisits`), sans rien changer d'autre. Une ligne d'exception n'est jamais visée. */
+function persistRecovery(chain: string, msSinceVisit: number): void {
+  void updateJournalEntry<JournalEntry>(
+    'selectorFailures',
+    (entry) => entry.kind !== 'error' && entry.chain === chain,
+    (entry) => markRecovered(entry, msSinceVisit)
+  );
+}
+
 async function readUserLanguage(): Promise<string | null> {
   return new Promise((resolve) => {
     try {
@@ -512,9 +522,12 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   // l'émetteur le réduit à une clé de compteur : l'adresse d'une page de revue ne peut pas
   // atteindre le collecteur (§10), ce que verrouillent `telemetry.test.ts` (corps émis,
   // égalité exacte) et `degradation.test.ts` (événement, égalité exacte).
+  //
+  // Le relevé de la page (`evidence`) suit le même chemin local, jamais `count()` : il décrit la
+  // page (§10, PRIVACY.md).
   const log = new SelectorLog(
     (event) => void count(event),
-    (chain) =>
+    (chain, evidence) =>
       persistJournalEntry({
         chain: chain.name,
         at: new Date().toISOString(),
@@ -523,7 +536,9 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
         // Absent plutôt que `undefined` : une chaîne sans description ne laisse pas de clé vide.
         ...(chain.problem ? { problem: chain.problem } : {}),
         platform,
-      })
+        evidence,
+      }),
+    (chain, msSinceVisit) => persistRecovery(chain.name, msSinceVisit)
   );
 
   // L'adaptateur vient de la table que fournit le point d'entrée (`content.ts`) : ce module ne
@@ -843,7 +858,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     // (revue Codex, PR #70). La protection contre le bruit, elle, reste entière : une
     // dégradation par chaîne et par PR visitée, pas une par mutation du DOM.
     if (changed) {
-      log.forgetSeen();
+      log.newVisit();
       errors?.forgetSeen();
     }
     void guarded('config', armFor)(pr, changed ? 'pr' : 'refresh');

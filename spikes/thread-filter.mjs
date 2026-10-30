@@ -23,7 +23,14 @@
 //     répartition), puis la permission seule (aucun enregistrement, hôte non classé) ;
 //   - la page est servie à l'URL github.com par interception de requête, les <script> de GitHub
 //     retirés (ils ne s'exécuteraient de toute façon pas hors ligne) ; les feuilles de GitHub ne
-//     chargent pas non plus — la mise en page mesurée n'est donc PAS celle de github.com ;
+//     chargent pas non plus — la mise en page mesurée n'est donc PAS celle de github.com, À UNE
+//     RÈGLE PRÈS, ajoutée à la main (`PRIMER_D_BLOCK`). Une première version de ce test ne la
+//     portait pas, a rendu 30 vérifications vertes, et le filtre ne masquait pourtant rien sur
+//     github.com : chaque fil porte la classe `d-block`, et un `display: none` en ligne ne bat pas
+//     un `display: block !important` de feuille. Un monde sans feuille est un monde où le code
+//     marche. La règle est inférée de DEUX observations faites sur la vraie page — un fil à la
+//     fois `style="display: none"` + `data-cct-filtered` dans le DOM, et visible à l'écran —,
+//     pas relue dans la feuille de GitHub : à confronter à github.com si elle change ;
 //   - tout ce qui n'est pas la page est refusé, la lecture de configuration comprise : c'est
 //     la configuration PAR DÉFAUT qui s'applique, pas celle d'un dépôt ;
 //   - la variante « typo » réécrit, dans le HTML servi, le préfixe d'UN commentaire (`praise
@@ -80,7 +87,12 @@ const manifest = JSON.parse(readFileSync(join(ext, 'manifest.json'), 'utf8'));
 manifest.host_permissions = ['https://github.com/*'];
 writeFileSync(join(ext, 'manifest.json'), JSON.stringify(manifest));
 
-const captured = readFileSync(FIXTURE, 'utf8').replace(/<script[\s\S]*?<\/script>/g, '');
+/** La règle qui rend un `display: none` en ligne inopérant sur les fils (voir l'en-tête). */
+const PRIMER_D_BLOCK = '<style>.d-block { display: block !important; }</style>';
+
+const captured = readFileSync(FIXTURE, 'utf8')
+  .replace(/<script[\s\S]*?<\/script>/g, '')
+  .replace('</head>', `${PRIMER_D_BLOCK}</head>`);
 
 /** Ce que la PAGE dit de ses fils, lu sans passer par l'extension : le label que le premier
  * commentaire de chaque fil porte en toutes lettres. À lire sur une page où l'extension ne

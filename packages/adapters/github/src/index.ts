@@ -18,12 +18,16 @@ import {
   closestChain,
   commentBodyText,
   matchesChain,
+  printElement,
   queryChain,
   queryChainAll,
+  selectorEvidence,
   writeToTextField,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
   type EntryGuard,
+  type SelectorChain,
+  type SelectorEvidence,
   type ClientAdapterOptions,
   type EditorChrome,
   type RenderedBodyShape,
@@ -78,6 +82,29 @@ export class GithubClientAdapter implements PlatformAdapter {
     this.#readOrgConfig = opts.readOrgConfig;
     this.log = opts.log ?? new SelectorLog();
     this.#guardEntry = opts.guardEntry ?? ((fn) => fn);
+  }
+
+  /** Journalise une chaîne qui n'a rien trouvé dans `root`, avec le relevé de la page (§9.4,
+   * `SelectorEvidence`) : la trace de ses candidats dans `root`, les contrôles sous l'ancêtre le
+   * plus profond atteint, ce que l'appelant sait de plus (`extra`) et les faits de la page.
+   * Le seul chemin vers `log.degraded()` de cet adaptateur : un appel direct écrirait une ligne
+   * sans relevé, celle dont le diagnostic exigeait de rouvrir une capture.
+   *
+   * Le relevé n'est calculé que si la ligne part (`SelectorLog`, une fois par chaîne et par
+   * visite) : cette méthode est appelée à chaque mutation du DOM. */
+  #degraded(chain: SelectorChain, root: ParentNode = this.#doc, extra: SelectorEvidence = {}): void {
+    this.log.degraded(chain, () => ({
+      ...selectorEvidence(root, chain.candidates),
+      ...extra,
+      facts: this.#pageFacts(),
+    }));
+  }
+
+  /** Ce que la page dit d'elle-même, tel qu'elle le dit — `absent` quand elle ne le dit pas. */
+  #pageFacts(): Record<string, string> {
+    const state = queryChain(this.#doc, selectors.prStateLabel).element?.getAttribute('data-status');
+    const release = queryChain(this.#doc, selectors.siteRelease).element?.getAttribute('content');
+    return { prState: state || 'absent', release: release ? release.slice(0, 12) : 'absent' };
   }
 
   platformProfile(): PlatformProfile {
@@ -198,7 +225,7 @@ export class GithubClientAdapter implements PlatformAdapter {
       if (text === 'public') return true;
       if (text === 'private') return false;
     }
-    this.log.degraded(selectors.repositoryPublicMeta);
+    this.#degraded(selectors.repositoryPublicMeta);
     return null;
   }
 
@@ -281,7 +308,9 @@ export class GithubClientAdapter implements PlatformAdapter {
       // voisin, champ masqué) vaut une entrée de journal à tort. Une seule, le journal
       // dédupliquant par chaîne — contre une extension muette dans le cas inverse.
       if (inconnues.length > 0) {
-        this.log.degraded(ALL_EDITORS);
+        // Le relevé nomme les champs inconnus eux-mêmes : c'est d'eux qu'il faut parler, pas
+        // des candidats, qui ont bien trouvé ce qu'ils cherchaient.
+        this.#degraded(ALL_EDITORS, this.#doc, { unmatched: inconnues.slice(0, 5).map(printElement) });
       }
       for (const el of found) {
         if (seen.has(el)) continue;
@@ -371,7 +400,9 @@ export class GithubClientAdapter implements PlatformAdapter {
     // rien : ne pas savoir n'est pas une dégradation.
     const surface = this.#surfaceOf.get(editor.element);
     for (const chain of [surface?.composerFrame, surface?.composerFrameOnField]) {
-      if (chain) this.log.degraded(chain);
+      // Ces chaînes s'appliquent au champ et à ses ancêtres, pas au document : le relevé nomme
+      // le champ, et la trace dans le document dit si la marque existe ailleurs sur la page.
+      if (chain) this.#degraded(chain, this.#doc, { subject: printElement(editor.element) });
     }
     return NEUTRAL_EDITOR_CHROME;
   }
@@ -431,9 +462,9 @@ export class GithubClientAdapter implements PlatformAdapter {
       // quand GitHub n'a pas rendu ce contenu du tout — un fil replié, chargé au dépliage :
       // il n'y avait rien à trouver (`selectors.deferredThread`).
       const deferred = matchesChain(el, selectors.deferredThread).element !== null;
-      if (!bodyEl && !deferred) this.log.degraded(selectors.commentBody);
-      if (!authorEl && !deferred) this.log.degraded(selectors.commentAuthor);
-      if (!anchorOutcome.element) this.log.degraded(selectors.threadAnchor);
+      if (!bodyEl && !deferred) this.#degraded(selectors.commentBody, el);
+      if (!authorEl && !deferred) this.#degraded(selectors.commentAuthor, el);
+      if (!anchorOutcome.element) this.#degraded(selectors.threadAnchor, el);
       const anchor = anchorOutcome.element?.getAttribute('href') ?? `#${id}`;
       return {
         id,
@@ -485,9 +516,13 @@ export class GithubClientAdapter implements PlatformAdapter {
     if (!element) {
       // Fusionnée, fermée ou brouillon : GitHub ne rend aucun bouton, et ne rien trouver est
       // le cas nominal, pas une chaîne pourrie (§9.4, `selectors.prSettledState`).
-      if (!queryChain(this.#doc, selectors.prSettledState).element) this.log.degraded(selectors.mergeButton);
+      if (!queryChain(this.#doc, selectors.prSettledState).element) this.#degraded(selectors.mergeButton);
       return null;
     }
+    // Trouvé : si la chaîne a été journalisée plus tôt dans cette visite, elle a été sondée
+    // avant que GitHub rende la boîte de fusion, et la ligne doit le dire (§9.4). Sans effet
+    // dans le cas nominal (`SelectorLog.recovered`).
+    this.log.recovered(selectors.mergeButton);
     return { element, kind: 'complete-pr' };
   }
 
@@ -627,12 +662,20 @@ export class GithubClientAdapter implements PlatformAdapter {
    * repli générique d'avant empêchait, en trouvant toujours une date. */
   #createdAt(scope: [string, string], number: number): string {
     const fromDom = queryChain(this.#doc, selectors.prCreatedAt).element?.getAttribute('datetime');
-    if (fromDom) return fromDom;
+    // Lue à chaque balayage : une date trouvée APRÈS une ligne journalisée dans la même visite
+    // est une date chargée tard, pas une chaîne pourrie.
+    if (fromDom) {
+      this.log.recovered(selectors.prCreatedAt);
+      return fromDom;
+    }
     for (const script of queryChainAll(this.#doc, selectors.prEmbeddedData)) {
       const fromData = this.#embeddedCreatedAt(script, scope, number);
-      if (fromData) return fromData;
+      if (fromData) {
+        this.log.recovered(selectors.prCreatedAt);
+        return fromData;
+      }
     }
-    this.log.degraded(selectors.prCreatedAt);
+    this.#degraded(selectors.prCreatedAt);
     return '';
   }
 
@@ -725,7 +768,7 @@ export class GithubClientAdapter implements PlatformAdapter {
           // repli 'reply', qui désactive la validation localement — jamais silencieusement
           // (§9.4). Le fil ne rend AUCUN commentaire reconnu (chaîne périmée, ce qu'était le
           // cas sur la vue `…/changes`), ou il en rend et l'éditeur n'est dans aucun.
-          this.log.degraded(selectors.renderedComment);
+          this.#degraded(selectors.renderedComment, thread);
         }
         const isRootEdit = comments.length > 0 && editedComment === comments[0];
         if (isRootEdit) {

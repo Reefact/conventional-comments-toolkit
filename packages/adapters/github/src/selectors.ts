@@ -325,6 +325,26 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
+  /** L'état de la PR, QUEL QU'IL SOIT — même étiquette que `prSettledState`, sans filtre sur
+   * `data-status`. Ne décide rien : sa valeur est un FAIT recopié dans le relevé d'une ligne du
+   * journal (`SelectorEvidence.facts.prState`), pour qu'un `merge-button` journalisé dise sur
+   * quelle sorte de PR il l'a été — `pullQueued`, par exemple, que rien ici ne mesure.
+   * MESURÉ le 2026-10-30 : présente dans l'en-tête des huit captures (`test/fixtures/pages`). */
+  prStateLabel: {
+    name: 'pr-state-label',
+    candidates: ['[class*="prc-PageHeader-PageHeader"] [data-component="StateLabel"]'],
+  } satisfies SelectorChain,
+
+  /** La version de github.com qui a servi la page — un hachage de commit, le même sur toutes les
+   * pages d'un déploiement. Recopiée dans le relevé (`facts.release`) : deux lignes qui
+   * diffèrent par elle ont été relevées sur deux déploiements. Empreinte de version du site, pas
+   * de session (`scripts/lib/captured-page-secrets.mjs` la laisse en clair, à dessein).
+   * MESURÉ le 2026-10-30 : `<meta name="release">` sur les huit captures. */
+  siteRelease: {
+    name: 'site-release',
+    candidates: ['meta[name="release"]'],
+  } satisfies SelectorChain,
+
   /** ————— Vue `/pull/N/changes` : les quatre chaînes ci-dessous y étaient TOUTES à zéro —————
    *
    * MESURÉ sur `https://github.com/Reefact/conventional-comments-toolkit/pull/48/changes`

@@ -385,6 +385,15 @@ describe('§9.4 — copier pour le débogage', () => {
     expect(area.readOnly).toBe(true);
   });
 
+  // Revue PR #106 : le repli disait `Ctrl+C` seul, faux sur macOS, précisément quand le
+  // presse-papiers refuse. La chaîne sœur du bloc de labels nomme déjà les deux raccourcis.
+  it.each(['fr', 'en'])('la consigne de copie manuelle (%s) nomme le raccourci de chaque système', (language) => {
+    const message = ui(language, 'options.status.selectors.copy.manual');
+
+    expect(message).toContain('Ctrl+C');
+    expect(message).toContain('⌘C');
+  });
+
   it('le rapport tient quand une valeur contient une clôture Markdown', async () => {
     const written = installClipboard();
     installPage({

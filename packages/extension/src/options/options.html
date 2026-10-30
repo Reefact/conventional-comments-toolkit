@@ -311,7 +311,9 @@
       /* La gouttière du bouton le décalerait de la colonne : son libellé doit tomber sur le
          même bord que le journal et sa légende, pas sur celui de sa propre boîte. */
       .status-detail .btn { margin-left: -0.5rem; }
-      .status-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      /* La marge du haut sépare les actions du journal et de sa légende : `gap` seul, celui du
+         conteneur, les laissait collées à la ligne d'au-dessus. */
+      .status-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.6rem; }
       /* Deux boutons côte à côte : la gouttière négative de `.status-detail .btn`, faite pour un
          libellé sans cadre seul sur sa ligne, ferait chevaucher le second sur le premier. */
       .status-actions .btn { margin-left: 0; }

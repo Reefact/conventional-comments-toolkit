@@ -14,7 +14,7 @@ _The settings page's journal says what went wrong in a sentence, records the ext
 
 ### ✨ Features
 
-- **The journal on the settings page can be copied for a bug report.** Each line has a copy icon, and a button copies the whole journal. What you paste into an issue carries the extension version, your browser and what a developer needs to reopen the problem, and none of the content of the pages you were reviewing. The address of the page is part of it, so look at it before you paste it into a public issue.
+- **The journal on the settings page can be copied for a bug report.** Each line has a copy icon, and a button copies the whole journal. What you paste into an issue carries the extension version, your browser and what a developer needs to reopen the problem. Page content is not collected as a field of its own, but the address of the page is in the report, and the message and details of an error can contain snippets of what the extension was handling. Read the whole report, not only the address, before you paste it into a public issue.
 
 - **Each journal line says what went wrong in a sentence.** "Merge button not found: it cannot be greyed out" instead of `merge-button`, with a level, `WARN` or `ERROR`. The technical name stays in the copy.
 

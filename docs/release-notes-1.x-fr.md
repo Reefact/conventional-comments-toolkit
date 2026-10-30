@@ -14,7 +14,7 @@ _Le journal de la page de réglages dit en une phrase ce qui s'est mal passé, e
 
 ### ✨ Nouveautés
 
-- **Le journal de la page de réglages se copie pour un rapport de bug.** Chaque ligne a une icône de copie, et un bouton copie tout le journal. Ce que vous collez dans une issue porte la version de l'extension, votre navigateur et ce dont un développeur a besoin pour rouvrir le problème, mais aucun contenu des pages que vous relisiez. L'adresse de la page en fait partie : relisez-la avant de coller dans une issue publique.
+- **Le journal de la page de réglages se copie pour un rapport de bug.** Chaque ligne a une icône de copie, et un bouton copie tout le journal. Ce que vous collez dans une issue porte la version de l'extension, votre navigateur et ce dont un développeur a besoin pour rouvrir le problème. Le contenu des pages n'est pas collecté dans un champ à part, mais l'adresse de la page figure dans le rapport, et le message et le détail d'une erreur peuvent contenir des extraits de ce que l'extension traitait. Relisez tout le rapport, pas seulement l'adresse, avant de le coller dans une issue publique.
 
 - **Chaque ligne du journal dit en une phrase ce qui s'est mal passé.** « Bouton de fusion introuvable : impossible de le griser » au lieu de `merge-button`, avec un niveau, `WARN` ou `ERROR`. Le nom technique reste dans la copie.
 

@@ -38,6 +38,7 @@
     "check:composer-layout": "node spikes/composer-layout.mjs",
     "check:open-tab-injection": "node spikes/open-tab-injection.mjs",
     "check:options-tour": "node spikes/options-tour.mjs",
+    "check:options-journal": "node spikes/options-journal.mjs",
     "check:style-isolation": "node spikes/platform-style-isolation.mjs",
     "check:bundle-isolation": "node scripts/check-bundle-isolation.mjs",
     "check:pr-scope": "node scripts/check-pr-scope.mjs"

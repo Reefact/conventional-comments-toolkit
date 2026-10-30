@@ -311,6 +311,29 @@
       /* La gouttière du bouton le décalerait de la colonne : son libellé doit tomber sur le
          même bord que le journal et sa légende, pas sur celui de sa propre boîte. */
       .status-detail .btn { margin-left: -0.5rem; }
+      /* La marge du haut sépare les actions du journal et de sa légende : `gap` seul, celui du
+         conteneur, les laissait collées à la ligne d'au-dessus. */
+      .status-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.6rem; }
+      /* Deux boutons côte à côte : la gouttière négative de `.status-detail .btn`, faite pour un
+         libellé sans cadre seul sur sa ligne, ferait chevaucher le second sur le premier. */
+      .status-actions .btn { margin-left: 0; }
+      /* L'icône de ligne est la puce ET le bouton : une boîte carrée de largeur constante, de
+         sorte que les horodatages restent alignés. Sa gouttière est reprise à gauche pour que
+         l'icône tombe sur le bord du journal et de sa légende. */
+      .status-detail pre .btn-icon {
+        display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem; padding: 0;
+        margin: 0 0.4rem 0 -0.25rem; vertical-align: middle; cursor: pointer;
+        background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--fg-faint);
+      }
+      .btn-icon svg { width: 0.9rem; height: 0.9rem; }
+      .btn-icon:hover { color: var(--accent); background: var(--accent-soft); }
+      .btn-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .btn-icon.copied { color: var(--pass); }
+      .status-detail .report-fallback {
+        box-sizing: border-box; width: 100%; margin-top: 0.3rem; font-family: var(--font-mono);
+        font-size: 0.72rem; color: var(--fg-muted); background: var(--bg-sunken);
+        border: 1px solid var(--line-strong); border-radius: 4px; padding: 0.4rem;
+      }
       .status-row pre {
         margin: 0.3rem 0 0; font-family: var(--font-mono); font-size: 0.76rem;
         color: var(--fg-muted); white-space: pre-wrap; word-break: break-all;

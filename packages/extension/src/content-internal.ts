@@ -11,6 +11,7 @@
 
 import type { ConfigRead, EffectiveConfig, Floor, PrRef, PublishedSummary } from '@cct/core';
 import { SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
+import { mergeSelectorFailure, type SelectorFailure } from './selector-failure.js';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage, type ResolvedClientConfig } from './config-resolver.js';
 import {
@@ -287,8 +288,14 @@ export const TELEMETRY_FLUSH_MS = 5 * 60_000;
  * deux onglets s'effaçaient l'un l'autre — le « 50 dernières » annoncé n'était que les 50
  * dernières du dernier onglet à avoir écrit (revue Codex, PR #31). D'où le passage par
  * `appendToJournal`, qui relit avant d'écrire, et l'ajout de la SEULE entrée nouvelle. */
-function persistSelectorFailure(entry: { chain: string; at: string; url?: string }): void {
-  void appendToJournal('selectorFailures', [entry], SELECTOR_LOG_LIMIT, (e) => e.chain);
+function persistSelectorFailure(entry: SelectorFailure): void {
+  void appendToJournal(
+    'selectorFailures',
+    [entry],
+    SELECTOR_LOG_LIMIT,
+    (e) => e.chain,
+    mergeSelectorFailure
+  );
 }
 
 async function readUserLanguage(): Promise<string | null> {
@@ -468,9 +475,9 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     return false;
   };
 
-  // Un seul rappel, deux effets, et c'est voulu : la dégradation de sélecteur se journalise
-  // LOCALEMENT dans tous les cas (§9.4, CA-11) et ne se remonte que si la télémétrie est
-  // armée. Le tri entre les deux vit dans l'émetteur, pas ici.
+  // Deux rappels, deux destinations : la dégradation de sélecteur se journalise LOCALEMENT dans
+  // tous les cas (§9.4, CA-11) et ne se remonte que si la télémétrie est armée. Le tri entre
+  // les deux vit dans l'émetteur, pas ici.
   //
   // L'URL est RELUE à cet instant, et non reprise de celle lue à l'injection (plus bas dans
   // ce fichier) : GitHub navigue en SPA, si bien que la page où la dégradation survient
@@ -478,15 +485,22 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   // QUELLE, fragment et paramètres compris — c'est ce que le lien de la page d'options
   // ouvre ; la réduction à « quelle page » se fait au rendu (`page-mark.ts`).
   //
-  // Elle ne va QUE dans le journal local. L'événement remis à `count()` reste
-  // `{ kind, chain }` — `SelectorLog` (paquet partagé) n'a pas changé —, et l'émetteur le
-  // réduit à une clé de compteur : l'adresse d'une page de revue ne peut pas atteindre le
-  // collecteur (§10), ce que verrouillent `telemetry.test.ts` (corps émis, égalité exacte)
-  // et `degradation.test.ts` (événement, égalité exacte).
-  const log = new SelectorLog((event) => {
-    persistSelectorFailure({ chain: event.chain, at: new Date().toISOString(), url: doc.location.href });
-    count(event);
-  });
+  // L'adresse, les candidats et la plateforme ne vont QUE dans le journal local, par le rappel
+  // LOCAL de `SelectorLog`. L'événement remis à `count()` reste `{ kind, chain }`, et
+  // l'émetteur le réduit à une clé de compteur : l'adresse d'une page de revue ne peut pas
+  // atteindre le collecteur (§10), ce que verrouillent `telemetry.test.ts` (corps émis,
+  // égalité exacte) et `degradation.test.ts` (événement, égalité exacte).
+  const log = new SelectorLog(
+    (event) => void count(event),
+    (chain) =>
+      persistSelectorFailure({
+        chain: chain.name,
+        at: new Date().toISOString(),
+        url: doc.location.href,
+        candidates: [...chain.candidates],
+        platform,
+      })
+  );
 
   // L'adaptateur vient de la table que fournit le point d'entrée (`content.ts`) : ce module ne
   // connaît aucune plateforme, et n'a plus de branche par défaut — un identifiant hors du

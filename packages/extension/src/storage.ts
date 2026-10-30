@@ -118,3 +118,34 @@ export function appendToJournal<T>(
   journalQueue = next.catch(() => undefined);
   return next;
 }
+
+/** Réécrit EN PLACE la ligne d'un journal partagé que `match` désigne — ni ajout, ni
+ * déplacement, ni troncature. Même file d'attente qu'`appendToJournal` : une mise à jour
+ * demandée après un ajout s'applique après lui, et retrouve donc la ligne qu'il a écrite.
+ * Aucune ligne ne correspond (journal effacé entre-temps) : rien n'est écrit. */
+export function updateJournalEntry<T>(key: string, match: (entry: T) => boolean, update: (entry: T) => T): Promise<void> {
+  const next = journalQueue.then(
+    () =>
+      new Promise<void>((resolve) => {
+        const area = localArea();
+        if (!area?.get || !area?.set) return resolve();
+        try {
+          area.get([key], (items) => {
+            const existing = Array.isArray(items?.[key]) ? (items[key] as T[]) : [];
+            try {
+              const at = existing.findIndex(match);
+              if (at < 0) return resolve();
+              const written = existing.map((e, i) => (i === at ? update(e) : e));
+              area.set!({ [key]: written }, () => resolve());
+            } catch {
+              resolve(); // contexte invalidé entre la lecture et l'écriture
+            }
+          });
+        } catch {
+          resolve();
+        }
+      })
+  );
+  journalQueue = next.catch(() => undefined);
+  return next;
+}

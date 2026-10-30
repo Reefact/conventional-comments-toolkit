@@ -23,10 +23,10 @@
 // `SelectorLog` borne UN onglet (et avec lui la remontée télémétrique), `appendToJournal`
 // borne le journal PARTAGÉ, qu'alimentent plusieurs onglets et plusieurs rechargements.
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SelectorLog } from '@cct/adapter-shared';
-import { appendToJournal } from '../src/storage.js';
-import { mergeJournalEntry, entryKey, type SelectorFailure } from '../src/journal-entry.js';
+import { appendToJournal, updateJournalEntry } from '../src/storage.js';
+import { mergeJournalEntry, entryKey, markRecovered, type JournalEntry, type SelectorFailure } from '../src/journal-entry.js';
 
 const chain = (name: string) => ({ name, candidates: ['.absent'] });
 
@@ -83,7 +83,7 @@ describe('§9.4 — le rappel local reçoit la chaîne entière', () => {
 
     log.degraded(c);
 
-    expect(local).toHaveBeenCalledWith(c);
+    expect(local).toHaveBeenCalledWith(c, { msSinceVisit: expect.any(Number) });
     // Égalité exacte : un candidat qui se glisserait dans l'événement atteindrait le collecteur.
     expect(telemetry).toHaveBeenCalledWith({ kind: 'selector-degradation', chain: 'merge-button' });
   });
@@ -228,6 +228,7 @@ describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () =>
       platform: 'github',
       firstAt: 't1',
       count: 4,
+      urls: ['https://x/1', 'https://x/2'],
     });
   });
 
@@ -268,3 +269,164 @@ describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () =>
   });
 });
 
+
+describe('§9.4 — le relevé de page part au journal local, une fois, avec son moment', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('le relevé n’est calculé que pour la ligne qui part, jamais aux appels suivants', () => {
+    const local = vi.fn();
+    const log = new SelectorLog(null, local);
+    const evidence = vi.fn(() => ({ facts: { prState: 'pullOpened' } }));
+
+    for (let i = 0; i < 20; i++) log.degraded(chain('merge-button'), evidence);
+
+    expect(evidence).toHaveBeenCalledTimes(1);
+    expect(local).toHaveBeenCalledWith(chain('merge-button'), {
+      facts: { prState: 'pullOpened' },
+      msSinceVisit: expect.any(Number),
+    });
+  });
+
+  it('un relevé qui lève ne coûte pas la ligne', () => {
+    const local = vi.fn();
+    const log = new SelectorLog(null, local);
+
+    log.degraded(chain('merge-button'), () => {
+      throw new Error('page inattendue');
+    });
+
+    expect(local).toHaveBeenCalledWith(chain('merge-button'), { msSinceVisit: expect.any(Number) });
+  });
+
+  it('le moment se compte depuis la visite : `newVisit` remet l’horloge à zéro, `forgetSeen` non', () => {
+    vi.useFakeTimers();
+    const local = vi.fn();
+    const log = new SelectorLog(null, local);
+
+    vi.advanceTimersByTime(300);
+    log.degraded(chain('a'));
+    expect(local.mock.lastCall![1].msSinceVisit).toBe(300);
+
+    // L'effacement du journal oublie ce qui a été signalé, sans que la personne ait changé de page.
+    vi.advanceTimersByTime(200);
+    log.forgetSeen();
+    log.degraded(chain('a'));
+    expect(local.mock.lastCall![1].msSinceVisit).toBe(500);
+
+    vi.advanceTimersByTime(100);
+    log.newVisit();
+    vi.advanceTimersByTime(40);
+    log.degraded(chain('a'));
+    expect(local.mock.lastCall![1].msSinceVisit).toBe(40);
+  });
+
+  it('le relevé ne va jamais à la télémétrie', () => {
+    const telemetry = vi.fn();
+    const log = new SelectorLog(telemetry, vi.fn());
+
+    log.degraded(chain('merge-button'), () => ({ facts: { prState: 'pullOpened' } }));
+
+    expect(telemetry).toHaveBeenCalledWith({ kind: 'selector-degradation', chain: 'merge-button' });
+  });
+});
+
+describe('§9.4 — une chaîne trouvée PLUS TARD dans la visite le dit', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('une fois par visite, et seulement pour une chaîne journalisée pendant elle', () => {
+    vi.useFakeTimers();
+    const recovered = vi.fn();
+    const log = new SelectorLog(null, vi.fn(), recovered);
+
+    // Trouvée sans avoir échoué : le cas nominal, qui ne doit rien écrire.
+    log.recovered(chain('merge-button'));
+    expect(recovered).not.toHaveBeenCalled();
+
+    log.degraded(chain('merge-button'));
+    vi.advanceTimersByTime(850);
+    for (let i = 0; i < 5; i++) log.recovered(chain('merge-button'));
+    expect(recovered).toHaveBeenCalledTimes(1);
+    expect(recovered).toHaveBeenCalledWith(chain('merge-button'), 850);
+
+    // Visite suivante : la chaîne peut de nouveau échouer, puis être rattrapée.
+    log.newVisit();
+    log.recovered(chain('merge-button'));
+    expect(recovered).toHaveBeenCalledTimes(1);
+    log.degraded(chain('merge-button'));
+    log.recovered(chain('merge-button'));
+    expect(recovered).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('§9.4 — la ligne garde les dernières pages et ses rattrapages', () => {
+  it('les adresses distinctes, cinq au plus, la plus récente en dernier', () => {
+    let entry: SelectorFailure | undefined;
+    for (const n of [1, 2, 1, 3, 4, 5, 6]) {
+      entry = mergeJournalEntry(entry, { chain: 'a', at: `t${n}`, url: `https://x/${n}` });
+    }
+    // `1` revisitée remonte en fin de liste : c'est `2`, la plus ancienne, qui sort.
+    expect(entry!.urls).toEqual(['https://x/1', 'https://x/3', 'https://x/4', 'https://x/5', 'https://x/6']);
+    expect(entry!.url).toBe('https://x/6');
+  });
+
+  it('une ligne écrite avant `urls` transmet sa seule adresse', () => {
+    const merged = mergeJournalEntry<SelectorFailure>(
+      { chain: 'a', at: 't1', url: 'https://x/1' },
+      { chain: 'a', at: 't2', url: 'https://x/2' }
+    );
+    expect(merged.urls).toEqual(['https://x/1', 'https://x/2']);
+  });
+
+  it('les rattrapages se cumulent d’une visite à l’autre, le nouveau relevé ne les efface pas', () => {
+    const recovered = markRecovered(markRecovered<SelectorFailure>({ chain: 'a', at: 't1' }, 400), 900);
+    expect(recovered).toMatchObject({ recoveredVisits: 2, lastRecoveredAfterMs: 900 });
+
+    const merged = mergeJournalEntry(recovered, { chain: 'a', at: 't2' });
+    expect(merged).toMatchObject({ recoveredVisits: 2, lastRecoveredAfterMs: 900, count: 2 });
+  });
+
+  it('une exception n’est jamais marquée rattrapée', () => {
+    const error: JournalEntry = { kind: 'error', message: 'x', at: 't1' };
+    expect(markRecovered(error, 10)).toBe(error);
+  });
+
+  it('`updateJournalEntry` réécrit la ligne en place, sans toucher aux autres ni à l’ordre', async () => {
+    const store: Record<string, unknown> = {
+      selectorFailures: [
+        { chain: 'a', at: 't1' },
+        { chain: 'merge-button', at: 't2', count: 3 },
+        { chain: 'b', at: 't3' },
+      ],
+    };
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: (keys: string[], cb: (items: Record<string, unknown>) => void) => {
+            const out: Record<string, unknown> = {};
+            for (const k of keys) if (k in store) out[k] = store[k];
+            cb(out);
+          },
+          set: (items: Record<string, unknown>, cb?: () => void) => {
+            Object.assign(store, items);
+            cb?.();
+          },
+        },
+      },
+    };
+
+    await updateJournalEntry<SelectorFailure>(
+      'selectorFailures',
+      (e) => e.chain === 'merge-button',
+      (e) => markRecovered(e, 120)
+    );
+    // Rien ne correspond : rien n'est écrit, et surtout rien n'est ajouté.
+    await updateJournalEntry<SelectorFailure>('selectorFailures', (e) => e.chain === 'absente', (e) => e);
+    delete (globalThis as { chrome?: unknown }).chrome;
+
+    expect(store['selectorFailures']).toEqual([
+      { chain: 'a', at: 't1' },
+      { chain: 'merge-button', at: 't2', count: 3, recoveredVisits: 1, lastRecoveredAfterMs: 120 },
+      { chain: 'b', at: 't3' },
+    ]);
+  });
+});

@@ -3,8 +3,11 @@
 // (version, navigateur, état de configuration).
 //
 // Du JSON dans un bloc de code Markdown : il se colle tel quel dans une issue, et un outil le lit
-// sans rien deviner. Tout vient du journal local et du navigateur — jamais du contenu de la page,
-// que ce journal ne garde pas.
+// sans rien deviner. Tout vient du journal local et du navigateur. Une ligne de sélecteur porte
+// un relevé de l'INTERFACE au dernier échec (`SelectorEvidence`, adapters/shared) — attributs
+// d'une liste fermée, texte des boutons —, jamais la valeur d'un champ ni le texte d'un
+// commentaire ; PRIVACY.md dit ce qu'il contient, et pourquoi le rapport se relit avant d'être
+// partagé.
 
 import type { JournalEntry } from '../journal-entry.js';
 

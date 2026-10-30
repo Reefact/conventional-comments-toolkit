@@ -276,10 +276,12 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
       'candidates',
       'chain',
       'count',
+      'evidence',
       'firstAt',
       'platform',
       'problem',
       'url',
+      'urls',
     ]);
     expect(entry.url).toContain('?view=1');
     // Les candidats DANS L'ORDRE où la chaîne les a essayés : c'est ce qu'un développeur ouvre
@@ -289,6 +291,27 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     expect(entry.problem).toBe('completion-control');
     expect(entry.count).toBe(1);
     expect(entry.firstAt).toBe(entry.at);
+    expect(entry.urls).toEqual([entry.url]);
+    // Appelé sans relevé, l'adaptateur n'apporte rien : reste le seul moment, que pose le journal.
+    expect(Object.keys(entry.evidence ?? {})).toEqual(['msSinceVisit']);
+
+    clearFakeAdapters();
+  });
+
+  it('la ligne garde le relevé de la page, et dit quand la chaîne a fini par trouver', async () => {
+    const { written } = installChrome();
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+    const mergeButton = { name: 'merge-button', candidates: ['button.a'], problem: 'completion-control' as const };
+
+    captured.log!.degraded(mergeButton, () => ({ facts: { prState: 'pullOpened' } }));
+    captured.log!.recovered(mergeButton);
+    for (let i = 0; i < 4; i++) await settle();
+
+    const entry = journal(written)[0] as SelectorFailure;
+    expect(entry.evidence).toEqual({ facts: { prState: 'pullOpened' }, msSinceVisit: expect.any(Number) });
+    expect(entry.recoveredVisits).toBe(1);
+    expect(entry.lastRecoveredAfterMs).toEqual(expect.any(Number));
+    expect(journal(written)).toHaveLength(1);
 
     clearFakeAdapters();
   });

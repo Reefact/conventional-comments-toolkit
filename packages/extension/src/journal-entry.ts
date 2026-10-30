@@ -9,11 +9,17 @@
 // `chrome.storage.local` et survit aux mises à jour, si bien que la page d'options relit des
 // lignes écrites par une version qui ne les connaissait pas.
 
+import type { SelectorEvidence } from '@cct/adapter-shared';
+
 interface EntryBase {
   /** Dernier relevé. */
   at: string;
   /** Adresse de la page au dernier relevé, telle quelle. */
   url?: string;
+  /** Les dernières adresses DISTINCTES où la ligne a été relevée, la plus récente en dernier
+   * (`MAX_URLS`). `url` ne garde que la dernière : douze relevés étalés sur cinq heures n'en
+   * montraient qu'une, sans dire si les onze autres venaient de la même page. */
+  urls?: string[];
   /** Identifiant de la plateforme dont l'adaptateur a journalisé. */
   platform?: string;
   /** Premier relevé de cette ligne conservé dans le journal. */
@@ -36,6 +42,16 @@ export interface SelectorFailure extends EntryBase {
   /** Ce que la chaîne SERT À FAIRE, dans un vocabulaire fermé et neutre (`SELECTOR_PROBLEMS`) :
    * la page d'options en tire la phrase affichée, dans la langue de la personne. */
   problem?: string;
+  /** Ce que la page montrait au DERNIER relevé, à la place de ce qu'on cherchait : trace des
+   * candidats, empreinte des contrôles voisins, faits lus par l'adaptateur (`SelectorEvidence`,
+   * adapters/shared). Celui du dernier relevé seulement, comme `url`. */
+  evidence?: SelectorEvidence;
+  /** Sur combien des visites relevées la chaîne a fini par TROUVER son élément, plus tard dans
+   * la même visite. Égal à `count` : la chaîne a été interrogée trop tôt, pas cassée. Absent :
+   * jamais trouvée après coup. */
+  recoveredVisits?: number;
+  /** Millisecondes entre le début de la visite et ce succès tardif, au dernier rattrapage. */
+  lastRecoveredAfterMs?: number;
 }
 
 /** Une exception levée par le code de l'extension, attrapée par personne d'autre. */
@@ -67,10 +83,33 @@ export function entryKey(entry: JournalEntry): string {
 /** La ligne écrite remplace la précédente de la même clé, mais lui reprend ce qu'elle sait.
  * Une ligne écrite avant ces champs compte pour un relevé, daté de son propre `at`. */
 export function mergeJournalEntry<T extends JournalEntry>(previous: T | undefined, next: T): T {
-  if (previous === undefined) return { ...next, firstAt: next.at, count: 1 };
+  if (previous === undefined) return { ...next, firstAt: next.at, count: 1, ...urlsOf(undefined, next) };
+  // Les rattrapages se cumulent comme `count` : ils comptent des visites passées, que la ligne
+  // nouvelle ne connaît pas. Une ligne d'exception n'en porte jamais.
+  const recovery =
+    previous.kind !== 'error' && previous.recoveredVisits !== undefined
+      ? { recoveredVisits: previous.recoveredVisits, lastRecoveredAfterMs: previous.lastRecoveredAfterMs }
+      : {};
   return {
     ...next,
+    ...recovery,
     firstAt: previous.firstAt ?? previous.at,
     count: (previous.count ?? 1) + 1,
+    ...urlsOf(previous, next),
   };
+}
+
+export const MAX_URLS = 5;
+
+function urlsOf(previous: JournalEntry | undefined, next: JournalEntry): { urls?: string[] } {
+  const before = previous?.urls ?? (previous?.url ? [previous.url] : []);
+  if (!next.url) return before.length > 0 ? { urls: before } : {};
+  return { urls: [...before.filter((u) => u !== next.url), next.url].slice(-MAX_URLS) };
+}
+
+/** La ligne d'une chaîne journalisée pendant cette visite, qui vient de trouver son élément.
+ * Elle ne change ni de place ni de date : c'est la même observation, complétée. */
+export function markRecovered<T extends JournalEntry>(entry: T, msSinceVisit: number): T {
+  if (entry.kind === 'error') return entry;
+  return { ...entry, recoveredVisits: (entry.recoveredVisits ?? 0) + 1, lastRecoveredAfterMs: msSinceVisit };
 }

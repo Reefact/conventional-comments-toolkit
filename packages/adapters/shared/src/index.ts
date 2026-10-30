@@ -2,6 +2,9 @@
 // d'écriture programmatique §9.3, chaînes de sélecteurs avec repli §9.4/§A.5.
 
 import { EMOJI_TOKEN_SOURCE, matchPrefix, splitBody } from '@cct/core';
+import type { SelectorEvidence } from './evidence.js';
+
+export * from './evidence.js';
 import type {
   ConfigRead,
   Disposable,
@@ -577,14 +580,45 @@ export class SelectorLog {
   // télémétrique, réduit à `{ kind, chain }` par construction, ne doit jamais porter (§10).
   // Deux rappels plutôt qu'un événement élargi : élargir l'événement mettrait les candidats à
   // un champ de l'émetteur, là où ce rappel-ci ne peut mener qu'au journal du navigateur.
-  #local: ((chain: SelectorChain) => void) | null;
+  //
+  // Le RELEVÉ de la page (`SelectorEvidence`) suit le même chemin, et pour la même raison : il
+  // décrit la page, il ne doit atteindre que le journal local.
+  #local: ((chain: SelectorChain, evidence: SelectorEvidence) => void) | null;
+  #recovered: ((chain: SelectorChain, msSinceVisit: number) => void) | null;
+
+  // Début de la visite en cours, et les chaînes journalisées pendant elle qu'on a fini par
+  // trouver. Le moment d'un échec est ce qui sépare une chaîne pourrie d'une chaîne interrogée
+  // TROP TÔT : `getCompletionControl()` est sondé pendant toute l'hydratation de la page, et un
+  // bouton rendu après l'en-tête de la PR échoue d'abord, puis répond. Sans ces deux relevés,
+  // les deux cas écrivaient la même ligne.
+  #visitStart = Date.now();
+  #recoveredThisVisit = new Set<string>();
 
   constructor(
     telemetry: ((event: { kind: 'selector-degradation'; chain: string }) => void) | null = null,
-    local: ((chain: SelectorChain) => void) | null = null
+    local: ((chain: SelectorChain, evidence: SelectorEvidence) => void) | null = null,
+    recovered: ((chain: SelectorChain, msSinceVisit: number) => void) | null = null
   ) {
     this.#telemetry = telemetry;
     this.#local = local;
+    this.#recovered = recovered;
+  }
+
+  /** Une nouvelle PR commence : ce qui a été signalé est oublié (`forgetSeen`), et l'horloge
+   * de visite repart. Distinct de `forgetSeen`, qu'appelle aussi l'effacement du journal : la
+   * personne qui vide son journal n'a pas changé de page, et l'horloge ne doit pas repartir. */
+  newVisit(): void {
+    this.forgetSeen();
+    this.#visitStart = Date.now();
+  }
+
+  /** Une chaîne journalisée PENDANT CETTE VISITE vient de trouver son élément. Le rappel ne
+   * part qu'une fois par chaîne et par visite, et jamais pour une chaîne qui n'a pas échoué :
+   * l'appel est fait à chaque succès, il ne doit rien coûter dans le cas nominal. */
+  recovered(chain: SelectorChain): void {
+    if (!this.#seen.has(chain.name) || this.#recoveredThisVisit.has(chain.name)) return;
+    this.#recoveredThisVisit.add(chain.name);
+    this.#recovered?.(chain, Date.now() - this.#visitStart);
   }
 
   /** Oublie ce qui a déjà été signalé, pour que la page SUIVANTE puisse l'être à son tour.
@@ -605,9 +639,14 @@ export class SelectorLog {
    * lui-même — une entrée par chaîne, quel que soit le nombre d'oublis. */
   forgetSeen(): void {
     this.#seen.clear();
+    this.#recoveredThisVisit.clear();
   }
 
-  degraded(chain: SelectorChain): void {
+  /** `evidence` : le relevé de la page, à la façon de l'adaptateur (`selectorEvidence`, plus
+   * ce qu'il sait lire d'autre). Une FONCTION, évaluée seulement quand la ligne part : cette
+   * méthode est appelée à chaque mutation du DOM, et la trace interroge la page candidat par
+   * candidat. */
+  degraded(chain: SelectorChain, evidence?: () => SelectorEvidence): void {
     if (this.#seen.has(chain.name)) return;
     this.#seen.add(chain.name);
     // UNE entrée par chaîne, rafraîchie plutôt qu'ajoutée. `#seen` ne suffit plus à borner
@@ -624,7 +663,17 @@ export class SelectorLog {
     else this.failures.push({ chain: chain.name, at });
     // Remontée télémétrique agrégée uniquement si la télémétrie est activée (§10, CA-11).
     this.#telemetry?.({ kind: 'selector-degradation', chain: chain.name });
-    this.#local?.(chain);
+    if (this.#local) {
+      // Un relevé qui lève ne doit pas coûter la ligne elle-même : sans lui, on sait encore
+      // QUELLE chaîne a échoué, ce que le journal disait avant qu'il existe.
+      let gathered: SelectorEvidence = {};
+      try {
+        gathered = evidence?.() ?? {};
+      } catch {
+        gathered = {};
+      }
+      this.#local(chain, { ...gathered, msSinceVisit: Date.now() - this.#visitStart });
+    }
   }
 }
 

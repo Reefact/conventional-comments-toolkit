@@ -173,6 +173,7 @@ const fr: Record<string, string> = {
   'options.journal.error.config': 'Erreur pendant la lecture de la configuration',
   'options.journal.error.editor':
     'Erreur pendant la gestion d’un champ de commentaire (barre d’outils, validation, envoi)',
+  'options.journal.error.editor-detection': 'Erreur pendant la détection des champs de commentaire',
   'options.journal.error.telemetry': 'Erreur pendant l’envoi des compteurs de télémétrie',
   'options.journal.problem.editor-field':
     'Champ de saisie non reconnu : ni barre d’outils ni validation dessus',
@@ -415,6 +416,7 @@ const en: Record<string, string> = {
   'options.journal.error.config': 'Error while reading the configuration',
   'options.journal.error.editor':
     'Error while handling a comment field (toolbar, validation, submission)',
+  'options.journal.error.editor-detection': 'Error while detecting comment fields',
   'options.journal.error.telemetry': 'Error while sending the telemetry counters',
   'options.journal.problem.editor-field':
     'Input field not recognised: no toolbar or validation on it',

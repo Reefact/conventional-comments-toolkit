@@ -529,7 +529,14 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   // L'adaptateur vient de la table que fournit le point d'entrée (`content.ts`) : ce module ne
   // connaît aucune plateforme, et n'a plus de branche par défaut — un identifiant hors du
   // registre ne sort pas de `selectPlatform()`, et la table en a une entrée par plateforme.
-  const adapter: PlatformAdapter = factories[platform]({ documentRef: doc, readOrgConfig, log });
+  // `guardEntry` : l'adaptateur ne peut pas importer `error-capture` et ne sait pas relever ; il
+  // enrobe ses points d'entrée — le balayage des champs — avec ce que nous lui donnons ici.
+  const adapter: PlatformAdapter = factories[platform]({
+    documentRef: doc,
+    readOrgConfig,
+    log,
+    guardEntry: (fn) => guarded('editor-detection', fn),
+  });
 
   const resolver = new ClientConfigResolver(readManagedFloor);
   const currentUser = await adapter.getCurrentUser();

@@ -27,6 +27,7 @@ import {
   writeToTextField,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
+  type EntryGuard,
   type ClientAdapterOptions,
   type EditorChrome,
   type RenderedBodyShape,
@@ -42,6 +43,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
   #doc: Document;
   #readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
   readonly log: SelectorLog;
+  #guardEntry: EntryGuard;
   #editorSeq = 0;
   /** Préfixe de chemin devant l'organisation/collection pour les routes d'API, établi par
    * currentPr() : '' sur dev.azure.com, '/DefaultCollection' éventuel sur
@@ -53,6 +55,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
     this.#doc = opts.documentRef ?? document;
     this.#readOrgConfig = opts.readOrgConfig;
     this.log = opts.log ?? new SelectorLog();
+    this.#guardEntry = opts.guardEntry ?? ((fn) => fn);
   }
 
   platformProfile(): PlatformProfile {
@@ -108,7 +111,9 @@ export class AzdoClientAdapter implements PlatformAdapter {
   /** Pas d'équivalent de Turbo : MutationObserver sur le conteneur racine (§B.3). */
   observeEditors(cb: (editor: EditorHandle) => void): Disposable {
     const seen = new WeakSet<Element>();
-    const scan = () => {
+    // Le balayage est le POINT D'ENTRÉE — le premier appel et l'observateur de mutations : une
+    // exception est relevée « pendant la détection des champs » au lieu de rester sans contexte.
+    const scan = this.#guardEntry(() => {
       for (const el of queryChainAll(this.#doc, selectors.editors)) {
         if (seen.has(el)) continue;
         // Marquer « vu » APRÈS #toHandle() : un élément balayé avant que currentPr() ne
@@ -119,7 +124,7 @@ export class AzdoClientAdapter implements PlatformAdapter {
         seen.add(el);
         cb(handle);
       }
-    };
+    });
     scan();
     const observer = new MutationObserver(() => scan());
     observer.observe(this.#doc.documentElement, { childList: true, subtree: true });

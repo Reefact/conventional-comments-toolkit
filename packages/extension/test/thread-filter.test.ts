@@ -5,7 +5,7 @@
 // fils par replay-residuals.test.ts.
 
 import { describe, expect, it } from 'vitest';
-import { applyLabelFilter, renderThreadFilter } from '../src/ui/thread-filter.js';
+import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from '../src/ui/thread-filter.js';
 
 function bar(selected: string | null, onSelect: (id: string | null) => void = () => {}): HTMLElement {
   return renderThreadFilter({ labels: ['issue', 'question', 'nitpick'], lang: 'fr', selected, onSelect });
@@ -88,6 +88,29 @@ describe('§5.5 — une barre de puces en tête des fils', () => {
     applyLabelFilter(rendered, labels, null);
     expect(el.style.display).toBe('grid');
     expect(el.style.getPropertyPriority('display')).toBe('');
+  });
+
+  it('rend un display en ligne déjà `!important` AVEC sa priorité, sur « tous » comme au nettoyage', () => {
+    // Revue de la PR : le marqueur ne gardait que la valeur, et la restauration réaffectait
+    // `style.display`, ce qui perdait l'`!important` d'origine — face à `d-block`, le `grid`
+    // (ou le `none`) posé par la plateforme revenait battu par la feuille.
+    for (const restore of [
+      (r: { id: string; element: Element }[], l: Map<string, string | null>) => applyLabelFilter(r, l, null),
+      (r: { id: string; element: Element }[]) => clearLabelFilter(r),
+    ]) {
+      const el = document.createElement('div');
+      el.style.setProperty('display', 'grid', 'important');
+      const rendered = [{ id: 't1', element: el }];
+      const labels = new Map<string, string | null>([['t1', 'praise']]);
+
+      applyLabelFilter(rendered, labels, 'issue');
+      expect(el.style.display).toBe('none');
+      expect(el.style.getPropertyPriority('display')).toBe('important');
+
+      restore(rendered, labels);
+      expect(el.style.display).toBe('grid');
+      expect(el.style.getPropertyPriority('display')).toBe('important');
+    }
   });
 
   it('un fil sans label résolu n’est retenu par aucun filtre, mais revient sur « tous »', () => {

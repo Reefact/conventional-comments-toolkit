@@ -57,6 +57,18 @@ export function renderThreadFilter(options: ThreadFilterOptions): HTMLElement {
  * chaîne vide. */
 const FILTERED_MARKER = 'cctFiltered';
 
+/** Priorité ORIGINALE du même `display` en ligne (`''` ou `important`), gardée à côté du
+ * marqueur : réaffecter `style.display` à la restauration la remet à zéro, et un `grid
+ * !important` posé par la plateforme reviendrait battu par `d-block` (revue de la PR #107). */
+const FILTERED_PRIORITY = 'cctFilteredPriority';
+
+/** Remet le `display` en ligne d'origine, priorité comprise, et retire les deux marqueurs. */
+function restoreDisplay(el: HTMLElement): void {
+  el.style.setProperty('display', el.dataset[FILTERED_MARKER]!, el.dataset[FILTERED_PRIORITY] ?? '');
+  delete el.dataset[FILTERED_MARKER];
+  delete el.dataset[FILTERED_PRIORITY];
+}
+
 /** Masque les fils rendus de la page dont le label ne correspond pas. `labelId` null = tous. */
 export function applyLabelFilter(
   renderedThreads: { id: string; element: Element }[],
@@ -67,19 +79,20 @@ export function applyLabelFilter(
     const el = element as HTMLElement;
     const visible = labelId === null || labelOfThread.get(id) === labelId;
     if (!visible) {
-      if (el.dataset[FILTERED_MARKER] === undefined) el.dataset[FILTERED_MARKER] = el.style.display;
+      if (el.dataset[FILTERED_MARKER] === undefined) {
+        el.dataset[FILTERED_MARKER] = el.style.display;
+        el.dataset[FILTERED_PRIORITY] = el.style.getPropertyPriority('display');
+      }
       // `important` : GitHub pose `d-block` (`display: block !important`) sur chaque fil, et un
       // `display: none` en ligne sans priorité y perd — le fil restait affiché, attribut
       // `data-cct-filtered` à l'appui (PR #331, replié comme déplié). Une déclaration en ligne
-      // `!important` bat une feuille `!important`. La restauration plus bas réaffecte
-      // `style.display`, ce qui remet la priorité à zéro : rien à défaire à part.
+      // `!important` bat une feuille `!important`.
       el.style.setProperty('display', 'none', 'important');
     } else if (el.dataset[FILTERED_MARKER] !== undefined) {
       // Seulement si CE filtre l'avait masqué : sinon, ne pas toucher à un `display` que la
       // plateforme porte pour ses propres raisons. Restaure la valeur D'ORIGINE, pas une
       // chaîne vide — un `display: grid` posé par la plateforme doit revenir tel quel.
-      el.style.display = el.dataset[FILTERED_MARKER]!;
-      delete el.dataset[FILTERED_MARKER];
+      restoreDisplay(el);
     }
   }
 }
@@ -91,9 +104,6 @@ export function applyLabelFilter(
 export function clearLabelFilter(renderedThreads: { id: string; element: Element }[]): void {
   for (const { element } of renderedThreads) {
     const el = element as HTMLElement;
-    if (el.dataset[FILTERED_MARKER] !== undefined) {
-      el.style.display = el.dataset[FILTERED_MARKER]!;
-      delete el.dataset[FILTERED_MARKER];
-    }
+    if (el.dataset[FILTERED_MARKER] !== undefined) restoreDisplay(el);
   }
 }

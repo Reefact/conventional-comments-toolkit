@@ -23,6 +23,7 @@ import { attachQuickInput } from './ui/quickinput.js';
 import { FeedbackView } from './ui/feedback.js';
 import { localizedConfig, type ResolvedClientConfig } from './config-resolver.js';
 import type { TelemetryEvent } from './telemetry.js';
+import { guarded } from './error-capture.js';
 
 /** Le label que le commentaire porte DÉJÀ, au sens du §3.4.1 — `null` s'il n'en porte
  * aucun. La question est posée à `core/` (`splitBody` isole la ligne de préfixe, `matchPrefix`
@@ -347,7 +348,7 @@ export class EditorController {
     // Validation débattue à 150 ms pendant la frappe (§5.3).
     const onInput = () => {
       if (this.#timer) clearTimeout(this.#timer);
-      this.#timer = setTimeout(() => this.refresh(), VALIDATION_DEBOUNCE_MS);
+      this.#timer = setTimeout(guarded('editor', () => this.refresh()), VALIDATION_DEBOUNCE_MS);
     };
     this.deps.editor.element.addEventListener('input', onInput);
     this.#disposers.push(() => this.deps.editor.element.removeEventListener('input', onInput));
@@ -379,8 +380,9 @@ export class EditorController {
         }
       }
     };
-    this.deps.editor.element.addEventListener('keydown', onKeydown, true);
-    this.#disposers.push(() => this.deps.editor.element.removeEventListener('keydown', onKeydown, true));
+    const guardedKeydown = guarded('editor', onKeydown);
+    this.deps.editor.element.addEventListener('keydown', guardedKeydown, true);
+    this.#disposers.push(() => this.deps.editor.element.removeEventListener('keydown', guardedKeydown, true));
 
     this.refresh();
   }
@@ -580,7 +582,8 @@ export class EditorController {
         this.#announceBlock();
       }
     };
-    control.element.addEventListener('click', onClick, true);
-    this.#disposers.push(() => control.element.removeEventListener('click', onClick, true));
+    const guardedClick = guarded('editor', onClick);
+    control.element.addEventListener('click', guardedClick, true);
+    this.#disposers.push(() => control.element.removeEventListener('click', guardedClick, true));
   }
 }

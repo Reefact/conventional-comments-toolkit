@@ -480,6 +480,30 @@ describe('§9.4 — une ligne dit le problème, avec son niveau', () => {
     expect(tags()[0]!.classList.contains('lvl-warn')).toBe(true);
   });
 
+  // Ce que le code faisait, dit en une phrase : « pendant l'affichage de la page ». Une exception
+  // qu'aucun point d'entrée n'a relevée n'a pas de contexte, et le dit — elle n'invente pas une fonction.
+  it('une exception avec contexte dit ce que le code faisait ; sans contexte, qu’on ne sait pas', async () => {
+    installPage({
+      selectorFailures: [
+        { kind: 'error', context: 'render', message: 'TypeError: x', at: '2026-10-30T09:00:00.000Z' },
+        { kind: 'error', context: 'editor', message: 'TypeError: y', at: '2026-10-30T09:01:00.000Z' },
+        { kind: 'error', message: 'TypeError: z', at: '2026-10-30T09:02:00.000Z' },
+        // Un contexte que CETTE version ne connaît pas : le repli, jamais la clé brute.
+        { kind: 'error', context: 'inconnu', message: 'TypeError: w', at: '2026-10-30T09:03:00.000Z' },
+      ],
+    });
+    await loadOptions();
+
+    const lines = rows();
+    expect(lines[0]).toContain(ui('fr', 'options.journal.error.render'));
+    expect(lines[1]).toContain(ui('fr', 'options.journal.error.editor'));
+    expect(lines[2]).toContain(ui('fr', 'options.journal.error'));
+    expect(lines[3]).toContain(ui('fr', 'options.journal.error'));
+    expect(lines[3]).not.toContain('options.journal.error.');
+    // Jamais le message technique à l'écran.
+    for (const line of lines) expect(line).not.toContain('TypeError');
+  });
+
   it('le niveau reste WARN / ERROR dans toutes les langues : c’est un identifiant', async () => {
     installPage({ selectorFailures: MIXED }, 'en');
     await loadOptions();

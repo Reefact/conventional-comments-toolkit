@@ -11,6 +11,7 @@
 // réécrit — seulement un `display` posé et repris.
 
 import { ui } from './strings.js';
+import { listen } from '../error-capture.js';
 
 export interface ThreadFilterOptions {
   /** Labels proposés, dans l'ordre de la configuration. */
@@ -39,7 +40,7 @@ export function renderThreadFilter(options: ThreadFilterOptions): HTMLElement {
     button.textContent = text;
     // `aria-pressed` plutôt qu'une classe seule : l'état actif doit être lu, pas seulement vu (§10).
     button.setAttribute('aria-pressed', String(options.selected === labelId));
-    button.addEventListener('click', () => options.onSelect(labelId));
+    listen('render', button, 'click', () => options.onSelect(labelId));
     return button;
   };
 

@@ -19,6 +19,7 @@ import {
   type ThreadInfo,
 } from '@cct/core';
 import { ui } from './strings.js';
+import { listen } from '../error-capture.js';
 
 /** Une entrée du sommaire : de quoi reconnaître le fil sans l'ouvrir. */
 export interface BannerAnchor {
@@ -162,7 +163,7 @@ export function renderBanner(
   root.open = options.open ?? blocksMerge;
   if (options.onToggle) {
     const notify = options.onToggle;
-    root.addEventListener('toggle', () => notify(root.open));
+    listen('render', root, 'toggle', () => notify(root.open));
   }
 
   const head = doc.createElement('summary');

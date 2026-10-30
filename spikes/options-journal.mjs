@@ -49,7 +49,7 @@ const JOURNAL = [
   { chain: 'pr-created-at', problem: 'pr-creation-date', at: '2026-10-30T08:13:33.647Z', url: `${PR}/changes` },
   { chain: 'comment-author', problem: 'comment-writer', at: '2026-10-30T07:56:08.497Z', url: `${PR}/files?diff=split` },
   { chain: 'comment-body', problem: 'comment-text', at: '2026-10-30T07:56:08.497Z', url: `${PR}/files?diff=split` },
-  { kind: 'error', message: "TypeError: Cannot read properties of undefined (reading 'closest')", at: '2026-10-30T09:02:11.100Z', url: `${PR}/files` },
+  { kind: 'error', context: 'editor', message: "TypeError: Cannot read properties of undefined (reading 'closest')", at: '2026-10-30T09:02:11.100Z', url: `${PR}/files` },
   { chain: 'thread-anchor', at: '2026-10-27T22:03:41.500Z' },
 ];
 

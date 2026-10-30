@@ -5,6 +5,7 @@
 import { IDENTIFIER_RE, resolveDecoration, type EffectiveConfig } from '@cct/core';
 import { labelsByZone } from './label-order.js';
 import { labelTooltip, ui } from './strings.js';
+import { listen } from '../error-capture.js';
 
 /** Ce que le commentaire porte à cet instant, tel que `core/` le lit (§3.4.1). */
 export interface PosedPrefix {
@@ -217,7 +218,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     // Infobulle : définition + exemple, dans la langue de l'interface (§5.1).
     const tooltip = labelTooltip(opts.lang, label, 'button');
     if (tooltip !== null) button.title = tooltip;
-    button.addEventListener('click', () => {
+    listen('editor', button, 'click', () => {
       // Le second clic RETIRE (§5.1). Ce qui décide est donc le label que le commentaire
       // porte à cet instant, lu dans le texte — pas celui qu'on se souvient d'avoir cliqué.
       const posed = opts.currentPrefix();
@@ -287,7 +288,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     b.textContent = segment.text;
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-checked', segment.id === null ? 'true' : 'false');
-    b.addEventListener('click', () => {
+    listen('editor', b, 'click', () => {
       decoration = { origin: 'pending', ids: segment.id === null ? [] : [segment.id] };
       checkSegment(b);
       // Le label sur lequel agir est celui que le COMMENTAIRE porte, et il est réinséré
@@ -356,7 +357,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
       opts.onFreeDecoration(raw, opts.currentPrefix().writtenLabel);
     };
     free.addEventListener('input', () => free.removeAttribute('aria-invalid'));
-    free.addEventListener('keydown', (e) => {
+    listen('editor', free, 'keydown', (e) => {
       const key = (e as KeyboardEvent).key;
       if (key === 'Enter') {
         e.preventDefault();
@@ -374,7 +375,7 @@ export function buildToolbar(opts: ToolbarOptions): Toolbar {
     // label de repli que le clic, voyant ce label désormais posé, retirerait aussitôt. Ce
     // clic-là consomme la décoration en attente lui-même — deux correctifs qui, combinés,
     // laissaient le commentaire sans label (revue Codex, PR #35).
-    free.addEventListener('blur', (e) => {
+    listen('editor', free, 'blur', (e) => {
       const next = (e as FocusEvent).relatedTarget;
       if (next instanceof HTMLElement && next.classList.contains('cct-label-button')) return;
       commitFree();

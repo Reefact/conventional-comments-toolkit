@@ -5,6 +5,7 @@
 import type { CommentAnalysis, Diagnostic } from '@cct/core';
 import type { FeedbackState } from '../guard.js';
 import { ui } from './strings.js';
+import { listen } from '../error-capture.js';
 
 const STATE_ICONS: Record<FeedbackState, string> = {
   compliant: '✅',
@@ -86,7 +87,7 @@ export class FeedbackView {
         button.className = 'cct-fix';
         button.textContent = ui(this.#lang, 'fix.apply');
         const replacement = d.fix.replacement;
-        button.addEventListener('click', () => r.onFix(replacement));
+        listen('editor', button, 'click', () => r.onFix(replacement));
         li.appendChild(button);
       }
       this.#list.appendChild(li);
@@ -102,7 +103,7 @@ export class FeedbackView {
         to: r.aliasRewrite.to,
       });
       const replacement = r.aliasRewrite.replacement;
-      button.addEventListener('click', () => r.onFix(replacement));
+      listen('editor', button, 'click', () => r.onFix(replacement));
       li.appendChild(button);
       this.#list.appendChild(li);
     }

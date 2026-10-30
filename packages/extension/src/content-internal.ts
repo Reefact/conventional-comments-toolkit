@@ -11,7 +11,7 @@
 
 import type { ConfigRead, EffectiveConfig, Floor, PrRef, PublishedSummary } from '@cct/core';
 import { SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
-import { captureErrors } from './error-capture.js';
+import { captureErrors, guarded } from './error-capture.js';
 import { entryKey, mergeJournalEntry, type JournalEntry } from './journal-entry.js';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage, type ResolvedClientConfig } from './config-resolver.js';
@@ -702,7 +702,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     });
     if (disposed || generation !== entry.generation) return;
     previousController?.dispose();
-    controller.attach();
+    guarded('editor', () => controller.attach())();
     entry.controller = controller;
     entry.builtSignature = signature;
   };
@@ -816,7 +816,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
       telemetry.arm(null);
       dropPendingDegradations();
     }
-    void armFor(armedFor?.pr ?? null, 'refresh');
+    void guarded('config', armFor)(armedFor?.pr ?? null, 'refresh');
   };
   try {
     chrome?.storage?.onChanged?.addListener(onTelemetryInputChanged);
@@ -839,7 +839,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
       log.forgetSeen();
       errors?.forgetSeen();
     }
-    void armFor(pr, changed ? 'pr' : 'refresh');
+    void guarded('config', armFor)(pr, changed ? 'pr' : 'refresh');
     // Éditeurs DÉJÀ CONNUS (§5, revue Codex et Reefact, PR #39) : chacun garde la
     // configuration capturée à son propre `attach()` tant que rien ne la lui repousse —
     // sans ce geste, un éditeur ouvert avant une ré-résolution (TTL expiré, ou sondage
@@ -860,8 +860,9 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   // Vidange : périodique, et à la fermeture de l'onglet. `pagehide` et non `unload` —
   // celui-ci empêche la mise en cache arrière/avant et n'est plus fiable ; `keepalive`
   // (telemetry.ts) est ce qui laisse la dernière requête partir malgré la fermeture.
-  const flushTimer = setInterval(() => telemetry.flush(), TELEMETRY_FLUSH_MS);
-  const flushOnHide = () => telemetry.flush();
+  const flush = guarded('telemetry', () => telemetry.flush());
+  const flushTimer = setInterval(flush, TELEMETRY_FLUSH_MS);
+  const flushOnHide = flush;
   doc.defaultView?.addEventListener('pagehide', flushOnHide);
 
   const revoke = () => {
@@ -1346,11 +1347,15 @@ export function observePrChromeNavigation(
   const scheduleNextConfigPoll = (): void => {
     if (disposed || configPollIntervalMs <= 0) return;
     if (configPollTimer !== null) clearTimeout(configPollTimer);
-    configPollTimer = setTimeout(() => void pollConfig().finally(scheduleNextConfigPoll), nextConfigPollDelay());
+    configPollTimer = setTimeout(
+      () => void guarded('config', pollConfig)().finally(scheduleNextConfigPoll),
+      nextConfigPollDelay()
+    );
   };
   scheduleNextConfigPoll();
 
-  const run = (): void => {
+  // Enrobé : c'est le rendu de la page, et ce qu'il lève est relevé AVEC ce qu'il faisait.
+  const run = guarded('render', (): void => {
     if (disposed) return;
     if (inFlight) {
       missedMutation = true; // traité en une seule relance temporisée à la fin du rendu en cours
@@ -1427,7 +1432,7 @@ export function observePrChromeNavigation(
     // pendant que `resolver.resolve()` ou `getThreads()` sont en vol, l'observation
     // déconnecte bien l'observateur, mais CE rendu-là aboutirait quand même et écrirait dans
     // une page dont elle ne sait plus rien (revue Codex, PR #26).
-    void renderPrChrome(adapter, resolver, doc, () => !disposed && key === prKeyFor(adapter.currentPr()), {
+    void guarded('render', renderPrChrome)(adapter, resolver, doc, () => !disposed && key === prKeyFor(adapter.currentPr()), {
       get: () => selectedLabel,
       set: (label) => {
         selectedLabel = label;
@@ -1501,7 +1506,7 @@ export function observePrChromeNavigation(
           }, RENDER_RETRY_THROTTLE_MS);
         }
       });
-  };
+  });
 
   run();
   const observer = new MutationObserver(run);

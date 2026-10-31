@@ -334,7 +334,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     const stored = written[SKELETON_KEY] as StoredSkeleton[];
     expect(stored.map((s) => s.id)).toEqual([first!.skeleton]);
     expect(stored[0]!.url).toBe('https://github.com/acme/demo/pull/42');
-    expect(await decompressSkeleton(stored[0]!.gz)).toContain(' div data-testid="mergebox-partial"\n  button data-variant="default" «Merge»');
+    expect(await decompressSkeleton(stored[0]!.gz)).toContain(' div data-testid="mergebox-partial"\n  button data-variant="default"');
 
     clearFakeAdapters();
   });

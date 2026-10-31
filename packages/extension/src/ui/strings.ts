@@ -209,9 +209,8 @@ const fr: Record<string, string> = {
     '\n' +
     'skeletons/ : le squelette de la page à l’instant où une règle de sélection n’a rien trouvé, ' +
     'un élément par ligne. Le champ « skeleton » d’une ligne de report.json nomme son fichier. ' +
-    'Un squelette ne garde que la balise, une liste fermée d’attributs d’interface et le texte ' +
-    'des boutons qui ne contiennent que du texte d’interface — jamais la valeur d’un champ, ni le ' +
-    'texte d’un commentaire ou du code. ' +
+    'Un squelette ne garde que la balise et une liste fermée d’attributs d’interface, sans aucun ' +
+    'texte — jamais la valeur d’un champ, ni le texte d’un commentaire, du code ou d’un bouton. ' +
     'Les squelettes les plus anciens sont effacés pour tenir dans 1 Mo : une ligne peut nommer ' +
     'un fichier absent.\n' +
     '\n' +
@@ -471,9 +470,8 @@ const en: Record<string, string> = {
     '\n' +
     'skeletons/: the skeleton of the page at the moment a selector rule found nothing, one ' +
     'element per line. The "skeleton" field of a report.json line names its file. A skeleton ' +
-    'keeps only the tag, a closed list of interface attributes and the text of buttons that hold ' +
-    'interface text only — never ' +
-    'the value of a field, nor the text of a comment or of code. The oldest skeletons are ' +
+    'keeps only the tag and a closed list of interface attributes, with no text — never the ' +
+    'value of a field, nor the text of a comment, of code or of a button. The oldest skeletons are ' +
     'deleted to fit in 1 MB: a line can name a missing file.\n' +
     '\n' +
     'Before sharing this archive, read report.json: the addresses name repositories and ' +

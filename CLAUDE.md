@@ -43,6 +43,8 @@
   branche ; elle n'existe plus sur `origin`, et la consigne est restée là, fausse,
   sans que rien ne le signale. Un nom de branche est une liste d'un seul élément :
   il vieillit comme les autres.
+  **Exception** (décision du propriétaire, 2026-10-31) : les branches `diagnostic/…`, une par
+  rapport de diagnostic, qui ne stockent que l'archive reçue — voir le skill `diagnostic`.
 - Les choix purement techniques appartiennent à l'agent ; l'absence d'une
   décision technique dans la spec est un espace de conception, pas une
   ambiguïté à remonter.

@@ -339,6 +339,29 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     clearFakeAdapters();
   });
 
+  it('une autre page dans la même seconde a son propre squelette, jamais celui de la précédente', async () => {
+    // Revue Codex, PR #110 : une navigation SPA vers une autre PR, moins d'une seconde après un
+    // échec, faisait désigner à la nouvelle ligne le squelette de l'ANCIENNE page.
+    const { written } = installChrome();
+    document.body.innerHTML = '<main data-testid="pr-42"></main>';
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a'] });
+    setLocation('https://github.com/acme/demo/pull/43');
+    document.body.innerHTML = '<main data-testid="pr-43"></main>';
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    for (let i = 0; i < 20; i++) await settle();
+
+    const [first, second] = journal(written) as SelectorFailure[];
+    expect(second!.url).toBe('https://github.com/acme/demo/pull/43');
+    expect(second!.skeleton).not.toBe(first!.skeleton);
+    const stored = (written[SKELETON_KEY] as StoredSkeleton[]).find((s) => s.id === second!.skeleton)!;
+    expect(stored.url).toBe('https://github.com/acme/demo/pull/43');
+    expect(await decompressSkeleton(stored.gz)).toContain('main data-testid="pr-43"');
+
+    clearFakeAdapters();
+  });
+
   it('le squelette montre la page À L’INSTANT de l’échec, pas quand il est construit', async () => {
     const { written } = installChrome();
     document.body.innerHTML = '<header data-testid="pr-header"></header>';

@@ -16,7 +16,7 @@ _When a part of the page is not recognised, the journal now records what the pag
 
 - **The journal records what the page showed when something was not recognised.** A line now says how far the extension got in the page, what it found there instead and when it happened; for the merge button and the PR creation date, it also says whether the element showed up a moment later. That is often enough for a developer to find the cause without asking you to capture the page. It keeps the page's structure and interface attributes only, never the page's text: not what you type, not comments or code. Attribute values are kept, though, and an interface label such as a button's accessible name, or an account name, can appear in them. It stays on your device.
 
-- **A skeleton of the page is kept from the moment of the problem, when your browser and storage allow it.** It is the page's structure, without the page's text, taken at the instant something failed rather than afterwards. Skeletons take at most 1 MB of the extension's storage, the oldest go first, and the extension never lets them crowd out anything else. When the browser cannot compress a skeleton or storage is short, none is kept, and the journal line simply has none.
+- **A skeleton of the page is kept from the moment of the problem, when your browser and storage allow it.** It is the page's structure, without the page's text, taken at the instant something failed rather than afterwards. Skeletons take at most 1 MB of the extension's storage, the oldest go first, and the extension never lets them crowd out anything else. When the browser cannot compress a skeleton or storage is short, none is stored: the journal line still names it, and the archive simply lacks that file.
 
 ### 🔧 Changed
 

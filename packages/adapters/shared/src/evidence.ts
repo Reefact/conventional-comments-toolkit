@@ -117,8 +117,25 @@ function formAction(el: Element): string | null {
   }
 }
 
-function isButton(el: Element): boolean {
-  return el.tagName === 'BUTTON' || el.getAttribute('role') === 'button';
+/** Ce qu'un bouton peut contenir pour que son texte soit lu : du texte d'interface mis en
+ * forme, une icône. Rien qui puisse porter un texte saisi — paragraphe, code, citation, lien,
+ * bloc. Une liste FERMÉE, comme celle des attributs : un descendant hors liste fait renoncer au
+ * libellé, il ne le filtre pas. */
+const LABEL_SAFE_DESCENDANTS = new Set(['SPAN', 'STRONG', 'B', 'EM', 'I', 'SMALL', 'KBD', 'svg', 'path', 'use', 'g']);
+
+/** Le libellé d'un bouton, ou `null`.
+ *
+ * Seul un `<button>` en a un — pas `role="button"`, que n'importe quel conteneur peut porter : un
+ * `<div role="button">` qui enveloppe un commentaire aurait fait entrer son texte dans le
+ * relevé, alors que PRIVACY.md promet le contraire (revue Reefact, PR #110). Et même un
+ * `<button>` n'en a pas dès qu'il contient autre chose que `LABEL_SAFE_DESCENDANTS`. */
+function buttonLabel(el: Element): string | null {
+  if (el.tagName !== 'BUTTON') return null;
+  for (const inner of el.querySelectorAll('*')) {
+    if (!LABEL_SAFE_DESCENDANTS.has(inner.tagName)) return null;
+  }
+  const label = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, MAX_LABEL);
+  return label || null;
 }
 
 function ancestorNotation(el: Element): string | null {
@@ -143,10 +160,8 @@ export function printElement(el: Element): ElementPrint {
     if (value !== null) attrs[attribute] = value;
   }
   if (Object.keys(attrs).length > 0) print.attrs = attrs;
-  if (isButton(el)) {
-    const label = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, MAX_LABEL);
-    if (label) print.label = label;
-  }
+  const label = buttonLabel(el);
+  if (label) print.label = label;
   const ancestors: string[] = [];
   for (let up = el.parentElement; up && up.tagName !== 'BODY' && ancestors.length < MAX_ANCESTORS; up = up.parentElement) {
     const notation = ancestorNotation(up);
@@ -260,10 +275,8 @@ function skeletonLine(el: Element, depth: number): string {
     const action = formAction(el);
     if (action) line += ` action="${action}"`;
   }
-  if (isButton(el)) {
-    const label = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, MAX_LABEL);
-    if (label) line += ` «${label}»`;
-  }
+  const label = buttonLabel(el);
+  if (label) line += ` «${label}»`;
   return line;
 }
 

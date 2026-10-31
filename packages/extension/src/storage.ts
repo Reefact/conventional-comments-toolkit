@@ -157,13 +157,15 @@ export function updateJournalEntry<T>(key: string, match: (entry: T) => boolean,
  * si le quota de l'aire n'a plus de marge. Même file d'attente que le journal : la ligne qui
  * désigne ce squelette a été demandée avant lui, et elle est écrite avant lui.
  *
- * `fit` reçoit les squelettes existants et rend la liste à écrire, ou `null` pour n'écrire rien.
+ * `fit` reçoit les squelettes existants, et les clés `alsoRead` lues dans la même lecture, et
+ * rend la liste à écrire, ou `null` pour n'écrire rien.
  * La garde de quota lit l'occupation de TOUTE l'aire : le budget borne ce que les squelettes
  * prennent, la garde protège ce qu'il reste aux autres clés. */
 export function storeBounded<T>(
   key: string,
-  fit: (existing: T[]) => T[] | null,
-  headroom: number
+  fit: (existing: T[], items: Record<string, unknown>) => T[] | null,
+  headroom: number,
+  alsoRead: readonly string[] = []
 ): Promise<boolean> {
   const next = journalQueue.then(
     () =>
@@ -171,10 +173,10 @@ export function storeBounded<T>(
         const area = localArea();
         if (!area?.get || !area?.set) return resolve(false);
         try {
-          area.get([key], (items) => {
+          area.get([key, ...alsoRead], (items) => {
             try {
               const existing = Array.isArray(items?.[key]) ? (items[key] as T[]) : [];
-              const written = fit(existing);
+              const written = fit(existing, items ?? {});
               if (written === null) return resolve(false);
               const write = () => area.set!({ [key]: written }, () => resolve(true));
               const quota = area.QUOTA_BYTES;

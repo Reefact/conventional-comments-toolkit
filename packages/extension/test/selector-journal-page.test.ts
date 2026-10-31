@@ -347,6 +347,9 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
 
     captured.log!.degraded({ name: 'merge-button', candidates: ['button.a'] });
+    // La navigation est du code de la PAGE : elle s'exécute entre deux tâches de l'extension,
+    // jamais au milieu d'une.
+    await settle();
     setLocation('https://github.com/acme/demo/pull/43');
     document.body.innerHTML = '<main data-testid="pr-43"></main>';
     captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
@@ -360,6 +363,54 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     expect(await decompressSkeleton(stored.gz)).toContain('main data-testid="pr-43"');
 
     clearFakeAdapters();
+  });
+
+  it('une page qui change entre deux échecs, même dans la seconde, donne deux squelettes (revue Reefact, PR #110)', async () => {
+    // Le cas même que le squelette sert à diagnostiquer : une hydratation. La chaîne A échoue,
+    // GitHub rend la boîte de fusion, la chaîne B échoue 300 ms plus tard — son squelette doit
+    // montrer la boîte, celui de A non.
+    const { written } = installChrome();
+    document.body.innerHTML = '<header data-testid="pr-header"></header>';
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    captured.log!.degraded({ name: 'comment-body', candidates: ['.a'] });
+    await settle();
+    document.body.insertAdjacentHTML('beforeend', '<div data-testid="mergebox-partial"></div>');
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a'] });
+    for (let i = 0; i < 20; i++) await settle();
+
+    const [a, b] = journal(written) as SelectorFailure[];
+    expect(b!.skeleton).not.toBe(a!.skeleton);
+    const textOf = async (id: string | undefined) =>
+      decompressSkeleton((written[SKELETON_KEY] as StoredSkeleton[]).find((s) => s.id === id)!.gz);
+    expect(await textOf(a!.skeleton)).not.toContain('mergebox-partial');
+    expect(await textOf(b!.skeleton)).toContain('mergebox-partial');
+
+    clearFakeAdapters();
+  });
+
+  it('« Effacer le journal » pendant la construction ne laisse aucun squelette orphelin (revue Reefact, PR #110)', async () => {
+    const { written, clear } = installChrome();
+    // Le navigateur rend la main quand IL le décide : le test tient le rappel, et choisit
+    // l'instant — après l'écriture de la ligne, après l'effacement.
+    const idle: (() => void)[] = [];
+    vi.stubGlobal('requestIdleCallback', (cb: () => void) => idle.push(cb));
+    try {
+      const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+      captured.log!.degraded({ name: 'merge-button', candidates: ['button.a'] });
+      for (let i = 0; i < 4; i++) await settle();
+      expect(journal(written)).toHaveLength(1);
+
+      clear();
+      expect(idle).toHaveLength(1);
+      idle[0]!();
+      for (let i = 0; i < 20; i++) await settle();
+
+      expect(SKELETON_KEY in written).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+      clearFakeAdapters();
+    }
   });
 
   it('le squelette montre la page À L’INSTANT de l’échec, pas quand il est construit', async () => {

@@ -194,8 +194,6 @@ const fr: Record<string, string> = {
   'options.journal.problem.pr-creation-date':
     'Date de création de la PR introuvable : PR tenue hors périmètre, rien n’est bloqué',
   'options.status.selectors.clear': 'Effacer le journal',
-  'options.status.selectors.legend':
-    'Même marque = même page. Un clic ouvre l’adresse relevée dans un nouvel onglet.',
   'options.status.selectors.page.unknown': 'Page non enregistrée.',
   'options.status.selectors.copy.aria': 'Copier le détail de « {what} » pour le débogage',
   'options.status.selectors.download': 'Télécharger le diagnostic (.zip)',
@@ -457,8 +455,6 @@ const en: Record<string, string> = {
   'options.journal.problem.pr-creation-date':
     'PR creation date not found: PR treated as out of scope, nothing is blocked',
   'options.status.selectors.clear': 'Clear the log',
-  'options.status.selectors.legend':
-    'Same mark = same page. Click one to open the recorded address in a new tab.',
   'options.status.selectors.page.unknown': 'Page not recorded.',
   'options.status.selectors.copy.aria': 'Copy the details of “{what}” for debugging',
   'options.status.selectors.download': 'Download the diagnostic (.zip)',

@@ -763,7 +763,6 @@ function refreshStatus(): void {
           renderSelectorJournal(failures, (entry) =>
             copyReport(entryReport(entry, environment()), feedback)
           ),
-          renderSelectorLegend(),
           actions,
           feedback
         );
@@ -947,13 +946,6 @@ function renderPageMark(url: string | undefined): HTMLElement {
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
   return link;
-}
-
-function renderSelectorLegend(): HTMLElement {
-  const hint = document.createElement('p');
-  hint.className = 'status-hint';
-  hint.textContent = ui(lang, 'options.status.selectors.legend');
-  return hint;
 }
 
 /** Vide le journal, squelettes de page compris — et rien d'autre.

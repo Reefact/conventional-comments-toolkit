@@ -309,8 +309,11 @@ function persistJournalEntry(entry: JournalEntry): void {
   );
 }
 
-/** Un squelette pris il y a moins de ce délai sert aussi aux lignes suivantes : plusieurs
- * chaînes échouent souvent au même balayage, et la page n'a pas changé entre elles. */
+/** Un squelette pris il y a moins de ce délai, SUR LA MÊME ADRESSE, sert aussi aux lignes
+ * suivantes : plusieurs chaînes échouent souvent au même balayage, et la page n'a pas changé
+ * entre elles. L'adresse compte autant que le délai : GitHub navigue sans recharger, et une
+ * autre PR atteinte dans la seconde se voyait attribuer le squelette de la précédente (revue
+ * Codex, PR #110). */
 const SKELETON_REUSE_MS = 1000;
 
 /** Copie la page MAINTENANT — c'est l'instant de l'échec qui compte —, puis en tire le
@@ -333,10 +336,11 @@ const SKELETON_REUSE_MS = 1000;
  * d'échouer. */
 function takeSkeleton(
   doc: Document,
-  last: { id: string; at: number } | null
-): { id: string; at: number } | null {
+  last: { id: string; at: number; url: string } | null
+): { id: string; at: number; url: string } | null {
   const now = Date.now();
-  if (last && now - last.at < SKELETON_REUSE_MS) return last;
+  const url = doc.location.href;
+  if (last && last.url === url && now - last.at < SKELETON_REUSE_MS) return last;
   let copy: Element;
   try {
     if (!doc.body) return null;
@@ -344,8 +348,7 @@ function takeSkeleton(
   } catch {
     return null;
   }
-  const taken = { id: newSkeletonId(now), at: now };
-  const url = doc.location.href;
+  const taken = { id: newSkeletonId(now), at: now, url };
   const build = () => {
     void compressSkeleton(pageSkeleton(copy))
       .then((gz) => {
@@ -585,7 +588,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   //
   // Le relevé de la page (`evidence`) suit le même chemin local, jamais `count()` : il décrit la
   // page (§10, PRIVACY.md).
-  let lastSkeleton: { id: string; at: number } | null = null;
+  let lastSkeleton: { id: string; at: number; url: string } | null = null;
   const log = new SelectorLog(
     (event) => void count(event),
     (chain, evidence) => {

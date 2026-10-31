@@ -1,0 +1,193 @@
+{
+  "extension": "v1.0.0-beta.19",
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "language": "fr",
+  "degradedState": null,
+  "generatedAt": "2026-10-31T14:26:01.055Z",
+  "entries": [
+    {
+      "at": "2026-10-31T09:27:56.244Z",
+      "candidates": [
+        "textarea[aria-label*=\"omment\"][class*=\"CommentBox\"]",
+        "div[data-testid*=\"comment-composer\"] textarea",
+        "textarea[name=\"comment[body]\"]",
+        "textarea[name=\"pull_request_review_comment[body]\"]",
+        "textarea[name=\"pull_request_review[body]\"]",
+        "textarea.js-comment-field",
+        "textarea[aria-label=\"Markdown value\"]",
+        "textarea[placeholder=\"Leave a comment\"]",
+        "textarea[class*=\"prc-Textarea-TextArea\"]"
+      ],
+      "chain": "editors",
+      "count": 2,
+      "evidence": {
+        "facts": {
+          "prState": "absent",
+          "release": "c4e7b7c92131"
+        },
+        "msSinceVisit": 106,
+        "trace": [
+          {
+            "candidate": "textarea[aria-label*=\"omment\"][class*=\"CommentBox\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "div[data-testid*=\"comment-composer\"] textarea",
+            "steps": [
+              0,
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[name=\"comment[body]\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[name=\"pull_request_review_comment[body]\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[name=\"pull_request_review[body]\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea.js-comment-field",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[aria-label=\"Markdown value\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[placeholder=\"Leave a comment\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[class*=\"prc-Textarea-TextArea\"]",
+            "steps": [
+              0
+            ]
+          }
+        ],
+        "unmatched": [
+          {
+            "ancestors": [
+              "text-expander",
+              "form[action=\"/users/Reefact\"]",
+              "waiting-form"
+            ],
+            "attrs": {
+              "aria-label": "Add a bio",
+              "class": "form-control js-length-limited-input mb-1 width-full js-user-profile-bio-edit",
+              "id": "user_profile_bio",
+              "name": "user[profile_bio]",
+              "placeholder": "Add a bio"
+            },
+            "tag": "textarea"
+          }
+        ]
+      },
+      "firstAt": "2026-10-31T09:27:56.136Z",
+      "platform": "github",
+      "problem": "editor-field",
+      "skeleton": "mvw779eb-lk3t30",
+      "url": "https://github.com/Reefact",
+      "urls": [
+        "https://github.com/Reefact"
+      ]
+    },
+    {
+      "at": "2026-10-31T14:24:56.986Z",
+      "candidates": [
+        "[data-testid=\"mergebox-partial\"] [data-component=\"ButtonGroup\"] button[data-variant=\"primary\"]",
+        "[data-testid=\"mergebox-partial\"] button.btn-primary",
+        "button[data-testid*=\"merge-button\"]",
+        ".merge-message button.btn-group-merge",
+        "button.js-merge-commit-button"
+      ],
+      "chain": "merge-button",
+      "count": 5,
+      "evidence": {
+        "anchor": {
+          "ancestors": [
+            "div[data-component=\"SplitPageLayout.Content\"]",
+            "div[data-component=\"SplitPageLayout\"]",
+            "div[data-component=\"SplitPageLayout\"]",
+            "div[id=\"diff-comparison-viewer-container\"]"
+          ],
+          "attrs": {
+            "class": "tmp-ml-md-6 tmp-pl-md-3 tmp-my-3",
+            "data-testid": "mergebox-partial"
+          },
+          "tag": "div"
+        },
+        "facts": {
+          "prState": "pullOpened",
+          "release": "c4e7b7c92131"
+        },
+        "msSinceVisit": 5,
+        "trace": [
+          {
+            "candidate": "[data-testid=\"mergebox-partial\"] [data-component=\"ButtonGroup\"] button[data-variant=\"primary\"]",
+            "steps": [
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "candidate": "[data-testid=\"mergebox-partial\"] button.btn-primary",
+            "steps": [
+              1,
+              0
+            ]
+          },
+          {
+            "candidate": "button[data-testid*=\"merge-button\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": ".merge-message button.btn-group-merge",
+            "steps": [
+              0,
+              0
+            ]
+          },
+          {
+            "candidate": "button.js-merge-commit-button",
+            "steps": [
+              0
+            ]
+          }
+        ]
+      },
+      "firstAt": "2026-10-31T09:27:39.123Z",
+      "lastRecoveredAfterMs": 1887,
+      "platform": "github",
+      "problem": "completion-control",
+      "recoveredVisits": 4,
+      "skeleton": "mvwht7yr-m0brim",
+      "url": "https://github.com/Reefact/conventional-comments-toolkit/pull/114",
+      "urls": [
+        "https://github.com/Reefact/first-class-errors/pull/472",
+        "https://github.com/Reefact/conventional-comments-toolkit/pull/114"
+      ]
+    }
+  ]
+}

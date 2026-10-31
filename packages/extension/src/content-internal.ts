@@ -309,13 +309,6 @@ function persistJournalEntry(entry: JournalEntry): void {
   );
 }
 
-/** Un squelette pris il y a moins de ce délai, SUR LA MÊME ADRESSE, sert aussi aux lignes
- * suivantes : plusieurs chaînes échouent souvent au même balayage, et la page n'a pas changé
- * entre elles. L'adresse compte autant que le délai : GitHub navigue sans recharger, et une
- * autre PR atteinte dans la seconde se voyait attribuer le squelette de la précédente (revue
- * Codex, PR #110). */
-const SKELETON_REUSE_MS = 1000;
-
 /** Copie la page MAINTENANT — c'est l'instant de l'échec qui compte —, puis en tire le
  * squelette et le stocke, compressé, dans son budget, quand le navigateur a du temps. Rend son
  * identifiant, que la ligne du journal porte ; `null` si la page n'a pas de `<body>` ou que la
@@ -334,13 +327,9 @@ const SKELETON_REUSE_MS = 1000;
  * La compression et l'écriture peuvent ne pas aboutir (navigateur sans `CompressionStream`,
  * budget, quota) : la ligne désigne alors un squelette absent, et l'archive le dit plutôt que
  * d'échouer. */
-function takeSkeleton(
-  doc: Document,
-  last: { id: string; at: number; url: string } | null
-): { id: string; at: number; url: string } | null {
+function takeSkeleton(doc: Document): string | null {
   const now = Date.now();
   const url = doc.location.href;
-  if (last && last.url === url && now - last.at < SKELETON_REUSE_MS) return last;
   let copy: Element;
   try {
     if (!doc.body) return null;
@@ -348,20 +337,34 @@ function takeSkeleton(
   } catch {
     return null;
   }
-  const taken = { id: newSkeletonId(now), at: now, url };
+  const id = newSkeletonId(now);
   const build = () => {
     void compressSkeleton(pageSkeleton(copy))
       .then((gz) => {
         if (gz === null) return;
-        const stored: StoredSkeleton = { id: taken.id, at: new Date(now).toISOString(), url, gz };
-        return storeBounded<StoredSkeleton>(SKELETON_KEY, (existing) => fitSkeletons(existing, stored), QUOTA_HEADROOM);
+        const stored: StoredSkeleton = { id, at: new Date(now).toISOString(), url, gz };
+        // Écrit seulement si une ligne du journal le désigne ENCORE : « Effacer le journal »
+        // peut tomber entre l'échec et cette écriture, différée jusqu'à cinq secondes, et le
+        // squelette serait sinon recréé, orphelin, après l'effacement (revue Reefact, PR #110).
+        // Reste la fenêtre entre la lecture et l'écriture de `storeBounded`, que
+        // `chrome.storage` ne permet pas de fermer — la même que `appendToJournal` assume.
+        return storeBounded<StoredSkeleton>(
+          SKELETON_KEY,
+          (existing, items) => (isReferenced(items['selectorFailures'], id) ? fitSkeletons(existing, stored) : null),
+          QUOTA_HEADROOM,
+          ['selectorFailures']
+        );
       })
       .catch(() => undefined);
   };
   const view = doc.defaultView as (Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }) | null;
   if (view?.requestIdleCallback) view.requestIdleCallback(build, { timeout: 5000 });
   else setTimeout(build, 0);
-  return taken;
+  return id;
+}
+
+function isReferenced(journal: unknown, id: string): boolean {
+  return Array.isArray(journal) && journal.some((e) => (e as { skeleton?: unknown } | null)?.skeleton === id);
 }
 
 /** La chaîne journalisée pendant cette visite a fini par trouver son élément : la ligne le dit
@@ -588,11 +591,23 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   //
   // Le relevé de la page (`evidence`) suit le même chemin local, jamais `count()` : il décrit la
   // page (§10, PRIVACY.md).
-  let lastSkeleton: { id: string; at: number; url: string } | null = null;
+  // Une copie de la page sert à TOUS les échecs relevés dans la même exécution synchrone — un
+  // balayage en relève souvent plusieurs —, et à eux seuls : entre deux de ces appels, aucun code
+  // de la page ne s'exécute, donc le DOM n'a pas pu changer. Au-delà, la page a pu changer, et un
+  // échec suivant prend sa propre copie. Un délai fixe partageait la copie à travers une
+  // hydratation, et même une navigation (revues Codex et Reefact, PR #110).
+  let shared: { id: string | null } | null = null;
   const log = new SelectorLog(
     (event) => void count(event),
     (chain, evidence) => {
-      lastSkeleton = takeSkeleton(doc, lastSkeleton);
+      if (shared === null) {
+        const current = { id: takeSkeleton(doc) };
+        shared = current;
+        queueMicrotask(() => {
+          if (shared === current) shared = null;
+        });
+      }
+      const skeleton = shared.id;
       persistJournalEntry({
         chain: chain.name,
         at: new Date().toISOString(),
@@ -602,7 +617,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
         ...(chain.problem ? { problem: chain.problem } : {}),
         platform,
         evidence,
-        ...(lastSkeleton ? { skeleton: lastSkeleton.id } : {}),
+        ...(skeleton ? { skeleton } : {}),
       });
     },
     (chain, msSinceVisit) => persistRecovery(chain.name, msSinceVisit)

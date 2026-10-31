@@ -105,6 +105,18 @@ describe('printElement — l’interface, jamais le contenu', () => {
     });
   });
 
+  it('un libellé ne vient que d’un <button> au contenu d’interface, jamais d’un conteneur (revue Reefact, PR #110)', () => {
+    const doc = page(`
+      <div role="button" class="c"><p class="comment-body">texte de revue privé</p></div>
+      <button><p>paragraphe privé</p></button>
+      <button><code>const privé = 1;</code></button>
+      <button><span data-component="text">Rebase <strong>and</strong> merge</span><svg><path d="M0"></path></svg></button>`);
+    const prints = [...doc.querySelectorAll('[role="button"], button')].map(printElement);
+    expect(JSON.stringify(prints)).not.toContain('privé');
+    expect(pageSkeleton(doc.body)).not.toContain('privé');
+    expect(prints.map((p) => p.label)).toEqual([undefined, undefined, undefined, 'Rebase and merge']);
+  });
+
   it('masque les empreintes hexadécimales, et borne les classes', () => {
     const doc = page(
       '<textarea id="new_inline_comment_diff-b4a859224d8b10404706a2_4397910058_" class="a b c d e f g h"></textarea>'

@@ -92,7 +92,7 @@ try {
   // Le squelette est compressé PAR LE NAVIGATEUR, comme le fait le script de contenu : c'est
   // `CompressionStream` de Chromium qui écrit, et `DecompressionStream` de Chromium qui relit.
   await page.evaluate(async (journal) => {
-    const text = 'body\n div data-testid="mergebox-partial"\n  button data-variant="default" «Merge»';
+    const text = 'body\n div data-testid="mergebox-partial"\n  button data-variant="default"';
     const gz = new Uint8Array(
       await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()
     );
@@ -193,7 +193,7 @@ try {
   );
   assert(
     'l’archive porte tout le journal, et le squelette compressé par le navigateur en ressort lisible',
-    archive?.lines === JOURNAL.length && archive?.skeleton.includes('button data-variant="default" «Merge»'),
+    archive?.lines === JOURNAL.length && archive?.skeleton.includes('button data-variant="default"'),
     archive ? `${archive.lines} ligne(s)` : ''
   );
 } finally {

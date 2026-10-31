@@ -14,7 +14,7 @@
 // ce qui a été trouvé ou non, il ne nomme aucune cause.
 //
 // CONFIDENTIALITÉ. Une empreinte ne lit QUE des attributs d'interface tirés d'une liste
-// fermée (`PRINTED_ATTRIBUTES`), et le texte des seuls boutons, tronqué. Jamais `value`, jamais
+// fermée (`PRINTED_ATTRIBUTES`) — AUCUN texte, pas même celui des boutons. Jamais `value`, jamais
 // le texte d'un champ ni d'un commentaire : sur une page capturée, le champ titre du dialogue
 // « Reference in new issue » porte en `value` le texte du commentaire d'origine. Les suites de
 // chiffres et les empreintes hexadécimales des identifiants sont masquées. Ce relevé ne va
@@ -26,8 +26,6 @@ export interface ElementPrint {
   tag: string;
   /** Attributs de la liste fermée `PRINTED_ATTRIBUTES` présents sur l'élément, masqués. */
   attrs?: Record<string, string>;
-  /** Texte d'un bouton, espaces resserrés, tronqué. Aucun autre élément n'en porte. */
-  label?: string;
   /** Les ancêtres qui portent une marque, du plus proche au plus lointain, en notation de
    * sélecteur — `details-dialog[aria-label="Reference in new issue"]`. */
   ancestors?: string[];
@@ -85,7 +83,6 @@ const NEARBY = 'button, textarea, input:not([type="hidden"]), select, [contented
 const MAX_NEARBY = 8;
 const MAX_ANCESTORS = 4;
 const MAX_VALUE = 80;
-const MAX_LABEL = 40;
 const MAX_CLASSES = 6;
 
 /** Masque ce qui identifie une instance plutôt qu'un rôle : `issuecomment-6442405642-body` →
@@ -117,26 +114,13 @@ function formAction(el: Element): string | null {
   }
 }
 
-/** Ce qu'un bouton peut contenir pour que son texte soit lu : du texte d'interface mis en
- * forme, une icône. Rien qui puisse porter un texte saisi — paragraphe, code, citation, lien,
- * bloc. Une liste FERMÉE, comme celle des attributs : un descendant hors liste fait renoncer au
- * libellé, il ne le filtre pas. */
-const LABEL_SAFE_DESCENDANTS = new Set(['SPAN', 'STRONG', 'B', 'EM', 'I', 'SMALL', 'KBD', 'svg', 'path', 'use', 'g']);
-
-/** Le libellé d'un bouton, ou `null`.
- *
- * Seul un `<button>` en a un — pas `role="button"`, que n'importe quel conteneur peut porter : un
- * `<div role="button">` qui enveloppe un commentaire aurait fait entrer son texte dans le
- * relevé, alors que PRIVACY.md promet le contraire (revue Reefact, PR #110). Et même un
- * `<button>` n'en a pas dès qu'il contient autre chose que `LABEL_SAFE_DESCENDANTS`. */
-function buttonLabel(el: Element): string | null {
-  if (el.tagName !== 'BUTTON') return null;
-  for (const inner of el.querySelectorAll('*')) {
-    if (!LABEL_SAFE_DESCENDANTS.has(inner.tagName)) return null;
-  }
-  const label = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, MAX_LABEL);
-  return label || null;
-}
+// AUCUN TEXTE, pas même le libellé d'un bouton (revue Reefact, PR #110, deux fois). Une
+// première version lisait le texte de tout `role="button"`, qu'un conteneur de commentaire
+// peut porter ; la suivante ne le lisait que d'un `<button>` aux descendants de mise en forme —
+// mais un `<span class="comment-body">` en est un. Un code commun à toutes les plateformes ne
+// peut pas savoir si un texte est un libellé d'interface ou une saisie : la seule promesse
+// tenable est de n'en lire aucun. Ce que dit un bouton reste lisible par ses attributs
+// d'interface — `aria-label`, `data-variant`, `data-testid`, `disabled`.
 
 function ancestorNotation(el: Element): string | null {
   const tag = el.tagName.toLowerCase();
@@ -160,8 +144,6 @@ export function printElement(el: Element): ElementPrint {
     if (value !== null) attrs[attribute] = value;
   }
   if (Object.keys(attrs).length > 0) print.attrs = attrs;
-  const label = buttonLabel(el);
-  if (label) print.label = label;
   const ancestors: string[] = [];
   for (let up = el.parentElement; up && up.tagName !== 'BODY' && ancestors.length < MAX_ANCESTORS; up = up.parentElement) {
     const notation = ancestorNotation(up);
@@ -275,13 +257,11 @@ function skeletonLine(el: Element, depth: number): string {
     const action = formAction(el);
     if (action) line += ` action="${action}"`;
   }
-  const label = buttonLabel(el);
-  if (label) line += ` «${label}»`;
   return line;
 }
 
 /** Le SQUELETTE d'une page : un élément par ligne, indenté par sa profondeur, réduit à sa
- * balise, aux attributs de `PRINTED_ATTRIBUTES` et au texte des seuls boutons — l'empreinte de
+ * balise et aux attributs de `PRINTED_ATTRIBUTES`, sans aucun texte — l'empreinte de
  * `printElement`, étendue à tout l'arbre.
  *
  * Sûr PAR CONSTRUCTION, et c'est la raison de cette forme plutôt que d'une capture masquée :
@@ -291,7 +271,7 @@ function skeletonLine(el: Element, depth: number): string {
  *
  * Ce que ce n'est PAS : une page qu'on recharge dans un test. Il sert à rejouer une chaîne de
  * sélecteurs à la lecture ; figer un comportement demande toujours une vraie capture. Les
- * sélecteurs qui filtrent par texte (hors boutons) n'y trouvent pas ce qu'ils cherchent. */
+ * sélecteurs qui filtrent par texte n'y trouvent pas ce qu'ils cherchent. */
 export function pageSkeleton(root: Element, limits: SkeletonLimits = SKELETON_LIMITS): string {
   const lines: string[] = [];
   let truncated = false;

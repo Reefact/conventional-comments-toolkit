@@ -67,7 +67,6 @@ describe('selectorEvidence — l’ancêtre atteint, et ce qu’il contient à l
       {
         tag: 'button',
         attrs: { 'data-variant': 'default', disabled: '' },
-        label: 'Merge when ready',
         ancestors: ['div[data-component="ButtonGroup"]', 'div[data-testid="mergebox-partial"]'],
       },
     ]);
@@ -105,16 +104,20 @@ describe('printElement — l’interface, jamais le contenu', () => {
     });
   });
 
-  it('un libellé ne vient que d’un <button> au contenu d’interface, jamais d’un conteneur (revue Reefact, PR #110)', () => {
+  it('aucun texte de bouton, quelle que soit sa forme (revue Reefact, PR #110)', () => {
+    // Les deux formes signalées en revue, puis un `<button>` ordinaire : aucun texte n'est lu,
+    // pas même un libellé d'interface. Les attributs restent.
     const doc = page(`
       <div role="button" class="c"><p class="comment-body">texte de revue privé</p></div>
-      <button><p>paragraphe privé</p></button>
-      <button><code>const privé = 1;</code></button>
-      <button><span data-component="text">Rebase <strong>and</strong> merge</span><svg><path d="M0"></path></svg></button>`);
+      <button><span class="comment-body">texte de revue privé</span></button>
+      <button aria-label="Fusionner" data-variant="primary"><span data-component="text">Rebase and merge</span></button>`);
     const prints = [...doc.querySelectorAll('[role="button"], button')].map(printElement);
-    expect(JSON.stringify(prints)).not.toContain('privé');
-    expect(pageSkeleton(doc.body)).not.toContain('privé');
-    expect(prints.map((p) => p.label)).toEqual([undefined, undefined, undefined, 'Rebase and merge']);
+    const skeleton = pageSkeleton(doc.body);
+    for (const text of ['privé', 'Rebase and merge']) {
+      expect(JSON.stringify(prints)).not.toContain(text);
+      expect(skeleton).not.toContain(text);
+    }
+    expect(prints[2]).toEqual({ tag: 'button', attrs: { 'aria-label': 'Fusionner', 'data-variant': 'primary' } });
   });
 
   it('masque les empreintes hexadécimales, et borne les classes', () => {
@@ -152,7 +155,7 @@ describe('pageSkeleton — tout l’arbre, réduit à l’interface', () => {
       [
         'body',
         ' div data-testid="mergebox-partial"',
-        '  button data-variant="primary" «Merge»',
+        '  button data-variant="primary"',
         // Le dessin d'une icône n'est pas parcouru.
         '  svg',
       ].join('\n')

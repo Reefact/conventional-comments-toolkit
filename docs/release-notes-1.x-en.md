@@ -8,6 +8,24 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
 extension installed.
 
+## 1.0.0-beta.19 — October 31, 2026
+
+_When a part of the page is not recognised, the journal now records what the page showed at that moment, and the whole diagnostic downloads as an archive to attach to a bug report; editing a comment on GitHub no longer writes a false alarm._
+
+### ✨ Features
+
+- **The journal records what the page showed when something was not recognised.** A line now says how far the extension got in the page, what it found there instead, when it happened, and whether the element showed up a moment later — enough for a developer to find the cause without asking you to capture the page. It keeps the page's structure and interface attributes only, never any text: not what you type, not comments or code, not even button labels. It stays on your device.
+
+- **A skeleton of the page is kept from the moment of the problem.** It is the page's structure, without any text, taken at the instant something failed rather than afterwards. Skeletons take at most 1 MB of the extension's storage, the oldest go first, and the extension never lets them crowd out anything else.
+
+### 🔧 Changed
+
+- **"Copy the whole log" becomes "Download the diagnostic (.zip)".** The archive holds the journal, the skeletons and a README that says what each file contains; attach it to an issue. Copying a single line works as before, and "Clear the log" now clears the skeletons too. The archive holds the addresses of the pages involved, which on an enterprise server name a repository and a review: read `report.json` before you share it.
+
+### 🐛 Bug fixes
+
+- **Editing a comment on GitHub no longer writes a false alarm to the journal.** A hidden field of GitHub's "Reference in new issue" dialog, which is not a comment field, was reported as a comment field not recognised although nothing was wrong.
+
 ## 1.0.0-beta.18 — October 30, 2026
 
 _The settings page's journal says what went wrong in a sentence, records the extension's own errors and can be copied for a bug report; filtering threads by label works on GitHub again._

@@ -12,6 +12,22 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [1.0.0-beta.19] - 2026-10-31
+
+### Added
+
+- **A selector line of the journal now records what the page showed in place of what it looked for.** Each line carries evidence (§9.4): how far every candidate selector got, compound selector by compound selector (`[1, 1, 0]`: the ancestors exist, the target does not); the deepest ancestor reached and the controls found under it; how long after the start of the visit the failure happened; the last five distinct addresses where the line was recorded, where `url` keeps only the last; and, when the chain found its element later in the same visit, on how many visits and after how many milliseconds (`recoveredVisits`, `lastRecoveredAfterMs`): a chain asked too early is no longer indistinguishable from a broken one. On GitHub, the evidence also gives the PR state read in the page header, the site release hash, and the fields an editor probe did not recognise. The evidence keeps tags and a closed list of interface attributes only, with digit runs and hex hashes masked, and **no text at all**: neither a field's value, nor comment or code text, nor even a button's label, since code shared by every platform cannot tell an interface label from typed text. It stays in the local journal and never reaches telemetry (§10).
+
+- **A skeleton of the page is taken at the moment of a failure.** At the instant a selector chain fails, the page is copied into an inert document, which runs none of the page's custom-element constructors; in idle time, a skeleton is built from that copy — one element per line, the same closed attribute list, no text — and stored compressed. The instant matters: a merge box rendered after the PR header is on no capture taken afterwards. A copy serves only the failures of the same synchronous run, so a page that changes or navigates between two failures gives two skeletons. Skeletons share a 1 MB budget, oldest evicted first; none is written when the extension's storage is above 80% of its quota, and none survives a "Clear the log", even one that lands while a skeleton is being written: the skeleton always gives way, never the journal line.
+
+### Changed
+
+- **"Copy the whole log (debug)" becomes "Download the diagnostic (.zip)".** Skeletons are far larger than an issue body accepts, so the whole journal now leaves as an archive to attach to an issue: `README.txt` in the page's language, `report.json` with what the whole-log copy held, and one `skeletons/<id>.txt` per skeleton a line names. The download needs no new permission. Copying a single line is unchanged. "Clear the log" now clears the skeletons as well. `PRIVACY.md` lists what the evidence, the skeletons and the archive hold.
+
+### Fixed
+
+- **Editing a comment on GitHub no longer writes a false `editors` line to the journal.** The hidden "Reference in new issue" dialog, measured on a captured page where a comment was being edited, holds a field that creates an issue and belongs to no comment zone (§4.1); whether the comment's "…" menu loads it on demand is not measured. No editor selector recognised it, so the probe that checks every editing field reported the editor selectors as failing although nothing had broken. That field is now excluded from the probe.
+
 ## [1.0.0-beta.18] - 2026-10-30
 
 ### Added
@@ -713,6 +729,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[1.0.0-beta.19]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.18...v1.0.0-beta.19
 [1.0.0-beta.18]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.17...v1.0.0-beta.18
 [1.0.0-beta.17]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.16...v1.0.0-beta.17
 [1.0.0-beta.16]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.15...v1.0.0-beta.16

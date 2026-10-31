@@ -8,6 +8,24 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
 navigateur des personnes ayant installé l'extension.
 
+## 1.0.0-beta.19 — 31 octobre 2026
+
+_Quand une partie de la page n'est pas reconnue, le journal enregistre ce que la page montrait à cet instant, et le diagnostic complet se télécharge en archive à joindre à un rapport de bug ; modifier un commentaire sur GitHub ne produit plus de fausse alerte._
+
+### ✨ Nouveautés
+
+- **Le journal enregistre ce que la page montrait quand quelque chose n'a pas été reconnu.** Une ligne dit désormais jusqu'où l'extension est allée dans la page, ce qu'elle y a trouvé à la place, à quel moment, et si l'élément est apparu un instant plus tard — de quoi permettre à un développeur de trouver la cause sans vous demander de capturer la page. Elle ne garde que la structure de la page et ses attributs d'interface, jamais aucun texte : ni ce que vous saisissez, ni les commentaires ou le code, pas même le libellé des boutons. Elle reste sur votre appareil.
+
+- **Un squelette de la page est conservé dès l'instant du problème.** C'est la structure de la page, sans aucun texte, prise au moment même de l'échec plutôt qu'après coup. Les squelettes occupent au plus 1 Mo du stockage de l'extension, les plus anciens partent d'abord, et l'extension ne les laisse jamais prendre la place du reste.
+
+### 🔧 Changements
+
+- **« Copier tout le journal » devient « Télécharger le diagnostic (.zip) ».** L'archive contient le journal, les squelettes et un README qui dit ce que contient chaque fichier ; joignez-la à une issue. La copie d'une seule ligne fonctionne comme avant, et « Effacer le journal » efface aussi les squelettes. L'archive contient les adresses des pages concernées, qui nomment un dépôt et une revue sur un serveur d'entreprise : relisez `report.json` avant de la partager.
+
+### 🐛 Corrections
+
+- **Modifier un commentaire sur GitHub n'écrit plus de fausse alerte dans le journal.** Un champ caché du dialogue « Reference in new issue » de GitHub, qui n'est pas un champ de commentaire, était signalé comme un champ de commentaire non reconnu alors que rien n'allait mal.
+
 ## 1.0.0-beta.18 — 30 octobre 2026
 
 _Le journal de la page de réglages dit en une phrase ce qui s'est mal passé, enregistre les erreurs de l'extension et se copie pour un rapport de bug ; le filtre des fils par label fonctionne de nouveau sur GitHub._

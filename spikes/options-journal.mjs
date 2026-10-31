@@ -15,10 +15,16 @@
 // (Playwright refuse de cliquer un élément recouvert, ce qui fait de l'échec une mesure) ; un mot
 // tient-il sur UNE ligne ; et quand la phrase se replie, sa suite reprend-elle sous le niveau.
 //
+// Et le TÉLÉCHARGEMENT de l'archive de diagnostic, que happy-dom ne sait pas faire : un lien
+// `download` vers un Blob, sans la permission `downloads`, depuis une page d'extension. Le
+// fichier reçu par le navigateur est relu par le module `zipfile` de Python, et le squelette
+// stocké compressé doit en ressortir lisible — `DecompressionStream` compris.
+//
 // CE QU'IL NE VÉRIFIE PAS : ce que le presse-papiers reçoit — c'est `options-journal.test.ts`,
 // avec un faux qui peut refuser ; un Chromium sans tête n'accorde pas toujours l'accès.
 
 import { chromium } from 'playwright-core';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -45,7 +51,7 @@ const PR = 'https://github.com/acme/demo/pull/48';
 // Des phrases réelles du vocabulaire, assez longues pour se replier à la largeur mesurée, plus
 // une exception et une ligne écrite avant les clés de description.
 const JOURNAL = [
-  { chain: 'merge-button', problem: 'completion-control', at: '2026-10-30T08:35:55.958Z', url: `${PR}/files` },
+  { chain: 'merge-button', problem: 'completion-control', at: '2026-10-30T08:35:55.958Z', url: `${PR}/files`, skeleton: 'k1' },
   { chain: 'pr-created-at', problem: 'pr-creation-date', at: '2026-10-30T08:13:33.647Z', url: `${PR}/changes` },
   { chain: 'comment-author', problem: 'comment-writer', at: '2026-10-30T07:56:08.497Z', url: `${PR}/files?diff=split` },
   { chain: 'comment-body', problem: 'comment-text', at: '2026-10-30T07:56:08.497Z', url: `${PR}/files?diff=split` },
@@ -83,10 +89,16 @@ try {
   // Le journal est écrit dans le VRAI `chrome.storage.local`, depuis la page elle-même : c'est le
   // contexte qui l'a, et la page relit ce qu'on y écrit (`storage.onChanged`). La visite guidée
   // est écartée : son voile modal recouvrirait ce qu'on mesure.
-  await page.evaluate(
-    (journal) => chrome.storage.local.set({ optionsTourSeen: true, selectorFailures: journal }),
-    JOURNAL
-  );
+  // Le squelette est compressé PAR LE NAVIGATEUR, comme le fait le script de contenu : c'est
+  // `CompressionStream` de Chromium qui écrit, et `DecompressionStream` de Chromium qui relit.
+  await page.evaluate(async (journal) => {
+    const text = 'body\n div data-testid="mergebox-partial"\n  button data-variant="default" «Merge»';
+    const gz = new Uint8Array(
+      await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()
+    );
+    const skeleton = { id: 'k1', at: '2026-10-30T08:35:55.958Z', url: journal[0].url, gz: btoa(String.fromCharCode(...gz)) };
+    await chrome.storage.local.set({ optionsTourSeen: true, selectorFailures: journal, journalSkeletons: [skeleton] });
+  }, JOURNAL);
   await page.reload();
   // Étroite à dessein : à 900 px, les phrases les plus longues se replient, et c'est là que les
   // deux défauts vivaient.
@@ -152,6 +164,38 @@ try {
     `écarts à gauche du niveau : ${JSON.stringify(layout.hanging)} px`
   );
   assert('les icônes tombent toutes sur la même colonne', layout.bullets.length === 1, JSON.stringify(layout.bullets));
+
+  // 3. L'archive : un vrai clic, un vrai téléchargement, relu par un outil tiers.
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 10000 }),
+    page.locator('#selector-log-detail .status-actions button.btn-p').click(),
+  ]);
+  const saved = join(profile, 'diagnostic.zip');
+  await download.saveAs(saved);
+  const read = spawnSync(
+    'python3',
+    [
+      '-c',
+      [
+        'import json, sys, zipfile',
+        'z = zipfile.ZipFile(sys.argv[1])',
+        'print(json.dumps({"bad": z.testzip(), "names": z.namelist(), "lines": len(json.loads(z.read("report.json"))["entries"]), "skeleton": z.read("skeletons/k1.txt").decode("utf-8")}))',
+      ].join('\n'),
+      saved,
+    ],
+    { encoding: 'utf8' }
+  );
+  const archive = read.status === 0 ? JSON.parse(read.stdout) : null;
+  assert(
+    'le bouton télécharge une archive .zip que zipfile ouvre, CRC compris',
+    /^cct-diagnostic-.*\.zip$/.test(download.suggestedFilename()) && archive?.bad === null,
+    archive ? `${download.suggestedFilename()} — ${archive.names.join(', ')}` : (read.stderr || 'python3 absent').trim()
+  );
+  assert(
+    'l’archive porte tout le journal, et le squelette compressé par le navigateur en ressort lisible',
+    archive?.lines === JOURNAL.length && archive?.skeleton.includes('button data-variant="default" «Merge»'),
+    archive ? `${archive.lines} ligne(s)` : ''
+  );
 } finally {
   await context.close();
   rmSync(profile, { recursive: true, force: true });

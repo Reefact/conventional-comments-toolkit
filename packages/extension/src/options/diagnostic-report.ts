@@ -10,6 +10,8 @@
 // partagé.
 
 import type { JournalEntry } from '../journal-entry.js';
+import { decompressSkeleton, type StoredSkeleton } from '../skeletons.js';
+import { zip, type ZipEntry } from './zip.js';
 
 export interface ReportEnvironment {
   /** `v1.0.0-beta.17`, ou null si le navigateur ne donne pas de manifeste. */
@@ -51,7 +53,40 @@ export function entryReport(entry: JournalEntry, env: ReportEnvironment): string
   return block({ ...header(env), entry });
 }
 
-/** Tout le journal, dans l'ordre où la page l'affiche. */
-export function journalReport(entries: readonly JournalEntry[], env: ReportEnvironment): string {
-  return block({ ...header(env), entries });
+/** L'archive de diagnostic : tout le journal, et les squelettes de page que ses lignes
+ * désignent.
+ *
+ * Elle remplace la copie du journal ENTIER, que les squelettes rendaient impossible : un
+ * squelette pèse de 200 Ko à 1,1 Mo de texte (mesuré sur les pages capturées), bien au-delà de
+ * ce qu'un corps d'issue accepte. Une archive se joint à l'issue ; une ligne seule se copie
+ * toujours (`entryReport`).
+ *
+ *   - `report.json` : ce que la copie du journal entier contenait, en JSON nu ;
+ *   - `skeletons/<id>.txt` : un fichier par squelette désigné ET encore stocké ;
+ *   - `README.txt` : ce que contient l'archive, dans la langue de la page (`readme`).
+ *
+ * Un squelette désigné mais absent (évincé par le budget, jamais écrit) n'est pas une erreur :
+ * la ligne garde son identifiant, et le fichier manque — le README le dit. */
+export async function diagnosticArchive(
+  entries: readonly JournalEntry[],
+  env: ReportEnvironment,
+  skeletons: readonly StoredSkeleton[],
+  readme: string
+): Promise<{ name: string; bytes: Uint8Array }> {
+  const encoder = new TextEncoder();
+  const files: ZipEntry[] = [
+    { name: 'README.txt', data: encoder.encode(readme) },
+    { name: 'report.json', data: encoder.encode(JSON.stringify({ ...header(env), entries }, null, 2)) },
+  ];
+  const wanted = new Set(entries.flatMap((e) => (e.kind !== 'error' && e.skeleton ? [e.skeleton] : [])));
+  for (const stored of skeletons) {
+    if (!wanted.has(stored.id)) continue;
+    const text = await decompressSkeleton(stored.gz);
+    if (text === null) continue;
+    // L'en-tête dit d'où vient le squelette : ouvert seul, le fichier doit se situer.
+    const head = `# ${stored.url}\n# ${stored.at}\n`;
+    files.push({ name: `skeletons/${stored.id}.txt`, data: encoder.encode(head + text + '\n') });
+  }
+  const stamp = env.generatedAt.replace(/[:.]/g, '-');
+  return { name: `cct-diagnostic-${stamp}.zip`, bytes: zip(files, new Date(env.generatedAt)) };
 }

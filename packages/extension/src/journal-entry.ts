@@ -52,6 +52,9 @@ export interface SelectorFailure extends EntryBase {
   recoveredVisits?: number;
   /** Millisecondes entre le début de la visite et ce succès tardif, au dernier rattrapage. */
   lastRecoveredAfterMs?: number;
+  /** Identifiant du squelette de page pris au DERNIER relevé (`skeletons.ts`), stocké à part.
+   * Il peut avoir été évincé depuis par le budget : l'archive de diagnostic le dit. */
+  skeleton?: string;
 }
 
 /** Une exception levée par le code de l'extension, attrapée par personne d'autre. */

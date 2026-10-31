@@ -4,7 +4,7 @@
 // structure donnée, pas ce que GitHub rend — c'est l'affaire des pages capturées de l'adaptateur.
 
 import { describe, expect, it } from 'vitest';
-import { printElement, selectorEvidence, selectorSteps, traceCandidates } from '../src/evidence.js';
+import { pageSkeleton, printElement, selectorEvidence, selectorSteps, traceCandidates } from '../src/evidence.js';
 
 function page(html: string): Document {
   return new DOMParser().parseFromString(`<!doctype html><html><body>${html}</body></html>`, 'text/html');
@@ -126,5 +126,50 @@ describe('printElement — l’interface, jamais le contenu', () => {
       'section[id="s1"]',
       'div[role="group"]',
     ]);
+  });
+});
+
+describe('pageSkeleton — tout l’arbre, réduit à l’interface', () => {
+  it('un élément par ligne, indenté par sa profondeur, attributs de la liste fermée seulement', () => {
+    const doc = page(`
+      <div data-testid="mergebox-partial" style="color: red" onclick="x()">
+        <button data-variant="primary" title="t">Merge</button>
+        <svg aria-hidden="true"><path d="M0 0L10 10"></path></svg>
+      </div>`);
+    expect(pageSkeleton(doc.body)).toBe(
+      [
+        'body',
+        ' div data-testid="mergebox-partial"',
+        '  button data-variant="primary" «Merge»',
+        // Le dessin d'une icône n'est pas parcouru.
+        '  svg',
+      ].join('\n')
+    );
+  });
+
+  it('ne garde ni valeur, ni texte de champ ou de commentaire, ni script', () => {
+    const doc = page(`
+      <form action="/comments/issues?token=secret">
+        <input name="issue[title]" value="praise: un commentaire privé">
+        <textarea name="issue[body]">texte privé</textarea>
+        <p class="comment-body">commentaire privé</p>
+        <script>window.csrf = "secret"</script>
+      </form>`);
+    const skeleton = pageSkeleton(doc.body);
+    expect(skeleton).not.toContain('privé');
+    expect(skeleton).not.toContain('secret');
+    expect(skeleton).toContain(' form action="/comments/issues"');
+    expect(skeleton).not.toContain('script');
+  });
+
+  it('résume la suite d’un parent trop long, et s’arrête au plafond d’éléments', () => {
+    const doc = page(`<table><tbody>${'<tr><td></td></tr>'.repeat(5)}</tbody></table>`);
+    const rows = pageSkeleton(doc.body, { maxChildren: 2, maxElements: 100 }).split('\n');
+    expect(rows.filter((r) => r.trim() === 'tr')).toHaveLength(2);
+    expect(rows).toContain('   … +3');
+
+    const capped = pageSkeleton(doc.body, { maxChildren: 100, maxElements: 4 }).split('\n');
+    expect(capped).toHaveLength(5);
+    expect(capped.at(-1)).toBe('… 4+');
   });
 });

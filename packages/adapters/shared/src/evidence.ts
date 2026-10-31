@@ -234,3 +234,70 @@ export function selectorEvidence(root: ParentNode, candidates: readonly string[]
   }
   return evidence;
 }
+
+/** Ce que le squelette ne parcourt pas : du code, du style, des gabarits inertes, des
+ * métadonnées. Aucun sélecteur de composeur ou de fil n'y cherche quoi que ce soit, et un
+ * `<script>` porte des données de session (jetons, état de la page). */
+const SKELETON_SKIPPED = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'LINK', 'META']);
+
+export interface SkeletonLimits {
+  /** Au-delà, la suite d'un même parent est résumée : un tableau de diff a une rangée par ligne
+   * de code, et aucun sélecteur n'y cherche la deux-centième. */
+  maxChildren: number;
+  /** Au-delà, le parcours s'arrête : la borne d'une PR que rien d'autre n'aurait bornée. */
+  maxElements: number;
+}
+
+export const SKELETON_LIMITS: SkeletonLimits = { maxChildren: 200, maxElements: 40_000 };
+
+function skeletonLine(el: Element, depth: number): string {
+  let line = ' '.repeat(depth) + el.tagName.toLowerCase();
+  for (const attribute of PRINTED_ATTRIBUTES) {
+    const value = printedValue(el, attribute);
+    if (value !== null) line += ` ${attribute}="${value}"`;
+  }
+  if (el.tagName === 'FORM') {
+    const action = formAction(el);
+    if (action) line += ` action="${action}"`;
+  }
+  if (isButton(el)) {
+    const label = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, MAX_LABEL);
+    if (label) line += ` «${label}»`;
+  }
+  return line;
+}
+
+/** Le SQUELETTE d'une page : un élément par ligne, indenté par sa profondeur, réduit à sa
+ * balise, aux attributs de `PRINTED_ATTRIBUTES` et au texte des seuls boutons — l'empreinte de
+ * `printElement`, étendue à tout l'arbre.
+ *
+ * Sûr PAR CONSTRUCTION, et c'est la raison de cette forme plutôt que d'une capture masquée :
+ * un masquage retire ce qu'on SAIT dangereux, si bien qu'un secret qu'on ne connaît pas encore
+ * passe ; ici on ne garde que ce qu'on a choisi de garder. Jamais de `value`, jamais le texte
+ * d'un commentaire ni du code.
+ *
+ * Ce que ce n'est PAS : une page qu'on recharge dans un test. Il sert à rejouer une chaîne de
+ * sélecteurs à la lecture ; figer un comportement demande toujours une vraie capture. Les
+ * sélecteurs qui filtrent par texte (hors boutons) n'y trouvent pas ce qu'ils cherchent. */
+export function pageSkeleton(root: Element, limits: SkeletonLimits = SKELETON_LIMITS): string {
+  const lines: string[] = [];
+  let truncated = false;
+  const walk = (el: Element, depth: number): void => {
+    if (truncated || SKELETON_SKIPPED.has(el.tagName)) return;
+    if (lines.length >= limits.maxElements) {
+      truncated = true;
+      return;
+    }
+    lines.push(skeletonLine(el, depth));
+    // Le dessin d'une icône ne désigne rien : ses chemins sont des coordonnées.
+    if (el.tagName.toLowerCase() === 'svg') return;
+    const children = [...el.children];
+    for (const child of children.slice(0, limits.maxChildren)) walk(child, depth + 1);
+    if (children.length > limits.maxChildren) {
+      lines.push(`${' '.repeat(depth + 1)}… +${children.length - limits.maxChildren}`);
+    }
+  };
+  walk(root, 0);
+  if (truncated) lines.push(`… ${limits.maxElements}+`);
+  return lines.join('\n');
+}

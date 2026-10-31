@@ -9,7 +9,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pageMark } from '../src/page-mark.js';
+import { compressSkeleton, SKELETON_KEY } from '../src/skeletons.js';
 import { ui } from '../src/ui/strings.js';
+import { unzip } from './helpers/unzip.js';
 
 const OPTIONS_HTML = readFileSync(
   resolve(process.cwd(), 'packages/extension/src/options/options.html'),
@@ -185,6 +187,16 @@ describe('§9.4 — effacer le journal', () => {
     expect(document.querySelector('#selector-log')?.className).not.toContain('degraded');
   });
 
+  it('le clic retire aussi les squelettes de page : ils ne servent qu’aux lignes', async () => {
+    const store = installPage({ selectorFailures: SEEDED, [SKELETON_KEY]: [{ id: 'k', at: 'x', url: PR, gz: '' }] });
+    await loadOptions();
+
+    clearButton()!.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(SKELETON_KEY in store).toBe(false);
+  });
+
   it('n’en laisse AUCUNE trace à l’écran', async () => {
     installPage({ selectorFailures: SEEDED });
     await loadOptions();
@@ -269,10 +281,30 @@ describe('§9.4 — copier pour le débogage', () => {
   const rowButtons = (): HTMLButtonElement[] => [
     ...document.querySelectorAll<HTMLButtonElement>('#selector-log-detail pre button'),
   ];
-  const copyAllButton = (): HTMLButtonElement | undefined =>
+  const downloadButton = (): HTMLButtonElement | undefined =>
     [...document.querySelectorAll<HTMLButtonElement>('#selector-log-detail button')].find(
-      (b) => b.textContent === ui('fr', 'options.status.selectors.copyAll')
+      (b) => b.textContent === ui('fr', 'options.status.selectors.download')
     );
+
+  /** Ce que la page remet au navigateur : le Blob du lien et le nom proposé. Le clic du lien
+   * est intercepté — un vrai navigateur ouvrirait la fenêtre d'enregistrement. */
+  function captureDownloads(): { blob: Blob; name: string }[] {
+    const captured: { blob: Blob; name: string }[] = [];
+    const blobs = new Map<string, Blob>();
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+      const url = `blob:test/${blobs.size}`;
+      blobs.set(url, blob as Blob);
+      return url;
+    });
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      captured.push({ blob: blobs.get(this.href)!, name: this.download });
+    });
+    return captured;
+  }
+  const settled = async () => {
+    for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+  };
   const flush = () => new Promise((r) => setTimeout(r, 0));
 
   afterEach(() => {
@@ -308,15 +340,29 @@ describe('§9.4 — copier pour le débogage', () => {
     expect(written[0]).not.toContain('"editors"');
   });
 
-  it('le bouton du journal copie TOUTES les lignes, dans l’ordre affiché', async () => {
-    const written = installClipboard();
-    installPage({ selectorFailures: RICH });
+  it('le bouton du journal télécharge une archive : TOUTES les lignes, et leurs squelettes', async () => {
+    const downloads = captureDownloads();
+    const lines = [{ ...RICH[0]!, skeleton: 'k1' }, ...RICH.slice(1)];
+    const gz = (await compressSkeleton('body\n div data-testid="mergebox-partial"'))!;
+    installPage({ selectorFailures: lines, [SKELETON_KEY]: [{ id: 'k1', at: 'a', url: PR, gz }] });
     await loadOptions();
 
-    copyAllButton()!.click();
-    await flush();
+    downloadButton()!.click();
+    await settled();
 
-    expect(payload(written[0]!)['entries']).toEqual(RICH);
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0]!.name).toMatch(/^cct-diagnostic-.*\.zip$/);
+    expect(downloads[0]!.blob.type).toBe('application/zip');
+    const files = unzip(new Uint8Array(await downloads[0]!.blob.arrayBuffer()));
+    expect(files.map((f) => f.name)).toEqual(['README.txt', 'report.json', 'skeletons/k1.txt']);
+    expect(files[0]!.text).toBe(ui('fr', 'options.status.selectors.readme'));
+    expect(JSON.parse(files[1]!.text).entries).toEqual(lines);
+    expect(files[2]!.text).toContain('div data-testid="mergebox-partial"');
+    // « Préparée », jamais « enregistrée » : la page ne voit pas la fenêtre d'enregistrement.
+    expect(document.querySelector('#selector-log-detail [role="status"]')?.textContent).toBe(
+      ui('fr', 'options.status.selectors.downloaded', { name: downloads[0]!.name })
+    );
+    vi.restoreAllMocks();
   });
 
   it('le bouton de ligne est l’icône qui ouvre la ligne, et il passe en coche une fois copié', async () => {
@@ -353,7 +399,7 @@ describe('§9.4 — copier pour le débogage', () => {
 
     // `btn-p` : « Copier la configuration » ; `btn-quiet` : « Retirer » un hôte. Aucun style
     // propre à cette section pour ses deux actions.
-    expect(copyAllButton()!.className).toBe('btn btn-p');
+    expect(downloadButton()!.className).toBe('btn btn-p');
     expect(clearButton()!.className).toBe('btn btn-quiet');
   });
 

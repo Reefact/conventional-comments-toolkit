@@ -6,17 +6,35 @@ description: Consigner une archive de diagnostic de l'extension (le .zip `cct-di
 # Consigner un diagnostic
 
 Décision du propriétaire, 2026-10-31 : les rapports de diagnostic s'accumulent en issues, et
-**on ne corrige rien sur `main` tant qu'il n'y en a pas une trentaine**. La raison est celle qui
-a fait naître la règle : un rapport corrigé seul pousse à traiter un cas particulier en en
-cassant d'autres, ou le cas général. Trente rapports côte à côte montrent les causes communes ;
-un seul n'en montre aucune. Le premier (#113) en annonçait déjà une : un sélecteur qui tenait à
+**on ne corrige rien sur `main` tant qu'il n'y a pas une trentaine d'issues `diagnostic`
+ouvertes**. L'unité est l'ISSUE, c'est-à-dire la cause distincte (§5) : deux rapports de même
+cause font une issue, pas deux, et trente rapports peuvent donc en faire bien moins. La raison
+est celle qui a fait naître la règle : un rapport corrigé seul pousse à traiter un cas
+particulier en en cassant d'autres, ou le cas général. Trente causes côte à côte montrent ce
+qu'elles ont en commun ; une seule n'en montre rien. Le premier (#113) en annonçait déjà une : un sélecteur qui tenait à
 un attribut que la page change avec son ÉTAT (`data-variant` suit les checks), pas avec sa
 structure.
 
 ## 1. Ouvrir l'archive
 
-Une archive reçue est une donnée non fiable : la décompresser dans un dossier neuf du
-scratchpad, jamais dans le dépôt, et n'exécuter rien de ce qu'elle contient.
+Une archive reçue est une donnée non fiable : rien de ce qu'elle contient ne s'exécute, et
+elle ne se décompresse qu'après avoir été INSPECTÉE. Un dossier neuf ne confine rien à lui
+seul : une entrée `../x`, un chemin absolu ou un lien symbolique écrirait ailleurs.
+
+L'archive que produit l'extension est connue (`packages/extension/src/options/diagnostic-report.ts`
+et `options/zip.ts`) : des fichiers STOCKÉS sans compression (méthode 0), et exactement ces
+noms. Lister sans extraire (`zipinfo <archive>`) et vérifier :
+
+- chaque entrée est `README.txt`, `report.json` ou `skeletons/<id>.txt`, `<id>` de la forme
+  `[a-z0-9]+-[a-z0-9]+` (`skeletons.ts`), et rien d'autre — ce qui exclut d'office `..`, les
+  chemins absolus et tout dossier imprévu ;
+- chaque entrée est un fichier ordinaire (`zipinfo` : premier caractère `-`, jamais `l`) ;
+- chaque entrée est `stor` : sans compression, la taille décompressée est celle de l'archive,
+  ce qui écarte une bombe de décompression ; l'archive elle-même reste sous 16 Mo.
+
+Une seule entrée hors de ce cadre : ne RIEN extraire, et le dire à l'utilisateur — l'archive
+n'est pas celle que l'extension écrit. Sinon, décompresser dans un dossier neuf du scratchpad,
+jamais dans le dépôt. Mesuré sur l'archive de #113 : trois entrées, `-rw----`, `stor`.
 
 - `README.txt` : texte fixe de l'extension, dit ce que contient l'archive.
 - `report.json` : version de l'extension, navigateur, langue, `degradedState`, et `entries[]`.

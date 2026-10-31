@@ -346,13 +346,17 @@ function takeSkeleton(doc: Document): string | null {
         // Écrit seulement si une ligne du journal le désigne ENCORE : « Effacer le journal »
         // peut tomber entre l'échec et cette écriture, différée jusqu'à cinq secondes, et le
         // squelette serait sinon recréé, orphelin, après l'effacement (revue Reefact, PR #110).
-        // Reste la fenêtre entre la lecture et l'écriture de `storeBounded`, que
-        // `chrome.storage` ne permet pas de fermer — la même que `appendToJournal` assume.
+        // L'intervalle entre la lecture et l'écriture de `storeBounded` est refermé après coup
+        // par la relecture ci-dessous (revue Reefact, PR #110).
         return storeBounded<StoredSkeleton>(
           SKELETON_KEY,
           (existing, items) => (isReferenced(items['selectorFailures'], id) ? fitSkeletons(existing, stored) : null),
           QUOTA_HEADROOM,
-          ['selectorFailures']
+          ['selectorFailures'],
+          // Relu après l'écriture : un effacement survenu entre la lecture et elle a vidé le
+          // journal, et ce squelette n'est plus désigné par rien — il repart.
+          (existing, items) =>
+            isReferenced(items['selectorFailures'], id) ? null : existing.filter((s) => s.id !== id)
         );
       })
       .catch(() => undefined);

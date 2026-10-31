@@ -17,6 +17,7 @@ declare const chrome:
         local?: {
           get?: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
           set?: (items: Record<string, unknown>, cb?: () => void) => void;
+          remove?: (keys: string[], cb?: () => void) => void;
           // Absents d'un navigateur qui ne les a pas : la garde de quota se passe alors d'eux.
           getBytesInUse?: (keys: string[] | null, cb: (bytes: number) => void) => void;
           QUOTA_BYTES?: number;
@@ -158,48 +159,77 @@ export function updateJournalEntry<T>(key: string, match: (entry: T) => boolean,
  * désigne ce squelette a été demandée avant lui, et elle est écrite avant lui.
  *
  * `fit` reçoit les squelettes existants, et les clés `alsoRead` lues dans la même lecture, et
- * rend la liste à écrire, ou `null` pour n'écrire rien.
- * La garde de quota lit l'occupation de TOUTE l'aire : le budget borne ce que les squelettes
- * prennent, la garde protège ce qu'il reste aux autres clés. */
+ * rend la liste à écrire, ou `null` pour n'écrire rien. La garde de quota lit l'occupation de
+ * TOUTE l'aire : le budget borne ce que les squelettes prennent, la garde protège ce qu'il reste
+ * aux autres clés.
+ *
+ * L'ORDRE est la correction d'un défaut (revue Reefact, PR #110). L'occupation était mesurée
+ * ENTRE la lecture qui vérifie `fit` et l'écriture : un « Effacer le journal » tombé pendant
+ * cette mesure asynchrone voyait son effacement défait par l'écriture qui suivait. Elle est
+ * désormais prise AVANT la lecture, et l'écriture part de la lecture même qui a décidé.
+ *
+ * Reste l'intervalle entre cette lecture et l'écriture, que `chrome.storage` ne sait pas fermer
+ * — aucune écriture conditionnelle. `verify` le referme après coup : relu APRÈS l'écriture, il
+ * rend la liste à réécrire si ce qui justifiait l'écriture a disparu entre-temps, ou `null`
+ * quand tout tient. Une liste vide retire la clé. Que l'aire applique les opérations de deux
+ * contextes dans l'ordre où elles lui parviennent est ce que suppose cette relecture : à
+ * vérifier, la documentation de `chrome.storage` ne le garantit pas en toutes lettres. */
 export function storeBounded<T>(
   key: string,
   fit: (existing: T[], items: Record<string, unknown>) => T[] | null,
   headroom: number,
-  alsoRead: readonly string[] = []
+  alsoRead: readonly string[] = [],
+  verify?: (existing: T[], items: Record<string, unknown>) => T[] | null
 ): Promise<boolean> {
-  const next = journalQueue.then(
-    () =>
-      new Promise<boolean>((resolve) => {
-        const area = localArea();
-        if (!area?.get || !area?.set) return resolve(false);
+  const next = journalQueue.then(async () => {
+    const area = localArea();
+    if (!area?.get || !area?.set) return false;
+    const read = () =>
+      new Promise<Record<string, unknown>>((resolve, reject) => {
         try {
-          area.get([key, ...alsoRead], (items) => {
-            try {
-              const existing = Array.isArray(items?.[key]) ? (items[key] as T[]) : [];
-              const written = fit(existing, items ?? {});
-              if (written === null) return resolve(false);
-              const write = () => area.set!({ [key]: written }, () => resolve(true));
-              const quota = area.QUOTA_BYTES;
-              if (!area.getBytesInUse || typeof quota !== 'number') return write();
-              area.getBytesInUse(null, (inUse) => {
-                try {
-                  // Ce qui s'ajoute, approché par la différence de taille JSON de la clé.
-                  const grows = JSON.stringify(written).length - JSON.stringify(existing).length;
-                  if (inUse + grows > quota * headroom) return resolve(false);
-                  write();
-                } catch {
-                  resolve(false);
-                }
-              });
-            } catch {
-              resolve(false); // contexte invalidé entre la lecture et l'écriture
-            }
-          });
-        } catch {
-          resolve(false);
+          area.get!([key, ...alsoRead], (items) => resolve(items ?? {}));
+        } catch (error) {
+          reject(error);
         }
-      })
-  );
+      });
+    const write = (items: Record<string, unknown>) =>
+      new Promise<void>((resolve, reject) => {
+        try {
+          area.set!(items, () => resolve());
+        } catch (error) {
+          reject(error);
+        }
+      });
+    const listIn = (items: Record<string, unknown>) => (Array.isArray(items[key]) ? (items[key] as T[]) : []);
+    try {
+      const quota = area.QUOTA_BYTES;
+      const inUse =
+        area.getBytesInUse && typeof quota === 'number'
+          ? await new Promise<number>((resolve) => area.getBytesInUse!(null, resolve))
+          : null;
+
+      const items = await read();
+      const existing = listIn(items);
+      const written = fit(existing, items);
+      if (written === null) return false;
+      if (inUse !== null && typeof quota === 'number') {
+        // Ce qui s'ajoute, approché par la différence de taille JSON de la clé.
+        const grows = JSON.stringify(written).length - JSON.stringify(existing).length;
+        if (inUse + grows > quota * headroom) return false;
+      }
+      await write({ [key]: written });
+
+      if (!verify) return true;
+      const after = await read();
+      const undone = verify(listIn(after), after);
+      if (undone === null) return true;
+      if (undone.length > 0) await write({ [key]: undone });
+      else await new Promise<void>((resolve) => (area.remove ? area.remove([key], () => resolve()) : resolve()));
+      return false;
+    } catch {
+      return false; // contexte invalidé en cours de route : un squelette de moins, rien de plus
+    }
+  });
   journalQueue = next.catch(() => undefined);
   return next;
 }

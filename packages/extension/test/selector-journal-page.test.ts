@@ -413,6 +413,62 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     }
   });
 
+  // Deux ordres d'opérations que la revue de la PR #110 a demandé de couvrir : un effacement
+  // pendant la mesure du quota, et un effacement entre la lecture qui décide et l'écriture.
+  // L'aire est pilotée à la main — un faux qui répondrait aussitôt ne pourrait exprimer ni l'un
+  // ni l'autre.
+  function controllableArea(written: Record<string, unknown>) {
+    const local = (globalThis as { chrome: { storage: { local: Record<string, unknown> } } }).chrome.storage.local;
+    const pendingQuota: (() => void)[] = [];
+    local['QUOTA_BYTES'] = 10_000_000;
+    local['getBytesInUse'] = (_keys: unknown, cb: (n: number) => void) => pendingQuota.push(() => cb(0));
+    local['remove'] = (keys: string[], cb?: () => void) => {
+      for (const k of keys) delete written[k];
+      cb?.();
+    };
+    return { local, pendingQuota };
+  }
+
+  it('un effacement pendant la mesure du quota n’est pas défait (revue Reefact, PR #110)', async () => {
+    const { written, clear } = installChrome();
+    const { pendingQuota } = controllableArea(written);
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a'] });
+    for (let i = 0; i < 20; i++) await settle();
+    expect(journal(written)).toHaveLength(1);
+    expect(pendingQuota).toHaveLength(1); // la mesure attend sa réponse
+
+    clear();
+    pendingQuota[0]!();
+    for (let i = 0; i < 20; i++) await settle();
+
+    expect(SKELETON_KEY in written).toBe(false);
+    clearFakeAdapters();
+  });
+
+  it('un effacement entre la lecture et l’écriture est rattrapé par la relecture (revue Reefact, PR #110)', async () => {
+    const { written, clear } = installChrome();
+    const { local, pendingQuota } = controllableArea(written);
+    // L'effacement arrive à l'aire JUSTE AVANT l'écriture du squelette : la lecture qui a décidé
+    // voyait encore la ligne.
+    const set = local['set'] as (items: Record<string, unknown>, cb?: () => void) => void;
+    local['set'] = (items: Record<string, unknown>, cb?: () => void) => {
+      if (SKELETON_KEY in items && 'selectorFailures' in written) clear();
+      set(items, cb);
+    };
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a'] });
+    for (let i = 0; i < 20; i++) await settle();
+    pendingQuota[0]!();
+    for (let i = 0; i < 20; i++) await settle();
+
+    expect('selectorFailures' in written).toBe(false);
+    expect(SKELETON_KEY in written).toBe(false);
+    clearFakeAdapters();
+  });
+
   it('le squelette montre la page À L’INSTANT de l’échec, pas quand il est construit', async () => {
     const { written } = installChrome();
     document.body.innerHTML = '<header data-testid="pr-header"></header>';

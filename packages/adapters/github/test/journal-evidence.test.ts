@@ -83,9 +83,12 @@ describe('§9.4 — `merge-button` : le relevé dit ce que la boîte de fusion c
     // Premier candidat : la boîte et le groupe existent, le bouton primaire non.
     expect(evidence.trace![0]!.steps).toEqual([1, 1, 0]);
     expect(evidence.anchor).toMatchObject({ attrs: { 'data-component': 'ButtonGroup' } });
+    // Le bouton se reconnaît à ses attributs d'interface ; son texte n'est jamais relevé
+    // (revue Reefact, PR #110 : aucun texte, pas même un libellé de bouton).
     expect(evidence.nearby).toContainEqual(
-      expect.objectContaining({ tag: 'button', label: 'Rebase and merge', attrs: expect.objectContaining({ 'data-variant': 'invisible' }) })
+      expect.objectContaining({ tag: 'button', attrs: expect.objectContaining({ 'data-variant': 'invisible' }) })
     );
+    expect(JSON.stringify(evidence)).not.toContain('Rebase and merge');
     expect(evidence.facts).toEqual({ prState: 'pullOpened', release: '3649ec8d4252' });
     expect(evidence.msSinceVisit).toEqual(expect.any(Number));
   }, T);

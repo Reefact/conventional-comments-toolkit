@@ -198,7 +198,25 @@ const fr: Record<string, string> = {
     'Même marque = même page. Un clic ouvre l’adresse relevée dans un nouvel onglet.',
   'options.status.selectors.page.unknown': 'Page non enregistrée.',
   'options.status.selectors.copy.aria': 'Copier le détail de « {what} » pour le débogage',
-  'options.status.selectors.copyAll': 'Copier tout le journal (débogage)',
+  'options.status.selectors.download': 'Télécharger le diagnostic (.zip)',
+  'options.status.selectors.downloaded': 'Archive préparée : {name}',
+  'options.status.selectors.readme':
+    'Diagnostic du Conventional Comments Toolkit\n' +
+    '\n' +
+    'report.json : le journal de la page d’options, avec la version de l’extension, le navigateur, ' +
+    'la langue et l’état de la configuration. Chaque ligne porte l’adresse de la page relevée ; ' +
+    'une ligne de sélecteur porte en plus un relevé de l’interface (« evidence »).\n' +
+    '\n' +
+    'skeletons/ : le squelette de la page à l’instant où une règle de sélection n’a rien trouvé, ' +
+    'un élément par ligne. Le champ « skeleton » d’une ligne de report.json nomme son fichier. ' +
+    'Un squelette ne garde que la balise, une liste fermée d’attributs d’interface et le texte ' +
+    'des boutons — jamais la valeur d’un champ, ni le texte d’un commentaire ou du code. ' +
+    'Les squelettes les plus anciens sont effacés pour tenir dans 1 Mo : une ligne peut nommer ' +
+    'un fichier absent.\n' +
+    '\n' +
+    'Avant de partager cette archive, relisez report.json : les adresses nomment des dépôts et ' +
+    'des revues, et un message d’exception peut citer ce que l’extension manipulait. Un libellé ' +
+    'd’interface peut nommer un compte.\n',
   'options.status.selectors.copied': 'Copié dans le presse-papiers.',
   'options.status.selectors.copy.manual':
     'Copie automatique impossible : le texte est sélectionné ci-dessous, copiez-le avec Ctrl+C (⌘C sur Mac).',
@@ -441,7 +459,24 @@ const en: Record<string, string> = {
     'Same mark = same page. Click one to open the recorded address in a new tab.',
   'options.status.selectors.page.unknown': 'Page not recorded.',
   'options.status.selectors.copy.aria': 'Copy the details of “{what}” for debugging',
-  'options.status.selectors.copyAll': 'Copy the whole log (debug)',
+  'options.status.selectors.download': 'Download the diagnostic (.zip)',
+  'options.status.selectors.downloaded': 'Archive prepared: {name}',
+  'options.status.selectors.readme':
+    'Conventional Comments Toolkit diagnostic\n' +
+    '\n' +
+    'report.json: the settings page’s log, with the extension version, the browser, the language ' +
+    'and the configuration state. Every line carries the address of the page it was recorded on; ' +
+    'a selector line also carries a record of the interface ("evidence").\n' +
+    '\n' +
+    'skeletons/: the skeleton of the page at the moment a selector rule found nothing, one ' +
+    'element per line. The "skeleton" field of a report.json line names its file. A skeleton ' +
+    'keeps only the tag, a closed list of interface attributes and the text of buttons — never ' +
+    'the value of a field, nor the text of a comment or of code. The oldest skeletons are ' +
+    'deleted to fit in 1 MB: a line can name a missing file.\n' +
+    '\n' +
+    'Before sharing this archive, read report.json: the addresses name repositories and ' +
+    'reviews, and an exception message can quote what the extension was handling. An interface ' +
+    'label can name an account.\n',
   'options.status.selectors.copied': 'Copied to the clipboard.',
   'options.status.selectors.copy.manual':
     'Automatic copy failed: the text is selected below, copy it with Ctrl+C (⌘C on Mac).',

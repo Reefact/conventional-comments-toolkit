@@ -2,7 +2,9 @@
 // le fabrique. Le câblage des boutons est mesuré dans `options-journal.test.ts`.
 
 import { describe, expect, it } from 'vitest';
-import { entryReport, journalReport, type ReportEnvironment } from '../src/options/diagnostic-report.js';
+import { diagnosticArchive, entryReport, type ReportEnvironment } from '../src/options/diagnostic-report.js';
+import { compressSkeleton, type StoredSkeleton } from '../src/skeletons.js';
+import { unzip } from './helpers/unzip.js';
 
 const ENV: ReportEnvironment = {
   extension: 'v1.0.0-beta.17',
@@ -30,12 +32,29 @@ describe('§9.4 — le rapport de débogage', () => {
     });
   });
 
-  it('le journal : toutes les lignes, dans l’ordre reçu', () => {
-    const second = { chain: 'editors', at: 'x' };
-    const report = journalReport([ENTRY, second], ENV);
-    const parsed = JSON.parse(report.slice('```json\n'.length, -'\n```'.length));
+  it('l’archive : le README, le journal entier dans l’ordre reçu, et les squelettes désignés', async () => {
+    const stored = async (id: string, text: string): Promise<StoredSkeleton> => ({
+      id,
+      at: '2026-10-30T09:00:00.000Z',
+      url: 'https://github.com/acme/demo/pull/7',
+      gz: (await compressSkeleton(text))!,
+    });
+    const second = { chain: 'editors', at: 'x', skeleton: 'k2' };
+    const third = { chain: 'comment-body', at: 'y', skeleton: 'evince' };
+    const skeletons = [await stored('k2', 'body\n main'), await stored('orphelin', 'body')];
 
-    expect(parsed.entries).toEqual([ENTRY, second]);
+    const { name, bytes } = await diagnosticArchive([ENTRY, second, third], ENV, skeletons, 'LISEZ-MOI');
+    const files = unzip(bytes);
+
+    expect(name).toBe('cct-diagnostic-2026-10-30T10-00-00-000Z.zip');
+    // Désigné et stocké : présent. Désigné mais évincé (`evince`) : absent, sans erreur.
+    // Stocké mais désigné par aucune ligne (`orphelin`) : absent aussi.
+    expect(files.map((f) => f.name)).toEqual(['README.txt', 'report.json', 'skeletons/k2.txt']);
+    expect(files[0]!.text).toBe('LISEZ-MOI');
+    const report = JSON.parse(files[1]!.text);
+    expect(report.entries).toEqual([ENTRY, second, third]);
+    expect(report.extension).toBe('v1.0.0-beta.17');
+    expect(files[2]!.text).toBe('# https://github.com/acme/demo/pull/7\n# 2026-10-30T09:00:00.000Z\nbody\n main\n');
   });
 
   it('une version absente reste visible comme `null`, pas omise', () => {

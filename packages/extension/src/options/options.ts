@@ -20,7 +20,8 @@ import { pageKey, pageMark } from '../page-mark.js';
 import { ui } from '../ui/strings.js';
 import { applyStaticStrings, currentLanguage } from './i18n.js';
 import { displayVersion } from './version.js';
-import { entryReport, journalReport, type ReportEnvironment } from './diagnostic-report.js';
+import { diagnosticArchive, entryReport, type ReportEnvironment } from './diagnostic-report.js';
+import { SKELETON_KEY, type StoredSkeleton } from '../skeletons.js';
 import { entryLevel, type JournalEntry } from '../journal-entry.js';
 import { maybeStartTour, startTour } from './tour.js';
 import { copySnippet, responseLabelsSnippet } from './response-labels.js';
@@ -753,8 +754,8 @@ function refreshStatus(): void {
         actions.append(
           // Les variantes que la page emploie déjà : « Copier la configuration » est un `btn-p`,
           // une action destructive (retirer un hôte) un `btn-quiet`.
-          makeButton(ui(lang, 'options.status.selectors.copyAll'), 'btn btn-p', () => {
-            void copyReport(journalReport(failures, environment()), feedback);
+          makeButton(ui(lang, 'options.status.selectors.download'), 'btn btn-p', () => {
+            void downloadDiagnostic(failures, environment(), feedback);
           }),
           renderSelectorClear()
         );
@@ -880,6 +881,44 @@ function copyReport(text: string, feedback: HTMLElement): Promise<'copied' | 'ma
   });
 }
 
+/** Prépare l'archive de diagnostic et la remet au navigateur comme un téléchargement.
+ *
+ * Un lien `download` vers un Blob, et non `chrome.downloads` : la page d'options est une page
+ * de l'extension, où ce mécanisme du web suffit, et la permission `downloads` ne figure pas
+ * parmi celles que le §10 accorde. Les squelettes sont relus AU CLIC, pas au rendu : ils sont
+ * écrits après la ligne qui les désigne, et peuvent arriver entre les deux.
+ *
+ * Le message dit que l'archive est PRÉPARÉE, pas enregistrée : la page ne sait pas ce que la
+ * personne fait de la fenêtre d'enregistrement. */
+function downloadDiagnostic(
+  failures: readonly JournalEntry[],
+  env: ReportEnvironment,
+  feedback: HTMLElement
+): Promise<void> {
+  return new Promise<StoredSkeleton[]>((resolve) => {
+    try {
+      chrome?.storage?.local?.get([SKELETON_KEY], (items) => {
+        const stored = items?.[SKELETON_KEY];
+        resolve(Array.isArray(stored) ? (stored as StoredSkeleton[]) : []);
+      });
+    } catch {
+      resolve([]);
+    }
+  })
+    .then((skeletons) => diagnosticArchive(failures, env, skeletons, ui(lang, 'options.status.selectors.readme')))
+    .then(({ name, bytes }) => {
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/zip' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = name;
+      link.click();
+      // Révoquée APRÈS que le navigateur a pris le lien : tout de suite, le téléchargement
+      // pourrait ne plus trouver le Blob.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      feedback.textContent = ui(lang, 'options.status.selectors.downloaded', { name });
+    });
+}
+
 /** La marque d'une entrée : un lien vers l'adresse relevée, ou un remplissage neutre.
  *
  * Le remplissage fait SIX caractères comme les marques : une entrée écrite avant que l'adresse
@@ -917,7 +956,7 @@ function renderSelectorLegend(): HTMLElement {
   return hint;
 }
 
-/** Vide le journal — et lui seul.
+/** Vide le journal, squelettes de page compris — et rien d'autre.
  *
  * PAS `degradedState` : cette ligne-là rapporte la dernière lecture de configuration, et la
  * remettre à « lue normalement » affirmerait une lecture qui n'a pas eu lieu.
@@ -930,7 +969,8 @@ function renderSelectorLegend(): HTMLElement {
  * `storage.ts` pour un outil de diagnostic, pas un défaut que ce bouton introduit. */
 function renderSelectorClear(): HTMLElement {
   return makeButton(ui(lang, 'options.status.selectors.clear'), 'btn btn-quiet', () => {
-    chrome?.storage?.local?.remove(['selectorFailures'], () => refreshStatus());
+    // Les squelettes avec : ils ne servent qu'aux lignes qui les désignent.
+    chrome?.storage?.local?.remove(['selectorFailures', SKELETON_KEY], () => refreshStatus());
   });
 }
 function renderVersion(): void {

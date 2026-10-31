@@ -10,7 +10,7 @@
 // exporter.
 
 import type { ConfigRead, EffectiveConfig, Floor, PrRef, PublishedSummary } from '@cct/core';
-import { SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
+import { pageSkeleton, SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
 import { captureErrors, guarded } from './error-capture.js';
 import { entryKey, markRecovered, mergeJournalEntry, type JournalEntry } from './journal-entry.js';
 import { analyze, enabledLabels } from '@cct/core';
@@ -32,7 +32,15 @@ import {
   type TelemetryConsent,
   type TelemetryEvent,
 } from './telemetry.js';
-import { appendToJournal, updateJournalEntry, writeCurrentState } from './storage.js';
+import { appendToJournal, storeBounded, updateJournalEntry, writeCurrentState } from './storage.js';
+import {
+  compressSkeleton,
+  fitSkeletons,
+  newSkeletonId,
+  QUOTA_HEADROOM,
+  SKELETON_KEY,
+  type StoredSkeleton,
+} from './skeletons.js';
 import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
 import { clearCommentDecorations, decorateComment } from './ui/badges.js';
@@ -301,6 +309,58 @@ function persistJournalEntry(entry: JournalEntry): void {
   );
 }
 
+/** Un squelette pris il y a moins de ce délai sert aussi aux lignes suivantes : plusieurs
+ * chaînes échouent souvent au même balayage, et la page n'a pas changé entre elles. */
+const SKELETON_REUSE_MS = 1000;
+
+/** Copie la page MAINTENANT — c'est l'instant de l'échec qui compte —, puis en tire le
+ * squelette et le stocke, compressé, dans son budget, quand le navigateur a du temps. Rend son
+ * identifiant, que la ligne du journal porte ; `null` si la page n'a pas de `<body>` ou que la
+ * copie lève.
+ *
+ * Deux temps, parce que le squelette coûte trop pour être pris sur le moment : 15 à 60 ms en
+ * médiane dans Chromium sur les pages capturées, pointes au-delà de 100 ms sur « Files
+ * changed » — au-dessus des 50 ms que le §10 tolère. La copie en coûte 4 à 17 (mesuré le
+ * 2026-10-31, `adapters/github/test/fixtures/pages`).
+ *
+ * La copie est IMPORTÉE dans un document inerte, jamais clonée dans la page : mesuré dans
+ * Chromium, `cloneNode` exécute le constructeur des éléments personnalisés de la page — du code
+ * de la plateforme, déclenché par l'extension —, alors qu'un document sans contexte de
+ * navigation n'en met aucun à niveau.
+ *
+ * La compression et l'écriture peuvent ne pas aboutir (navigateur sans `CompressionStream`,
+ * budget, quota) : la ligne désigne alors un squelette absent, et l'archive le dit plutôt que
+ * d'échouer. */
+function takeSkeleton(
+  doc: Document,
+  last: { id: string; at: number } | null
+): { id: string; at: number } | null {
+  const now = Date.now();
+  if (last && now - last.at < SKELETON_REUSE_MS) return last;
+  let copy: Element;
+  try {
+    if (!doc.body) return null;
+    copy = doc.implementation.createHTMLDocument('').importNode(doc.body, true);
+  } catch {
+    return null;
+  }
+  const taken = { id: newSkeletonId(now), at: now };
+  const url = doc.location.href;
+  const build = () => {
+    void compressSkeleton(pageSkeleton(copy))
+      .then((gz) => {
+        if (gz === null) return;
+        const stored: StoredSkeleton = { id: taken.id, at: new Date(now).toISOString(), url, gz };
+        return storeBounded<StoredSkeleton>(SKELETON_KEY, (existing) => fitSkeletons(existing, stored), QUOTA_HEADROOM);
+      })
+      .catch(() => undefined);
+  };
+  const view = doc.defaultView as (Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }) | null;
+  if (view?.requestIdleCallback) view.requestIdleCallback(build, { timeout: 5000 });
+  else setTimeout(build, 0);
+  return taken;
+}
+
 /** La chaîne journalisée pendant cette visite a fini par trouver son élément : la ligne le dit
  * (`recoveredVisits`), sans rien changer d'autre. Une ligne d'exception n'est jamais visée. */
 function persistRecovery(chain: string, msSinceVisit: number): void {
@@ -525,9 +585,11 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
   //
   // Le relevé de la page (`evidence`) suit le même chemin local, jamais `count()` : il décrit la
   // page (§10, PRIVACY.md).
+  let lastSkeleton: { id: string; at: number } | null = null;
   const log = new SelectorLog(
     (event) => void count(event),
-    (chain, evidence) =>
+    (chain, evidence) => {
+      lastSkeleton = takeSkeleton(doc, lastSkeleton);
       persistJournalEntry({
         chain: chain.name,
         at: new Date().toISOString(),
@@ -537,7 +599,9 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
         ...(chain.problem ? { problem: chain.problem } : {}),
         platform,
         evidence,
-      }),
+        ...(lastSkeleton ? { skeleton: lastSkeleton.id } : {}),
+      });
+    },
     (chain, msSinceVisit) => persistRecovery(chain.name, msSinceVisit)
   );
 

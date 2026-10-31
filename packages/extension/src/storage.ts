@@ -17,6 +17,9 @@ declare const chrome:
         local?: {
           get?: (keys: string[], cb: (items: Record<string, unknown>) => void) => void;
           set?: (items: Record<string, unknown>, cb?: () => void) => void;
+          // Absents d'un navigateur qui ne les a pas : la garde de quota se passe alors d'eux.
+          getBytesInUse?: (keys: string[] | null, cb: (bytes: number) => void) => void;
+          QUOTA_BYTES?: number;
         };
       };
     }
@@ -143,6 +146,55 @@ export function updateJournalEntry<T>(key: string, match: (entry: T) => boolean,
           });
         } catch {
           resolve();
+        }
+      })
+  );
+  journalQueue = next.catch(() => undefined);
+  return next;
+}
+
+/** Ajoute un squelette de page (`skeletons.ts`), dans le budget qui lui est réservé, et rien
+ * si le quota de l'aire n'a plus de marge. Même file d'attente que le journal : la ligne qui
+ * désigne ce squelette a été demandée avant lui, et elle est écrite avant lui.
+ *
+ * `fit` reçoit les squelettes existants et rend la liste à écrire, ou `null` pour n'écrire rien.
+ * La garde de quota lit l'occupation de TOUTE l'aire : le budget borne ce que les squelettes
+ * prennent, la garde protège ce qu'il reste aux autres clés. */
+export function storeBounded<T>(
+  key: string,
+  fit: (existing: T[]) => T[] | null,
+  headroom: number
+): Promise<boolean> {
+  const next = journalQueue.then(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const area = localArea();
+        if (!area?.get || !area?.set) return resolve(false);
+        try {
+          area.get([key], (items) => {
+            try {
+              const existing = Array.isArray(items?.[key]) ? (items[key] as T[]) : [];
+              const written = fit(existing);
+              if (written === null) return resolve(false);
+              const write = () => area.set!({ [key]: written }, () => resolve(true));
+              const quota = area.QUOTA_BYTES;
+              if (!area.getBytesInUse || typeof quota !== 'number') return write();
+              area.getBytesInUse(null, (inUse) => {
+                try {
+                  // Ce qui s'ajoute, approché par la différence de taille JSON de la clé.
+                  const grows = JSON.stringify(written).length - JSON.stringify(existing).length;
+                  if (inUse + grows > quota * headroom) return resolve(false);
+                  write();
+                } catch {
+                  resolve(false);
+                }
+              });
+            } catch {
+              resolve(false); // contexte invalidé entre la lecture et l'écriture
+            }
+          });
+        } catch {
+          resolve(false);
         }
       })
   );

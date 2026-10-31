@@ -15,6 +15,7 @@ import type { PrRef } from '@cct/core';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
 import type { EntryGuard } from '@cct/adapter-shared';
 import type { ErrorEntry, JournalEntry, SelectorFailure } from '../src/journal-entry.js';
+import { decompressSkeleton, SKELETON_KEY, type StoredSkeleton } from '../src/skeletons.js';
 import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
 // Chaque `bootstrap()` pose ses écouteurs sur la `window` PARTAGÉE de happy-dom : un test qui
@@ -280,6 +281,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
       'firstAt',
       'platform',
       'problem',
+      'skeleton',
       'url',
       'urls',
     ]);
@@ -312,6 +314,62 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     expect(entry.recoveredVisits).toBe(1);
     expect(entry.lastRecoveredAfterMs).toEqual(expect.any(Number));
     expect(journal(written)).toHaveLength(1);
+
+    clearFakeAdapters();
+  });
+
+  it('la ligne désigne le squelette de la page pris à l’instant de l’échec, partagé par les échecs simultanés', async () => {
+    const { written } = installChrome();
+    document.body.innerHTML = '<div data-testid="mergebox-partial"><button data-variant="default">Merge</button></div>';
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a'] });
+    captured.log!.degraded({ name: 'editors', candidates: ['textarea'] });
+    for (let i = 0; i < 20; i++) await settle();
+
+    const [first, second] = journal(written) as SelectorFailure[];
+    expect(first!.skeleton).toEqual(expect.any(String));
+    // Même balayage, même page : un seul squelette pour les deux lignes.
+    expect(second!.skeleton).toBe(first!.skeleton);
+    const stored = written[SKELETON_KEY] as StoredSkeleton[];
+    expect(stored.map((s) => s.id)).toEqual([first!.skeleton]);
+    expect(stored[0]!.url).toBe('https://github.com/acme/demo/pull/42');
+    expect(await decompressSkeleton(stored[0]!.gz)).toContain(' div data-testid="mergebox-partial"\n  button data-variant="default" «Merge»');
+
+    clearFakeAdapters();
+  });
+
+  it('le squelette montre la page À L’INSTANT de l’échec, pas quand il est construit', async () => {
+    const { written } = installChrome();
+    document.body.innerHTML = '<header data-testid="pr-header"></header>';
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a'] });
+    // GitHub rend la boîte de fusion juste après la sonde, avant que le squelette soit tiré de
+    // la copie : c'est l'état que le diagnostic doit montrer, et celui qu'une capture faite
+    // après coup aurait manqué.
+    document.body.insertAdjacentHTML('beforeend', '<div data-testid="mergebox-partial"></div>');
+    for (let i = 0; i < 20; i++) await settle();
+
+    const text = await decompressSkeleton((written[SKELETON_KEY] as StoredSkeleton[])[0]!.gz);
+    expect(text).toContain('header data-testid="pr-header"');
+    expect(text).not.toContain('mergebox-partial');
+
+    clearFakeAdapters();
+  });
+
+  it('un quota sans marge coûte le squelette, jamais la ligne du journal', async () => {
+    const { written } = installChrome();
+    const local = (globalThis as { chrome: { storage: { local: Record<string, unknown> } } }).chrome.storage.local;
+    local['QUOTA_BYTES'] = 1000;
+    local['getBytesInUse'] = (_keys: unknown, cb: (n: number) => void) => cb(990);
+    const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
+
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a'] });
+    for (let i = 0; i < 20; i++) await settle();
+
+    expect(journal(written)).toHaveLength(1);
+    expect(SKELETON_KEY in written).toBe(false);
 
     clearFakeAdapters();
   });

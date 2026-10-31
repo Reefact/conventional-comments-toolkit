@@ -116,6 +116,22 @@ describe('§4.1, §9.2.3 — Conversation : nouveau commentaire (capture 01)', (
     expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('comment-author');
   });
 
+  it("trouve le bouton de fusion quand des checks échouent, où il n'est plus `primary` (§6.5, §9.4)", () => {
+    // Relevé le 2026-10-31 par un diagnostic d'utilisateur (squelette de page, PR ouverte, un
+    // check obligatoire en échec) : la boîte de fusion y est celle de cette capture, nœud pour
+    // nœud, à un attribut près — `data-variant="default"`. On rejoue cette seule différence.
+    // Avant le correctif, rien n'était trouvé et `merge-button` était journalisé.
+    const button = page.doc.querySelector('[data-testid="mergebox-partial"] button[data-variant="primary"]')!;
+    button.setAttribute('data-variant', 'default');
+    try {
+      const adapter = new GithubClientAdapter({ documentRef: page.doc });
+      expect(adapter.getCompletionControl()?.element).toBe(button);
+      expect(adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
+    } finally {
+      button.setAttribute('data-variant', 'primary');
+    }
+  });
+
   // Les deux sondes ne font taire le journal que lorsqu'elles matchent : si GitHub les renomme,
   // l'absence redevient une entrée — du bruit, jamais du silence. Ces deux tests altèrent la
   // page déjà chargée, puis la restaurent, plutôt que d'en charger une copie : chaque chargement

@@ -280,13 +280,25 @@ export const selectors = {
    * github.com. Le journal le disait — `merge-button`, sur chaque page —, noyé dans les entrées
    * des PR fusionnées où l'absence est la norme (cf. `prSettledState`).
    *
-   * Non mesuré : l'étape de confirmation qui suit le clic, si GitHub en rend une. Le grisage ne
-   * porte que sur le bouton affiché à l'arrivée sur la page. */
+   * La VARIANTE du bouton n'est pas une prise : elle suit l'état des checks. Relevé le 2026-10-31
+   * par un diagnostic (journal + squelette, extension v1.0.0-beta.19) sur une PR ouverte dont un
+   * check obligatoire échouait : la boîte de fusion y est celle de la capture 01, nœud pour nœud
+   * — même `ButtonGroup`, même second item vide, même lien vers la ligne de commande, même
+   * « Convert to draft » —, à un attribut près : le bouton y est `data-variant="default"`. Le
+   * candidat exigeait `primary` ; rien n'était trouvé, `merge-button` était journalisé, et le
+   * §6.5 ne grisait pas le bouton sur la PR même où les checks échouaient. Le squelette ne garde
+   * aucun texte : le libellé du bouton, ce jour-là, n'est pas connu. `data-component="Button"`
+   * est présent sur les deux relevés, et écarte un éventuel bouton de menu du second item.
+   *
+   * Non mesuré : l'étape de confirmation qui suit le clic, si GitHub en rend une ; la variante
+   * `danger` d'un contournement des règles, que rien ici n'a relevée. Le grisage ne porte que
+   * sur le bouton affiché à l'arrivée sur la page. */
   mergeButton: {
     name: 'merge-button',
     problem: 'completion-control',
     candidates: [
-      '[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-variant="primary"]', // MESURÉ
+      // MESURÉ : capture 01 (`primary`) et diagnostic du 2026-10-31 (`default`, checks en échec).
+      '[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-component="Button"]',
       '[data-testid="mergebox-partial"] button.btn-primary',
       'button[data-testid*="merge-button"]',
       '.merge-message button.btn-group-merge',

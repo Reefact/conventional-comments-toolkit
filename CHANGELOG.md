@@ -24,7 +24,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Fixed
 
-- **Placeholders on the options page are readable in both themes, the shortcuts field included.** The shortcuts field kept the browser's default grey, since the placeholder rule covered text inputs only; it now follows the other fields. Placeholder contrast against the field background is about 4.5:1 in the light theme and about 4.8:1 in the dark one, which meets WCAG 1.4.3, while staying quieter than typed text.
+- **The placeholders of the "Direct shortcuts" and "Button order" fields are readable in both themes.** The "Direct shortcuts" field kept the browser's default grey, since the placeholder rule covered text inputs only; it now follows "Button order". Their placeholder contrast against the field background is about 4.5:1 in the light theme and about 4.8:1 in the dark one, which meets WCAG 1.4.3, while staying quieter than typed text. The "Domain to allow" field (`#host-input`) keeps its own placeholder style, unchanged: about 3.4:1 in the light theme, below that threshold.
 
 ## [1.0.0-beta.19] - 2026-10-31
 

@@ -10,7 +10,7 @@ extension installed.
 
 ## 1.0.0-beta.20 — November 1, 2026
 
-_The diagnostic archive now shows how the extension was activated in your browser, to track down pages where it does nothing at all; the settings page is easier to read._
+_The diagnostic archive now shows how the extension was activated in your browser, to track down pages where it does nothing at all; two settings fields are easier to read._
 
 ### ✨ Features
 
@@ -22,7 +22,7 @@ _The diagnostic archive now shows how the extension was activated in your browse
 
 ### 🐛 Bug fixes
 
-- **The hints inside the settings page's fields are readable in both themes, the shortcuts field included.** They are quieter than what you type, but no longer too faint to read.
+- **The hints inside the "Direct shortcuts" and "Button order" fields are readable in both themes.** They are quieter than what you type, but no longer too faint to read. The hint of the "Domain to allow" field is unchanged.
 
 ## 1.0.0-beta.19 — October 31, 2026
 

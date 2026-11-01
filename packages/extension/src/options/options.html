@@ -22,7 +22,8 @@
         --fg-2: #29384a;
         --fg-muted: #5a6b80;
         --fg-faint: #6c7e93;
-        --placeholder-opacity: 0.84;
+        --placeholder-color: var(--fg-muted);
+        --placeholder-opacity: 1;
         --line: #d3dbe5;
         --line-soft: #e2e8ef;
         --line-strong: #b4c0ce;
@@ -62,7 +63,8 @@
           --fg-2: #c3cedc;
           --fg-muted: #93a2b5;
           --fg-faint: #8797aa;
-          --placeholder-opacity: 0.55;
+          --placeholder-color: var(--fg-faint);
+          --placeholder-opacity: 0.85;
           --line: #223144;
           --line-soft: #1a2636;
           --line-strong: #34465c;
@@ -88,7 +90,8 @@
         --fg-2: #c3cedc;
         --fg-muted: #93a2b5;
         --fg-faint: #8797aa;
-        --placeholder-opacity: 0.55;
+        --placeholder-color: var(--fg-faint);
+        --placeholder-opacity: 0.85;
         --line: #223144;
         --line-soft: #1a2636;
         --line-strong: #34465c;
@@ -282,7 +285,7 @@
       .field textarea, .field input[type="text"], .config-snippet { font-family: var(--font-mono); }
       .field textarea, .config-snippet { resize: vertical; }
       .field input[type="text"]::placeholder, .field textarea::placeholder {
-        color: var(--fg-faint); opacity: var(--placeholder-opacity);
+        color: var(--placeholder-color); opacity: var(--placeholder-opacity);
       }
       .field select:focus-visible, .field textarea:focus-visible, .field input[type="text"]:focus-visible,
       .config-snippet:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

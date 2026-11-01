@@ -313,8 +313,9 @@ function servedOrigins(origins: string[], tags: Record<string, HostPlatform>): s
   });
 }
 
-function stateOf(registered: { id: string; persistAcrossSessions?: boolean }[]): RegistrationState {
-  const ours = registered.find((script) => script.id === SCRIPT_ID);
+function stateOf(read: RegisteredRead): RegistrationState {
+  if (!read.ok) return { readError: read.error };
+  const ours = read.scripts.find((script) => script.id === SCRIPT_ID);
   return { present: ours !== undefined, persist: ours?.persistAcrossSessions ?? null };
 }
 
@@ -353,7 +354,10 @@ async function appendRegistrationEvent(event: RegistrationEvent): Promise<void> 
 async function applyRegistration(matches: string[], cause: RegistrationCause): Promise<void> {
   const scripting = chrome?.scripting;
   if (!scripting) return;
-  const registered = await listRegisteredScripts();
+  const read = await readRegisteredScripts();
+  // Une lecture échouée vaut liste vide pour la LOGIQUE, comme avant ce journal : c'est le
+  // journal seul qui la distingue d'une absence (`stateOf`).
+  const registered = read.ok ? read.scripts : [];
   const ours = registered.some((script) => script.id === SCRIPT_ID);
   const calls: RegistrationEvent['calls'] = [];
   let injectedTabs = 0;
@@ -414,9 +418,9 @@ async function applyRegistration(matches: string[], cause: RegistrationCause): P
     at: new Date().toISOString(),
     cause,
     matches,
-    before: stateOf(registered),
+    before: stateOf(read),
     calls,
-    after: stateOf(await listRegisteredScripts()),
+    after: stateOf(await readRegisteredScripts()),
     injectedTabs,
   });
 }
@@ -528,14 +532,24 @@ async function injectIntoOpenTabs(matches: string[]): Promise<number> {
   return injected;
 }
 
-function listRegisteredScripts(): Promise<{ id: string; persistAcrossSessions?: boolean }[]> {
+type RegisteredRead =
+  | { ok: true; scripts: { id: string; persistAcrossSessions?: boolean }[] }
+  | { ok: false; error: string };
+
+/** Ce que Chrome a enregistré pour l'extension — ou l'échec de la lecture, DIT comme tel :
+ * `lastError` du rappel, ou exception levée à l'appel. Une API absente vaut liste vide : il
+ * n'y a alors rien d'enregistré à lire, ce n'est pas une panne. */
+function readRegisteredScripts(): Promise<RegisteredRead> {
   return new Promise((resolve) => {
     const get = chrome?.scripting?.getRegisteredContentScripts;
-    if (!get) return resolve([]);
+    if (!get) return resolve({ ok: true, scripts: [] });
     try {
-      get((scripts) => resolve(scripts ?? []));
-    } catch {
-      resolve([]);
+      get((scripts) => {
+        const error = lastErrorMessage();
+        resolve(error !== null ? { ok: false, error } : { ok: true, scripts: scripts ?? [] });
+      });
+    } catch (thrown) {
+      resolve({ ok: false, error: thrown instanceof Error ? thrown.message : String(thrown) });
     }
   });
 }

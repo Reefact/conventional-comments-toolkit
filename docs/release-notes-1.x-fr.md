@@ -10,7 +10,7 @@ navigateur des personnes ayant installé l'extension.
 
 ## 1.0.0-beta.20 — 1er novembre 2026
 
-_L'archive de diagnostic montre désormais comment l'extension s'est activée dans votre navigateur, pour retrouver les pages où elle ne fait rien du tout ; la page de réglages se lit plus facilement._
+_L'archive de diagnostic montre désormais comment l'extension s'est activée dans votre navigateur, pour retrouver les pages où elle ne fait rien du tout ; deux champs de la page de réglages se lisent plus facilement._
 
 ### ✨ Nouveautés
 
@@ -22,7 +22,7 @@ _L'archive de diagnostic montre désormais comment l'extension s'est activée da
 
 ### 🐛 Corrections
 
-- **Les indications affichées dans les champs de la page de réglages se lisent dans les deux thèmes, champ des raccourcis compris.** Elles restent plus discrètes que ce que vous saisissez, sans être trop pâles pour être lues.
+- **Les indications affichées dans les champs « Raccourcis directs » et « Ordre des boutons » se lisent dans les deux thèmes.** Elles restent plus discrètes que ce que vous saisissez, sans être trop pâles pour être lues. L'indication du champ « Domaine à autoriser » n'a pas changé.
 
 ## 1.0.0-beta.19 — 31 octobre 2026
 

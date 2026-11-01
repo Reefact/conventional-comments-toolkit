@@ -16,11 +16,13 @@ export type RegistrationCause =
 
 /** L'état de NOTRE inscription tel que Chrome le rend, à un instant. `persist` : ce que
  * `getRegisteredContentScripts()` rapporte de `persistAcrossSessions`, `null` si Chrome ne le
- * dit pas. */
-export interface RegistrationState {
-  present: boolean;
-  persist: boolean | null;
-}
+ * dit pas.
+ *
+ * Une lecture qui ÉCHOUE n'est pas une absence, et s'écrit autrement : `readError`, avec le
+ * message de Chrome. Confondre les deux ferait d'une panne de l'instrument de mesure une preuve
+ * sur la chose mesurée — précisément l'inscription que ce journal existe pour observer (revue
+ * Reefact, PR #121). */
+export type RegistrationState = { present: boolean; persist: boolean | null } | { readError: string };
 
 /** Une passe d'`applyRegistration()`, telle qu'elle s'est déroulée (#118).
  *

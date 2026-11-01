@@ -46,6 +46,10 @@ interface FakeChrome {
   /** Les appels d'inscription qui doivent ÉCHOUER, et le message que Chrome poserait alors dans
    * `runtime.lastError` — l'appel échoué ne change rien à l'inscription, comme le vrai. */
   failOn: Partial<Record<'register' | 'update' | 'unregister', string>>;
+  /** Les lectures `getRegisteredContentScripts` qui doivent échouer, par rang d'appel (0 pour la
+   * première) : Chrome pose alors `runtime.lastError` et rappelle sans résultat. Par rang, parce
+   * que l'échec qui compte est celui de la relecture APRÈS une inscription réussie. */
+  failReads: Map<number, string>;
 }
 
 /** `alreadyRegistered` : ce que le navigateur a GARDÉ d'une version précédente. Un
@@ -73,6 +77,7 @@ function installFakeChrome(
   const live = new Map<string, { id: string; persistAcrossSessions: boolean }>(
     alreadyRegistered.map((id) => [id, { id, persistAcrossSessions: true }])
   );
+  let reads = 0;
   /** Rappelle `cb` comme Chrome : avec `runtime.lastError` posé PENDANT le rappel seulement. */
   const answer = (op: 'register' | 'update' | 'unregister', cb: () => void, apply: () => void) => {
     const failure = fake.failOn[op];
@@ -125,9 +130,13 @@ function installFakeChrome(
               live.set(script.id, { ...script, persistAcrossSessions: script.persistAcrossSessions ?? false });
           })
       ),
-      getRegisteredContentScripts: vi.fn((cb: (s: { id: string }[]) => void) =>
-        cb([...live.values()].map((script) => ({ ...script })))
-      ),
+      getRegisteredContentScripts: vi.fn((cb: (s?: { id: string }[]) => void) => {
+        const failure = fake.failReads.get(reads++);
+        if (failure === undefined) return cb([...live.values()].map((script) => ({ ...script })));
+        fake.runtime.lastError = { message: failure };
+        cb(undefined);
+        fake.runtime.lastError = null;
+      }),
       // STATEFUL, et pour la même raison que le reste de ce faux : le worker DEMANDE
       // désormais à l'onglet s'il a déjà le script, et un faux qui répondrait toujours la
       // même chose décrirait un monde où la question ne sert à rien. Le marqueur suit donc
@@ -184,6 +193,7 @@ function installFakeChrome(
     },
     store,
     failOn: {},
+    failReads: new Map(),
   };
   (globalThis as { chrome?: unknown }).chrome = fake;
   return fake;
@@ -387,12 +397,13 @@ describe('§2, §A.4, §B.4 — UN SEUL script enregistré, sur les hôtes réel
 
 
 describe('#118 — chaque passe d’inscription est consignée, avec ce que Chrome a répondu', () => {
+  type State = { present: boolean; persist: boolean | null } | { readError: string };
   type Logged = {
     cause: string;
     matches: string[];
-    before: { present: boolean; persist: boolean | null };
+    before: State;
     calls: { op: string; ids: string[]; error: string | null }[];
-    after: { present: boolean; persist: boolean | null };
+    after: State;
     injectedTabs: number;
     at: string;
   };
@@ -491,6 +502,35 @@ describe('#118 — chaque passe d’inscription est consignée, avec ce que Chro
       'permission-removed',
       'managed-changed',
     ]);
+  });
+
+  it('une relecture qui ÉCHOUE après une inscription réussie est dite comme telle, jamais comme une absence', async () => {
+    // Le défaut relevé en revue (PR #121) : une lecture ratée rendait `[]`, et le journal
+    // aurait consigné `after: { present: false }` pour une inscription bel et bien posée.
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    fake.failReads.set(1, 'Extension context invalidated.'); // 0 : avant ; 1 : après
+    await import('../src/background.js');
+    await settle();
+
+    expect(logOf(fake)[0]).toMatchObject({
+      before: { present: false, persist: null },
+      calls: [{ op: 'register', error: null }],
+      after: { readError: 'Extension context invalidated.' },
+    });
+    expect(logOf(fake)[0]!.after).not.toHaveProperty('present');
+  });
+
+  it('une lecture AVANT qui échoue est dite aussi, et l’inscription suit la logique d’avant ce journal', async () => {
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    fake.failReads.set(0, 'boom');
+    await import('../src/background.js');
+    await settle();
+
+    expect(logOf(fake)[0]).toMatchObject({
+      before: { readError: 'boom' },
+      calls: [{ op: 'register', error: null }],
+      after: { present: true, persist: true },
+    });
   });
 
   it('le journal est borné : les passes les plus anciennes sortent d’abord', async () => {

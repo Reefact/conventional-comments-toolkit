@@ -22,6 +22,7 @@ import { applyStaticStrings, currentLanguage } from './i18n.js';
 import { displayVersion } from './version.js';
 import { diagnosticArchive, entryReport, type ReportEnvironment } from './diagnostic-report.js';
 import { SKELETON_KEY, type StoredSkeleton } from '../skeletons.js';
+import { REGISTRATION_LOG_KEY, type RegistrationEvent } from '../registration-log.js';
 import { entryLevel, type JournalEntry } from '../journal-entry.js';
 import { maybeStartTour, startTour } from './tour.js';
 import { copySnippet, responseLabelsSnippet } from './response-labels.js';
@@ -894,17 +895,26 @@ function downloadDiagnostic(
   env: ReportEnvironment,
   feedback: HTMLElement
 ): Promise<void> {
-  return new Promise<StoredSkeleton[]>((resolve) => {
+  // Le journal d'inscription (#118) est relu dans la MÊME lecture que les squelettes : écrit par
+  // le service worker, il est hors du journal que cette page affiche, et n'a d'usage que dans
+  // l'archive.
+  return new Promise<{ skeletons: StoredSkeleton[]; registrationLog: RegistrationEvent[] }>((resolve) => {
     try {
-      chrome?.storage?.local?.get([SKELETON_KEY], (items) => {
+      chrome?.storage?.local?.get([SKELETON_KEY, REGISTRATION_LOG_KEY], (items) => {
         const stored = items?.[SKELETON_KEY];
-        resolve(Array.isArray(stored) ? (stored as StoredSkeleton[]) : []);
+        const log = items?.[REGISTRATION_LOG_KEY];
+        resolve({
+          skeletons: Array.isArray(stored) ? (stored as StoredSkeleton[]) : [],
+          registrationLog: Array.isArray(log) ? (log as RegistrationEvent[]) : [],
+        });
       });
     } catch {
-      resolve([]);
+      resolve({ skeletons: [], registrationLog: [] });
     }
   })
-    .then((skeletons) => diagnosticArchive(failures, env, skeletons, ui(lang, 'options.status.selectors.readme')))
+    .then(({ skeletons, registrationLog }) =>
+      diagnosticArchive(failures, env, skeletons, ui(lang, 'options.status.selectors.readme'), registrationLog)
+    )
     .then(({ name, bytes }) => {
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/zip' }));
       const link = document.createElement('a');
@@ -961,8 +971,12 @@ function renderPageMark(url: string | undefined): HTMLElement {
  * `storage.ts` pour un outil de diagnostic, pas un défaut que ce bouton introduit. */
 function renderSelectorClear(): HTMLElement {
   return makeButton(ui(lang, 'options.status.selectors.clear'), 'btn btn-quiet', () => {
-    // Les squelettes avec : ils ne servent qu'aux lignes qui les désignent.
-    chrome?.storage?.local?.remove(['selectorFailures', SKELETON_KEY], () => refreshStatus());
+    // Les squelettes avec : ils ne servent qu'aux lignes qui les désignent. Le journal
+    // d'inscription aussi : c'est un outil de diagnostic comme eux, et PRIVACY.md promet que ce
+    // bouton efface ce que l'archive contient.
+    chrome?.storage?.local?.remove(['selectorFailures', SKELETON_KEY, REGISTRATION_LOG_KEY], () =>
+      refreshStatus()
+    );
   });
 }
 function renderVersion(): void {

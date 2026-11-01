@@ -57,6 +57,24 @@ describe('§9.4 — le rapport de débogage', () => {
     expect(files[2]!.text).toBe('# https://github.com/acme/demo/pull/7\n# 2026-10-30T09:00:00.000Z\nbody\n main\n');
   });
 
+  it('#118 — l’archive porte le journal d’inscription du script, tel que le worker l’a écrit', async () => {
+    const event = {
+      at: '2026-11-01T12:00:00.000Z',
+      cause: 'worker-start' as const,
+      matches: ['https://github.com/*'],
+      before: { present: true, persist: false },
+      calls: [{ op: 'update' as const, ids: ['cct-hosts'], error: null }],
+      after: { present: true, persist: false },
+      injectedTabs: 2,
+    };
+    const { bytes } = await diagnosticArchive([ENTRY], ENV, [], 'LISEZ-MOI', [event]);
+    expect(JSON.parse(unzip(bytes)[1]!.text).registrationLog).toEqual([event]);
+
+    // Sans journal, le champ est là et vide : « rien d'enregistré » se lit, au lieu de se déduire.
+    const empty = await diagnosticArchive([ENTRY], ENV, [], 'LISEZ-MOI');
+    expect(JSON.parse(unzip(empty.bytes)[1]!.text).registrationLog).toEqual([]);
+  });
+
   it('une version absente reste visible comme `null`, pas omise', () => {
     const report = entryReport(ENTRY, { ...ENV, extension: null });
 

@@ -10,6 +10,7 @@
 // partagé.
 
 import type { JournalEntry } from '../journal-entry.js';
+import type { RegistrationEvent } from '../registration-log.js';
 import { decompressSkeleton, type StoredSkeleton } from '../skeletons.js';
 import { zip, type ZipEntry } from './zip.js';
 
@@ -61,7 +62,8 @@ export function entryReport(entry: JournalEntry, env: ReportEnvironment): string
  * ce qu'un corps d'issue accepte. Une archive se joint à l'issue ; une ligne seule se copie
  * toujours (`entryReport`).
  *
- *   - `report.json` : ce que la copie du journal entier contenait, en JSON nu ;
+ *   - `report.json` : ce que la copie du journal entier contenait, en JSON nu, plus le journal
+ *     d'inscription du script de contenu (`registrationLog`, #118) ;
  *   - `skeletons/<id>.txt` : un fichier par squelette désigné ET encore stocké ;
  *   - `README.txt` : ce que contient l'archive, dans la langue de la page (`readme`).
  *
@@ -71,12 +73,14 @@ export async function diagnosticArchive(
   entries: readonly JournalEntry[],
   env: ReportEnvironment,
   skeletons: readonly StoredSkeleton[],
-  readme: string
+  readme: string,
+  registrationLog: readonly RegistrationEvent[] = []
 ): Promise<{ name: string; bytes: Uint8Array }> {
   const encoder = new TextEncoder();
+  const report = { ...header(env), entries, registrationLog };
   const files: ZipEntry[] = [
     { name: 'README.txt', data: encoder.encode(readme) },
-    { name: 'report.json', data: encoder.encode(JSON.stringify({ ...header(env), entries }, null, 2)) },
+    { name: 'report.json', data: encoder.encode(JSON.stringify(report, null, 2)) },
   ];
   const wanted = new Set(entries.flatMap((e) => (e.kind !== 'error' && e.skeleton ? [e.skeleton] : [])));
   for (const stored of skeletons) {

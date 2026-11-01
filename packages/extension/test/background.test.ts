@@ -17,7 +17,7 @@ const SCRIPT_ID = 'cct-hosts';
 interface FakeChrome {
   runtime: {
     onMessage: { addListener: ReturnType<typeof vi.fn> };
-    lastError: null;
+    lastError: { message: string } | null;
     openOptionsPage: ReturnType<typeof vi.fn>;
     onInstalled: { addListener: ReturnType<typeof vi.fn> };
   };
@@ -43,6 +43,9 @@ interface FakeChrome {
   };
   /** L'état que le faux fait mine de conserver, lisible par les assertions. */
   store: Record<string, unknown>;
+  /** Les appels d'inscription qui doivent ÉCHOUER, et le message que Chrome poserait alors dans
+   * `runtime.lastError` — l'appel échoué ne change rien à l'inscription, comme le vrai. */
+  failOn: Partial<Record<'register' | 'update' | 'unregister', string>>;
 }
 
 /** `alreadyRegistered` : ce que le navigateur a GARDÉ d'une version précédente. Un
@@ -60,8 +63,27 @@ function installFakeChrome(
   openTabs: string[] = []
 ): FakeChrome {
   const store: Record<string, unknown> = { [HOST_PLATFORMS_KEY]: { ...tags } };
-  /** Ce que le navigateur a réellement enregistré à cet instant. */
-  const live = new Map<string, { id: string }>(alreadyRegistered.map((id) => [id, { id }]));
+  /** Ce que le navigateur a réellement enregistré à cet instant, avec ce qu'il rapporte de
+   * `persistAcrossSessions`. MESURÉ dans Chromium le 2026-11-01 (#118, extension minimale) :
+   * `registerContentScripts` sans le champ le rapporte à `true`, `updateContentScripts` sans le
+   * champ le fait passer à `false`. Ce faux le reproduit parce que le journal d'inscription le
+   * relit — un faux qui rendrait toujours la même valeur décrirait un monde où le journal n'a
+   * rien à rapporter (CLAUDE.md, règle 2). Ce qu'a l'enregistrement d'une version précédente
+   * n'est pas mesuré : `true`, la valeur d'une inscription neuve. */
+  const live = new Map<string, { id: string; persistAcrossSessions: boolean }>(
+    alreadyRegistered.map((id) => [id, { id, persistAcrossSessions: true }])
+  );
+  /** Rappelle `cb` comme Chrome : avec `runtime.lastError` posé PENDANT le rappel seulement. */
+  const answer = (op: 'register' | 'update' | 'unregister', cb: () => void, apply: () => void) => {
+    const failure = fake.failOn[op];
+    if (failure === undefined) {
+      apply();
+      return cb();
+    }
+    fake.runtime.lastError = { message: failure };
+    cb();
+    fake.runtime.lastError = null;
+  };
   const tabsById = openTabs.map((url, index) => ({ id: index + 1, url }));
   /** Les onglets qui portent le marqueur du script de contenu, à cet instant. */
   const marked = new Set<number>();
@@ -84,20 +106,27 @@ function installFakeChrome(
       // toujours `alreadyRegistered`, si bien que le code ne se voyait jamais lui-même
       // enregistré — et le retrait de l'enregistrement, quand plus rien n'est servi, n'avait
       // aucun monde où se produire (CLAUDE.md, règle 2).
-      registerContentScripts: vi.fn((scripts: { id: string }[], cb: () => void) => {
-        for (const script of scripts) live.set(script.id, script);
-        cb();
-      }),
-      unregisterContentScripts: vi.fn((filter: { ids: string[] }, cb: () => void) => {
-        for (const id of filter.ids) live.delete(id);
-        cb();
-      }),
-      updateContentScripts: vi.fn((scripts: { id: string }[], cb: () => void) => {
-        for (const script of scripts) live.set(script.id, script);
-        cb();
-      }),
+      registerContentScripts: vi.fn(
+        (scripts: { id: string; persistAcrossSessions?: boolean }[], cb: () => void) =>
+          answer('register', cb, () => {
+            for (const script of scripts)
+              live.set(script.id, { ...script, persistAcrossSessions: script.persistAcrossSessions ?? true });
+          })
+      ),
+      unregisterContentScripts: vi.fn((filter: { ids: string[] }, cb: () => void) =>
+        answer('unregister', cb, () => {
+          for (const id of filter.ids) live.delete(id);
+        })
+      ),
+      updateContentScripts: vi.fn(
+        (scripts: { id: string; persistAcrossSessions?: boolean }[], cb: () => void) =>
+          answer('update', cb, () => {
+            for (const script of scripts)
+              live.set(script.id, { ...script, persistAcrossSessions: script.persistAcrossSessions ?? false });
+          })
+      ),
       getRegisteredContentScripts: vi.fn((cb: (s: { id: string }[]) => void) =>
-        cb([...live.values()])
+        cb([...live.values()].map((script) => ({ ...script })))
       ),
       // STATEFUL, et pour la même raison que le reste de ce faux : le worker DEMANDE
       // désormais à l'onglet s'il a déjà le script, et un faux qui répondrait toujours la
@@ -154,6 +183,7 @@ function installFakeChrome(
       onChanged: { addListener: vi.fn() },
     },
     store,
+    failOn: {},
   };
   (globalThis as { chrome?: unknown }).chrome = fake;
   return fake;
@@ -355,6 +385,130 @@ describe('§2, §A.4, §B.4 — UN SEUL script enregistré, sur les hôtes réel
   });
 });
 
+
+describe('#118 — chaque passe d’inscription est consignée, avec ce que Chrome a répondu', () => {
+  type Logged = {
+    cause: string;
+    matches: string[];
+    before: { present: boolean; persist: boolean | null };
+    calls: { op: string; ids: string[]; error: string | null }[];
+    after: { present: boolean; persist: boolean | null };
+    injectedTabs: number;
+    at: string;
+  };
+  const logOf = (fake: FakeChrome): Logged[] => (fake.store['registrationLog'] as Logged[] | undefined) ?? [];
+  const onChangedOf = (fake: FakeChrome) =>
+    fake.storage.onChanged.addListener.mock.calls[0]![0] as (c: Record<string, unknown>, area: string) => void;
+
+  it('le démarrage du worker consigne une inscription neuve, l’état avant et après', async () => {
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' }, [], [
+      'https://github.com/acme/demo/pull/1',
+    ]);
+    await import('../src/background.js');
+    await settle();
+
+    const [event] = logOf(fake);
+    expect(logOf(fake)).toHaveLength(1);
+    expect(event).toMatchObject({
+      cause: 'worker-start',
+      matches: ['https://github.com/*'],
+      before: { present: false, persist: null },
+      calls: [{ op: 'register', ids: [SCRIPT_ID], error: null }],
+      after: { present: true, persist: true },
+      injectedTabs: 1,
+    });
+    expect(Number.isNaN(Date.parse(event!.at))).toBe(false);
+  });
+
+  it('une mise à jour est consignée avec ce que Chrome rapporte ensuite de la persistance', async () => {
+    // Le passage à `false` est celui que Chrome produit (mesuré, voir le faux) : le journal doit
+    // le RAPPORTER tel quel, c'est l'une des deux choses que #118 a besoin de voir.
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    await import('../src/background.js');
+    await settle();
+
+    onChangedOf(fake)({ [HOST_PLATFORMS_KEY]: {} }, 'local');
+    await settle();
+
+    expect(logOf(fake).map((e) => e.cause)).toEqual(['worker-start', 'host-tags-changed']);
+    expect(logOf(fake)[1]).toMatchObject({
+      before: { present: true, persist: true },
+      calls: [{ op: 'update', ids: [SCRIPT_ID], error: null }],
+      after: { present: true, persist: false },
+    });
+  });
+
+  it('une erreur renvoyée par Chrome est consignée, et l’état relu montre l’inscription absente', async () => {
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    fake.failOn.register = 'Duplicate script ID';
+    await import('../src/background.js');
+    await settle();
+
+    expect(logOf(fake)[0]).toMatchObject({
+      calls: [{ op: 'register', error: 'Duplicate script ID' }],
+      after: { present: false, persist: null },
+    });
+  });
+
+  it('une désinscription parce que plus rien n’est servi est consignée, motifs vides compris', async () => {
+    const fake = installFakeChrome([], {}, [SCRIPT_ID]);
+    await import('../src/background.js');
+    await settle();
+
+    expect(logOf(fake)[0]).toMatchObject({
+      cause: 'worker-start',
+      matches: [],
+      before: { present: true },
+      calls: [{ op: 'unregister', ids: [SCRIPT_ID], error: null }],
+      after: { present: false },
+      injectedTabs: 0,
+    });
+  });
+
+  it('une passe sans rien à faire est consignée aussi : son absence de geste est un fait', async () => {
+    const fake = installFakeChrome([], {});
+    await import('../src/background.js');
+    await settle();
+
+    expect(logOf(fake)[0]).toMatchObject({ matches: [], calls: [], before: { present: false }, after: { present: false } });
+  });
+
+  it('la cause suit l’événement : permission accordée, retirée, politique modifiée', async () => {
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    await import('../src/background.js');
+    await settle();
+
+    (fake.permissions.onAdded.addListener.mock.calls[0]![0] as (p: { origins: string[] }) => void)({ origins: [] });
+    await settle();
+    (fake.permissions.onRemoved.addListener.mock.calls[0]![0] as (p: { origins: string[] }) => void)({ origins: [] });
+    await settle();
+    onChangedOf(fake)({ allowedHosts: {} }, 'managed');
+    await settle();
+
+    expect(logOf(fake).map((e) => e.cause)).toEqual([
+      'worker-start',
+      'permission-added',
+      'permission-removed',
+      'managed-changed',
+    ]);
+  });
+
+  it('le journal est borné : les passes les plus anciennes sortent d’abord', async () => {
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    const { MAX_REGISTRATION_EVENTS } = await import('../src/registration-log.js');
+    await import('../src/background.js');
+    await settle();
+    for (let i = 0; i < MAX_REGISTRATION_EVENTS + 5; i++) {
+      onChangedOf(fake)({ [HOST_PLATFORMS_KEY]: {} }, 'local');
+      await settle();
+    }
+
+    const log = logOf(fake);
+    expect(log).toHaveLength(MAX_REGISTRATION_EVENTS);
+    // La passe de démarrage, la plus ancienne, est sortie.
+    expect(log.every((e) => e.cause === 'host-tags-changed')).toBe(true);
+  });
+});
 
 describe('bouton de la barre d’outils : le clic amène aux réglages', () => {
   it('un clic sur l’icône ouvre la page d’options', async () => {

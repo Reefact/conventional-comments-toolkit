@@ -34,6 +34,13 @@ import {
   type ExtraHostsByPlatform,
   type HostPlatform,
 } from './host-platform.js';
+import {
+  MAX_REGISTRATION_EVENTS,
+  REGISTRATION_LOG_KEY,
+  type RegistrationCause,
+  type RegistrationEvent,
+  type RegistrationState,
+} from './registration-log.js';
 
 interface FetchConfigRequest {
   kind: 'cct-fetch-config';
@@ -73,7 +80,7 @@ declare const chrome: {
   scripting?: {
     registerContentScripts: (scripts: RegisteredContentScript[], cb: () => void) => void;
     unregisterContentScripts: (filter: { ids: string[] }, cb: () => void) => void;
-    getRegisteredContentScripts?: (cb: (scripts: { id: string }[]) => void) => void;
+    getRegisteredContentScripts?: (cb: (scripts: { id: string; persistAcrossSessions?: boolean }[]) => void) => void;
     updateContentScripts?: (scripts: RegisteredContentScript[], cb: () => void) => void;
     executeScript?: (
       injection: { target: { tabId: number }; files?: string[]; func?: () => unknown },
@@ -306,14 +313,50 @@ function servedOrigins(origins: string[], tags: Record<string, HostPlatform>): s
   });
 }
 
+function stateOf(registered: { id: string; persistAcrossSessions?: boolean }[]): RegistrationState {
+  const ours = registered.find((script) => script.id === SCRIPT_ID);
+  return { present: ours !== undefined, persist: ours?.persistAcrossSessions ?? null };
+}
+
+/** Le message d'erreur que Chrome a posé pour le rappel en cours, ou `null`. Le LIRE est aussi
+ * ce qui empêche Chrome de le signaler comme non traité. */
+function lastErrorMessage(): string | null {
+  const error = chrome?.runtime?.lastError;
+  return error ? (error.message ?? 'unknown error') : null;
+}
+
+/** Ajoute une passe au journal d'inscription. Jamais bloquant pour l'inscription elle-même :
+ * un journal qu'on n'arrive pas à écrire ne doit rien coûter de plus que son absence. Les
+ * passes étant sérialisées (`publishExtraHostsByPlatform`), deux écritures ne se croisent pas. */
+async function appendRegistrationEvent(event: RegistrationEvent): Promise<void> {
+  const local = chrome?.storage?.local;
+  if (!local) return;
+  try {
+    const previous = await new Promise<RegistrationEvent[]>((resolve) =>
+      local.get([REGISTRATION_LOG_KEY], (items) => {
+        const stored = items?.[REGISTRATION_LOG_KEY];
+        resolve(Array.isArray(stored) ? (stored as RegistrationEvent[]) : []);
+      })
+    );
+    const next = [...previous, event].slice(-MAX_REGISTRATION_EVENTS);
+    await new Promise<void>((resolve) => local.set({ [REGISTRATION_LOG_KEY]: next }, () => resolve()));
+  } catch {
+    // Rien : voir plus haut.
+  }
+}
+
 /** Amène l'enregistrement à l'état voulu — inscrit, mis à jour, ou retiré s'il ne reste
  * rien à servir. `matches` vide n'est pas une option : `registerContentScripts` la refuse,
- * et c'est heureux, un script sans motif ne voulant rien dire. */
-async function applyRegistration(matches: string[]): Promise<void> {
+ * et c'est heureux, un script sans motif ne voulant rien dire.
+ *
+ * Chaque passe est consignée dans le journal d'inscription (`RegistrationEvent`, #118). */
+async function applyRegistration(matches: string[], cause: RegistrationCause): Promise<void> {
   const scripting = chrome?.scripting;
   if (!scripting) return;
   const registered = await listRegisteredScripts();
   const ours = registered.some((script) => script.id === SCRIPT_ID);
+  const calls: RegistrationEvent['calls'] = [];
+  let injectedTabs = 0;
 
   // Le ménage vise ce que les versions ANTÉRIEURES ont laissé : elles nommaient un script
   // par origine, sous des identifiants que plus rien ici ne sait reconstruire. Un
@@ -323,36 +366,59 @@ async function applyRegistration(matches: string[]): Promise<void> {
     .map((script) => script.id)
     .filter((id) => id.startsWith(SCRIPT_ID_PREFIX) && id !== SCRIPT_ID);
   if (stale.length > 0) {
-    await new Promise<void>((resolve) => scripting.unregisterContentScripts({ ids: stale }, () => resolve()));
+    await new Promise<void>((resolve) =>
+      scripting.unregisterContentScripts({ ids: stale }, () => {
+        calls.push({ op: 'unregister', ids: stale, error: lastErrorMessage() });
+        resolve();
+      })
+    );
   }
 
   if (matches.length === 0) {
     if (ours) {
       await new Promise<void>((resolve) =>
-        scripting.unregisterContentScripts({ ids: [SCRIPT_ID] }, () => resolve())
+        scripting.unregisterContentScripts({ ids: [SCRIPT_ID] }, () => {
+          calls.push({ op: 'unregister', ids: [SCRIPT_ID], error: lastErrorMessage() });
+          resolve();
+        })
       );
     }
-    return;
+  } else {
+    const script: RegisteredContentScript = {
+      id: SCRIPT_ID,
+      matches,
+      js: ['content.js'],
+      css: ['styles.css'],
+      runAt: 'document_idle',
+    };
+    await new Promise<void>((resolve) => {
+      // `update` plutôt que désenregistrer-puis-réenregistrer : ce dernier ouvrirait, à chaque
+      // changement d'étiquette, une fenêtre où plus aucun hôte n'est servi.
+      if (ours && scripting.updateContentScripts) {
+        scripting.updateContentScripts([script], () => {
+          calls.push({ op: 'update', ids: [SCRIPT_ID], error: lastErrorMessage() });
+          resolve();
+        });
+      } else {
+        scripting.registerContentScripts([script], () => {
+          calls.push({ op: 'register', ids: [SCRIPT_ID], error: lastErrorMessage() });
+          resolve();
+        });
+      }
+    });
+
+    injectedTabs = await injectIntoOpenTabs(matches);
   }
 
-  const script: RegisteredContentScript = {
-    id: SCRIPT_ID,
+  await appendRegistrationEvent({
+    at: new Date().toISOString(),
+    cause,
     matches,
-    js: ['content.js'],
-    css: ['styles.css'],
-    runAt: 'document_idle',
-  };
-  await new Promise<void>((resolve) => {
-    // `update` plutôt que désenregistrer-puis-réenregistrer : ce dernier ouvrirait, à chaque
-    // changement d'étiquette, une fenêtre où plus aucun hôte n'est servi.
-    if (ours && scripting.updateContentScripts) {
-      scripting.updateContentScripts([script], () => resolve());
-    } else {
-      scripting.registerContentScripts([script], () => resolve());
-    }
+    before: stateOf(registered),
+    calls,
+    after: stateOf(await listRegisteredScripts()),
+    injectedTabs,
   });
-
-  await injectIntoOpenTabs(matches);
 }
 
 /** Injecte dans les onglets DÉJÀ OUVERTS que l'enregistrement vient de couvrir.
@@ -409,9 +475,10 @@ async function hasContentScript(tabId: number): Promise<boolean> {
   });
 }
 
-async function injectIntoOpenTabs(matches: string[]): Promise<void> {
+async function injectIntoOpenTabs(matches: string[]): Promise<number> {
   const scripting = chrome?.scripting;
-  if (!scripting?.executeScript || !chrome?.tabs?.query || matches.length === 0) return;
+  if (!scripting?.executeScript || !chrome?.tabs?.query || matches.length === 0) return 0;
+  let injected = 0;
 
   const tabs = await new Promise<{ id?: number }[]>((resolve) => {
     try {
@@ -450,7 +517,7 @@ async function injectIntoOpenTabs(matches: string[]): Promise<void> {
     await new Promise<void>((resolve) => {
       try {
         scripting.executeScript!({ target: { tabId }, files: ['content.js'] }, () => {
-          void chrome?.runtime?.lastError;
+          if (!chrome?.runtime?.lastError) injected += 1;
           resolve();
         });
       } catch {
@@ -458,9 +525,10 @@ async function injectIntoOpenTabs(matches: string[]): Promise<void> {
       }
     });
   }
+  return injected;
 }
 
-function listRegisteredScripts(): Promise<{ id: string }[]> {
+function listRegisteredScripts(): Promise<{ id: string; persistAcrossSessions?: boolean }[]> {
   return new Promise((resolve) => {
     const get = chrome?.scripting?.getRegisteredContentScripts;
     if (!get) return resolve([]);
@@ -478,7 +546,7 @@ function listRegisteredScripts(): Promise<{ id: string }[]> {
  * les faire diverger est exactement ce qui a produit l'injection sur des hôtes que rien
  * n'activait. */
 export async function syncContentScriptsWithGrantedPermissions(): Promise<void> {
-  await publishExtraHostsByPlatform();
+  await publishExtraHostsByPlatform('worker-start');
 }
 
 /** Étiquettes posées par la page d'options, et celles poussées par la politique
@@ -517,7 +585,7 @@ async function readPlatformTags(): Promise<Record<string, HostPlatform>> {
  * seconde, réinstallant une liste périmée d'où le nouvel hôte est absent — le script de
  * contenu le rejetterait alors jusqu'au prochain événement ou redémarrage du worker
  * (revue Codex, PR #29). */
-async function computeAndStoreExtraHosts(): Promise<ExtraHostsByPlatform> {
+async function computeAndStoreExtraHosts(cause: RegistrationCause): Promise<ExtraHostsByPlatform> {
   const result: ExtraHostsByPlatform = emptyByPlatform();
   if (!chrome?.permissions || !chrome?.storage?.local) return result;
   const [origins, tags] = await Promise.all([grantedOrigins(), readPlatformTags()]);
@@ -536,7 +604,7 @@ async function computeAndStoreExtraHosts(): Promise<ExtraHostsByPlatform> {
   // MÊME source pour les deux : ce qui est injecté et ce qui est activé se déduisent du même
   // croisement, dans le même passage. Les séparer, c'était laisser l'un injecter là où
   // l'autre ne ferait rien.
-  await applyRegistration(servedOrigins(origins, tags));
+  await applyRegistration(servedOrigins(origins, tags), cause);
   return result;
 }
 
@@ -575,8 +643,12 @@ async function forgetPlatformTags(origins: string[]): Promise<void> {
  * a lu l'état le plus récent, et c'est elle qui reste écrite. */
 let publishQueue: Promise<ExtraHostsByPlatform> = Promise.resolve(EMPTY_EXTRA_HOSTS);
 
-export function publishExtraHostsByPlatform(): Promise<ExtraHostsByPlatform> {
-  const next = publishQueue.then(computeAndStoreExtraHosts, computeAndStoreExtraHosts);
+/** `cause` : ce qui a déclenché la publication, consigné par le journal d'inscription (#118).
+ * Le défaut ne sert qu'aux appels sans contexte — les tests ; chaque appel de ce fichier nomme
+ * la sienne. */
+export function publishExtraHostsByPlatform(cause: RegistrationCause = 'worker-start'): Promise<ExtraHostsByPlatform> {
+  const run = () => computeAndStoreExtraHosts(cause);
+  const next = publishQueue.then(run, run);
   publishQueue = next.catch(() => EMPTY_EXTRA_HOSTS);
   return next;
 }
@@ -584,18 +656,20 @@ export function publishExtraHostsByPlatform(): Promise<ExtraHostsByPlatform> {
 // Un octroi ne demande rien de particulier : la publication recalcule tout, enregistrement
 // compris, à partir des permissions et des étiquettes du moment.
 chrome?.permissions?.onAdded?.addListener(() => {
-  void publishExtraHostsByPlatform();
+  void publishExtraHostsByPlatform('permission-added');
 });
 // Un RETRAIT demande une chose de plus : oublier l'étiquette avant de republier, pour que
 // la répartition se calcule sur un état déjà nettoyé.
 chrome?.permissions?.onRemoved?.addListener((perms) => {
-  void forgetPlatformTags(perms.origins ?? []).then(() => publishExtraHostsByPlatform());
+  void forgetPlatformTags(perms.origins ?? []).then(() => publishExtraHostsByPlatform('permission-removed'));
 });
 // Une étiquette posée ou corrigée dans la page d'options doit republier la répartition :
 // la permission, elle, n'a pas bougé, donc aucun `onAdded`/`onRemoved` ne se déclenche.
 chrome?.storage?.onChanged?.addListener((changes, areaName) => {
-  if ((areaName === 'local' && HOST_PLATFORMS_KEY in changes) || areaName === 'managed') {
-    void publishExtraHostsByPlatform();
+  if (areaName === 'managed') {
+    void publishExtraHostsByPlatform('managed-changed');
+  } else if (areaName === 'local' && HOST_PLATFORMS_KEY in changes) {
+    void publishExtraHostsByPlatform('host-tags-changed');
   }
 });
 // Un SEUL appel : `syncContentScriptsWithGrantedPermissions()` n'a plus de calcul propre,

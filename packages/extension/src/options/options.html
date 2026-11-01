@@ -309,7 +309,7 @@
       .status-row .page-mark-none { color: var(--fg-faint); cursor: help; }
       .status-hint { margin: 0; font-size: 0.74rem; color: var(--fg-faint); }
       /* La gouttière du bouton le décalerait de la colonne : son libellé doit tomber sur le
-         même bord que le journal et sa légende, pas sur celui de sa propre boîte. */
+         même bord que le journal, pas sur celui de sa propre boîte. */
       .status-detail .btn { margin-left: -0.5rem; }
       /* La marge du haut sépare les actions du journal : `gap` seul, celui du conteneur, les
          laissait collées à la ligne d'au-dessus. 2.1rem = ce que la légende (supprimée) et ses
@@ -320,7 +320,7 @@
       .status-actions .btn { margin-left: 0; }
       /* L'icône de ligne est la puce ET le bouton : une boîte carrée de largeur constante, de
          sorte que les horodatages restent alignés. Sa gouttière est reprise à gauche pour que
-         l'icône tombe sur le bord du journal et de sa légende. */
+         l'icône tombe sur le bord du journal. */
       .status-detail pre .btn-icon {
         display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem; padding: 0;
         margin: 0 0.4rem 0 -0.25rem; vertical-align: middle; cursor: pointer;
@@ -623,7 +623,7 @@
             <span class="dot"></span>
             <div class="status-body">
               <span class="status-text" aria-live="polite">—</span>
-              <!-- Rempli par le code : le journal, sa légende et le bouton d'effacement. Un
+              <!-- Rempli par le code : le journal et les boutons d'action. Un
                    conteneur DÉDIÉ, et non `.status-body` : le vider est alors sûr, là où
                    vider `.status-body` emporterait la ligne d'état elle-même. La région
                    live se limite pour la même raison à `.status-text` — l'englober ferait

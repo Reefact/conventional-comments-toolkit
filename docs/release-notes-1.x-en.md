@@ -8,6 +8,22 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
 extension installed.
 
+## 1.0.0-beta.20 — November 1, 2026
+
+_The diagnostic archive now shows how the extension was activated in your browser, to track down pages where it does nothing at all; the settings page is easier to read._
+
+### ✨ Features
+
+- **The diagnostic archive records how the extension's script was set up in your browser.** On some GitHub pages the extension can be completely inactive — no badges, no toolbar, and nothing blocked even in `enforce` mode — until you open its settings page. Looking into it from outside repairs it, so the cause could not be seen. The extension now keeps a short history of each time it set up, updated or removed its script: what triggered it, which sites it covered, what the browser reported before and after, and any error. If the problem happens to you, download the diagnostic from the settings page before anything else and attach it to an issue; the download is offered even when the journal has no other line. The history holds no page address, and "Clear the log" clears it too.
+
+### 🔧 Changed
+
+- **The settings page's journal no longer shows the legend about page marks.** The marks and their links work as before.
+
+### 🐛 Bug fixes
+
+- **The hints inside the settings page's fields are readable in both themes, the shortcuts field included.** They are quieter than what you type, but no longer too faint to read.
+
 ## 1.0.0-beta.19 — October 31, 2026
 
 _When a part of the page is not recognised, the journal now records what the page showed at that moment, and the whole diagnostic downloads as an archive to attach to a bug report; editing a comment on GitHub no longer writes a false alarm._

@@ -12,6 +12,20 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [1.0.0-beta.20] - 2026-11-01
+
+### Added
+
+- **The diagnostic archive now records every registration of the content script.** On some github.com loads the extension was not active at all — no badge, no banner, no toolbar and no send guard — reloads included, until its settings page was opened (#118). Any way of looking at the registration starts the extension's service worker, which re-applies it, so the state could not be observed. The service worker now records each pass that registers, updates or removes the content script, the last 40 of them: the event that triggered it (extension start, host permission granted or removed, host tags or managed policy changed), the address patterns of the served hosts, the registration as the browser reports it before and after (present, and whether it persists across sessions), each call with the error the browser returned, and how many open tabs the script was injected into. A read of the registration that fails is recorded as a read error, never as an absent registration. `report.json` in the diagnostic archive carries it as `registrationLog`; the download and "Clear the log" are offered as soon as either journal has entries, since a content script that was never injected logs no selector line; "Clear the log" clears it with the rest. It holds no page address. `PRIVACY.md` says so, in both languages (§9.4).
+
+### Changed
+
+- **The options page's journal no longer shows its page-mark legend.** The sentence "Same mark = same page. Click one to open the recorded address in a new tab." under the journal is gone; the marks and their links are unchanged.
+
+### Fixed
+
+- **Placeholders on the options page are readable in both themes, the shortcuts field included.** The shortcuts field kept the browser's default grey, since the placeholder rule covered text inputs only; it now follows the other fields. Placeholder contrast against the field background is about 4.5:1 in the light theme and about 4.8:1 in the dark one, which meets WCAG 1.4.3, while staying quieter than typed text.
+
 ## [1.0.0-beta.19] - 2026-10-31
 
 ### Added
@@ -729,6 +743,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[1.0.0-beta.20]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.19...v1.0.0-beta.20
 [1.0.0-beta.19]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.18...v1.0.0-beta.19
 [1.0.0-beta.18]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.17...v1.0.0-beta.18
 [1.0.0-beta.17]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.16...v1.0.0-beta.17

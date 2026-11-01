@@ -8,6 +8,22 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
 navigateur des personnes ayant installé l'extension.
 
+## 1.0.0-beta.20 — 1er novembre 2026
+
+_L'archive de diagnostic montre désormais comment l'extension s'est activée dans votre navigateur, pour retrouver les pages où elle ne fait rien du tout ; la page de réglages se lit plus facilement._
+
+### ✨ Nouveautés
+
+- **L'archive de diagnostic enregistre comment le script de l'extension a été mis en place dans votre navigateur.** Sur certaines pages GitHub, l'extension peut être entièrement inactive — ni badges, ni barre d'outils, et rien de bloqué même en mode `enforce` — jusqu'à ce que vous ouvriez sa page de réglages. L'examiner de l'extérieur la répare, si bien que la cause restait invisible. L'extension garde désormais un court historique de chaque fois qu'elle a mis en place, mis à jour ou retiré son script : ce qui l'a déclenché, les sites couverts, ce que le navigateur rapportait avant et après, et l'erreur éventuelle. Si le problème vous arrive, téléchargez le diagnostic depuis la page de réglages avant toute autre chose et joignez-le à une issue ; le téléchargement est proposé même quand le journal n'a aucune autre ligne. L'historique ne contient aucune adresse de page, et « Effacer le journal » l'efface aussi.
+
+### 🔧 Changements
+
+- **Le journal de la page de réglages n'affiche plus la légende des marques de page.** Les marques et leurs liens fonctionnent comme avant.
+
+### 🐛 Corrections
+
+- **Les indications affichées dans les champs de la page de réglages se lisent dans les deux thèmes, champ des raccourcis compris.** Elles restent plus discrètes que ce que vous saisissez, sans être trop pâles pour être lues.
+
 ## 1.0.0-beta.19 — 31 octobre 2026
 
 _Quand une partie de la page n'est pas reconnue, le journal enregistre ce que la page montrait à cet instant, et le diagnostic complet se télécharge en archive à joindre à un rapport de bug ; modifier un commentaire sur GitHub ne produit plus de fausse alerte._

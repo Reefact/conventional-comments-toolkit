@@ -695,7 +695,8 @@ telemetryOptIn?.addEventListener('change', () => {
 // recharge (revue Reefact, PR #70).
 chrome?.storage?.onChanged?.addListener((changes, area) => {
   if (area === 'managed' || (area === 'local' && TELEMETRY_CONSENT_KEY in changes)) refreshTelemetry();
-  if (area === 'local' && ('selectorFailures' in changes || 'degradedState' in changes)) refreshStatus();
+  if (area === 'local' && ('selectorFailures' in changes || 'degradedState' in changes || REGISTRATION_LOG_KEY in changes))
+    refreshStatus();
 });
 
 /** Une ligne d'état : la pastille porte le niveau, le texte porte le fait. */
@@ -708,7 +709,7 @@ function renderStatus(row: HTMLElement | null, text: string, degraded: boolean):
 
 // État dégradé (§5.4, §9.2.3) et journal de dégradation de sélecteurs (§9.4).
 function refreshStatus(): void {
-    chrome?.storage?.local?.get(['degradedState', 'selectorFailures'], (items) => {
+    chrome?.storage?.local?.get(['degradedState', 'selectorFailures', REGISTRATION_LOG_KEY], (items) => {
     const degradedState = items['degradedState'];
     renderStatus(
       document.getElementById('degraded-state'),
@@ -720,6 +721,13 @@ function refreshStatus(): void {
 
     const failures =
       (items['selectorFailures'] as JournalEntry[] | undefined) ?? [];
+    // Le journal d'inscription (#118) suffit à rendre l'archive utile, même sans aucune ligne
+    // de sélecteur — c'est même le cas qu'il vise : un script de contenu qui n'a pas été
+    // injecté n'a rien pu journaliser. Les deux boutons en dépendent donc aussi, sans quoi la
+    // preuve resterait enfermée dans le stockage, ni exportable ni effaçable (revue Codex,
+    // PR #121). La ligne d'état, elle, continue de parler des seuls sélecteurs.
+    const registrationLog = items[REGISTRATION_LOG_KEY];
+    const hasRegistrationLog = Array.isArray(registrationLog) && registrationLog.length > 0;
     const log = document.getElementById('selector-log');
     renderStatus(
       log,
@@ -739,7 +747,7 @@ function refreshStatus(): void {
     const detail = document.getElementById('selector-log-detail');
     if (detail) {
       while (detail.firstChild) detail.removeChild(detail.firstChild);
-      if (failures.length > 0) {
+      if (failures.length > 0 || hasRegistrationLog) {
         const feedback = document.createElement('div');
         feedback.setAttribute('role', 'status');
         feedback.className = 'status-hint';
@@ -760,13 +768,14 @@ function refreshStatus(): void {
           }),
           renderSelectorClear()
         );
-        detail.append(
-          renderSelectorJournal(failures, (entry) =>
-            copyReport(entryReport(entry, environment()), feedback)
-          ),
-          actions,
-          feedback
-        );
+        if (failures.length > 0) {
+          detail.append(
+            renderSelectorJournal(failures, (entry) =>
+              copyReport(entryReport(entry, environment()), feedback)
+            )
+          );
+        }
+        detail.append(actions, feedback);
       }
     }
   });

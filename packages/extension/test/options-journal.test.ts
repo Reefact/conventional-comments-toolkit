@@ -365,6 +365,66 @@ describe('§9.4 — copier pour le débogage', () => {
     vi.restoreAllMocks();
   });
 
+  // #118 : un script de contenu jamais injecté ne journalise aucun sélecteur. Le journal
+  // d'inscription est alors la SEULE preuve, et sans boutons elle restait enfermée dans le
+  // stockage (revue Codex, PR #121).
+  const REGISTRATION = [
+    {
+      at: '2026-11-01T12:00:00.000Z',
+      cause: 'worker-start',
+      matches: ['https://github.com/*'],
+      before: { present: true, persist: false },
+      calls: [{ op: 'update', ids: ['cct-hosts'], error: null }],
+      after: { present: true, persist: false },
+      injectedTabs: 1,
+    },
+  ];
+
+  it('#118 — sans ligne de sélecteur, le journal d’inscription suffit à offrir l’export, qui le contient', async () => {
+    const downloads = captureDownloads();
+    installPage({ registrationLog: REGISTRATION });
+    await loadOptions();
+
+    // La ligne d'état parle toujours des sélecteurs : aucun n'a échoué.
+    expect(statusText()).toBe(ui('fr', 'options.status.selectors.none'));
+    expect(journalRows()).toEqual([]);
+    downloadButton()!.click();
+    await settled();
+
+    expect(downloads).toHaveLength(1);
+    const report = JSON.parse(unzip(new Uint8Array(await downloads[0]!.blob.arrayBuffer()))[1]!.text);
+    expect(report.entries).toEqual([]);
+    expect(report.registrationLog).toEqual(REGISTRATION);
+    vi.restoreAllMocks();
+  });
+
+  it('#118 — « Effacer le journal » efface aussi le journal d’inscription, et les boutons disparaissent', async () => {
+    const store = installPage({ registrationLog: REGISTRATION });
+    await loadOptions();
+
+    clearButton()!.click();
+    await settled();
+
+    expect(store['registrationLog']).toBeUndefined();
+    expect(downloadButton()).toBeUndefined();
+    expect(clearButton()).toBeNull();
+  });
+
+  it('#118 — un journal d’inscription écrit APRÈS l’ouverture de la page fait apparaître l’export', async () => {
+    // Le worker l'écrit à son démarrage — ce qu'ouvrir cette page peut justement provoquer.
+    const store = installPage({});
+    await loadOptions();
+    expect(downloadButton()).toBeUndefined();
+
+    (globalThis as { chrome: { storage: { local: { set: (i: Record<string, unknown>) => void } } } }).chrome.storage.local.set({
+      registrationLog: REGISTRATION,
+    });
+    await settled();
+
+    expect(store['registrationLog']).toEqual(REGISTRATION);
+    expect(downloadButton()).toBeDefined();
+  });
+
   it('le bouton de ligne est l’icône qui ouvre la ligne, et il passe en coche une fois copié', async () => {
     installClipboard();
     installPage({ selectorFailures: RICH });

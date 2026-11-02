@@ -56,6 +56,7 @@ interface RegisteredContentScript {
   js: string[];
   css: string[];
   runAt: 'document_idle';
+  persistAcrossSessions: true;
 }
 
 declare const chrome: {
@@ -68,6 +69,7 @@ declare const chrome: {
     lastError?: { message?: string } | null;
     openOptionsPage?: () => void;
     onInstalled?: { addListener: (cb: (details: { reason?: string }) => void) => void };
+    onStartup?: { addListener: (cb: () => void) => void };
   };
   action?: {
     onClicked: { addListener: (cb: () => void) => void };
@@ -388,12 +390,20 @@ async function applyRegistration(matches: string[], cause: RegistrationCause): P
       );
     }
   } else {
+    // `persistAcrossSessions` est ÉCRIT, et à chaque appel, parce que sa valeur par défaut
+    // dépend de l'appel. MESURÉ dans Chromium (#118, `spikes/registration-persistence.mjs`) :
+    // `registerContentScripts` sans le champ le rapporte à `true`, `updateContentScripts`
+    // sans le champ le fait passer à `false` — et une inscription à `false` disparaît au
+    // redémarrage du navigateur. Le premier changement d'étiquette suffisait donc à rendre
+    // l'extension inerte sur tous les hôtes servis, garde d'envoi comprise (§5.4), dès le
+    // lancement suivant, jusqu'à ce que quelque chose réveille ce worker.
     const script: RegisteredContentScript = {
       id: SCRIPT_ID,
       matches,
       js: ['content.js'],
       css: ['styles.css'],
       runAt: 'document_idle',
+      persistAcrossSessions: true,
     };
     await new Promise<void>((resolve) => {
       // `update` plutôt que désenregistrer-puis-réenregistrer : ce dernier ouvrirait, à chaque
@@ -554,11 +564,14 @@ function readRegisteredScripts(): Promise<RegisteredRead> {
   });
 }
 
-/** Conservé pour l'appel de démarrage : l'enregistrement ne survit pas à un rechargement du
- * service worker sans être reposé. Il n'a plus de calcul propre — la publication de la
- * répartition et l'enregistrement partent des MÊMES origines et des MÊMES étiquettes, et
- * les faire diverger est exactement ce qui a produit l'injection sur des hôtes que rien
- * n'activait. */
+/** L'appel de démarrage du worker : il repose l'enregistrement à partir de l'état du moment,
+ * ce qui répare une inscription perdue, quelle qu'en soit la cause. Il n'a plus de calcul
+ * propre — la publication de la répartition et l'enregistrement partent des MÊMES origines et
+ * des MÊMES étiquettes, et les faire diverger est exactement ce qui a produit l'injection sur
+ * des hôtes que rien n'activait.
+ *
+ * Il ne court que si le worker démarre, et rien ne le démarre de lui-même au lancement du
+ * navigateur : voir l'écouteur `runtime.onStartup`, en pied de fichier. */
 export async function syncContentScriptsWithGrantedPermissions(): Promise<void> {
   await publishExtraHostsByPlatform('worker-start');
 }
@@ -685,6 +698,15 @@ chrome?.storage?.onChanged?.addListener((changes, areaName) => {
   } else if (areaName === 'local' && HOST_PLATFORMS_KEY in changes) {
     void publishExtraHostsByPlatform('host-tags-changed');
   }
+});
+// Le lancement du navigateur. MESURÉ dans Chromium (#118, `spikes/registration-persistence.mjs`) :
+// sans écouteur de cet événement, le worker ne démarre PAS au lancement, et l'appel du dessous
+// ne court qu'au premier événement qui le réveille — l'ouverture de la page d'options, dans
+// chaque observation de #118. Une inscription perdue pendant la session précédente le restait
+// donc jusque-là. L'écouteur fait démarrer le worker au lancement, et sa passe se consigne sous
+// sa propre cause : le journal d'inscription dit ainsi que le navigateur l'a bien déclenchée.
+chrome?.runtime?.onStartup?.addListener(() => {
+  void publishExtraHostsByPlatform('browser-start');
 });
 // Un SEUL appel : `syncContentScriptsWithGrantedPermissions()` n'a plus de calcul propre,
 // elle délègue à la publication, qui pose l'enregistrement dans le même passage.

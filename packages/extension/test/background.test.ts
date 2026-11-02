@@ -20,6 +20,7 @@ interface FakeChrome {
     lastError: { message: string } | null;
     openOptionsPage: ReturnType<typeof vi.fn>;
     onInstalled: { addListener: ReturnType<typeof vi.fn> };
+    onStartup: { addListener: ReturnType<typeof vi.fn> };
   };
   action: { onClicked: { addListener: ReturnType<typeof vi.fn> } };
   permissions: {
@@ -50,6 +51,9 @@ interface FakeChrome {
    * première) : Chrome pose alors `runtime.lastError` et rappelle sans résultat. Par rang, parce
    * que l'échec qui compte est celui de la relecture APRÈS une inscription réussie. */
   failReads: Map<number, string>;
+  /** Le navigateur se ferme et se relance : ce qu'il garde des inscriptions dynamiques.
+   * N'appelle AUCUN écouteur — c'est au test de déclencher `runtime.onStartup` s'il le veut. */
+  restartBrowser: () => void;
 }
 
 /** `alreadyRegistered` : ce que le navigateur a GARDÉ d'une version précédente. Un
@@ -98,6 +102,7 @@ function installFakeChrome(
       lastError: null,
       openOptionsPage: vi.fn(),
       onInstalled: { addListener: vi.fn() },
+      onStartup: { addListener: vi.fn() },
     },
     action: { onClicked: { addListener: vi.fn() } },
     permissions: {
@@ -194,6 +199,14 @@ function installFakeChrome(
     store,
     failOn: {},
     failReads: new Map(),
+    // MESURÉ dans Chromium (#118, `spikes/registration-persistence.mjs`, extension installée
+    // comme « Load unpacked ») : au redémarrage, une inscription rapportée à
+    // `persistAcrossSessions: false` disparaît, une inscription à `true` reste. C'est tout ce
+    // que ce faux reproduit d'un redémarrage — un faux qui garderait tout décrirait le monde où
+    // #118 n'existe pas (CLAUDE.md, règle 2).
+    restartBrowser: () => {
+      for (const [id, script] of live) if (!script.persistAcrossSessions) live.delete(id);
+    },
   };
   (globalThis as { chrome?: unknown }).chrome = fake;
   return fake;
@@ -234,6 +247,7 @@ describe('§2, §A.4, §B.4 — UN SEUL script enregistré, sur les hôtes réel
         js: ['content.js'],
         css: ['styles.css'],
         runAt: 'document_idle',
+        persistAcrossSessions: true,
       },
     ]);
   });
@@ -432,8 +446,9 @@ describe('#118 — chaque passe d’inscription est consignée, avec ce que Chro
   });
 
   it('une mise à jour est consignée avec ce que Chrome rapporte ensuite de la persistance', async () => {
-    // Le passage à `false` est celui que Chrome produit (mesuré, voir le faux) : le journal doit
-    // le RAPPORTER tel quel, c'est l'une des deux choses que #118 a besoin de voir.
+    // Le journal RAPPORTE ce que Chrome relit. Sans le champ, une mise à jour le faisait passer à
+    // `false` (mesuré, voir le faux) ; le worker l'écrit désormais à chaque appel, et la relecture
+    // le dit — c'est ce qu'une archive prise sur le terrain montrera après le correctif de #118.
     const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
     await import('../src/background.js');
     await settle();
@@ -445,7 +460,7 @@ describe('#118 — chaque passe d’inscription est consignée, avec ce que Chro
     expect(logOf(fake)[1]).toMatchObject({
       before: { present: true, persist: true },
       calls: [{ op: 'update', ids: [SCRIPT_ID], error: null }],
-      after: { present: true, persist: false },
+      after: { present: true, persist: true },
     });
   });
 
@@ -547,6 +562,79 @@ describe('#118 — chaque passe d’inscription est consignée, avec ce que Chro
     expect(log).toHaveLength(MAX_REGISTRATION_EVENTS);
     // La passe de démarrage, la plus ancienne, est sortie.
     expect(log.every((e) => e.cause === 'host-tags-changed')).toBe(true);
+  });
+});
+
+describe('#118 — l’inscription survit au redémarrage du navigateur', () => {
+  // Le défaut : chaque `updateContentScripts` sans `persistAcrossSessions` faisait passer
+  // l'inscription à `false`, Chrome la jetait au redémarrage, et rien ne redémarrait le worker
+  // avant l'ouverture de la page d'options. Toute page servie était alors sans script de contenu
+  // — ni badge, ni bandeau, ni garde d'envoi (§5.4). Ces tests rejouent la séquence relevée
+  // dans l'archive de l'owner (inscription, changement d'étiquette, redémarrage).
+  const onChangedOf = (fake: FakeChrome) =>
+    fake.storage.onChanged.addListener.mock.calls[0]![0] as (c: Record<string, unknown>, area: string) => void;
+  const registered = (fake: FakeChrome) =>
+    new Promise<{ id: string; persistAcrossSessions?: boolean }[]>((resolve) =>
+      fake.scripting.getRegisteredContentScripts((s?: { id: string; persistAcrossSessions?: boolean }[]) =>
+        resolve(s ?? [])
+      )
+    );
+
+  it('chaque appel d’inscription — register ET update — écrit persistAcrossSessions: true', async () => {
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    await import('../src/background.js');
+    await settle();
+    onChangedOf(fake)({ [HOST_PLATFORMS_KEY]: {} }, 'local');
+    onChangedOf(fake)({}, 'managed');
+    await settle();
+
+    const calls = [
+      ...fake.scripting.registerContentScripts.mock.calls,
+      ...fake.scripting.updateContentScripts.mock.calls,
+    ].map(([scripts]) => scripts as { persistAcrossSessions?: boolean }[]);
+    expect(fake.scripting.updateContentScripts).toHaveBeenCalledTimes(2);
+    expect(calls).toHaveLength(3);
+    for (const scripts of calls) expect(scripts[0]!.persistAcrossSessions).toBe(true);
+  });
+
+  it('inscription, changement d’étiquette, redémarrage : l’inscription est toujours là', async () => {
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    await import('../src/background.js');
+    await settle();
+    onChangedOf(fake)({ [HOST_PLATFORMS_KEY]: {} }, 'local'); // → updateContentScripts
+    await settle();
+
+    fake.restartBrowser();
+
+    expect(await registered(fake)).toEqual([
+      expect.objectContaining({ id: SCRIPT_ID, persistAcrossSessions: true }),
+    ]);
+  });
+
+  it('le lancement du navigateur réveille le worker, et sa passe repose une inscription perdue', async () => {
+    const fake = installFakeChrome(['https://github.com/*'], { 'github.com': 'github' });
+    await import('../src/background.js');
+    await settle();
+
+    // Écouté dès l'évaluation du module : un écouteur ajouté plus tard ne ferait pas démarrer
+    // le worker au lancement, Chrome ne connaissant que ceux de la première évaluation.
+    expect(fake.runtime.onStartup.addListener).toHaveBeenCalledTimes(1);
+
+    // Une inscription perdue pour une raison que ce code ne connaît pas.
+    await new Promise<void>((resolve) =>
+      fake.scripting.unregisterContentScripts({ ids: [SCRIPT_ID] }, () => resolve())
+    );
+    const onStartup = fake.runtime.onStartup.addListener.mock.calls[0]![0] as () => void;
+    onStartup();
+    await settle();
+
+    expect(await registered(fake)).toEqual([expect.objectContaining({ id: SCRIPT_ID })]);
+    const log = fake.store['registrationLog'] as { cause: string; before: unknown; calls: { op: string }[] }[];
+    expect(log.at(-1)).toMatchObject({
+      cause: 'browser-start',
+      before: { present: false, persist: null },
+      calls: [{ op: 'register' }],
+    });
   });
 });
 

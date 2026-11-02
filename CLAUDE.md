@@ -126,6 +126,14 @@ porte une LEÇON, pas pour faire l'inventaire — `package.json` fait foi sur ce
   Le même commentaire y est rendu des DEUX façons — badges dans le paragraphe du sujet, badges
   au-dessus de lui — pour que la géométrie distingue réellement les deux, plutôt que de constater
   qu'une page s'affiche.
+- `npm run check:registration-persistence` — ce qu'un REDÉMARRAGE du navigateur laisse de
+  l'inscription du script de contenu (#118). La valeur par défaut de `persistAcrossSessions`
+  dépend de l'APPEL : `true` à l'inscription, `false` à la mise à jour — et une inscription à
+  `false` disparaît au redémarrage, sans qu'aucun worker ne démarre pour la reposer s'il
+  n'écoute pas `runtime.onStartup`. La première mesure avait conclu à tort, et pour une raison
+  à retenir : une extension chargée par `--load-extension` est RÉINSTALLÉE à chaque lancement,
+  si bien qu'un redémarrage mesuré ainsi mesure le harnais. Un faux de test hérite de la même
+  question — de quel monde parle-t-il ?
 - `npm run smoke:mv3` — l'extension **empaquetée** chargée dans un vrai Chromium,
   qui vérifie les prémisses de l'architecture (le service worker voit bien
   `chrome.permissions`, il publie bien la répartition, la page d'options n'impose
@@ -207,6 +215,7 @@ npm run check:github-theme-vars # variables Primer de styles.css toujours prése
 npm run check:beacon            # un POST no-cors cross-origin part et arrive, sans referer ni cookie
 npm run check:content-script-cors # ce qu'un script de contenu a le droit de LIRE (redirections, cookies)
 npm run check:relay-cors        # la même question pour le service worker du relais
+npm run check:registration-persistence # l'inscription du script survit au redémarrage (#118)
 npm run check:pr-scope          # la PR touche une plateforme OU le partagé (défaut : origin/main...HEAD)
 npm run check:subject-line      # badges et sujet sur UNE seule ligne, mesuré (§5.5)
 npm run check:options-journal   # journal de la page d'options : boutons cliquables, mots entiers, retrait suspendu (§9.4)

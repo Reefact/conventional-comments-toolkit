@@ -114,6 +114,15 @@ jobs:
       - name: Injection — ce qu'un enregistrement dynamique atteint (§A.4)
         run: npm run check:open-tab-injection
 
+      # « L'inscription survit au redémarrage » : un faux `chrome` le dira toujours, et c'est
+      # exactement ce qui a laissé passer #118 — `updateContentScripts` sans
+      # `persistAcrossSessions` le fait passer à `false`, l'inscription disparaît au
+      # redémarrage, et sans écouteur `onStartup` aucun worker ne la repose. L'extension ne
+      # faisait alors plus rien sur github.com, garde d'envoi comprise (§5.4). Ce garde mesure
+      # ces prémisses ET l'extension empaquetée à travers un vrai redémarrage.
+      - name: Inscription — survit au redémarrage du navigateur (#118, §5.4)
+        run: npm run check:registration-persistence
+
       # Une visite guidée est une affirmation de MISE EN PAGE : happy-dom dit de quel élément
       # un nœud est enfant, jamais où il tombe. Les deux défauts de sa première version — la
       # dernière étape hors écran, la fiche débordant sous la fenêtre — étaient exactement de

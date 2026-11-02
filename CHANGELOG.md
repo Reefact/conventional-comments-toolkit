@@ -12,6 +12,12 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Fixed
+
+- **The extension stays active on github.com after the browser restarts.** After a browser restart, the extension did nothing on any page it serves — no badge, no banner, no toolbar and no send guard, so a non-compliant comment was not blocked under `enforce` (§5.4) — until its settings page was opened (#118). Two browser behaviours combined. Updating the content script's registration without saying whether it persists across browser sessions makes Chrome record it as not persistent, and the extension updated it on every host or tag change and every service worker start; Chrome then drops it when it restarts. And Chrome does not start the extension's service worker at launch unless it listens for the browser's start, so nothing registered the script again. The registration now always says it persists, and the service worker now listens for the browser's start and re-applies the registration then; that pass appears in the diagnostic archive's `registrationLog` with the cause `browser-start`. A new browser check, `npm run check:registration-persistence`, measures both behaviours in Chromium and runs the packaged extension through a real browser restart.
+
 ## [1.0.0-beta.20] - 2026-11-01
 
 ### Added
@@ -743,6 +749,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[Unreleased]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.20...HEAD
 [1.0.0-beta.20]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.19...v1.0.0-beta.20
 [1.0.0-beta.19]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.18...v1.0.0-beta.19
 [1.0.0-beta.18]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.17...v1.0.0-beta.18

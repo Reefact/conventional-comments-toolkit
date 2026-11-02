@@ -9,6 +9,7 @@
  * texte. */
 export type RegistrationCause =
   | 'worker-start'
+  | 'browser-start'
   | 'permission-added'
   | 'permission-removed'
   | 'host-tags-changed'

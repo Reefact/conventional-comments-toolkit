@@ -12,7 +12,7 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
-## [Unreleased]
+## [1.0.0-beta.21] - 2026-11-02
 
 ### Fixed
 
@@ -749,7 +749,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
-[Unreleased]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.20...HEAD
+[1.0.0-beta.21]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.20...v1.0.0-beta.21
 [1.0.0-beta.20]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.19...v1.0.0-beta.20
 [1.0.0-beta.19]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.18...v1.0.0-beta.19
 [1.0.0-beta.18]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.17...v1.0.0-beta.18

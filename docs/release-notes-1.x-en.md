@@ -8,6 +8,14 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
 extension installed.
 
+## 1.0.0-beta.21 — November 2, 2026
+
+_The extension no longer goes silent on GitHub after you restart your browser._
+
+### 🐛 Bug fixes
+
+- **The extension stays active after the browser restarts.** After a browser restart, the extension could do nothing at all on GitHub — no badges, no banner, no toolbar, and no blocking even in `enforce` mode — until you opened its settings page. The browser was dropping the extension's script at restart, and nothing set it up again. The script now survives a restart, and the extension also sets it up again as soon as the browser starts. If you had to open the settings page after each restart to get the extension back, you no longer need to. The diagnostic archive now shows that start-up step too.
+
 ## 1.0.0-beta.20 — November 1, 2026
 
 _The diagnostic archive now shows how the extension was activated in your browser, to track down pages where it does nothing at all; two settings fields are easier to read._

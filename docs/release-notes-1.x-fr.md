@@ -8,6 +8,14 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
 navigateur des personnes ayant installé l'extension.
 
+## 1.0.0-beta.21 — 2 novembre 2026
+
+_L'extension ne devient plus muette sur GitHub après un redémarrage du navigateur._
+
+### 🐛 Corrections
+
+- **L'extension reste active après un redémarrage du navigateur.** Après un redémarrage, l'extension pouvait ne plus rien faire du tout sur GitHub — ni badges, ni bandeau, ni barre d'outils, et rien de bloqué même en mode `enforce` — jusqu'à ce que vous ouvriez sa page de réglages. Le navigateur abandonnait le script de l'extension au redémarrage, et rien ne le remettait en place. Le script survit désormais au redémarrage, et l'extension le remet aussi en place dès le lancement du navigateur. Si vous deviez ouvrir la page de réglages après chaque redémarrage pour retrouver l'extension, ce n'est plus nécessaire. L'archive de diagnostic montre désormais aussi cette étape de lancement.
+
 ## 1.0.0-beta.20 — 1er novembre 2026
 
 _L'archive de diagnostic montre désormais comment l'extension s'est activée dans votre navigateur, pour retrouver les pages où elle ne fait rien du tout ; deux champs de la page de réglages se lisent plus facilement._

@@ -1,0 +1,1011 @@
+{
+  "extension": "v1.0.0-beta.21",
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "language": "fr",
+  "degradedState": null,
+  "generatedAt": "2026-11-06T08:22:54.605Z",
+  "entries": [
+    {
+      "at": "2026-11-05T18:18:51.986Z",
+      "candidates": [
+        "textarea[aria-label*=\"omment\"][class*=\"CommentBox\"]",
+        "div[data-testid*=\"comment-composer\"] textarea",
+        "textarea[name=\"comment[body]\"]",
+        "textarea[name=\"pull_request_review_comment[body]\"]",
+        "textarea[name=\"pull_request_review[body]\"]",
+        "textarea.js-comment-field",
+        "textarea[aria-label=\"Markdown value\"]",
+        "textarea[placeholder=\"Leave a comment\"]",
+        "textarea[class*=\"prc-Textarea-TextArea\"]"
+      ],
+      "chain": "editors",
+      "count": 8,
+      "evidence": {
+        "facts": {
+          "prState": "absent",
+          "release": "db139f0bf57b"
+        },
+        "msSinceVisit": 14,
+        "trace": [
+          {
+            "candidate": "textarea[aria-label*=\"omment\"][class*=\"CommentBox\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "div[data-testid*=\"comment-composer\"] textarea",
+            "steps": [
+              0,
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[name=\"comment[body]\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[name=\"pull_request_review_comment[body]\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[name=\"pull_request_review[body]\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea.js-comment-field",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[aria-label=\"Markdown value\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[placeholder=\"Leave a comment\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "textarea[class*=\"prc-Textarea-TextArea\"]",
+            "steps": [
+              0
+            ]
+          }
+        ],
+        "unmatched": [
+          {
+            "ancestors": [
+              "text-expander",
+              "form[action=\"/users/Reefact\"]",
+              "waiting-form"
+            ],
+            "attrs": {
+              "aria-label": "Add a bio",
+              "class": "form-control js-length-limited-input mb-1 width-full js-user-profile-bio-edit",
+              "id": "user_profile_bio",
+              "name": "user[profile_bio]",
+              "placeholder": "Add a bio"
+            },
+            "tag": "textarea"
+          }
+        ]
+      },
+      "firstAt": "2026-11-02T06:52:32.301Z",
+      "platform": "github",
+      "problem": "editor-field",
+      "skeleton": "mw3vdas1-vasmnz",
+      "url": "https://github.com/Reefact",
+      "urls": [
+        "https://github.com/Reefact"
+      ]
+    },
+    {
+      "at": "2026-11-05T20:16:19.714Z",
+      "candidates": [
+        "[data-testid=\"comment-body\"]",
+        ".comment-body",
+        "[class*=\"ReviewThreadComment-module__SafeHTMLBox\"]",
+        "[class*=\"SafeHTMLBox__\"]"
+      ],
+      "chain": "comment-body",
+      "count": 1,
+      "evidence": {
+        "facts": {
+          "prState": "pullOpened",
+          "release": "5f0df4009b0e"
+        },
+        "msSinceVisit": 27305,
+        "subject": {
+          "ancestors": [
+            "turbo-frame[id=\"review-thread-or-comment-id-#\"]",
+            "div[id=\"pullrequestreview-#\"]",
+            "rails-partial",
+            "div[data-component=\"SplitPageLayout.Content\"]"
+          ],
+          "attrs": {
+            "class": "review-thread-component js-comment-container js-resolvable-timeline-thread-conta"
+          },
+          "tag": "review-thread-collapsible"
+        },
+        "trace": [
+          {
+            "candidate": "[data-testid=\"comment-body\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": ".comment-body",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "[class*=\"ReviewThreadComment-module__SafeHTMLBox\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "[class*=\"SafeHTMLBox__\"]",
+            "steps": [
+              0
+            ]
+          }
+        ]
+      },
+      "firstAt": "2026-11-05T20:16:19.714Z",
+      "platform": "github",
+      "problem": "comment-text",
+      "skeleton": "mw3zkcu3-qj65sy",
+      "url": "https://github.com/Reefact/just-dummies/pull/535",
+      "urls": [
+        "https://github.com/Reefact/just-dummies/pull/535"
+      ]
+    },
+    {
+      "at": "2026-11-05T20:16:19.715Z",
+      "candidates": [
+        "[data-testid=\"comment-author\"]",
+        ".author",
+        "[data-testid=\"avatar-link\"]"
+      ],
+      "chain": "comment-author",
+      "count": 1,
+      "evidence": {
+        "facts": {
+          "prState": "pullOpened",
+          "release": "5f0df4009b0e"
+        },
+        "msSinceVisit": 27313,
+        "subject": {
+          "ancestors": [
+            "turbo-frame[id=\"review-thread-or-comment-id-#\"]",
+            "div[id=\"pullrequestreview-#\"]",
+            "rails-partial",
+            "div[data-component=\"SplitPageLayout.Content\"]"
+          ],
+          "attrs": {
+            "class": "review-thread-component js-comment-container js-resolvable-timeline-thread-conta"
+          },
+          "tag": "review-thread-collapsible"
+        },
+        "trace": [
+          {
+            "candidate": "[data-testid=\"comment-author\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": ".author",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "[data-testid=\"avatar-link\"]",
+            "steps": [
+              0
+            ]
+          }
+        ]
+      },
+      "firstAt": "2026-11-05T20:16:19.715Z",
+      "platform": "github",
+      "problem": "comment-writer",
+      "skeleton": "mw3zkcu3-qj65sy",
+      "url": "https://github.com/Reefact/just-dummies/pull/535",
+      "urls": [
+        "https://github.com/Reefact/just-dummies/pull/535"
+      ]
+    },
+    {
+      "at": "2026-11-06T08:21:21.007Z",
+      "candidates": [
+        "[data-testid=\"mergebox-partial\"] [data-component=\"ButtonGroup\"] button[data-variant=\"primary\"]",
+        "[data-testid=\"mergebox-partial\"] button.btn-primary",
+        "button[data-testid*=\"merge-button\"]",
+        ".merge-message button.btn-group-merge",
+        "button.js-merge-commit-button"
+      ],
+      "chain": "merge-button",
+      "count": 24,
+      "evidence": {
+        "facts": {
+          "prState": "pullOpened",
+          "release": "9c9a37e2423e"
+        },
+        "msSinceVisit": 1,
+        "trace": [
+          {
+            "candidate": "[data-testid=\"mergebox-partial\"] [data-component=\"ButtonGroup\"] button[data-variant=\"primary\"]",
+            "steps": [
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "candidate": "[data-testid=\"mergebox-partial\"] button.btn-primary",
+            "steps": [
+              0,
+              0
+            ]
+          },
+          {
+            "candidate": "button[data-testid*=\"merge-button\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": ".merge-message button.btn-group-merge",
+            "steps": [
+              0,
+              0
+            ]
+          },
+          {
+            "candidate": "button.js-merge-commit-button",
+            "steps": [
+              0
+            ]
+          }
+        ]
+      },
+      "firstAt": "2026-11-02T06:39:20.619Z",
+      "lastRecoveredAfterMs": 1223,
+      "platform": "github",
+      "problem": "completion-control",
+      "recoveredVisits": 11,
+      "skeleton": "mw4pgqnh-weqhbv",
+      "url": "https://github.com/Reefact/just-dummies/pull/537",
+      "urls": [
+        "https://github.com/Reefact/just-dummies/pull/536?overview=true",
+        "https://github.com/Reefact/just-dummies/pull/536?overview=false",
+        "https://github.com/Reefact/just-dummies/pull/537?overview=true",
+        "https://github.com/Reefact/just-dummies/pull/537?overview=false",
+        "https://github.com/Reefact/just-dummies/pull/537"
+      ]
+    }
+  ],
+  "registrationLog": [
+    {
+      "after": {
+        "persist": null,
+        "present": false
+      },
+      "at": "2026-11-02T06:34:16.670Z",
+      "before": {
+        "persist": null,
+        "present": false
+      },
+      "calls": [],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": []
+    },
+    {
+      "after": {
+        "persist": null,
+        "present": false
+      },
+      "at": "2026-11-02T06:34:21.607Z",
+      "before": {
+        "persist": null,
+        "present": false
+      },
+      "calls": [],
+      "cause": "permission-added",
+      "injectedTabs": 0,
+      "matches": []
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-02T06:34:21.640Z",
+      "before": {
+        "persist": null,
+        "present": false
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "register"
+        }
+      ],
+      "cause": "host-tags-changed",
+      "injectedTabs": 1,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-02T06:40:18.657Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-02T06:40:18.674Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "browser-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-02T06:48:01.195Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-02T06:50:13.265Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-02T06:52:32.591Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-02T07:04:06.227Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-02T07:04:53.046Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-02T07:04:53.058Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "browser-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-04T19:05:59.641Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-04T19:12:37.407Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T17:11:11.466Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T17:11:11.476Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "browser-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T17:15:08.674Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T17:29:40.246Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T18:12:35.899Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T18:18:52.098Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T18:40:25.467Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T18:45:19.873Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T19:28:46.608Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T20:06:25.526Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T20:15:52.608Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T21:47:15.934Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T21:48:41.768Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-05T21:56:48.484Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-06T08:13:56.699Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-06T08:20:33.656Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    }
+  ]
+}

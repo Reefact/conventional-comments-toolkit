@@ -61,6 +61,41 @@ rapporte ») s'appliquent entières. En pratique :
 3. Lister ce qui n'est PAS mesuré : les états de la page qu'aucune capture ne montre, et les
    captures qui trancheraient.
 
+### Sur quelle vue la ligne a-t-elle été relevée ? (GitHub)
+
+Depuis le 2026-11-05, la page de conversation d'une PR GitHub existe en DEUX vues : la classique,
+et la **page Overview**, en préversion publique sur inscription (bouton « ✨ Try the Overview
+page » de l'en-tête ; le même menu ramène à la vue classique). GitHub l'a annoncée comme « a
+starting point, not the finished pull request experience » : elle bougera encore. Sources :
+<https://github.blog/changelog/2026-11-05-new-pull-request-overview-page-in-public-preview> et
+<https://github.com/orgs/community/discussions/212186>. Une même chaîne peut donc échouer pour
+deux raisons sans rapport selon la vue : **la vue fait partie de la cause** (§5), et deux
+rapports d'une même chaîne sur deux vues ne sont pas de même cause tant que rien ne le montre.
+
+Ce que les données permettent d'en dire, et ce qu'elles ne permettent pas :
+
+| Source | Ce qu'elle dit de la vue |
+|---|---|
+| `url` / `urls` de `report.json` | Stockées BRUTES, requête comprise. `?overview=true` → Overview ; `?overview=false` → classique. Sans le paramètre : **inconnue** — GitHub sert alors la vue choisie par le compte. |
+| `at` / `firstAt` | Un relevé antérieur au 2026-11-05 précède la préversion publique. |
+| `facts.release` | Un déploiement de github.com, pas la préférence d'un compte. Qu'il soit le même pour les deux vues est probable, **non mesuré** : ne rien en tirer. |
+| Marque de page (page d'options) | **Ne distingue PAS les deux vues.** `pageKey()` ne garde que les paramètres déclarés dans `viewParams`, et la fiche GitHub (`packages/adapters/github/src/descriptor.ts`) n'en déclare aucun : `?overview=true` et `?overview=false` y portent la même marque. Lire `report.json`, jamais la colonne des marques, tant que la fiche n'a pas changé. |
+| Squelette | Il distinguerait les deux vues (tout l'arbre, `data-testid` et `data-component` compris), mais **aucun marqueur n'est mesuré** : aucune capture de la vue Overview dans `test/fixtures/pages/` au 2026-11-06. N'en inventer aucun. Le libellé du bouton « Try the Overview page » n'y figure pas (aucun texte dans un squelette). |
+
+Le paramètre `overview` et son effet viennent du propriétaire (2026-11-06, sur
+`Reefact/just-dummies` PR 537 : `?overview=false`, `?overview=true`, et l'adresse nue qui
+valait `true` chez lui). Ils n'ont pas été mesurés depuis une session de l'agent : github.com
+n'y est pas joignable, et une visite anonyme ne verrait pas une préférence de compte.
+
+Dans l'issue, la vue s'écrit telle qu'elle est SUE : `overview=true`, `overview=false`, ou
+`unknown (no overview parameter)` — jamais une vue déduite d'une trace ou d'une zone qui
+échoue. Les zones que l'annonce dit modifiées (zone de fusion déplacée en haut et réduite,
+donc la chaîne `merge-button` et le grisage du §6.5 ; liste des commentaires filtrable et
+triable) sont des endroits où REGARDER, pas des causes à écrire.
+
+Quand une capture de la vue Overview existera (skill `plateforme`), ce paragraphe se met à jour
+avec le marqueur mesuré, et la colonne « Squelette » cesse d'être vide.
+
 **Ce skill ne touche pas au code.** Pas de correctif, pas de test, pas de sélecteur modifié :
 une piste de correction s'écrit dans l'issue, en une ligne, comme une piste. Corriger, c'est le
 lot (§6). Seule exception : ce que l'utilisateur demande explicitement.
@@ -104,12 +139,13 @@ l'interface web. La branche est donc le support.
 ## 5. L'issue
 
 D'abord chercher une issue `diagnostic` de MÊME CAUSE (même chaîne, même étape de trace, même
-différence de structure). Si elle existe : un commentaire dessus, avec le nouveau rapport — on
+différence de structure, même vue quand elle est connue — §2). Si elle existe : un commentaire dessus, avec le nouveau rapport — on
 compte les causes, pas les rapports. Sinon une issue, en anglais, label `diagnostic`, créée
 directement (l'utilisateur l'a demandé ; donner le lien ensuite) :
 
 - **Titre** : `<chain>: <symptôme, état de la page> (v<version>)`.
-- **Report** : date, version, navigateur, langue, URL de la page, `release`, résumé de la ligne
+- **Report** : date, version, navigateur, langue, URL de la page, vue (GitHub : §2, « Sur quelle
+  vue »), `release`, résumé de la ligne
   du journal ; le nom de la branche, et des liens vers le `.zip` et chacun de ses fichiers en
   **permalien sur le SHA du commit**. Écrire ces liens en texte simple : un lien dont le
   libellé est entre accents graves est arrivé abîmé sur #113 ;

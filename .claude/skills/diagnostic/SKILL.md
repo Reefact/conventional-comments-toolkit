@@ -76,9 +76,10 @@ Ce que les données permettent d'en dire, et ce qu'elles ne permettent pas :
 
 | Source | Ce qu'elle dit de la vue |
 |---|---|
-| `url` / `urls` de `report.json` | Stockées BRUTES, requête comprise. `?overview=true` → Overview ; `?overview=false` → classique. Sans le paramètre : **inconnue** — GitHub sert alors la vue choisie par le compte. |
+| `url` de `report.json` | La SEULE adresse du dernier relevé — celui dont viennent `evidence` et `skeleton` (`mergeJournalEntry()`, `packages/extension/src/journal-entry.ts`, les remplace tous trois à chaque relevé). Stockée BRUTE, requête comprise : `?overview=true` → Overview ; `?overview=false` → classique ; sans le paramètre, **inconnue** — GitHub sert alors la vue choisie par le compte. |
+| `urls` de `report.json` | Un HISTORIQUE : jusqu'à cinq adresses distinctes, de visites différentes. Il dit sur quelles vues la ligne a été relevée au fil du temps, **jamais** la vue du dernier relevé : ne pas rattacher `evidence` ni `skeleton` à une vue vue seulement dans `urls`. Historique mêlé : écrire que les visites couvrent les deux vues, et garder la vue du dernier relevé telle que `url` la donne (`unknown` sans le paramètre). |
 | `at` / `firstAt` | Un relevé antérieur au 2026-11-05 précède la préversion publique. |
-| `facts.release` | Un déploiement de github.com, pas la préférence d'un compte. Qu'il soit le même pour les deux vues est probable, **non mesuré** : ne rien en tirer. |
+| `facts.release` | Un déploiement de github.com, pas la préférence d'un compte. Même valeur observée sur les deux vues : `9c9a37e2423e` sur le squelette Overview et les deux squelettes classiques de #127 (même compte, même PR, à neuf minutes d'écart). Trois échantillons, pas une règle — et de toute façon pas un discriminant de vue : ne rien en tirer. |
 | Marque de page (page d'options) | **Ne distingue PAS les deux vues.** `pageKey()` ne garde que les paramètres déclarés dans `viewParams`, et la fiche GitHub (`packages/adapters/github/src/descriptor.ts`) n'en déclare aucun : `?overview=true` et `?overview=false` y portent la même marque. Lire `report.json`, jamais la colonne des marques, tant que la fiche n'a pas changé. |
 | Squelette | Premiers marqueurs relevés le 2026-11-06 (#127) : `aria-label="Preview: Overview preview options"`, `aria-label="Merge status"`, `data-testid="mini-status"`, `id="overview-comments"`, `id="overview-status-and-details"`, `data-testid="sticky-sidebar"` — présents sur le squelette Overview, absents des six squelettes de PR antérieurs ; à l'inverse, ni `mergebox-partial`, ni `rails-partial`, ni `js-discussion…`. Vue classique d'un compte INSCRIT, mesurée le même jour (deux squelettes `?overview=false`, commentaire sur #127) : aucun de ces marqueurs, et le bouton de préversion de l'en-tête y porte `aria-label="Try the Overview page"` — contre `aria-label="Preview: Overview preview options"` sur l'Overview. **Cette paire est le marqueur le plus direct**, mais sur un seul compte, une seule PR, et un seul échantillon Overview encore en chargement. Non mesuré : l'en-tête d'un compte jamais inscrit. Citer des comptes, pas une règle. Aucune capture Overview dans `test/fixtures/pages/`. Aucun texte dans un squelette : pas de libellé de bouton. |
 
@@ -87,14 +88,16 @@ Le paramètre `overview` et son effet viennent du propriétaire (2026-11-06, sur
 valait `true` chez lui). Ils n'ont pas été mesurés depuis une session de l'agent : github.com
 n'y est pas joignable, et une visite anonyme ne verrait pas une préférence de compte.
 
-Dans l'issue, la vue s'écrit telle qu'elle est SUE : `overview=true`, `overview=false`, ou
-`unknown (no overview parameter)` — jamais une vue déduite d'une trace ou d'une zone qui
-échoue. Les zones que l'annonce dit modifiées (zone de fusion déplacée en haut et réduite,
+Dans l'issue, la vue du dernier relevé s'écrit telle que `url` la donne : `overview=true`,
+`overview=false`, ou `unknown (no overview parameter)` — jamais une vue déduite d'une trace ou
+d'une zone qui échoue. Les marqueurs du squelette s'écrivent À PART, nommés comme tels
+(« the skeleton carries the Overview markers »), sans remplacer la vue de l'URL. Les zones que l'annonce dit modifiées (zone de fusion déplacée en haut et réduite,
 donc la chaîne `merge-button` et le grisage du §6.5 ; liste des commentaires filtrable et
 triable) sont des endroits où REGARDER, pas des causes à écrire.
 
-Quand une capture de la vue Overview existera (skill `plateforme`), ce paragraphe se met à jour
-avec le marqueur mesuré, et la colonne « Squelette » cesse d'être vide.
+Ce qui manque est une capture de la page Overview CHARGÉE dans `test/fixtures/pages/` (skill
+`plateforme`). Quand elle existera, y compter les marqueurs de la ligne « Squelette » ci-dessus,
+et mettre la ligne à jour avec ce que la page chargée confirme, infirme ou ajoute.
 
 **Ce skill ne touche pas au code.** Pas de correctif, pas de test, pas de sélecteur modifié :
 une piste de correction s'écrit dans l'issue, en une ligne, comme une piste. Corriger, c'est le

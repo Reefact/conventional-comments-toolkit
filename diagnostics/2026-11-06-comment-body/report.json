@@ -1,0 +1,285 @@
+{
+  "extension": "v1.0.0-beta.21",
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "language": "fr",
+  "degradedState": null,
+  "generatedAt": "2026-11-06T08:31:46.639Z",
+  "entries": [
+    {
+      "at": "2026-11-06T08:25:19.539Z",
+      "candidates": [
+        "[data-testid=\"comment-body\"]",
+        ".comment-body",
+        "[class*=\"ReviewThreadComment-module__SafeHTMLBox\"]",
+        "[class*=\"SafeHTMLBox__\"]"
+      ],
+      "chain": "comment-body",
+      "count": 1,
+      "evidence": {
+        "facts": {
+          "prState": "pullOpened",
+          "release": "9c9a37e2423e"
+        },
+        "msSinceVisit": 4976,
+        "subject": {
+          "ancestors": [
+            "turbo-frame[id=\"review-thread-or-comment-id-#\"]",
+            "div[id=\"pullrequestreview-#\"]",
+            "rails-partial",
+            "div[data-component=\"SplitPageLayout.Content\"]"
+          ],
+          "attrs": {
+            "class": "review-thread-component js-comment-container js-resolvable-timeline-thread-conta"
+          },
+          "tag": "review-thread-collapsible"
+        },
+        "trace": [
+          {
+            "candidate": "[data-testid=\"comment-body\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": ".comment-body",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "[class*=\"ReviewThreadComment-module__SafeHTMLBox\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "[class*=\"SafeHTMLBox__\"]",
+            "steps": [
+              0
+            ]
+          }
+        ]
+      },
+      "firstAt": "2026-11-06T08:25:19.539Z",
+      "platform": "github",
+      "problem": "comment-text",
+      "skeleton": "mw4plup8-r6nzvk",
+      "url": "https://github.com/Reefact/just-dummies/pull/537?overview=false",
+      "urls": [
+        "https://github.com/Reefact/just-dummies/pull/537?overview=false"
+      ]
+    },
+    {
+      "at": "2026-11-06T08:25:19.539Z",
+      "candidates": [
+        "[data-testid=\"comment-author\"]",
+        ".author",
+        "[data-testid=\"avatar-link\"]"
+      ],
+      "chain": "comment-author",
+      "count": 1,
+      "evidence": {
+        "facts": {
+          "prState": "pullOpened",
+          "release": "9c9a37e2423e"
+        },
+        "msSinceVisit": 4983,
+        "subject": {
+          "ancestors": [
+            "turbo-frame[id=\"review-thread-or-comment-id-#\"]",
+            "div[id=\"pullrequestreview-#\"]",
+            "rails-partial",
+            "div[data-component=\"SplitPageLayout.Content\"]"
+          ],
+          "attrs": {
+            "class": "review-thread-component js-comment-container js-resolvable-timeline-thread-conta"
+          },
+          "tag": "review-thread-collapsible"
+        },
+        "trace": [
+          {
+            "candidate": "[data-testid=\"comment-author\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": ".author",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": "[data-testid=\"avatar-link\"]",
+            "steps": [
+              0
+            ]
+          }
+        ]
+      },
+      "firstAt": "2026-11-06T08:25:19.539Z",
+      "platform": "github",
+      "problem": "comment-writer",
+      "skeleton": "mw4plup8-r6nzvk",
+      "url": "https://github.com/Reefact/just-dummies/pull/537?overview=false",
+      "urls": [
+        "https://github.com/Reefact/just-dummies/pull/537?overview=false"
+      ]
+    },
+    {
+      "at": "2026-11-06T08:29:12.898Z",
+      "candidates": [
+        "[data-testid=\"mergebox-partial\"] [data-component=\"ButtonGroup\"] button[data-variant=\"primary\"]",
+        "[data-testid=\"mergebox-partial\"] button.btn-primary",
+        "button[data-testid*=\"merge-button\"]",
+        ".merge-message button.btn-group-merge",
+        "button.js-merge-commit-button"
+      ],
+      "chain": "merge-button",
+      "count": 2,
+      "evidence": {
+        "anchor": {
+          "ancestors": [
+            "div[data-component=\"SplitPageLayout.Content\"]",
+            "div[data-component=\"SplitPageLayout\"]",
+            "div[data-component=\"SplitPageLayout\"]",
+            "div[id=\"diff-comparison-viewer-container\"]"
+          ],
+          "attrs": {
+            "class": "tmp-ml-md-6 tmp-pl-md-3 tmp-my-3",
+            "data-testid": "mergebox-partial"
+          },
+          "tag": "div"
+        },
+        "facts": {
+          "prState": "pullOpened",
+          "release": "9c9a37e2423e"
+        },
+        "msSinceVisit": 2,
+        "trace": [
+          {
+            "candidate": "[data-testid=\"mergebox-partial\"] [data-component=\"ButtonGroup\"] button[data-variant=\"primary\"]",
+            "steps": [
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "candidate": "[data-testid=\"mergebox-partial\"] button.btn-primary",
+            "steps": [
+              1,
+              0
+            ]
+          },
+          {
+            "candidate": "button[data-testid*=\"merge-button\"]",
+            "steps": [
+              0
+            ]
+          },
+          {
+            "candidate": ".merge-message button.btn-group-merge",
+            "steps": [
+              0,
+              0
+            ]
+          },
+          {
+            "candidate": "button.js-merge-commit-button",
+            "steps": [
+              0
+            ]
+          }
+        ]
+      },
+      "firstAt": "2026-11-06T08:25:14.561Z",
+      "lastRecoveredAfterMs": 1141,
+      "platform": "github",
+      "problem": "completion-control",
+      "recoveredVisits": 1,
+      "skeleton": "mw4pquri-qp2p6y",
+      "url": "https://github.com/Reefact/just-dummies/pull/537?overview=false",
+      "urls": [
+        "https://github.com/Reefact/just-dummies/pull/537?overview=false"
+      ]
+    }
+  ],
+  "registrationLog": [
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-06T08:22:56.703Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-06T08:25:14.675Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    },
+    {
+      "after": {
+        "persist": true,
+        "present": true
+      },
+      "at": "2026-11-06T08:29:13.013Z",
+      "before": {
+        "persist": true,
+        "present": true
+      },
+      "calls": [
+        {
+          "error": null,
+          "ids": [
+            "cct-hosts"
+          ],
+          "op": "update"
+        }
+      ],
+      "cause": "worker-start",
+      "injectedTabs": 0,
+      "matches": [
+        "https://github.com/*"
+      ]
+    }
+  ]
+}

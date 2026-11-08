@@ -130,6 +130,16 @@ export const selectors = {
     candidates: ['[data-discussion-resolved="true"]'],
   } satisfies SelectorChain,
 
+  /** Marque d'un fil OUVERT — résoluble et non résolu, sur le conteneur du fil. MESURÉ : tous les
+   * fils non résolus des captures portent `data-discussion-resolvable="true"` sans
+   * `data-discussion-resolved`, dans l'Overview comme en Rapid Diffs (03, 03-changes, 05, 06…) ;
+   * le seul fil résolu porte les deux (03-overview-fil-resolu). Sans cette marque, un fil ouvert
+   * et un fil dont l'état n'est pas rendu se confondraient (`unknown`). */
+  threadUnresolved: {
+    name: 'thread-unresolved',
+    candidates: ['[data-discussion-resolvable="true"]:not([data-discussion-resolved="true"])'],
+  } satisfies SelectorChain,
+
   /** Auteur de la RÉSOLUTION d'un fil résolu (§6.1, `resolvedBy`). MESURÉ : dans l'en-tête replié,
    * « Resolved just now by Sylvain AURAT », suivi d'un lien `a.js-user-link[href="/<username>"]` —
    * SANS `data-username`, le nom se lit sur le chemin (03-overview-fil-resolu). Absent de tout fil
@@ -277,9 +287,21 @@ export const selectors = {
     candidates: ['.detail-page-description > time[datetime]'],
   } satisfies SelectorChain,
 
-  /** Contrôle de complétion — le bouton de fusion (§6.5, §9.4). MESURÉ : présent sur une merge
-   * request ouverte (01, 01-…-mr2), absent sur une merge request fermée (08) : son absence y est
-   * la NORME, pas une rupture de sélecteur. */
+  /** Merge request ARRÊTÉE — l'absence du bouton de fusion y est la norme (§9.4). MESURÉ :
+   * `[data-testid="reopen-merge-request"]` sur la merge request fermée (08), absent de toutes les
+   * captures d'une merge request ouverte. Une merge request FUSIONNÉE n'est pas capturée (§C.6) :
+   * aucun candidat ne la décrit, et sur elle l'absence du bouton sera journalisée — une ligne de
+   * trop, jamais un blocage de trop. Aucun candidat sur le libellé localisé de l'état. */
+  prSettledState: {
+    name: 'pr-settled-state',
+    candidates: ['[data-testid="reopen-merge-request"]'],
+  } satisfies SelectorChain,
+
+  /** Contrôle de complétion — le bouton de fusion (§6.5, §9.4). MESURÉ : présent dans l'Overview
+   * d'une merge request ouverte (01, 01-…-mr2) ; absent sur une merge request fermée (08) ; et
+   * absent de TOUTES les captures de l'onglet Changes (`…/diffs`), dans les deux vues (03- à
+   * 06-changes) — le widget de fusion n'y est pas rendu. Dans ces deux cas, son absence est la
+   * NORME, pas une rupture de sélecteur. */
   mergeButton: {
     name: 'merge-button',
     problem: 'completion-control',

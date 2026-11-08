@@ -4,6 +4,7 @@
 // identité des éléments avant/après, point fixe — se mesure à chaque `reduce-captured-pages`.
 import { describe, expect, it } from 'vitest';
 import {
+  describeMismatch,
   reducePage,
   rulesFor,
   serializeReduced,
@@ -166,6 +167,25 @@ describe('réduction des pages capturées — ce qui survit', () => {
       reduced('<body><a href="/p?q=1">x</a><div data-u="/a/b?c=d" style="x"><svg><path/></svg></div>\n</body>')
     );
     expect(serializeReduced(reduced(once))).toBe(once);
+  });
+});
+
+describe('écart avant/après — ce que l’outil en imprime', () => {
+  const secret = '/p?token=SECRET-VALUE';
+  const describeIt = (before: unknown, after: unknown) =>
+    describeMismatch({ key: 'threadAnchor', candidate: 'a[href]', before, after });
+
+  it('nomme l’attribut qui diffère, jamais sa valeur — ni brute, ni réduite', () => {
+    // Revue Reefact, PR #133 : la première version imprimait les deux valeurs, jeton compris.
+    const text = describeIt([['12', { href: secret, datetime: null }]], [['12', { href: '/p', datetime: null }]]);
+    expect(text).toBe("threadAnchor \"a[href]\" : mêmes éléments, mais l'élément n° 12 n'a plus la même valeur pour href");
+    expect(text).not.toContain('SECRET');
+    expect(text).not.toContain('/p');
+  });
+
+  it('compte les éléments perdus ou en plus, sans rien en citer', () => {
+    const text = describeIt([['1', { href: secret }], ['2', { href: secret }]], [['1', { href: secret }]]);
+    expect(text).toBe('threadAnchor "a[href]" : brut 2 élément(s), réduit 1 — 1 perdu(s), 0 en plus');
   });
 });
 

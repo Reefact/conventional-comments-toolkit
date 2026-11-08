@@ -236,6 +236,29 @@ const SVG_ONLY = [
   'clippath', 'mask', 'lineargradient', 'radialgradient', 'stop', 'tspan', 'foreignobject',
 ];
 
+/** L'écart d'un candidat, dit SANS AUCUNE VALEUR d'attribut : le sélecteur, le repère de
+ * l'élément, et les NOMS des attributs qui diffèrent. Une valeur brute est précisément ce que la
+ * réduction retire — `href="/p?token=…"` —, et l'imprimer le publierait dans le terminal, un
+ * journal de CI ou un message recopié (revue Reefact, PR #133 : la première version affichait
+ * les deux valeurs). Chaque élément trouvé est `[repère, { attribut: valeur }]`, ou le candidat
+ * vaut le texte d'erreur du moteur. */
+export function describeMismatch({ key, candidate, before, after }) {
+  const head = `${key} ${JSON.stringify(candidate)}`;
+  if (!Array.isArray(before) || !Array.isArray(after)) {
+    return `${head} : le moteur refuse le sélecteur ${Array.isArray(before) ? 'après' : 'avant'} la réduction`;
+  }
+  const marks = (list) => list.map(([mark]) => mark);
+  if (JSON.stringify(marks(before)) !== JSON.stringify(marks(after))) {
+    const lost = marks(before).filter((m) => !marks(after).includes(m)).length;
+    const added = marks(after).filter((m) => !marks(before).includes(m)).length;
+    return `${head} : brut ${before.length} élément(s), réduit ${after.length} — ${lost} perdu(s), ${added} en plus`;
+  }
+  const at = before.findIndex(([, values], i) => JSON.stringify(values) !== JSON.stringify(after[i][1]));
+  const [mark, values] = before[at];
+  const names = Object.keys(values).filter((name) => values[name] !== after[at][1][name]);
+  return `${head} : mêmes éléments, mais l'élément n° ${mark} n'a plus la même valeur pour ${names.join(', ')}`;
+}
+
 /** Ce qu'un sélecteur cite et que la réduction ne garde pas : la liste des raisons, vide quand
  * il ne cite que ce qui survit. Lecture TEXTUELLE du sélecteur — ce qu'on peut savoir sans la
  * page : un nom d'attribut ou d'élément. Une valeur retirée parce qu'opaque ne s'y voit pas. */

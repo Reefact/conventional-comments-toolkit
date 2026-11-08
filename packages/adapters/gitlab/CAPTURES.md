@@ -184,3 +184,12 @@ and their variants) contain Rapid Diffs markup: `<diff-file>` elements and `rd-d
 (`rd-diff-file`, `rd-discussion-row`, `rd-diff-line-discussions-list`). Whether Rapid Diffs is
 this account's default, gitlab.com's default, or was switched on earlier is not measured; the
 classic view is not captured. Open: capture the classic view too, or state it as not measured.
+
+The "Rapid Diffs" dropdown holds three entries: "Learn more", "Leave feedback", and the
+`button` "Switch to classic loading" (opened and closed without choosing, 2026-11-08). The
+"Learn more" page (GitLab docs, "Changes in merge requests", read 2026-11-08) says Rapid Diffs
+"is on by default on the merge request Changes tab", is in beta with some classic features
+missing, and that after switching to classic loading "your preference persists across sessions"
+— without saying whether the preference belongs to the account or to the browser. Per the docs,
+then, Rapid Diffs is what a user sees unless they opted out; the classic view is what a user who
+opted out sees.

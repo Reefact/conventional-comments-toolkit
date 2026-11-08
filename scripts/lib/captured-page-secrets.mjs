@@ -82,6 +82,23 @@ export function findCapturedPageSecrets(html) {
   return found;
 }
 
+/** La SOURCE d'une expression qui vaut `findCapturedPageSecrets`, autonome : la fonction et tout ce
+ * qu'elle lit — listes, expressions, `MASK`, `esc` — recopiés tels quels. Le script de réduction
+ * dans le navigateur l'embarque pour refuser, AVANT de télécharger, ce que la ligne de commande
+ * refuse (revue Codex, PR #135) : une seule détection, pas deux qui divergeraient. */
+export function secretFinderSource() {
+  const literal = (re) => re.toString();
+  return `(() => {
+  const MASK = ${JSON.stringify(MASK)};
+  const SECRET_ATTRIBUTES = ${JSON.stringify(SECRET_ATTRIBUTES)};
+  const SECRET_INPUTS = [${SECRET_INPUTS.map(literal).join(', ')}];
+  const SECRET_METAS = ${JSON.stringify(SECRET_METAS)};
+  const SECRET_TEXT = [${SECRET_TEXT.map(literal).join(', ')}];
+  const esc = ${esc.toString()};
+  return ${findCapturedPageSecrets.toString()};
+})()`;
+}
+
 /** La page, secrets remplacés par `REDACTED`. Idempotente : une page déjà masquée revient
  * identique. */
 export function redactCapturedPage(html) {

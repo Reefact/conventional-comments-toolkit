@@ -26,6 +26,8 @@
 // Ce que la réduction NE fait PAS : retirer le contenu privé. Le texte des commentaires et le
 // code restent — la PR de test doit toujours être sans contenu privé.
 
+import { secretFinderSource } from './captured-page-secrets.mjs';
+
 /** Les règles communes à toutes les plateformes. Les expressions sont des SOURCES, pas des
  * `RegExp` : les règles traversent `page.evaluate`, qui ne transporte que du JSON. */
 export const BASE_RULES = {
@@ -277,9 +279,10 @@ export function reduceAndVerify({ html, rules, candidates, reads, mark, reduce, 
 }
 
 /** Le script à exécuter DANS une page ouverte (`javascript_tool` de Claude in Chrome) : il réduit
- * la page affichée, prouve la réduction, et TÉLÉCHARGE la seule forme réduite sous `file`. Il ne
- * rend qu'un résumé — jamais de HTML : la page brute ne touche ni le disque, ni la conversation.
- * Une page qui échoue n'est pas téléchargée.
+ * la page affichée, prouve la réduction, refuse un secret connu, et TÉLÉCHARGE la seule forme
+ * réduite sous `file`. Il ne rend qu'un résumé fait de ce qu'il sait déjà ou mesure — aucun
+ * texte de la page : la page brute ne touche ni le disque, ni la conversation. Une page qui
+ * échoue n'est pas téléchargée.
  *
  * Le script ne contient que des sources de fonctions et des données JSON : pas d'`eval`, pas de
  * `new Function`, qu'une politique de sécurité de la page pourrait refuser. */
@@ -291,16 +294,22 @@ export function buildPageReducer({ rules, candidates, reads, file }) {
   const reductionMismatches = ${reductionMismatches.toString()};
   const describeMismatch = ${describeMismatch.toString()};
   const reduceAndVerify = ${reduceAndVerify.toString()};
+  const findCapturedPageSecrets = ${secretFinderSource()};
   const { rules, candidates, reads, file, mark } = ${args};
   // Sous Trusted Types, \`DOMParser\` refuse une chaîne : une politique propre au script, si la
-  // page en admet une. Sinon, échec explicite — la voie manuelle prend le relais.
-  let policy = null;
+  // page en admet une. Sinon, échec explicite — la voie manuelle prend le relais. La politique
+  // vit autant que le DOCUMENT, pas que le script : créée une fois, elle est retrouvée aux
+  // captures suivantes de la même page — la recréer échoue sans 'allow-duplicates' (revue
+  // Codex, PR #135).
+  const policyKey = Symbol.for('cct-reduce-capture');
+  let policy = globalThis[policyKey] ?? null;
   const parse = (text) => {
     try {
       return new DOMParser().parseFromString(policy ? policy.createHTML(text) : text, 'text/html');
     } catch (err) {
       if (policy || typeof trustedTypes === 'undefined') throw err;
       policy = trustedTypes.createPolicy('cct-reduce-capture', { createHTML: (s) => s });
+      globalThis[policyKey] = policy;
       return new DOMParser().parseFromString(policy.createHTML(text), 'text/html');
     }
   };
@@ -310,15 +319,26 @@ export function buildPageReducer({ rules, candidates, reads, file }) {
     const problems = [];
     if (candidates) for (const m of reductionMismatches(candidates, r.before, r.after)) problems.push(describeMismatch(m));
     if (!r.fixedPoint) problems.push('la page réduite, réduite à nouveau, ne revient pas à l’identique');
-    // Le protocole capture la page SANS l'extension Conventional Comments.
-    if (/\\sclass="[^"]*\\bcct-/.test(r.out)) problems.push('des classes cct- dans la page : l’extension Conventional Comments est active');
+    // Ce que la ligne de commande refuse, refusé AVANT d'écrire quoi que ce soit — par la même
+    // détection. Le genre du secret, jamais sa valeur.
+    for (const s of findCapturedPageSecrets(r.out)) problems.push('secret connu restant : ' + s.kind);
+    // Le protocole capture la page SANS l'extension Conventional Comments. Lu sur les CLASSES des
+    // éléments, pas dans le texte sérialisé, où un exemple de code échappé (\`&lt;div
+    // class="cct-toolbar"&gt;\`) passerait pour l'extension (revue Codex, PR #135).
+    const active = Array.from(document.querySelectorAll('[class*="cct-"]')).some((el) =>
+      Array.from(el.classList).some((c) => c.startsWith('cct-'))
+    );
+    if (active) problems.push('des classes cct- dans la page : l’extension Conventional Comments est active');
     if (problems.length > 0) return { file, ok: false, problems };
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([r.out], { type: 'text/html' }));
     a.download = file;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-    return { file, ok: true, rawBytes: html.length, reducedBytes: r.out.length, title: document.title };
+    // Rien de la page dans le résumé : ni titre, ni texte, ni valeur — seulement ce que le script
+    // sait déjà ou mesure. Le titre d'une PR peut nommer un client ou un incident, et le résumé
+    // entre dans la conversation (revue Reefact, PR #135).
+    return { file, ok: true, rawBytes: html.length, reducedBytes: r.out.length };
   } catch (err) {
     return { file, ok: false, problems: [\`erreur : \${err.name} — \${String(err.message).slice(0, 160)}\`] };
   }

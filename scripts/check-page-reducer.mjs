@@ -31,8 +31,11 @@ const EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 const ORIGIN = 'https://captured.page.test';
 
 // Ce que la réduction doit retirer, sous chacune de ses formes connues.
+// Du texte de la page, qui ne doit apparaître dans aucun résumé rendu à l'agent.
+const PAGE_TEXT = ['SENTINEL-TITLE-7f3a', 'ce nom ne dit pas'];
+
 const RAW = `<!DOCTYPE html>
-<html lang="en" data-auth-token="t0ken" style="x"><head>
+<html lang="en" data-auth-token="t0ken" style="x"><head><title>SENTINEL-TITLE-7f3a</title>
 <meta name="request-id" content="r1"><meta name="release" content="v1">
 <link rel="stylesheet" href="/a.css"><script nonce="n">var s = 1;</script><style>p{}</style>
 </head><body>
@@ -60,6 +63,12 @@ const section = (since, text) => {
 /** Sert `html` à une URL, avec l'en-tête CSP voulu, exécute le script de réduction dans la page
  * et rend `{ result, downloaded }` — `downloaded` nul si rien n'a été téléchargé. */
 async function runInPage(html, script, csp) {
+  return (await runAllInPage(html, [script], csp))[0];
+}
+
+/** Plusieurs scripts dans la MÊME page, l'un après l'autre — les captures successives d'états
+ * ouverts sans recharger le document. */
+async function runAllInPage(html, scripts, csp) {
   const context = await browser.newContext({ acceptDownloads: true });
   await context.route('**/*', (route) =>
     route.request().url() === `${ORIGIN}/page`
@@ -77,12 +86,20 @@ async function runInPage(html, script, csp) {
   try {
     const page = await context.newPage();
     await page.goto(`${ORIGIN}/page`, { waitUntil: 'domcontentloaded' });
-    const download = page.waitForEvent('download', { timeout: 3000 }).catch(() => null);
-    const result = await page.evaluate(script);
-    const d = await download;
-    const downloaded = d ? readFileSync(await d.path(), 'utf8') : null;
-    const live = await page.evaluate(() => '<!DOCTYPE html>\n' + document.documentElement.outerHTML);
-    return { result, downloaded, suggested: d?.suggestedFilename() ?? null, live };
+    const runs = [];
+    for (const script of scripts) {
+      const download = page.waitForEvent('download', { timeout: 3000 }).catch(() => null);
+      const result = await page.evaluate(script);
+      const d = await download;
+      const downloaded = d ? readFileSync(await d.path(), 'utf8') : null;
+      const live = await page.evaluate(() => '<!DOCTYPE html>\n' + document.documentElement.outerHTML);
+      runs.push({ result, downloaded, suggested: d?.suggestedFilename() ?? null, live });
+      // Rien de la page dans AUCUN résumé, accepté ou refusé (revue Reefact, PR #135).
+      for (const marker of PAGE_TEXT) {
+        if (JSON.stringify(result).includes(marker)) fail(`le résumé rendu contient du texte de la page : « ${marker} »`);
+      }
+    }
+    return runs;
   } finally {
     await context.close();
   }
@@ -157,7 +174,33 @@ try {
   if (!tt.some((p) => p.startsWith('erreur'))) fail('Trusted Types sans aucune politique : refus sans erreur explicite');
   const withTt = await runInPage(RAW, buildPageReducer({ ...raw, file: '01-test-page-brute.html' }), "require-trusted-types-for 'script'");
   if (!withTt.result?.ok || withTt.downloaded !== run.downloaded) fail('sous Trusted Types, la politique du script ne permet pas la réduction');
-  section(since, '  contre-épreuves : écart, extension active, Trusted Types — refus sans téléchargement ; politique propre : réduction identique.');
+  // Deux captures dans la même page, sous une politique nommée SANS 'allow-duplicates' : la
+  // seconde retrouve la politique de la première (revue Codex, PR #135).
+  const twice = await runAllInPage(
+    RAW,
+    [buildPageReducer({ ...raw, file: '01-test-page-brute.html' }), buildPageReducer({ ...raw, file: '02-test-page-brute.html' })],
+    "require-trusted-types-for 'script'; trusted-types cct-reduce-capture"
+  );
+  if (!twice.every((t) => t.result?.ok && t.downloaded === run.downloaded)) {
+    fail(`deux captures dans la même page sous Trusted Types : ${JSON.stringify(twice.map((t) => t.result))}`);
+  }
+  // Un secret connu dans le TEXTE survit à la liste blanche : refusé avant d'écrire, comme la
+  // ligne de commande le refuse — son genre dit, sa valeur jamais (revue Codex, PR #135).
+  const secretInText = RAW.replace('</body>', '<p>{"clientToken":"SECRET-VALUE-91"}</p></body>');
+  const secretProblems = await refused('secret connu dans le texte', secretInText, raw);
+  if (!secretProblems.some((p) => p.startsWith('secret connu restant'))) fail('secret connu dans le texte : refus sans le dire');
+  if (JSON.stringify(secretProblems).includes('SECRET-VALUE-91')) fail('secret connu dans le texte : la valeur est dans le résumé');
+  // Un exemple de code ÉCHAPPÉ qui montre une classe cct- n'est pas l'extension (revue Codex, PR #135).
+  const example = await runInPage(
+    RAW.replace('</body>', '<pre>&lt;div class="cct-toolbar"&gt;&lt;/div&gt;</pre></body>'),
+    buildPageReducer({ ...raw, file: '01-test-exemple-echappe.html' })
+  );
+  if (!example.result?.ok || example.downloaded === null) fail(`exemple de code échappé : refusé — ${JSON.stringify(example.result?.problems)}`);
+  section(
+    since,
+    '  contre-épreuves : écart, extension active, secret dans le texte, Trusted Types sans politique — refus sans téléchargement ;\n' +
+      '  politique propre (deux captures dans la même page), exemple de code échappé : acceptés ; aucun texte de la page dans les résumés.'
+  );
 } finally {
   await browser.close();
 }

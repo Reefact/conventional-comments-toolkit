@@ -80,10 +80,11 @@ Pour chaque état, dans un onglet que la session ouvre elle-même :
    (`--no-selectors` pour une plateforme sans `selectors.ts`, comme à l'étape 2).
 3. L'exécuter par `javascript_tool` dans l'onglet de l'état. Il réduit la page affichée, prouve
    la réduction — chaque candidat, mêmes éléments et mêmes valeurs lues avant et après ; point
-   fixe ; aucune classe `cct-` — par la même fonction que la ligne de commande
-   (`check:page-reducer` les tient pour équivalentes), puis TÉLÉCHARGE la seule forme réduite. Il
-   rend un résumé, jamais de HTML : `ok: false` liste les problèmes et rien n'est téléchargé —
-   corriger l'état, ou le signaler.
+   fixe ; aucun secret connu ; aucune classe `cct-` sur un élément — par les mêmes fonctions que
+   la ligne de commande (`check:page-reducer` les tient pour équivalentes), puis TÉLÉCHARGE la
+   seule forme réduite. Il rend un résumé fait de ce qu'il sait déjà ou mesure — nom de fichier,
+   tailles, problèmes —, AUCUN texte de la page, pas même son titre : `ok: false` liste les
+   problèmes et rien n'est téléchargé — corriger l'état, ou le signaler.
 4. Déplacer le fichier téléchargé dans `packages/adapters/<id>/test/fixtures/pages/`, en
    vérifiant son nom (Chrome suffixe « (1) » un doublon).
 

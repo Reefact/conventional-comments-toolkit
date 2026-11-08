@@ -72,8 +72,13 @@ omis en silence.
 capture, inventorier les commandes de l'éditeur qui peuvent en changer l'élément ou le
 conteneur : bascule texte brut / texte enrichi, plein écran, aperçu. Sur gitlab.com
 (2026-11-08), sous chaque champ, « Switch to rich text editing » — les captures en mode
-Markdown ne contiennent aucun `contenteditable`, l'autre mode est à capturer avant de conclure
-quoi que ce soit — et, dans la barre d'outils, « Go full screen ». Le bouton `<>` de cette barre
+Markdown ne contiennent aucun `contenteditable` ; en texte enrichi, MESURÉ (capture
+`01-…-texte-riche`), la `<textarea>` disparaît au profit d'un `div[contenteditable]`
+ProseMirror (`aria-label="Comment"`), et `data-testid="comment-field"` passe sur un `div` et un
+`input type=hidden` — et le choix est MÉMORISÉ pour le compte : rechargement, autre vue, autre
+éditeur, tous ouvrent dans le dernier mode choisi. Remettre le mode d'origine de la personne
+après la capture, et vérifier qu'il tient après rechargement. Dans la barre d'outils, aussi,
+« Go full screen ». Le bouton `<>` de cette barre
 est « Insert code » (mise en forme), pas un agrandissement. Une variante prend le numéro de son
 état et nomme son mode : `01-overview-nouveau-commentaire-texte-riche.html`. (Question du
 propriétaire, après les captures 01 à 05 : aucune n'avait regardé ces commandes.)

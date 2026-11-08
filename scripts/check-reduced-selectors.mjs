@@ -16,10 +16,10 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { rulesFor, unreachableAttributeReads, unreachableByReduction } from './lib/captured-page-reducer.mjs';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ADAPTERS = join(ROOT, 'packages', 'adapters');
 
 // La contre-épreuve d'abord : un garde qui laisse passer ceux-là ne prouve rien ailleurs.

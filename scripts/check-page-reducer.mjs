@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 // Le script de navigateur (`build-page-reducer.mjs`) fait-il EXACTEMENT ce que fait l'outil en
 // ligne de commande ? Mesuré dans Chromium, sur le script tel qu'il sera livré, exécuté dans une
 // page ouverte comme le ferait l'outil `javascript_tool` de Claude in Chrome.
@@ -25,7 +26,7 @@ import { buildPageReducer, reduceAndVerify, reducePage, rulesFor } from './lib/c
 import { loadReductionInputs } from './lib/captured-page-inputs.mjs';
 import { findCapturedPageSecrets } from './lib/captured-page-secrets.mjs';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ADAPTERS = join(ROOT, 'packages', 'adapters');
 const EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 const ORIGIN = 'https://captured.page.test';

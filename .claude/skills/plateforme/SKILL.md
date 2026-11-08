@@ -97,8 +97,7 @@ skill en cours d'amélioration si elle n'est pas fusionnée, puis `npm ci` et `n
 supposer installée — un utilisateur de l'application de bureau ou de claude.ai ne l'a pas
 forcément (premier usage, 2026-11-08, Windows : « 'claude' n'est pas reconnu »). L'installer
 selon la documentation Claude Code, « Advanced setup », dont la commande dépend du terminal
-(PowerShell, CMD, macOS/Linux) — HORS du clone : la commande CMD dépose `install.cmd` dans le
-dossier courant et l'y laisse si elle échoue. Si le téléchargement du binaire échoue (même
+(PowerShell, CMD, macOS/Linux). Si le téléchargement du binaire échoue (même
 session, `curl: (56)`, « Failed to download binary »), `winget install Anthropic.ClaudeCode`
 se passe de curl (même page de documentation, « Troubleshoot installation »). Puis ouvrir un
 NOUVEAU terminal, sans quoi le PATH n'est pas relu ; (4) `claude --chrome` lancé dans le clone, et le skill invoqué. La session locale prend

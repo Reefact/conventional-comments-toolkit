@@ -60,6 +60,32 @@ export const selectors = {
     candidates: ['form.edit-note'],
   } satisfies SelectorChain,
 
+  /** ZONE d'un champ de fil — le formulaire ne la dit pas (`threadForm`), ses ANCÊTRES si.
+   * Règle MESURÉE sur les douze champs de fil des captures (02, 04 ×4, 05 ×3, 06 ×4 : Overview,
+   * Rapid Diffs, vue classique ; Markdown et texte enrichi), sans exception :
+   *   1. entouré de `replyWrapper` → RÉPONSE ;
+   *   2. sinon, entouré de `noteContainer` → MODIFICATION du commentaire de ce conteneur ;
+   *   3. sinon → NOUVEAU FIL de ligne.
+   * L'ORDRE compte : en Rapid Diffs, une réponse est AUSSI dans le conteneur de la note à laquelle
+   * elle répond (05) — testée en second, cette marque la prendrait pour une modification.
+   * Confirmation indépendante, dans les mêmes captures : le formulaire d'une modification est le
+   * seul sans aucun bouton de revue (`start-review-button` / `add-to-review-button`).
+   * Écartées parce qu'elles ne valent que dans certaines vues : `.note-body` (absent de l'édition
+   * en Rapid Diffs), `.discussion-reply-holder` (absent des réponses en Rapid Diffs, présent sur un
+   * nouveau fil classique), `.note-edit-form` (présent sur des réponses). */
+  replyWrapper: {
+    name: 'reply-wrapper',
+    candidates: ['[data-testid="reply-wrapper"]'],
+  } satisfies SelectorChain,
+
+  /** Conteneur d'un commentaire publié — `li#note_<id>`. MESURÉ dans les trois vues (03, 05, 06) ;
+   * `data-testid="noteable-note-container"` y est partout, `data-note-id` seulement dans l'Overview
+   * et la vue classique : l'identifiant se lit sur l'`id` (`note_<id>`), commun aux trois. */
+  noteContainer: {
+    name: 'note-container',
+    candidates: ['li[data-testid="noteable-note-container"]', 'li[id^="note_"]'],
+  } satisfies SelectorChain,
+
   /** Panneau de soumission de revue — zone `review-body`. MESURÉ : 07-overview-panneau-revue et
    * 07-overview-corps-revue, un tiroir `.gl-drawer-body` ouvert par « Your review ». */
   reviewDrawer: {

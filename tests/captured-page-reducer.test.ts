@@ -72,6 +72,30 @@ describe('réduction des pages capturées — ce qui survit', () => {
     expect(doc.querySelector('a')!.getAttribute('href')).toBe('https://x.test/o/r/pull/1#issuecomment-2');
   });
 
+  it('garde la FORME d’une référence relative — une ancre seule ne devient pas la racine du site', () => {
+    // Revue Codex, PR #133 : `#issue-1` était réécrit `/#issue-1`, et l'adaptateur GitHub lit ce
+    // `href` tel quel pour l'ancre d'un fil.
+    const doc = reduced(
+      '<body><a id="a" href="#issuecomment-6463117950">a</a><a id="b" href="files?w=1#diff-1">b</a>' +
+        '<a id="c" href="#frag?pas-une-requete">c</a><a id="d" href="//cdn.test/x?sig=1">d</a></body>'
+    );
+    const href = (id: string) => doc.getElementById(id)!.getAttribute('href');
+    expect(href('a')).toBe('#issuecomment-6463117950');
+    expect(href('b')).toBe('files#diff-1');
+    expect(href('c')).toBe('#frag?pas-une-requete');
+    expect(href('d')).toBe('//cdn.test/x');
+  });
+
+  it('applique la liste blanche aux attributs de <html> lui-même', () => {
+    // Revue Codex, PR #133 : `walk` ne traitait que les enfants de la racine.
+    const doc = reduced('<html lang="en" data-auth-token="t" style="x" class="js"><body></body></html>');
+    const root = doc.documentElement;
+    expect(root.hasAttribute('data-auth-token')).toBe(false);
+    expect(root.hasAttribute('style')).toBe(false);
+    expect(root.getAttribute('lang')).toBe('en');
+    expect(root.getAttribute('class')).toBe('js');
+  });
+
   it('garde un data-* dont la valeur est un CHEMIN, même long — mesuré sur les fils repliés de GitHub', () => {
     // La première version le tenait pour opaque (40 caractères sans espace) : les fils repliés
     // n'étaient plus reconnus, et deux tests sur pages réelles échouaient.

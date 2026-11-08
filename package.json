@@ -8,13 +8,14 @@
     "packages/adapters/shared",
     "packages/adapters/github",
     "packages/adapters/azdo",
+    "packages/adapters/gitlab",
     "packages/extension"
   ],
   "scripts": {
-    "build": "tsc -b packages/core packages/adapters/shared packages/adapters/github packages/adapters/azdo packages/extension",
+    "build": "tsc -b packages/core packages/adapters/shared packages/adapters/github packages/adapters/azdo packages/adapters/gitlab packages/extension",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b --force packages/core packages/adapters/shared packages/adapters/github packages/adapters/azdo packages/extension",
+    "typecheck": "tsc -b --force packages/core packages/adapters/shared packages/adapters/github packages/adapters/azdo packages/adapters/gitlab packages/extension",
     "typecheck:tests": "tsc -p packages/extension/tsconfig.test.json",
     "spike": "node spikes/p1-prime/run.mjs",
     "check:github-selectors-live": "node scripts/check-github-selectors-live.mjs",

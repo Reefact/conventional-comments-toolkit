@@ -1,0 +1,15 @@
+{
+  "name": "@cct/adapter-gitlab",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./descriptor": "./dist/descriptor.js"
+  },
+  "dependencies": {
+    "@cct/core": "1.0.0",
+    "@cct/adapter-shared": "1.0.0"
+  }
+}

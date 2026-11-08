@@ -34,12 +34,31 @@ comment template", "Attach a file or image", "Add a quick action".
 | "Go full screen" | captured: `01-overview-nouveau-commentaire-plein-ecran.html` |
 | "Preview (Shift+Ctrl+P)" | to capture — state 9 |
 | "Start review" | to capture — state 7 |
-| "Comment type" (split button next to "Comment") | to capture — a menu that changes what is sent |
+| "Comment type" (split button next to "Comment") | captured open: `01-overview-nouveau-commentaire-menu-type.html` |
 | "internal note" checkbox (`data-testid="internal-note-checkbox"`) | to capture |
-| "Close merge request" (same form) | to capture with text typed — its label may change |
-| "Comment" submit button | disabled while the field is empty in every capture so far; to capture with text typed, without sending |
+| "Close merge request" (same form) | captured with text typed: becomes "Comment and close merge request" |
+| "Comment" submit button | captured empty (`01-…`) and with text typed (`01-…-rempli`) |
 
 Keyboard submission (Ctrl+Enter) has no element: to test during final validation.
+
+### Submit area, empty vs. filled
+
+Measured on `01-overview-nouveau-commentaire.html` (empty) and `01-…-rempli.html` (text typed,
+never sent):
+
+- With an empty field, `button[type=submit]` ("Comment") and
+  `button[data-testid="start-review-button"]` carry `aria-disabled="true"` and the class
+  `disabled` — but NOT the `disabled` attribute (`button.disabled === false` in the live page).
+  `:disabled` / `:enabled` cannot tell the two states apart. The "Comment type" toggle behaves the
+  same way: it does not open while the field is empty.
+- With text typed, `aria-disabled` is gone, and `button[data-testid="close-reopen-button"]` reads
+  "Comment and close merge request": a second submit path in the same form.
+- The typed text is not in the capture — a `<textarea>` value is not serialized into HTML.
+- "Comment type" menu options: **Comment** ("Add a general comment to this merge request.",
+  checked by default) and **Start thread** ("Discuss a specific suggestion or question that needs
+  to be resolved."). Both are in the DOM even while the menu is closed.
+- No draft survived: after clearing the field and reloading, it was empty, and no localStorage
+  key matched `autosave|draft|note`.
 
 ## Rich text mode
 

@@ -65,7 +65,7 @@ est affichée.
 `01-conversation-nouveau-commentaire.html`, `06-files-modification-commentaire.html`. Deux
 captures du même état dans deux vues portent le même numéro.
 
-## 2. Désensibiliser AVANT tout envoi — sur la machine de qui a capturé
+## 2. Réduire AVANT tout envoi — sur la machine de qui a capturé
 
 Une page capturée porte la session de qui l'a prise : jetons CSRF, nonces, canaux signés,
 identifiant de session du socket. **Aucune capture brute ne quitte cette machine** — ni vers
@@ -75,37 +75,58 @@ le serveur), et une déconnexion n'invalide pas forcément tous les jetons publi
 Reefact, PR #85). La conversation n'est pas une issue non plus : une page pèse de 0,5 à 3 Mo et
 sature le contexte, une capture s'y est perdue.
 
-**L'outil tourne en local, sans installation.** `scripts/check-captured-pages.mjs` et sa
-bibliothèque n'importent que des modules de Node : un clone superficiel suffit, sans
-`npm install`. La consigne à donner, telle quelle :
+**Ce qui s'envoie, c'est la page RÉDUITE, jamais la page masquée.** Masquer
+(`--redact`) retire ce qu'on SAIT dangereux ; un secret qu'on ne connaît pas encore passe, et
+c'est le cas de toute plateforme nouvelle. Réduire (`scripts/reduce-captured-pages.mjs`) prend
+le problème à l'envers : une liste blanche — structure, texte, attributs d'interface —, et tout
+le reste disparaît, scripts, `<meta>` non listés, valeurs des champs, requêtes des URL. Mesuré
+le 2026-11-08 sur les huit captures GitHub : 16 Mo → 7,8 Mo, les 71 tests de l'adaptateur
+verts, aucun secret connu restant, et chacun des 99 candidats de `selectors.ts` trouve les
+mêmes éléments avant et après.
+
+La réduction se fait sur la machine de qui a capturé, parce que c'est le SEUL moment où la page
+brute existe : l'outil y prouve, page par page, que chaque candidat trouve les mêmes éléments
+avant et après, et que la page réduite est un point fixe ; une page qui échoue n'est pas
+réécrite, et ne part pas. Elle demande Node, Git et un Chromium (`playwright-core`). La consigne
+à donner, telle quelle :
 
 > ```
 > git clone --depth 1 https://github.com/Reefact/conventional-comments-toolkit cct-captures
 > cd cct-captures
+> npm ci
+> npx playwright-core install chromium
+> npm run build
 > mkdir -p packages/adapters/<id>/test/fixtures/pages
 > # y copier les captures, puis :
-> node scripts/check-captured-pages.mjs --redact
+> node scripts/reduce-captured-pages.mjs <id>
+> node scripts/check-captured-pages.mjs --audit
+> node scripts/check-captured-pages.mjs
 > ```
 >
-> La dernière ligne doit dire « aucun secret de session en clair ». Ce sont les fichiers de ce
-> dossier, et eux seuls, qui s'envoient ensuite.
+> La réduction doit finir par « page(s) réduite(s) », la dernière commande par « aucun secret
+> de session en clair ». Envoie le rapport de `--audit` d'abord, seul ; les fichiers du dossier
+> ensuite, quand on te le demande.
 
 Sans Node ni Git sur la machine, il n'y a PAS de voie de repli : on ne reçoit pas la capture.
 
-**Une plateforme NOUVELLE a ses propres secrets**, que la liste de
-`scripts/lib/captured-page-secrets.mjs` ne connaît pas encore : `--redact` les laisserait
-passer. Avant le premier envoi, donc :
+**Ce que la réduction ne retire pas** : le texte — commentaires, code, noms —, et les attributs
+de sa liste blanche (`id`, `class`, `aria-*`, `data-*` courts, chemins d'URL). Un secret qui s'y
+logerait passerait. D'où, pour une plateforme NOUVELLE, avant le premier envoi :
 
 1. Capturer des pages d'**au moins deux PR différentes** — une donnée de session est la même
    sur toutes les pages, une donnée de PR change d'une PR à l'autre.
-2. En local : `node scripts/check-captured-pages.mjs --audit`. Le rapport ne contient que des
-   NOMS de champs (`link[rel=shared-web-socket] @data-session-id`), jamais de valeur : il se
-   transmet sans rien divulguer. Sur les captures GitHub, c'est ce critère — une valeur commune
-   à des PR différentes — qui a trouvé `data-session-id`, qu'aucune relecture n'avait vu.
-3. Trier le rapport : ce qui authentifie (jeton, identifiant de session, signature) entre dans
-   la liste, par une PR d'outillage livrée AVANT les captures ; les empreintes de version du
-   site (`x-pjax-*-version`, `release`) et les données de PR restent.
-4. Alors seulement : `--redact` en local, puis envoi.
+2. Réduire, puis `--audit`, sur les pages RÉDUITES. Le rapport ne contient que des NOMS de
+   champs (`link[rel=shared-web-socket] @data-session-id`), jamais de valeur : il se transmet
+   sans rien divulguer. Sur les captures GitHub, c'est ce critère — une valeur commune à des PR
+   différentes — qui a trouvé `data-session-id`, qu'aucune relecture n'avait vu.
+3. Trier le rapport : ce qui authentifie (jeton, identifiant de session, signature) doit être
+   retiré par la réduction — règle de `scripts/lib/captured-page-reducer.mjs`, par une PR
+   d'outillage livrée AVANT les captures ; les empreintes de version du site (`release`) et les
+   données de PR restent.
+4. Alors seulement : envoi des pages réduites.
+
+Les captures GitHub sont encore stockées sous leur forme masquée, antérieure à la réduction :
+leur conversion est une PR GitHub à part.
 
 **Si une capture brute a malgré tout été envoyée**, la traiter comme une fuite : révoquer
 explicitement la session concernée sur la plateforme — sur github.com, *Settings → Access → Sessions*
@@ -127,6 +148,10 @@ l'état demandé (le champ est-il là, ouvert, prérempli pour une édition ?). 
 montre pas l'état annoncé se RENOMME d'après ce qu'elle montre — elle sert souvent ailleurs — et
 l'état manquant se redemande.
 
+Et qu'elle est bien RÉDUITE : `node scripts/reduce-captured-pages.mjs <id> --check` n'écrit
+rien et échoue sur une page que la réduction changerait — la réduction étant un point fixe, une
+telle page n'avait pas été réduite. C'est une page brute : à traiter selon l'étape 2.
+
 ## 4. Écrire les sélecteurs depuis les captures
 
 - Chaque candidat cite la capture qui le justifie (`// MESURÉ le AAAA-MM-JJ, test/fixtures/pages/05`).
@@ -139,6 +164,13 @@ l'état manquant se redemande.
   `DOMParser`) qui écrit son résultat dans le scratchpad, et le supprimer ensuite.
 - Pour un bouton à intercepter : identifier aussi celui qui ANNULE, et prouver qu'il n'est pas
   pris. Bloquer *Cancel* enfermerait l'auteur d'un commentaire non conforme.
+- Les captures sont RÉDUITES : un candidat ne peut chercher que ce que la réduction garde.
+  `npm run check:reduced-selectors` refuse celui qui cite un attribut ou un élément retiré
+  (`style`, `<link>`, un `<meta>` non listé…) — sur la capture il ne trouverait rien, et une
+  assertion négative y passerait à tort. Si la prise est vraiment la bonne, élargir
+  `PLATFORM_RULES` (`scripts/lib/captured-page-reducer.mjs`) et RECAPTURER : la page brute,
+  seule à porter l'attribut, n'existe plus. Ce garde ne voit pas une valeur retirée parce
+  qu'opaque (`data-*` en forme d'empreinte) ; seule la réduction, page brute en main, la voit.
 
 ## 5. Figer : les tests sur pages réelles
 
@@ -153,6 +185,8 @@ d'envoi, les fils et les corps rendus.
   ce que trouve Chromium, candidat par candidat. Mesuré : `:enabled`, `:any-link`,
   `:placeholder-shown` ne trouvent rien dans happy-dom, `:empty` y trouve cent fois trop. Un tel
   candidat ferait passer un test sur un monde qui n'existe pas.
+- `npm run check:reduced-selectors` (dans `checks` et la CI) : aucun candidat, aucune lecture
+  `getAttribute` de l'adaptateur ne cherche ce que la réduction retire.
 
 ## 6. Surveiller la page en ligne
 

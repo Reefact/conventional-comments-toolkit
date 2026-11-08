@@ -1,0 +1,154 @@
+// Réduit EN PLACE les pages capturées d'une plateforme à leur forme stockable
+// (`scripts/lib/captured-page-reducer.mjs` dit ce qu'elle garde, et pourquoi une liste blanche).
+//
+// Usage : node scripts/reduce-captured-pages.mjs <id> [--check]
+//   --check : n'écrit rien, et échoue si une page n'est pas DÉJÀ sous sa forme réduite — ce que
+//   doit vérifier qui reçoit des captures (la réduction est un point fixe).
+//   (pages de packages/adapters/<id>/test/fixtures/pages/ ; sélecteurs COMPILÉS : `npm run
+//   build` d'abord, faute de quoi la comparaison avant/après est sautée — et dit l'être).
+//
+// Se lance sur la machine de qui a capturé, AVANT tout envoi : c'est le seul moment où la page
+// brute existe, donc le seul où l'on peut prouver que la réduction n'a rien retiré qu'un
+// sélecteur lise. Pour chaque page, et avant d'écrire quoi que ce soit :
+//   1. chaque candidat de `selectors.ts` doit trouver les MÊMES éléments avant et après —
+//      l'identité, par un marqueur posé sur la page brute, pas le nombre ;
+//   2. réduire la page réduite doit la rendre à l'identique : une réduction qui n'est pas un
+//      point fixe dirait autre chose à chaque passage.
+// Une page qui échoue à l'un des deux n'est PAS réécrite : elle reste brute, sur cette machine,
+// pour qu'on voie ce qui manque — et ne doit pas partir.
+//
+// Le tout dans Chromium, JavaScript coupé et réseau refusé, par `DOMParser` comme les tests.
+
+import { chromium } from 'playwright-core';
+import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { reducePage, reductionMismatches, rulesFor } from './lib/captured-page-reducer.mjs';
+import { findCapturedPageSecrets } from './lib/captured-page-secrets.mjs';
+
+const ROOT = new URL('..', import.meta.url).pathname;
+const EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
+const MARK = 'data-cct-reduce-id';
+
+const check = process.argv.includes('--check');
+const id = process.argv.slice(2).find((a) => !a.startsWith('--'));
+if (!id) {
+  console.error('Usage : node scripts/reduce-captured-pages.mjs <id> [--check]   (github, azdo…)');
+  process.exit(2);
+}
+const dir = join(ROOT, 'packages', 'adapters', id, 'test', 'fixtures', 'pages');
+let files = [];
+try {
+  if (statSync(dir).isDirectory()) files = readdirSync(dir).filter((f) => f.endsWith('.html')).sort();
+} catch {
+  // pas de dossier : rien à réduire
+}
+if (files.length === 0) {
+  console.log(`Aucune page dans ${relative(ROOT, dir)} : rien à réduire.`);
+  process.exit(0);
+}
+
+let candidates = null;
+try {
+  const { selectors } = await import(pathToFileURL(join(ROOT, 'packages', 'adapters', id, 'dist', 'selectors.js')).href);
+  candidates = Object.fromEntries(Object.entries(selectors).map(([k, c]) => [k, c.candidates]));
+} catch {
+  console.log(
+    `⚠ pas de sélecteurs compilés pour « ${id} » : comparaison avant/après SAUTÉE.\n` +
+      '  Sur une plateforme qui a déjà un adaptateur, lancer `npm run build` et recommencer.'
+  );
+}
+
+const rules = rulesFor(id);
+
+/** Exécutée dans la page. Reçoit le SOURCE de `reducePage` : la fonction est autonome. */
+function inPage({ html, rules, candidates, reduceSource, mark }) {
+  const reduce = new Function(`return (${reduceSource})`)();
+  const parse = (text) => new DOMParser().parseFromString(text, 'text/html');
+  const serialize = (doc) => '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+  const found = (doc) => {
+    if (!candidates) return null;
+    const out = {};
+    for (const [key, list] of Object.entries(candidates)) {
+      out[key] = list.map((c) => {
+        try {
+          return Array.from(doc.querySelectorAll(c), (el) => el.getAttribute(mark));
+        } catch (err) {
+          return `erreur : ${err.message}`;
+        }
+      });
+    }
+    return out;
+  };
+  const raw = parse(html);
+  let n = 0;
+  for (const el of raw.querySelectorAll('*')) el.setAttribute(mark, String(n++));
+  const before = found(raw);
+  const dropped = reduce(raw, { ...rules, preserve: [mark] });
+  // Relire ce qui serait écrit : c'est la page RE-PARSÉE que les tests liront.
+  const reread = parse(serialize(raw));
+  const after = found(reread);
+  for (const el of reread.querySelectorAll(`[${mark}]`)) el.removeAttribute(mark);
+  const out = serialize(reread);
+  const again = parse(out);
+  reduce(again, rules);
+  return { out, dropped, before, after, fixedPoint: serialize(again) === out };
+}
+
+const browser = await chromium.launch({ executablePath: EXECUTABLE, args: ['--no-sandbox'] });
+const context = await browser.newContext({ javaScriptEnabled: false });
+await context.route('**/*', (route) => route.abort());
+const page = await context.newPage();
+
+let failed = 0;
+try {
+  for (const file of files) {
+    const path = join(dir, file);
+    const html = readFileSync(path, 'utf8');
+    const r = await page.evaluate(inPage, { html, rules, candidates, reduceSource: reducePage.toString(), mark: MARK });
+    const problems = [];
+    if (candidates) {
+      for (const m of reductionMismatches(candidates, r.before, r.after)) {
+        const n = (v) => (Array.isArray(v) ? `${v.length} élément(s)` : v);
+        problems.push(`${m.key} ${JSON.stringify(m.candidate)} : brut ${n(m.before)}, réduit ${n(m.after)}`);
+      }
+    }
+    if (!r.fixedPoint) problems.push('la page réduite, réduite à nouveau, ne revient pas à l’identique');
+    for (const s of findCapturedPageSecrets(r.out)) problems.push(`secret connu restant : ${s.kind}`);
+    if (check && r.out !== html) problems.push('pas sous sa forme réduite : la réduire la changerait');
+    if (problems.length > 0) {
+      failed++;
+      console.log(`✗ ${file} — ${check ? 'refusée' : 'NON réécrite'} :`);
+      for (const p of problems) console.log(`    ${p}`);
+      continue;
+    }
+    if (check) {
+      console.log(`✓ ${file} : déjà réduite`);
+      continue;
+    }
+    writeFileSync(path, r.out);
+    const top = Object.entries(r.dropped)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([k, v]) => `${k} ×${v}`)
+      .join(', ');
+    const mo = (s) => (s.length / 1e6).toFixed(2);
+    console.log(`✓ ${file} : ${mo(html)} Mo → ${mo(r.out)} Mo${top ? ` (retirés : ${top}…)` : ''}`);
+  }
+} finally {
+  await browser.close();
+}
+
+if (failed > 0) {
+  console.log(`\n✗ ${failed} page(s) non réduite(s) : elles sont encore BRUTES, et ne doivent pas partir.`);
+  process.exit(1);
+}
+if (check) {
+  console.log(`\n✓ ${files.length} page(s) déjà sous leur forme réduite.`);
+  process.exit(0);
+}
+console.log(
+  `\n✓ ${files.length} page(s) réduite(s).` +
+    (candidates ? ' Chaque candidat trouve les mêmes éléments avant et après.' : '') +
+    '\n  Ensuite : node scripts/check-captured-pages.mjs --audit, puis node scripts/check-captured-pages.mjs.'
+);

@@ -6,6 +6,7 @@
     { "path": "../core" },
     { "path": "../adapters/shared" },
     { "path": "../adapters/github" },
-    { "path": "../adapters/azdo" }
+    { "path": "../adapters/azdo" },
+    { "path": "../adapters/gitlab" }
   ]
 }

@@ -298,10 +298,12 @@ export class GitlabClientAdapter implements PlatformAdapter {
       return { zone: 'review-body', action: 'compose', pr, canCarryBlockingState: false, inScope: true };
     }
     if (closestChain(el, selectors.conversationForm).element) {
-      // Un commentaire général de GitLab peut être publié comme FIL résoluble (« Start thread »,
-      // §C.6) : qu'il puisse alors porter un état bloquant est à trancher dans la spec. D'ici là,
-      // la réponse de GitHub — la conversation ne porte pas d'état bloquant.
-      return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: false, inScope: true };
+      // Sur GitLab, un commentaire général PEUT être un fil résoluble — publié par « Start thread »
+      // (§C.6 ; mesuré : tous les fils généraux de !1 portent `data-discussion-resolvable`). Il
+      // porte donc un état bloquant, contrairement à GitHub : décision du propriétaire, 2026-11-08
+      // — la réponse `false` faisait afficher W-NOT-BLOCKABLE, faux sur cette plateforme. Limite
+      // écrite au §C.6 : publié par « Comment », c'est une note simple que le blocage ne voit pas.
+      return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
     }
     const thread = closestChain(el, selectors.thread).element;
     const threadId = thread ? this.#threadId(thread) : undefined;

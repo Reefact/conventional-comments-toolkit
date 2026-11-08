@@ -4,6 +4,7 @@
 // identité des éléments avant/après, point fixe — se mesure à chaque `reduce-captured-pages`.
 import { describe, expect, it } from 'vitest';
 import {
+  buildPageReducer,
   describeMismatch,
   reducePage,
   rulesFor,
@@ -222,6 +223,24 @@ describe('écart avant/après — ce que l’outil en imprime', () => {
   it('compte les éléments perdus ou en plus, sans rien en citer', () => {
     const text = describeIt([['1', { href: secret }], ['2', { href: secret }]], [['1', { href: secret }]]);
     expect(text).toBe('threadAnchor "a[href]" : brut 2 élément(s), réduit 1 — 1 perdu(s), 0 en plus');
+  });
+});
+
+describe('script de réduction dans le navigateur — ce qu’il est', () => {
+  const script = buildPageReducer({
+    rules: rulesFor('github'),
+    candidates: { anchor: ['#anchor'] },
+    reads: ['href'],
+    file: '01-overview-nouveau-commentaire.html',
+  });
+
+  it('est une expression JavaScript valide, qui porte le nom du fichier à télécharger', () => {
+    expect(() => new Function(`return ${script}`)).not.toThrow();
+    expect(script).toContain('"file":"01-overview-nouveau-commentaire.html"');
+  });
+
+  it('ne passe ni par eval ni par new Function — qu’une politique de la page pourrait refuser', () => {
+    expect(script).not.toMatch(/\beval\s*\(|new Function\s*\(/);
   });
 });
 

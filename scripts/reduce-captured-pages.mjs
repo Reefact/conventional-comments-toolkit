@@ -28,10 +28,10 @@
 // Le tout dans Chromium, JavaScript coupé et réseau refusé, par `DOMParser` comme les tests.
 
 import { chromium } from 'playwright-core';
-import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { attributeReads, describeMismatch, reducePage, reductionMismatches, rulesFor } from './lib/captured-page-reducer.mjs';
+import { describeMismatch, reduceAndVerify, reducePage, reductionMismatches } from './lib/captured-page-reducer.mjs';
+import { InputsError, loadReductionInputs } from './lib/captured-page-inputs.mjs';
 import { findCapturedPageSecrets } from './lib/captured-page-secrets.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -57,74 +57,26 @@ if (files.length === 0) {
   process.exit(0);
 }
 
-// La comparaison est la PREUVE de la réduction : elle ne se saute que sur demande explicite, et
-// seulement là où il n'y a rien à comparer.
-const hasSelectors = existsSync(join(ROOT, 'packages', 'adapters', id, 'src', 'selectors.ts'));
-let candidates = null;
-if (noSelectors) {
-  if (hasSelectors) {
-    console.error(`✗ --no-selectors refusé : « ${id} » a un selectors.ts, la comparaison est due.`);
-    process.exit(2);
-  }
-  console.log(`⚠ « ${id} » n'a pas de selectors.ts : réduction SANS comparaison avant/après (--no-selectors).`);
-} else {
-  try {
-    const { selectors } = await import(pathToFileURL(join(ROOT, 'packages', 'adapters', id, 'dist', 'selectors.js')).href);
-    candidates = Object.fromEntries(Object.entries(selectors).map(([k, c]) => [k, c.candidates]));
-  } catch (err) {
-    console.error(
-      `✗ sélecteurs compilés de « ${id} » introuvables ou illisibles (${err.message.split('\n')[0]}).\n` +
-        (hasSelectors
-          ? '  Lancer `npm run build` et recommencer : sans eux, la réduction ne peut pas être vérifiée.'
-          : `  « ${id} » n'a pas encore de selectors.ts : relancer avec --no-selectors pour réduire sans comparaison.`)
-    );
-    process.exit(1);
-  }
-}
-
-const rules = rulesFor(id);
-const srcDir = join(ROOT, 'packages', 'adapters', id, 'src');
-let reads = [];
+let inputs;
 try {
-  reads = [...new Set(readdirSync(srcDir).filter((f) => f.endsWith('.ts')).flatMap((f) => attributeReads(readFileSync(join(srcDir, f), 'utf8'))))].sort();
-} catch {
-  // pas d'adaptateur : rien n'est lu
+  inputs = await loadReductionInputs(ROOT, id, { noSelectors });
+} catch (err) {
+  if (!(err instanceof InputsError)) throw err;
+  console.error(err.message);
+  process.exit(err.exitCode);
+}
+const { rules, candidates, reads } = inputs;
+if (!candidates) {
+  console.log(`⚠ « ${id} » n'a pas de selectors.ts : réduction SANS comparaison avant/après (--no-selectors).`);
 }
 
-/** Exécutée dans la page. Reçoit le SOURCE de `reducePage` : la fonction est autonome. */
-function inPage({ html, rules, candidates, reduceSource, mark, reads }) {
+/** Exécutée dans la page : la vérification PARTAGÉE avec le script de navigateur
+ * (`reduceAndVerify`), reçue en source avec `reducePage` — toutes deux autonomes. */
+function inPage({ verifySource, reduceSource, args }) {
   const reduce = new Function(`return (${reduceSource})`)();
+  const verify = new Function(`return (${verifySource})`)();
   const parse = (text) => new DOMParser().parseFromString(text, 'text/html');
-  const serialize = (doc) => '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
-  const found = (doc) => {
-    if (!candidates) return null;
-    const out = {};
-    for (const [key, list] of Object.entries(candidates)) {
-      out[key] = list.map((c) => {
-        try {
-          return Array.from(doc.querySelectorAll(c), (el) =>
-            [el.getAttribute(mark), Object.fromEntries(reads.map((r) => [r, el.getAttribute(r)]))]
-          );
-        } catch (err) {
-          return `erreur : ${err.message}`;
-        }
-      });
-    }
-    return out;
-  };
-  const raw = parse(html);
-  let n = 0;
-  for (const el of raw.querySelectorAll('*')) el.setAttribute(mark, String(n++));
-  const before = found(raw);
-  const dropped = reduce(raw, { ...rules, preserve: [mark] });
-  // Relire ce qui serait écrit : c'est la page RE-PARSÉE que les tests liront.
-  const reread = parse(serialize(raw));
-  const after = found(reread);
-  for (const el of reread.querySelectorAll(`[${mark}]`)) el.removeAttribute(mark);
-  const out = serialize(reread);
-  const again = parse(out);
-  reduce(again, rules);
-  return { out, dropped, before, after, fixedPoint: serialize(again) === out };
+  return verify({ ...args, reduce, parse });
 }
 
 const browser = await chromium.launch({ executablePath: EXECUTABLE, args: ['--no-sandbox'] });
@@ -137,7 +89,11 @@ try {
   for (const file of files) {
     const path = join(dir, file);
     const html = readFileSync(path, 'utf8');
-    const r = await page.evaluate(inPage, { html, rules, candidates, reduceSource: reducePage.toString(), mark: MARK, reads });
+    const r = await page.evaluate(inPage, {
+      verifySource: reduceAndVerify.toString(),
+      reduceSource: reducePage.toString(),
+      args: { html, rules, candidates, reads, mark: MARK },
+    });
     const problems = [];
     if (candidates) {
       for (const m of reductionMismatches(candidates, r.before, r.after)) {

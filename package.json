@@ -26,6 +26,8 @@
     "check:captured-selectors": "node scripts/check-captured-selectors.mjs",
     "check:reduced-selectors": "node scripts/check-reduced-selectors.mjs",
     "reduce:captured-pages": "node scripts/reduce-captured-pages.mjs",
+    "build:page-reducer": "node scripts/build-page-reducer.mjs",
+    "check:page-reducer": "node scripts/check-page-reducer.mjs",
     "check:extension-css": "node scripts/check-extension-css.mjs",
     "checks": "npm run check:ca-matrix && npm run check:invisible && npm run check:captured-pages && npm run check:extension-css && npm run build && npm run typecheck:tests && npm run build:extension && npm run check:context-apis && npm run check:bundle-isolation && npm run check:content-script-io && npm run check:managed-keys && npm run check:platform-isolation && npm run check:reduced-selectors",
     "check:context-apis": "node scripts/check-context-apis.mjs",

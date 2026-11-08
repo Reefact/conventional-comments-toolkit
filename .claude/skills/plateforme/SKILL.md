@@ -127,8 +127,8 @@ logerait passerait. D'où, pour une plateforme NOUVELLE, avant le premier envoi 
    données de PR restent.
 4. Alors seulement : envoi des pages réduites.
 
-Les captures GitHub sont encore stockées sous leur forme masquée, antérieure à la réduction :
-leur conversion est une PR GitHub à part.
+Les captures GitHub sont stockées réduites depuis le 2026-11-08, et la CI le vérifie
+(`reduce:captured-pages -- <id> --check`, workflow « Canari navigateur »).
 
 **Si une capture brute a malgré tout été envoyée**, la traiter comme une fuite : révoquer
 explicitement la session concernée sur la plateforme — sur github.com, *Settings → Access → Sessions*

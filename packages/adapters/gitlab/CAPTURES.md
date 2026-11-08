@@ -104,6 +104,20 @@ after the click (two attempts).
 - Each published comment also has a hidden `<textarea data-update-url="…/notes/<id>">` holding
   its Markdown source (for editing) — which is why a comment's text appears twice in `03-…`.
 
+## Editing a published comment (state 06)
+
+Measured on `06-overview-modification-commentaire.html` (pencil on the `issue:` comment, never
+saved, then cancelled — the comment shows no "edited" mark):
+
+- The edit field is again `textarea[data-testid="reply-field"][aria-label="Reply to comment"]`
+  — the same attributes as a reply and a new diff-line comment. Its `id` is `note_note`.
+- What tells it apart is its form: `form.edit-note` (a new comment's form is
+  `form.new-note … js-main-target-form`). Buttons: "Save comment" and "Cancel".
+- The comment being edited is the ancestor `li#note_<id>[data-note-id="<id>"]` — a candidate for
+  `commentId`.
+
+So far: Overview only. The Changes view still needs its own edit capture.
+
 ## Diff views
 
 The Changes tab offers a "Rapid Diffs (Beta)" view next to the classic one. All captures so far

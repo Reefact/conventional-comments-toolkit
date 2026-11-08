@@ -13,6 +13,13 @@
 // que là où aucun attribut de sens n'existe. Un même `data-testid` désigne parfois des rôles
 // différents selon la vue (« reply-comment-button » est « Add comment now » sur une réponse et
 // « Save comment » sur une édition) : le rôle se lit alors sur le FORMULAIRE, pas sur le bouton.
+//
+// Les candidats d'une chaîne sont des REPLIS ORDONNÉS, jamais une union : `queryChainAll` rend
+// les éléments du PREMIER candidat qui trouve quelque chose. Quand une chaîne doit rendre
+// PLUSIEURS sortes d'éléments à la fois (les champs de toutes les zones, tous les boutons d'envoi
+// d'un formulaire), l'union s'écrit en UN candidat, liste de sélecteurs CSS. Une première écriture
+// listait ces sortes comme candidats séparés : dans l'Overview, `comment-field` trouvait le champ
+// général et les champs de réponse n'étaient jamais observés.
 
 import type { SelectorChain } from '@cct/adapter-shared';
 
@@ -29,9 +36,7 @@ export const selectors = {
   editors: {
     name: 'editors',
     candidates: [
-      'textarea[data-testid="comment-field"]',
-      'textarea[data-testid="reply-field"]',
-      'textarea[name="review[note]"]',
+      'textarea[data-testid="comment-field"], textarea[data-testid="reply-field"], textarea[name="review[note]"]',
     ],
   } satisfies SelectorChain,
 
@@ -195,12 +200,9 @@ export const selectors = {
   submitButtons: {
     name: 'submit-buttons',
     candidates: [
-      'button[type="submit"]',
-      'button[data-testid="start-review-button"]',
-      'button[data-testid="add-to-review-button"]',
-      'button[data-testid="add-comment-now-button"]',
-      'button[data-testid="comment-now-button"]',
-      'button[data-testid="reply-comment-button"]',
+      'button[type="submit"], button[data-testid="start-review-button"], button[data-testid="add-to-review-button"], ' +
+        'button[data-testid="add-comment-now-button"], button[data-testid="comment-now-button"], ' +
+        'button[data-testid="reply-comment-button"]',
     ],
   } satisfies SelectorChain,
 
@@ -231,9 +233,7 @@ export const selectors = {
   cancelButtons: {
     name: 'cancel-buttons',
     candidates: [
-      'button[data-testid="cancel"]',
-      'button[data-testid="cancelBatchCommentsEnabled"]',
-      'button[data-testid="discard-review-btn"]',
+      'button[data-testid="cancel"], button[data-testid="cancelBatchCommentsEnabled"], button[data-testid="discard-review-btn"]',
     ],
   } satisfies SelectorChain,
 

@@ -95,13 +95,43 @@ export const selectors = {
    * `data-discussion-resolvable`. Ses notes sont les `noteContainer` qu'il contient, la première
    * étant la racine du fil, les suivantes ses réponses (03-overview-commentaires-discussion).
    *
-   * Aucun IDENTIFIANT de fil n'est lisible sur les captures : il est à vérifier — non mesuré —
-   * que GitLab en pose un, sous une forme que la réduction retire comme opaque (une empreinte de
-   * 40 caractères ne passe pas `opaqueValue`). L'identifiant d'un fil est donc celui de sa PREMIÈRE
-   * note (`note_<id>`), conservé et commun aux trois vues. */
+   * L'identifiant NATIF du fil n'est pas dans les captures, et c'est mesuré : la page vivante le
+   * porte sur `div[data-discussion-id]` (Overview, 2026-11-08, nom d'attribut relevé sans sa
+   * valeur), et l'API rend une empreinte hexadécimale de 40 caractères — que la réduction retire
+   * comme opaque. L'identifiant d'un fil est donc celui de sa PREMIÈRE note (`note_<id>`), lu sur
+   * `threadAnchor` quand il existe, sur le premier `noteContainer` sinon. */
   thread: {
     name: 'thread',
     candidates: ['[data-testid="discussion-content"]'],
+  } satisfies SelectorChain,
+
+  /** Lien d'horodatage de la première note d'un fil — `href="#note_<id>"`. MESURÉ dans l'Overview et
+   * la vue classique : dans CHAQUE fil, résolu ou non, il désigne la première note, sans un seul
+   * écart (03, 05-, 06-changes-classique, 06, 07, 09) — et il est le SEUL porteur de cet
+   * identifiant dans un fil résolu, replié sans aucune note (03-overview-fil-resolu). Absent en
+   * Rapid Diffs (03-, 04-, 05-, 06-changes) : l'identifiant s'y lit sur la première note. */
+  threadAnchor: {
+    name: 'thread-anchor',
+    candidates: ['a.note-timestamp[href^="#note_"]'],
+  } satisfies SelectorChain,
+
+  /** Marque d'un fil RÉSOLU, sur le conteneur du fil. MESURÉ : `data-discussion-resolved="true"`
+   * sur le seul fil résolu de 03-overview-fil-resolu, absente des cinq autres et de tous les fils
+   * des autres captures. Un fil résolu y est REPLIÉ : son en-tête reste, ses notes non.
+   * En Rapid Diffs, un fil résolu n'est PAS DANS LE DOM (03-changes-fil-resolu : aucune trace de sa
+   * note) : l'état résolu ne se lit que dans l'Overview ou la vue classique — §C.5. */
+  threadResolved: {
+    name: 'thread-resolved',
+    candidates: ['[data-discussion-resolved="true"]'],
+  } satisfies SelectorChain,
+
+  /** Auteur de la RÉSOLUTION d'un fil résolu (§6.1, `resolvedBy`). MESURÉ : dans l'en-tête replié,
+   * « Resolved just now by Sylvain AURAT », suivi d'un lien `a.js-user-link[href="/<username>"]` —
+   * SANS `data-username`, le nom se lit sur le chemin (03-overview-fil-resolu). Absent de tout fil
+   * non résolu de la même capture. */
+  threadResolver: {
+    name: 'thread-resolver',
+    candidates: ['.discussion-headline-light a.js-user-link'],
   } satisfies SelectorChain,
 
   /** Corps RENDU d'un commentaire publié, cherché DANS son `noteContainer`. MESURÉ : `.note-text.md`

@@ -81,7 +81,21 @@ après la capture, et vérifier qu'il tient après rechargement. Dans la barre d
 « Go full screen » : MESURÉ (capture `01-…-plein-ecran`), la `<textarea>` reste la même, aux
 mêmes classes ; seul son conteneur prend `zen-backdrop … fullscreen`, `<html>` prend
 `zen-mode-fullscreen`, et les boutons d'envoi, masqués à l'écran, restent dans le DOM. Qu'il
-soit mémorisé n'est PAS mesuré — l'état ne se lisait pas de façon fiable juste après le clic. Le bouton `<>` de cette barre
+soit mémorisé n'est PAS mesuré — l'état ne se lisait pas de façon fiable juste après le clic.
+
+L'inventaire se fait sur la PREMIÈRE capture, pas de mémoire : lister tous les `button`, `input`
+et `select` du formulaire qui contient le champ (happy-dom, depuis le scratchpad), puis les
+trier en deux familles. Ceux qui n'écrivent que du TEXTE dans le champ (gras, tableau, liste,
+modèle de commentaire, pièce jointe…) n'appellent aucune capture. Ceux qui changent l'ÉLÉMENT,
+son CONTENEUR ou le CHEMIN D'ENVOI en appellent une chacun. Sur gitlab.com (2026-11-08), la
+seconde famille compte, en plus des deux modes ci-dessus : l'aperçu (état 9) ; le bouton
+scindé « Comment » / « Comment type » (menu qui change l'envoi) ; « Start review » (état 7) ;
+la case « internal note » ; « Close merge request », dans le même formulaire, dont le libellé
+est à mesurer champ rempli ; le bouton d'envoi lui-même, désactivé champ vide — d'où une
+capture champ REMPLI, sans envoi. L'envoi au clavier (`Ctrl+Entrée`) n'a pas d'élément : aucune
+capture ne le montre, il se teste à la validation finale. (Question du propriétaire : « tu t'es
+assuré que tu as testé toutes les possibilités de l'éditeur ? » — non, l'inventaire n'avait
+pas été fait.) Le bouton `<>` de cette barre
 est « Insert code » (mise en forme), pas un agrandissement. Une variante prend le numéro de son
 état et nomme son mode : `01-overview-nouveau-commentaire-texte-riche.html`. (Question du
 propriétaire, après les captures 01 à 05 : aucune n'avait regardé ces commandes.)

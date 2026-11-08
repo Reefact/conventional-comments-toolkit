@@ -127,6 +127,28 @@ it left the form open. The visible "Cancel" is the one next to "Save comment". W
 Cancel is not intercepted, test the visible one — and do not take "the first Cancel" as a
 selector.
 
+## Review (state 07)
+
+A draft review was started from the main form ("Start review" with a test text), its panel
+opened, captured, then **discarded** ("Discard review", confirmed in an in-page modal). After a
+reload: `GET …/merge_requests/1/draft_notes` returned 0 drafts, no "Pending" badge, no "Your
+review" button, 6 notes as before.
+
+- `07-overview-panneau-revue.html` — the "Submit your review" drawer (`.gl-drawer-body`), as it
+  opens: approval radios (`value` = `reviewed` / `approved` / `requested_changes`; their `id`
+  and `name` are generated — `gitlab_ui_radio_179` — not a hold), and the summary as a plain
+  `input[data-testid="placeholder-input-field"]` ("Add optional summary content…").
+- `07-overview-corps-revue.html` — after clicking the summary: it becomes a full Markdown editor,
+  **`textarea[data-testid="comment-textarea"][name="review[note]"]`**, `aria-label="Comment"`, in
+  the same drawer. This is the `review-body` zone. Its submit button:
+  `button[data-testid="submit-review-button"][type=submit]` ("Submit review"); also "Continue
+  review" (closes the drawer) and `button[data-testid="discard-review-btn"]`.
+- **While a review is in progress, the main form's buttons change**: "Start review" is gone,
+  replaced by "Add to review" and "Add comment now" — another submit path, in both captures.
+  (Reply forms already show "Start a review" / "Add comment now", see `02` and `05`.)
+
+Not captured: the review drawer in rich text mode; the drawer opened from the Changes view.
+
 ## Diff views
 
 The Changes tab offers a "Rapid Diffs (Beta)" view next to the classic one. All captures so far

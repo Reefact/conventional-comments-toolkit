@@ -1,6 +1,6 @@
 # Spécification — « Conventional Comments Toolkit »
 
-**Cibles :** GitHub (github.com, Enterprise Cloud / EMU, Enterprise Server) et Azure DevOps (Services, Server)
+**Cibles :** GitHub (github.com, Enterprise Cloud / EMU, Enterprise Server), Azure DevOps (Services, Server) et GitLab (gitlab.com ; Dedicated et Self-Managed : à vérifier, §C.1)
 **Statut :** Draft v0.2 — à valider par l'équipe
 **Type de document :** spécifications communes (indépendantes de la plateforme) + annexes par plateforme
 
@@ -26,7 +26,7 @@ L'équipe a adopté [Conventional Comments](https://conventionalcomments.org/) p
 - Ne concerne **pas** les messages de commit (voir Conventional Commits, sujet distinct).
 - Ne remplace **pas** les linters, analyseurs statiques ou revues automatisées par IA.
 - Ne juge **pas** la qualité ou la pertinence du contenu d'un commentaire, uniquement sa **forme**.
-- Ne gère pas GitLab, Bitbucket ou Gerrit (extensibilité prévue, implémentation hors périmètre — voir §9.2).
+- Ne gère pas Bitbucket ou Gerrit (extensibilité prévue, implémentation hors périmètre — voir §9.2). GitLab, d'abord rangé ici, entre dans le périmètre : décision du propriétaire, 2026-11-08, annexe C.
 
 ---
 
@@ -469,7 +469,7 @@ L'arobase, elle, **ouvre couramment une remarque de revue** : interpeller quelqu
 2. **`toolCommands` entre alors dans le domaine de `fingerprint()`** (§9.2.2, comme `exemptUsers` et `allowlistPatterns`) au même titre que toute autre clé de `EffectiveConfig` — sans traitement particulier à écrire. Une valeur embarquée dans le code de l'adaptateur, elle, échapperait structurellement à l'empreinte : un écart entre les versions de `core/` de l'extension et du vérificateur y serait alors invisible, alors même qu'il changerait le verdict — exactement le trou qu'aurait laissé une liste portée par le code plutôt que par la configuration.
 3. **Un seul mécanisme, pas deux.** Un outil tiers installé sur GitHub *ou* sur Azure DevOps s'ajoute de la même façon, dans la même clé — nul besoin d'un canal de configuration séparé par plateforme (§A.7, §B.6).
 
-**Résoudre le handle plutôt que le nommer n'est pas une option.** L'idée se présente d'elle-même : exempter `@handle` lorsque le compte interpellé *est* un robot, ce que les deux plateformes savent dire. Elle bute sur le §2 et sur `CA-06`. La validation s'exécute **à la frappe** dans le navigateur et doit rendre le même verdict que le vérificateur, au caractère près ; une résolution de compte la rendrait asynchrone, dépendante du réseau et de droits de lecture, et ferait dépendre le verdict d'un état extérieur que les deux composants ne voient pas au même instant. Une liste de chaînes exactes, quelle que soit sa source, est ce qui permet à `validate()` de rester une fonction pure de son entrée.
+**Résoudre le handle plutôt que le nommer n'est pas une option.** L'idée se présente d'elle-même : exempter `@handle` lorsque le compte interpellé *est* un robot, ce que GitHub et Azure DevOps savent dire. Elle bute sur le §2 et sur `CA-06`. La validation s'exécute **à la frappe** dans le navigateur et doit rendre le même verdict que le vérificateur, au caractère près ; une résolution de compte la rendrait asynchrone, dépendante du réseau et de droits de lecture, et ferait dépendre le verdict d'un état extérieur que les deux composants ne voient pas au même instant. Une liste de chaînes exactes, quelle que soit sa source, est ce qui permet à `validate()` de rester une fonction pure de son entrée.
 
 **Exempter un auteur, c'est le retirer des deux décomptes.** Un commentaire exempté ne porte aucun label résolu : il n'est donc jamais bloquant au sens du §6.1, et n'apparaît pas dans les indicateurs du §12. Les deux effets sont solidaires et ne se dissocient pas. La conséquence porte sur les **relecteurs automatiques** — revue de code par IA, analyseurs qui commentent une ligne de diff —, dont les remarques sont, elles, de vraies remarques de revue : les inscrire dans `exemptUsers` garantit qu'un `issue (blocking):` qu'ils poseraient sur un défaut réel ne bloquera rien. Le choix appartient à l'organisation et il est explicite : soit l'outil reste exempté et ses remarques sont consultatives, soit on lui apprend la convention — ils savent tous la produire sur instruction — et il est traité comme un relecteur. La seconde branche a un coût qu'il faut connaître : on n'édite pas le commentaire d'un tiers, donc un `E-NO-LABEL` de sa part n'est corrigeable que par lui.
 
@@ -596,7 +596,7 @@ Une plateforme qui **cesse** de répondre après avoir répondu — configuratio
 
 Un fil de discussion est **bloquant** si son **commentaire racine** est bloquant au sens du §3.3.
 
-Un fil bloquant est considéré **résolu** selon des états propres à chaque plateforme — voir annexes A et B pour le détail des statuts pris en compte.
+Un fil bloquant est considéré **résolu** selon des états propres à chaque plateforme — voir annexes A, B et C pour le détail des statuts pris en compte.
 
 **Règle de gouvernance.** Une résolution n'est retenue que dans **deux cas, et deux seulement** :
 
@@ -1355,7 +1355,7 @@ interface PublishedSummary {
 }
 ```
 
-*`PublishedSummary` ne porte **aucune liste de fils**, délibérément.* Une liste aurait demandé un second format machine à publier, à reparser et à tenir synchronisé, sur une seule des deux plateformes — pour une information que l'extension a déjà sous les yeux : les fils sont dans le DOM de la page qu'elle décore. Le **décompte** vient donc du résumé publié, qui fait autorité, et les **ancres** du DOM local, qui les porte.
+*`PublishedSummary` ne porte **aucune liste de fils**, délibérément.* Une liste aurait demandé un second format machine à publier, à reparser et à tenir synchronisé, sur une seule des plateformes — pour une information que l'extension a déjà sous les yeux : les fils sont dans le DOM de la page qu'elle décore. Le **décompte** vient donc du résumé publié, qui fait autorité, et les **ancres** du DOM local, qui les porte.
 
 *`PublishedSummary` porte `state` pour la même raison que `ComplianceResult` : le §6.5 dit que l'extension « **reflète** l'état, elle ne le crée pas ». Sans ce champ, elle devrait le recalculer à partir du mode et des compteurs — donc juger — et elle se tromperait : sur une PR en brouillon ou exemptée, le vérificateur publie du vert avec des compteurs non nuls (§6.2.4, §6.3.2), et une extension qui déduirait « bloqué » griserait le bouton de merge d'une PR que la source de vérité laisse passer.*
 
@@ -1519,7 +1519,7 @@ En sont **exclues** : `telemetry.*`, `language`, `badgeStyle`, `labels[].color` 
 ```ts
 // `Zone` dit *où vit* le commentaire : les quatre emplacements que le tableau du §4.1 distingue et qui
 // peuvent porter un commentaire soumis à validation.
-// Elle est employée par `core/` comme par les deux adaptateurs. Ce que *fait* l'utilisateur est une notion d'interface, portée
+// Elle est employée par `core/` comme par les adaptateurs. Ce que *fait* l'utilisateur est une notion d'interface, portée
 // séparément par `action` : le vérificateur ne la produit jamais, et une édition n'en reste
 // pas moins située dans une zone.
 type Zone = 'thread-root' | 'reply' | 'review-body' | 'conversation';
@@ -1713,7 +1713,7 @@ interface VerifierPlatformAdapter {
 }
 ```
 
-*Aucune méthode ne demande à la plateforme qui a le droit de résoudre un fil.* Les deux plateformes du périmètre l'autorisent à tout le monde (§A.6, §B.5), et la règle du §6.1 est de toute façon vérifiée **après coup** par `core/` sur `ThreadInfo.resolvedBy`. Une telle méthode n'aurait donc aucun appelant.
+*Aucune méthode ne demande à la plateforme qui a le droit de résoudre un fil.* GitHub et Azure DevOps l'autorisent à tout le monde (§A.6, §B.5) — GitLab est à vérifier (§C.5) —, et la règle du §6.1 est de toute façon vérifiée **après coup** par `core/` sur `ThreadInfo.resolvedBy`. Une telle méthode n'aurait donc aucun appelant.
 
 **Ce qui reste hors des adaptateurs, donc dans `core/` :** le calcul de conformité, et la résolution de la configuration — la **lecture** des documents restant en dehors, c'est-à-dire dans les adaptateurs (§9.2.2) ; il n'y a plus de stockage dont il faudrait dire de quel côté il tombe —, la normalisation d'entrée, et la décision de **retenir ou non** une résolution au sens du §6.1. Un adaptateur traduit et transporte ; il ne juge jamais.
 
@@ -1723,9 +1723,9 @@ Ce découpage définit également le point d'extension pour une plateforme non p
 
 ### 9.3 Contraintes d'implémentation connues
 
-Les contraintes concrètes d'implémentation par plateforme (type d'éditeur, écriture programmatique, navigation SPA, gestion des domaines) sont documentées dans les annexes A et B, qui suivent la même trame — quatre rubriques communes en tête de chacune, complétées par ce qui est propre à la plateforme.
+Les contraintes concrètes d'implémentation par plateforme (type d'éditeur, écriture programmatique, navigation SPA, gestion des domaines) sont documentées dans les annexes A, B et C, qui suivent la même trame — quatre rubriques communes en tête de chacune, complétées par ce qui est propre à la plateforme.
 
-**Stratégie d'écriture programmatique — commune aux deux plateformes.** Les éditeurs pilotés par un état applicatif absorbent l'affectation directe de `value` : le champ paraît modifié, mais le contenu soumis ne l'est pas. C'est vrai des vues React de GitHub (§A.2) comme, probablement, de l'éditeur Azure DevOps (§B.2). Les adaptateurs emploient donc **la même méthode partout** — passer par le setter natif de la propriété puis émettre un événement `input` qui remonte, ou recourir à une commande d'insertion de texte du navigateur — et **jamais** `element.value = …`.
+**Stratégie d'écriture programmatique — commune à toutes les plateformes.** Les éditeurs pilotés par un état applicatif absorbent l'affectation directe de `value` : le champ paraît modifié, mais le contenu soumis ne l'est pas. C'est vrai des vues React de GitHub (§A.2) comme, probablement, de l'éditeur Azure DevOps (§B.2). GitLab ajoute un cas que les deux autres n'ont pas : un éditeur de texte enrichi qui n'est **pas** une `<textarea>` (§C.2), où le setter natif de `value` n'existe pas et où seule la commande d'insertion de texte reste candidate — à établir sur ce cas avant d'y écrire quoi que ce soit. Les adaptateurs emploient donc **la même méthode partout** — passer par le setter natif de la propriété puis émettre un événement `input` qui remonte, ou recourir à une commande d'insertion de texte du navigateur — et **jamais** `element.value = …`.
 
 **Risque à lever :** un *spike* technique valide cette stratégie sur les deux plateformes, en commençant par établir le type réel de l'éditeur Azure DevOps. Il est mené **en parallèle** du développement de `core/` (§14). Son volet GitHub conditionne la seule **insertion de préfixe** de `P2` (`CA-02`) et doit donc aboutir tôt ; le reste de `P2` — validation, retour visuel, diagnostics — n'en dépend pas et démarre sans l'attendre. La barre d'outils (§5.1) et la saisie rapide (§5.2) en relèvent en revanche pleinement : l'une comme l'autre écrivent dans l'éditeur, et sans le spike il n'en reste que des boutons inertes. Ce risque n'est **pas** spécifique à Azure DevOps, et le dimensionnement de `P2` doit en tenir compte.
 
@@ -1755,7 +1755,7 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 - Les décisions de revue (`decision`, §6.1.1) ne font l'objet d'**aucune journalisation externe** : elles vivent dans la PR, sous le compte de leur auteur, comme n'importe quel commentaire de revue. C'est un avantage du mécanisme sur un journal de contournements — il ne crée aucun traitement de données nouveau.
 
 **Sécurité**
-- Manifest V3, permissions minimales (`storage`, `scripting`, `activeTab`), pas de `<all_urls>` — les domaines de plateforme sont demandés via `optional_host_permissions`, activés à la demande (§2, annexes A et B). **L'hôte de `configUrl` en fait partie** : il est souvent interne à l'organisation et distinct de tout domaine de plateforme, et sans cette permission `getOrgConfig()` échoue structurellement — l'extension résoudrait alors deux niveaux là où le vérificateur en résout trois, et son empreinte de configuration ne pourrait jamais coïncider (§8.1.3, règle 2). La politique d'entreprise qui pousse le plancher pré-autorise cet hôte en même temps que les domaines de plateforme.
+- Manifest V3, permissions minimales (`storage`, `scripting`, `activeTab`), pas de `<all_urls>` — les domaines de plateforme sont demandés via `optional_host_permissions`, activés à la demande (§2, annexes A, B et C). **L'hôte de `configUrl` en fait partie** : il est souvent interne à l'organisation et distinct de tout domaine de plateforme, et sans cette permission `getOrgConfig()` échoue structurellement — l'extension résoudrait alors deux niveaux là où le vérificateur en résout trois, et son empreinte de configuration ne pourrait jamais coïncider (§8.1.3, règle 2). La politique d'entreprise qui pousse le plancher pré-autorise cet hôte en même temps que les domaines de plateforme.
 - Aucun stockage de PAT ni de secret dans l'extension. **Conséquence à assumer :** les API publiques des plateformes n'acceptent pas l'authentification par cookie de session — elles exigent un jeton, que l'extension n'a pas le droit de détenir. Toute donnée que l'extension ne peut pas lire dans le DOM — état de résolution des fils, habilitation à résoudre ou à exempter — est donc **tranchée par le vérificateur**, et l'extension ne la connaît que par le résumé qu'il publie sur la PR (`readPublishedResult()`, §9.2.3), jamais par un appel d'API depuis le navigateur. **Le vérificateur ne détient pour autant aucun identifiant de service** : il s'exécute dans l'intégration continue du dépôt, authentifié par le jeton que cette exécution reçoit (§6.4, §A.8). L'extension ne lui parle pas — il n'y a rien à qui parler entre deux exécutions ; elle lit ce qu'il a laissé sur la page. C'est pourquoi `getThreads()` et `getCurrentUser()` (§9.2.3) ne lisent que le DOM : l'extension s'en sert pour afficher, jamais pour trancher. Toute décision d'autorisation — qui peut résoudre, qui peut exempter — appartient au vérificateur, qui la prend sans lire aucun groupe sur GitHub, l'habilitation y étant une liste de comptes (§A.7). Là où aucun vérificateur ne tourne — une plateforme où CCT n'en livre pas (§B.7), un dépôt qui n'a pas installé le workflow —, l'extension **fonctionne sans lui** : elle assiste et valide la saisie, sans jamais prétendre refléter un état de conformité qui n'est calculé nulle part. Ce n'est pas l'**état dégradé** du §5.4 — qui désigne une configuration que l'extension n'a pas pu lire, et qui seul désarme le blocage d'envoi.
 
   **Une exception, et une seule : la lecture de la configuration (`getRepoConfig()`, `getOrgConfig()`, §9.2.3).** L'extension lit le fichier `.conventional-comments.json` du dépôt affiché et le document d'organisation désigné par le canal de plancher, par la **route web** de la plateforme — celle que la session de l'utilisateur autorise déjà — et non par son API à jeton. La distinction n'est pas un contournement de la règle ci-dessus, elle en est la lecture exacte : la règle interdit de détenir un secret, de faire sortir du contenu, et de trancher une autorisation. Lire un fichier de configuration versionné, visible de quiconque a accès au dépôt, n'est aucun des trois.
@@ -2055,7 +2055,7 @@ Couvre Azure DevOps Services et Azure DevOps Server.
 ### B.2 Éditeur et écriture programmatique
 
 - Éditeur : **à établir par le spike** (§14, `P1'`). L'hypothèse de travail est un éditeur riche piloté par un état applicatif interne plutôt qu'un simple `<textarea>`, mais elle n'est pas vérifiée — et la documentation Microsoft présente l'éditeur de commentaires de PR comme un éditeur Markdown aligné sur le reste du produit, ce qui n'est pas concluant dans un sens ou dans l'autre. **La première tâche du spike est de déterminer le type d'élément**, pas seulement la méthode d'écriture.
-- Écriture programmatique : dès lors que l'éditeur est piloté par un état applicatif, l'affectation directe de `value` ne suffit pas — voir la stratégie commune décrite en §9.3, qui s'applique aux deux plateformes.
+- Écriture programmatique : dès lors que l'éditeur est piloté par un état applicatif, l'affectation directe de `value` ne suffit pas — voir la stratégie commune décrite en §9.3, qui s'applique à toutes les plateformes.
 
 **Risque à lever :** si l'éditeur est bien piloté par un état applicatif interne, l'écriture programmatique présente un **risque de désynchronisation entre le DOM et cet état** — l'affichage peut sembler correct alors que le contenu soumis à la plateforme diverge.
 
@@ -2111,3 +2111,64 @@ Le §6.4 pose que le vérificateur s'exécute dans l'intégration continue de la
 Une rédaction antérieure décrivait à cet endroit un service compagnon abonné aux service hooks, avec son stockage et sa réconciliation périodique. Il a disparu avec le §6.4, et **il ne doit pas revenir par cette annexe** : le jour où l'enforcement Azure DevOps sera livré, il le sera sous la même contrainte que sur GitHub — s'exécuter dans la plateforme, ne rien retenir, ne rien héberger.
 
 Les équipes qui veulent la contrainte sur Azure DevOps aujourd'hui disposent de la policy native *Check for comment resolution*. Elle ne distingue pas les fils bloquants des autres — elle les exige tous résolus — et ne satisfait donc pas O3 telle quelle ; c'est un choix d'équipe, pas un composant à déployer.
+
+---
+
+## Annexe C — GitLab
+
+Couvre gitlab.com. GitLab Dedicated et GitLab Self-Managed sont dans la cible (en-tête), mais **rien n'y a été mesuré** : chaque affirmation ci-dessous vaut pour gitlab.com, à la date et sur les captures indiquées, et se relit avant d'être étendue aux deux autres offres.
+
+Entrée au périmètre : décision du propriétaire, 2026-11-08 (§1). Les faits de cette annexe viennent des pages capturées le même jour sur un projet de test (`packages/adapters/gitlab/test/fixtures/pages/`, détail dans `packages/adapters/gitlab/CAPTURES.md`) ou de la documentation GitLab, citée comme telle. Ce qui n'a été ni mesuré ni lu s'écrit **à vérifier**.
+
+### C.1 Matrice cloud / auto-hébergé
+
+| | Cloud | Auto-hébergé |
+|---|---|---|
+| **Offre** | gitlab.com ; GitLab Dedicated (instance dédiée, à vérifier) | GitLab Self-Managed |
+| **Domaine** | `gitlab.com`, hôte fixe. Dedicated : hôte propre à chaque client, à vérifier | Domaine interne, variable par instance |
+| **Rythme de mise à jour du produit** | Continu | Par release |
+| **Version minimale supportée** | — | *à définir avec la même méthode qu'en A.1* |
+
+### C.2 Éditeur et écriture programmatique
+
+- **Deux éditeurs, au choix de l'utilisateur, et le choix est mémorisé pour son compte.** Par défaut, une `<textarea>` Markdown. La commande *Switch to rich text editing*, présente sous chaque champ, la remplace par un éditeur de texte enrichi : un `div[contenteditable="true"]` (ProseMirror), la `<textarea>` disparaissant du DOM. Mesuré le 2026-11-08 sur toutes les zones (nouveau commentaire, réponse, commentaire de ligne, modification) ; après une seule bascule, un rechargement, une autre vue et un autre champ s'ouvrent tous en texte enrichi. Un utilisateur qui a basculé une fois y reste : ce n'est pas un cas marginal.
+- Écriture programmatique, `<textarea>` : stratégie commune du §9.3.
+- Écriture programmatique, texte enrichi : **à établir**. Le setter natif de `value` n'existe pas sur un `contenteditable` ; la commande d'insertion de texte du navigateur (§9.3) est la seule candidate, et ce qu'elle produit dans l'état de l'éditeur — donc dans le corps soumis — n'est pas mesuré. Un `input[type=hidden][name="note[note]"]` accompagne l'éditeur ; qu'il porte le Markdown soumis est à vérifier. **Tant que ce n'est pas établi, l'adaptateur n'écrit pas dans l'éditeur de texte enrichi** : assistance sans écriture, plutôt qu'écriture désynchronisée (même risque qu'en §B.2).
+- Lecture : la valeur d'une `<textarea>` se lit sur l'élément ; celle de l'éditeur de texte enrichi est à établir avec l'écriture.
+
+### C.3 Navigation
+
+Application à vues dynamiques : les onglets *Overview* et *Changes* d'une merge request, et les formulaires de commentaire, apparaissent sans rechargement. L'adaptateur observe le conteneur racine par `MutationObserver`, comme sur Azure DevOps (§B.3). Les événements de navigation propres à GitLab, s'il en existe d'exploitables, sont à vérifier.
+
+**Deux vues de l'onglet *Changes*.** *Rapid Diffs*, vue par défaut d'après la documentation GitLab (« Changes in merge requests », lue le 2026-11-08), et la vue classique, que l'utilisateur choisit par *Switch to classic loading* — choix mémorisé, mesuré. Leur DOM diffère (Rapid Diffs : éléments `<diff-file>`, classes `rd-diff-…`) et l'adaptateur doit reconnaître les deux, au titre du §A.5 : plusieurs générations de DOM à un même instant.
+
+### C.4 Domaines et lecture de la configuration
+
+`gitlab.com` est un hôte fixe — le groupe et le projet vivent dans le CHEMIN : il va au catalogue de la page d'options, selon la règle du §A.4. Un domaine Self-Managed se saisit, plateforme choisie avant l'octroi ; l'hôte de Dedicated, de même, à vérifier.
+
+**Lecture du fichier de configuration par l'extension** (`getRepoConfig()`, §9.2.3, §10) : **à établir par une mesure**, avec les questions que le dépôt a appris à poser (`check:content-script-cors`, `check:relay-cors`) — quelle route, si elle redirige, ce que la cible répond en CORS, ce qu'elle exige en `credentials`. Une route de fichier brut de la forme `/{groupe}/{projet}/-/raw/{branche}/…` est à vérifier, jusqu'à son existence même. Tant que la lecture n'est pas mesurée, `getRepoConfig()` y renvoie `{ status: 'unreachable' }` et l'extension y est en état dégradé au sens du §5.4.
+
+### C.5 Résolution de fil
+
+Les fils portent un bouton *Resolve thread* (mesuré). Ce qui suit est **à vérifier** avant que le §6 s'applique ici :
+
+- l'état exposé dans la page pour un fil résolu, que lit `getThreads()` ;
+- qui a le droit de résoudre un fil — non mesuré ;
+- si l'auteur de la résolution est exposé. S'il ne l'est pas, le cas du §6.1 pour les plateformes qui ne l'exposent pas s'applique, comme en §B.5.
+
+### C.6 Actions couvertes spécifiques
+
+Mesurées le 2026-11-08 ; chaque chemin d'envoi passe par la validation, et le bouton qui ANNULE n'est jamais intercepté.
+
+- **Nouveau commentaire général** : bouton scindé *Comment* / menu *Comment type*, dont l'option *Start thread* change le libellé du bouton d'envoi ; case *Make this an internal note*, qui le change encore (*Add internal note*). Le même formulaire porte **un second chemin d'envoi**, *Comment and close merge request* (et ses variantes), qui ferme la merge request en publiant.
+- **Réponse, commentaire de ligne, modification** : *Add comment now*, *Start a review* / *Add to review*, *Save comment*.
+- **Revue soumise en lot** : GitLab porte un corps de revue (*Submit your review*, champ de résumé), d'où `scope.validateReviewSummary` (§8.2), comme sur GitHub (§A.7).
+- **Note interne** : un commentaire peut être publié comme note interne. Qu'il entre dans le périmètre de la validation et du blocage comme un commentaire ordinaire est **à trancher** (§4.1).
+- **Commandes adressées à un outil** (§4.2) : GitLab a des *quick actions* — commandes `/…` dans un commentaire, que l'éditeur annonce (`data-supports-quick-actions`, bouton *Add a quick action*). Le sentinel `/*` de `toolCommands` (§8.2) les couvre ; le recommander en exemple pour GitLab est à trancher, comme sur GitHub (§A.7) — jamais imposé par le produit.
+- **Bloc de suggestion** (§4.2, étage 0 du §3.5.1) : un bloc de code délimité dont l'*info string* commence par `suggestion`, **suivi d'une plage de lignes** — mesuré : ` ```suggestion:-0+0 `, inséré par l'éditeur de commentaire de ligne, rendu en bloc *Suggested change* avec *Apply suggestion*. **Le marqueur de GitLab n'est donc pas une info string fixe** : la détection actuelle de `core/` compare le premier mot exactement (`containsSuggestionBlock()`) et ne reconnaîtrait pas `suggestion:-0+0`. Fixer la forme du marqueur — `suggestion` suivi d'une plage `:-N+M`, optionnelle ou obligatoire, à vérifier dans la documentation GitLab — relève d'un amendement de ce paragraphe ; l'adapter dans `core/`, d'une PR de code partagé distincte. Tant que ce n'est pas fait, `suggestionInfoString` vaut `null` pour GitLab : pas d'étage 0, et un `suggestion:` explicite y reste toujours accepté.
+- **Provenance d'une étiquette** (§6.3.2), **`resolverOverrideGroup`**, **comptes de service** : à établir, sans objet tant qu'aucun vérificateur n'est livré (§C.7).
+- **Versions à couvrir en test** (§9.4) : gitlab.com, dans ses deux vues de *Changes* et ses deux éditeurs ; Self-Managed, liste à arrêter avec la même méthode qu'en A.1.
+
+### C.7 Vérification de conformité — non livrée
+
+**CCT ne livre pas de vérificateur pour GitLab** à ce jour. Cette annexe décrit ce que le composant A sait faire ici ; elle s'arrête là, comme l'annexe B (§B.7), et pour la même raison : le §6.4 veut un vérificateur exécuté dans l'intégration continue de la plateforme, et rien n'a été mesuré sur GitLab CI. Le jour où il sera conçu, il le sera sous la même contrainte — s'exécuter dans la plateforme, ne rien retenir, ne rien héberger.

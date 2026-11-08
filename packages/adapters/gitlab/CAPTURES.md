@@ -16,6 +16,19 @@ Created from the browser tab with the signed-in session, at the owner's request:
 `new_line`) makes a diff-line thread. The `X-CSRF-Token` header was read from the page and never
 returned; the scripts returned only status codes and numbers.
 
+## Secrets audit
+
+2026-11-08, on the reduced pages of two merge requests (!1: 15 pages, !2:
+`01-overview-nouveau-commentaire-mr2.html` and `04-changes-commentaire-ligne-mr2.html`),
+`node scripts/check-captured-pages.mjs --audit` reports **no opaque value shared by the two
+GitLab merge requests**. Its only finding, `meta[name=release] @content`, comes from the GitHub
+captures (a site version fingerprint, already sorted as a constant). The GitLab captures keep no
+`<meta>` at all after reduction. `node scripts/check-captured-pages.mjs`: no known session secret
+in clear. No reducer rule had to be added for GitLab.
+
+What the audit cannot see, as for any platform: a secret inside text or inside an attribute the
+reducer keeps (`id`, `class`, `aria-*`, short `data-*`, URL paths) that is not opaque-looking.
+
 ## Comment editor: controls inventory
 
 Every `button` / `input` of the form holding the field, in both editing modes (captures `01-…`

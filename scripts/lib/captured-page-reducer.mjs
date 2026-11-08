@@ -226,6 +226,105 @@ export function reducePage(doc, rules) {
   return dropped;
 }
 
+/** Réduit une page et PROUVE la réduction, comme la font l'outil en ligne de commande et le script
+ * de navigateur — la MÊME fonction pour les deux, que `check:page-reducer` tient pour
+ * équivalents. AUTONOME : sérialisée dans Chromium par `page.evaluate`, recopiée telle quelle
+ * dans le script de navigateur.
+ *
+ * - `reduce` : `reducePage`, passée en argument plutôt qu'appelée, pour que la fonction reste
+ *   sans fermeture ;
+ * - `parse(text)` : l'analyse HTML. Mesuré le 2026-11-08 : sous `require-trusted-types-for
+ *   'script'`, `DOMParser.parseFromString` refuse une chaîne — le script de navigateur passe
+ *   donc la sienne ;
+ * - `candidates` / `reads` : les candidats de `selectors.ts` et les attributs que l'adaptateur
+ *   lit ; `candidates` nul = pas de comparaison (`--no-selectors`).
+ *
+ * Rend la page réduite (`out`), ce qui a été retiré, les relevés avant/après de chaque candidat
+ * — élément marqué et valeurs lues, jamais imprimés tels quels (`describeMismatch`) —, et si la
+ * réduction est un point fixe. */
+export function reduceAndVerify({ html, rules, candidates, reads, mark, reduce, parse }) {
+  const serialize = (doc) => '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+  const found = (doc) => {
+    if (!candidates) return null;
+    const out = {};
+    for (const [key, list] of Object.entries(candidates)) {
+      out[key] = list.map((c) => {
+        try {
+          return Array.from(doc.querySelectorAll(c), (el) => [
+            el.getAttribute(mark),
+            Object.fromEntries(reads.map((r) => [r, el.getAttribute(r)])),
+          ]);
+        } catch (err) {
+          return `erreur : ${err.message}`;
+        }
+      });
+    }
+    return out;
+  };
+  const raw = parse(html);
+  let n = 0;
+  for (const el of raw.querySelectorAll('*')) el.setAttribute(mark, String(n++));
+  const before = found(raw);
+  const dropped = reduce(raw, { ...rules, preserve: [mark] });
+  // Relire ce qui serait écrit : c'est la page RE-PARSÉE que les tests liront.
+  const reread = parse(serialize(raw));
+  const after = found(reread);
+  for (const el of reread.querySelectorAll(`[${mark}]`)) el.removeAttribute(mark);
+  const out = serialize(reread);
+  const again = parse(out);
+  reduce(again, rules);
+  return { out, dropped, before, after, fixedPoint: serialize(again) === out };
+}
+
+/** Le script à exécuter DANS une page ouverte (`javascript_tool` de Claude in Chrome) : il réduit
+ * la page affichée, prouve la réduction, et TÉLÉCHARGE la seule forme réduite sous `file`. Il ne
+ * rend qu'un résumé — jamais de HTML : la page brute ne touche ni le disque, ni la conversation.
+ * Une page qui échoue n'est pas téléchargée.
+ *
+ * Le script ne contient que des sources de fonctions et des données JSON : pas d'`eval`, pas de
+ * `new Function`, qu'une politique de sécurité de la page pourrait refuser. */
+export function buildPageReducer({ rules, candidates, reads, file }) {
+  const args = JSON.stringify({ rules, candidates, reads, file, mark: 'data-cct-reduce-id' });
+  return `(() => {
+  'use strict';
+  const reducePage = ${reducePage.toString()};
+  const reductionMismatches = ${reductionMismatches.toString()};
+  const describeMismatch = ${describeMismatch.toString()};
+  const reduceAndVerify = ${reduceAndVerify.toString()};
+  const { rules, candidates, reads, file, mark } = ${args};
+  // Sous Trusted Types, \`DOMParser\` refuse une chaîne : une politique propre au script, si la
+  // page en admet une. Sinon, échec explicite — la voie manuelle prend le relais.
+  let policy = null;
+  const parse = (text) => {
+    try {
+      return new DOMParser().parseFromString(policy ? policy.createHTML(text) : text, 'text/html');
+    } catch (err) {
+      if (policy || typeof trustedTypes === 'undefined') throw err;
+      policy = trustedTypes.createPolicy('cct-reduce-capture', { createHTML: (s) => s });
+      return new DOMParser().parseFromString(policy.createHTML(text), 'text/html');
+    }
+  };
+  try {
+    const html = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;
+    const r = reduceAndVerify({ html, rules, candidates, reads, mark, reduce: reducePage, parse });
+    const problems = [];
+    if (candidates) for (const m of reductionMismatches(candidates, r.before, r.after)) problems.push(describeMismatch(m));
+    if (!r.fixedPoint) problems.push('la page réduite, réduite à nouveau, ne revient pas à l’identique');
+    // Le protocole capture la page SANS l'extension Conventional Comments.
+    if (/\\sclass="[^"]*\\bcct-/.test(r.out)) problems.push('des classes cct- dans la page : l’extension Conventional Comments est active');
+    if (problems.length > 0) return { file, ok: false, problems };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([r.out], { type: 'text/html' }));
+    a.download = file;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    return { file, ok: true, rawBytes: html.length, reducedBytes: r.out.length, title: document.title };
+  } catch (err) {
+    return { file, ok: false, problems: [\`erreur : \${err.name} — \${String(err.message).slice(0, 160)}\`] };
+  }
+})()`;
+}
+
 /** La page, telle qu'elle s'écrit sur disque. SANS retour à la ligne après `</html>` : le
  * parseur le range dans `<body>`, et chaque passage en ajoutait un — la réduction n'était plus
  * un point fixe (mesuré à la première exécution). */

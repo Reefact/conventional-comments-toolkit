@@ -224,6 +224,8 @@ npm run check:captured-pages    # aucune page capturée ne garde un secret de se
 npm run check:captured-selectors # happy-dom trouve, sur les pages capturées, exactement ce que trouve Chromium
 npm run reduce:captured-pages -- <id> # réduit les captures à leur forme stockable (--check : vérifier sans écrire)
 npm run check:reduced-selectors # aucun sélecteur ne cherche ce que la réduction des captures retire
+npm run build:page-reducer -- <id> <NN-vue-état.html> # script qui réduit la page ouverte dans Chrome (skill plateforme)
+npm run check:page-reducer      # ce script et la ligne de commande : même réduction, mêmes refus (Chromium)
 npm run check:github-selectors-live # les chaînes de selectors.ts trouvent encore sur github.com (sans session)
 ```
 

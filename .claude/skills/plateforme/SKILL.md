@@ -1,6 +1,6 @@
 ---
 name: plateforme
-description: Protocole de création ou de remise à niveau d'un adaptateur de plateforme (Azure DevOps, GitLab, Bitbucket, une nouvelle génération de GitHub…) — captures de la plateforme SANS l'extension d'abord, puis sélecteurs mesurés, tests sur pages réelles, gardes et canari. À utiliser dès qu'on parle de créer une plateforme, d'en remettre une à niveau, de corriger ses sélecteurs, ou de recevoir des captures de pages.
+description: Protocole de création ou de remise à niveau d'un adaptateur de plateforme (Azure DevOps, GitLab, Bitbucket, une nouvelle génération de GitHub…) — captures de la plateforme SANS l'extension d'abord (de préférence par une session Claude Code locale pilotant Claude in Chrome, qui capture et réduit dans le navigateur), puis sélecteurs mesurés, tests sur pages réelles, gardes et canari. À utiliser dès qu'on parle de créer une plateforme, d'en remettre une à niveau, de corriger ses sélecteurs, ou de recevoir des captures de pages.
 ---
 
 # Créer ou remettre à niveau une plateforme
@@ -50,8 +50,71 @@ champ ou INTERCEPTE un envoi : un défaut y change ce qu'elle bloque. 8 et 9 peu
 Un état que la plateforme n'a pas s'écrit « sans objet » dans la PR, avec la raison — jamais
 omis en silence.
 
-Les captures se prennent **extension désactivée**, sur une PR de test sans contenu privé. La
-consigne à donner à la personne, telle quelle :
+Les captures se prennent **extension Conventional Comments désactivée**, sur des PR de test sans
+contenu privé — dans une organisation de test si possible. Deux voies : **A**, la session locale
+avec Claude in Chrome, qui couvre aussi les étapes 2 et 3 et ne demande à la personne que ce
+qu'elle seule peut faire ; **B**, la copie à la main, en repli.
+
+### Voie A — session locale avec Claude in Chrome (recommandée)
+
+Claude Code pilote l'extension Claude in Chrome dans le navigateur de la personne, avec sa
+session connectée (documentation Claude Code, « Use Claude Code with Chrome », lue le
+2026-11-08). La même session a le terminal, Git, Node ET le navigateur : elle capture, réduit,
+vérifie et commite sans copier-coller.
+
+**Elle exige une session LOCALE** — `claude --chrome`, ou `/chrome` dans une session ouverte,
+en CLI ou dans VS Code — lancée dans un clone du dépôt (`npm ci`, `npm run build`). Une session
+dans le cloud n'a pas les outils `mcp__claude-in-chrome__*` : la chercher par ToolSearch, et
+s'ils manquent, ne rien improviser — proposer à la personne de relancer en local, ou la voie B.
+Prérequis à lui faire vérifier : l'extension Claude in Chrome (1.0.36 ou plus), connectée au
+même compte et à la même organisation que Claude Code ; l'extension Conventional Comments
+DÉSACTIVÉE dans ce Chrome ; les PR de test créées par elle — ne rien créer ni écrire sur la
+plateforme sans son accord.
+
+Pour chaque état, dans un onglet que la session ouvre elle-même :
+
+1. Ouvrir l'état (naviguer, cliquer). Page de connexion, CAPTCHA, bouton introuvable : demander
+   à la personne, qui le fait dans la fenêtre visible, puis reprendre.
+2. Générer le script de réduction de l'état :
+   `npm run --silent build:page-reducer -- <id> NN-<vue>-<état>.html --out <scratchpad>/NN.js`
+   (`--no-selectors` pour une plateforme sans `selectors.ts`, comme à l'étape 2).
+3. L'exécuter par `javascript_tool` dans l'onglet de l'état. Il réduit la page affichée, prouve
+   la réduction — chaque candidat, mêmes éléments et mêmes valeurs lues avant et après ; point
+   fixe ; aucune classe `cct-` — par la même fonction que la ligne de commande
+   (`check:page-reducer` les tient pour équivalentes), puis TÉLÉCHARGE la seule forme réduite. Il
+   rend un résumé, jamais de HTML : `ok: false` liste les problèmes et rien n'est téléchargé —
+   corriger l'état, ou le signaler.
+4. Déplacer le fichier téléchargé dans `packages/adapters/<id>/test/fixtures/pages/`, en
+   vérifiant son nom (Chrome suffixe « (1) » un doublon).
+
+**Ce qui ne se fait jamais**, parce que la page brute ne doit ni toucher le disque ni entrer dans
+la conversation : extraire le HTML ou une valeur d'attribut de la page (`javascript_tool` qui
+renvoie `outerHTML`, lecture d'un texte de page pour le recopier), coller une page, téléverser
+une capture. Lire la page pour s'y repérer et cliquer, oui ; en extraire, non.
+
+Ensuite, comme toute capture : `reduce:captured-pages -- <id> --check`, l'audit (`node
+scripts/check-captured-pages.mjs --audit`, sur au moins deux PR pour une plateforme nouvelle,
+rapport trié comme à l'étape 2), `node scripts/check-captured-pages.mjs`, puis l'étape 3.
+
+**À vérifier au premier usage, et à écrire ici une fois mesuré** — `check:page-reducer` mesure le
+script par `page.evaluate` dans Chromium, pas par l'extension :
+- que `javascript_tool` exécute le script comme `page.evaluate`, et en rend le résultat ;
+- que le téléchargement passe sans demande de confirmation de Chrome ;
+- que Claude in Chrome n'ajoute rien au DOM capturé — chercher, dans la première page réduite,
+  un élément étranger à la plateforme ;
+- la politique de sécurité de la plateforme : sous Trusted Types, le script crée sa propre
+  politique (`cct-reduce-capture`) ; une page qui les interdit toutes le fait échouer
+  explicitement (mesuré dans Chromium), et l'on passe à la voie B.
+
+La validation finale passe par la même session : une fois l'adaptateur écrit (étapes 4-5) et
+l'extension construite (`npm run build:extension`), la personne charge `dist-ext/` dans ce
+Chrome et l'active ; la session ouvre chaque état sur les PR de test, enregistre des captures
+d'écran et les MONTRE à la personne, qui valide. Ces captures montrent une page connectée : elles
+ne se commitent pas.
+
+### Voie B — à la main
+
+La consigne à donner à la personne, telle quelle :
 
 > Pour chaque état : ouvre-le dans la page, puis F12 → onglet « Elements » → clic droit sur la
 > toute première ligne `<html>` → « Copy » → « Copy outerHTML », et colle le tout dans un
@@ -66,6 +129,9 @@ est affichée.
 captures du même état dans deux vues portent le même numéro.
 
 ## 2. Réduire AVANT tout envoi — sur la machine de qui a capturé
+
+(La voie A réduit dans le navigateur, page par page, et n'a de cette étape que l'audit et ses
+règles. Ce qui suit vaut pour les deux voies, la consigne en ligne de commande pour la B.)
 
 Une page capturée porte la session de qui l'a prise : jetons CSRF, nonces, canaux signés,
 identifiant de session du socket. **Aucune capture brute ne quitte cette machine** — ni vers

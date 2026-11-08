@@ -27,6 +27,9 @@ on:
       - 'scripts/check-captured-selectors.mjs'
       - 'scripts/reduce-captured-pages.mjs'
       - 'scripts/lib/captured-page-reducer.mjs'
+      - 'scripts/lib/captured-page-inputs.mjs'
+      - 'scripts/build-page-reducer.mjs'
+      - 'scripts/check-page-reducer.mjs'
       - '.github/workflows/browser-smoke.yml'
   workflow_dispatch:
 
@@ -168,3 +171,10 @@ jobs:
             id=$(echo "$dir" | cut -d/ -f3)
             npm run --silent reduce:captured-pages -- "$id" --check
           done
+
+      # La voie « session locale avec Claude in Chrome » réduit la page DANS le navigateur, par un
+      # script généré (scripts/build-page-reducer.mjs). Il doit faire exactement ce que fait la
+      # ligne de commande : même octets sur chaque capture et sur une page brute piégée, mêmes
+      # refus (écart avant/après, extension active, Trusted Types sans politique possible).
+      - name: Le script de réduction dans le navigateur équivaut à la ligne de commande
+        run: npm run check:page-reducer

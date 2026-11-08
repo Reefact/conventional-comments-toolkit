@@ -106,6 +106,7 @@ function makeAdapter(
     getRenderedComments?: () => { element: Element; bodyText: string }[];
     getRenderedCommentElements?: () => Element[];
     getBannerMount?: () => Element | null;
+    getThreadFilterMount?: () => Element | null;
   } = {}
 ): PlatformAdapter {
   const renderedComments = opts.getRenderedComments ?? (() => []);
@@ -131,6 +132,9 @@ function makeAdapter(
     getRenderedCommentElements:
       opts.getRenderedCommentElements ?? (() => renderedComments().map((c) => c.element)),
     getBannerMount: opts.getBannerMount ?? (() => null),
+    // Par défaut, la place que le code partagé choisissait lui-même : avant le premier fil.
+    getThreadFilterMount:
+      opts.getThreadFilterMount ?? (() => (opts.getRenderedThreadElements?.() ?? [])[0]?.element ?? null),
   };
 }
 
@@ -1587,6 +1591,54 @@ describe('§5.5 — le bandeau se monte en tête de PR, le filtre en tête des f
 
     expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0); // une PR saine ne se décore pas
     expect(doc.querySelector('.cct-thread-filter')).not.toBeNull();
+  });
+
+  it('la place du filtre est celle que la PLATEFORME donne — et `null` veut dire : pas de filtre', async () => {
+    // La décision était celle du code partagé (« avant le premier fil ») ; elle appartient à
+    // l'adaptateur (`getThreadFilterMount`) : dans une vue de diff, les fils sont intercalés
+    // entre les lignes, et le filtre tombait au milieu du code (validation sur GitLab).
+    const doc = document;
+    const thread: ThreadInfo = {
+      id: 't1',
+      pr: pr(44),
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'issue: quelque chose ne va pas',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution: 'unknown',
+      canCarryBlockingState: true,
+    };
+    const first = doc.createElement('div');
+    const elsewhere = doc.createElement('section');
+    doc.body.append(elsewhere, first);
+
+    const placed = makeAdapter(() => pr(44), () => null, {
+      getThreads: async () => [thread],
+      getRenderedThreadElements: () => [{ id: 't1', element: first }],
+      getThreadFilterMount: () => elsewhere,
+    });
+    const stopPlaced = observe(placed, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    expect(doc.querySelector('.cct-thread-filter')?.nextElementSibling).toBe(elsewhere);
+    stopPlaced();
+
+    doc.body.innerHTML = '';
+    const again = doc.createElement('div');
+    doc.body.appendChild(again);
+    const none = makeAdapter(() => pr(45), () => null, {
+      getThreads: async () => [{ ...thread, pr: pr(45) }],
+      getRenderedThreadElements: () => [{ id: 't1', element: again }],
+      getThreadFilterMount: () => null,
+    });
+    observe(none, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    expect(doc.querySelector('.cct-thread-filter')).toBeNull();
   });
 });
 

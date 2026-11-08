@@ -622,6 +622,12 @@ export class GithubClientAdapter implements PlatformAdapter {
     return queryChain(this.#doc, selectors.bannerMount).element;
   }
 
+  /** §5.5 — avant le premier fil rendu : la place que le code partagé choisissait lui-même avant
+   * que le contrat ne la demande à la plateforme. Comportement inchangé. */
+  getThreadFilterMount(): Element | null {
+    return this.getRenderedThreadElements()[0]?.element ?? null;
+  }
+
   /** Conteneurs de fils rendus, pour le filtre local du §5.5 (§9.2.3) — même dérivation
    * d'identifiant que getThreads(). */
   getRenderedThreadElements(): { id: string; element: Element }[] {

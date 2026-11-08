@@ -247,6 +247,9 @@ describe('C — bootstrap(document, testFactories()) met le relais entre les mai
             getBannerMount() {
               return null;
             },
+            getThreadFilterMount() {
+              return this.getRenderedThreadElements()[0]?.element ?? null;
+            },
             getRenderedThreadElements() {
               return [];
             },
@@ -438,6 +441,9 @@ describe('E — le relais ne sert QUE les origines tierces (revue Codex, PR #30)
             },
             getBannerMount() {
               return null;
+            },
+            getThreadFilterMount() {
+              return this.getRenderedThreadElements()[0]?.element ?? null;
             },
             getRenderedThreadElements() {
               return [];

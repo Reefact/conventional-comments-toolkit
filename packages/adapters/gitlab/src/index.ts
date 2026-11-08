@@ -256,6 +256,15 @@ export class GitlabClientAdapter implements PlatformAdapter {
     return queryChain(this.#doc, selectors.bannerMount).element;
   }
 
+  /** §5.5 — dans l'Overview, avant le premier fil : les fils y forment la liste d'activité, et le
+   * filtre la précède. Dans l'onglet Changes, AUCUN filtre (`null`) : les fils y sont intercalés
+   * entre les lignes du diff, et un filtre posé avant le premier tombait au milieu du code
+   * (validation du propriétaire, 2026-11-08). */
+  getThreadFilterMount(): Element | null {
+    if (MR_PATH.exec(this.#doc.location?.pathname ?? '')?.[4] !== undefined) return null;
+    return this.getRenderedThreadElements()[0]?.element ?? null;
+  }
+
   getRenderedThreadElements(): { id: string; element: Element }[] {
     return queryChainAll(this.#doc, selectors.thread).map((element, i) => ({
       id: this.#threadId(element) ?? `dom-thread-${i}`,

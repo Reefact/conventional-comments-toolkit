@@ -622,6 +622,9 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
         getBannerMount() {
           return null;
         }
+        getThreadFilterMount() {
+          return this.getRenderedThreadElements()[0]?.element ?? null;
+        }
         getRenderedThreadElements() {
           return [];
         }
@@ -1107,6 +1110,9 @@ describe('D — dégradation de sélecteur : journal local TOUJOURS, télémétr
             },
             getBannerMount() {
               return null;
+            },
+            getThreadFilterMount() {
+              return this.getRenderedThreadElements()[0]?.element ?? null;
             },
             getRenderedThreadElements() {
               return [];

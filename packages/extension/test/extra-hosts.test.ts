@@ -280,6 +280,9 @@ describe('C — bootstrap(document, testFactories()) construit LE bon adaptateur
       getBannerMount() {
         return null;
       },
+      getThreadFilterMount() {
+        return this.getRenderedThreadElements()[0]?.element ?? null;
+      },
       getRenderedThreadElements() {
         return [];
       },
@@ -545,6 +548,9 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
         getBannerMount() {
           return null;
         }
+        getThreadFilterMount() {
+          return this.getRenderedThreadElements()[0]?.element ?? null;
+        }
         getRenderedThreadElements() {
           return [];
         }
@@ -616,6 +622,9 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
         }
         getBannerMount() {
           return null;
+        }
+        getThreadFilterMount() {
+          return this.getRenderedThreadElements()[0]?.element ?? null;
         }
         getRenderedThreadElements() {
           return [];
@@ -730,6 +739,9 @@ function mockGithubAdapterDeliveringOneEditor(disposeEditors: () => void): void 
       }
       getBannerMount() {
         return null;
+      }
+      getThreadFilterMount() {
+        return this.getRenderedThreadElements()[0]?.element ?? null;
       }
       getRenderedThreadElements() {
         return [];
@@ -1003,6 +1015,9 @@ describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur'
         }
         getBannerMount() {
           return null;
+        }
+        getThreadFilterMount() {
+          return this.getRenderedThreadElements()[0]?.element ?? null;
         }
         getRenderedThreadElements() {
           return [];
@@ -1306,6 +1321,9 @@ describe('H4 — un contrôleur dont l’éditeur a quitté le document est lib�
         }
         getBannerMount() {
           return null;
+        }
+        getThreadFilterMount() {
+          return this.getRenderedThreadElements()[0]?.element ?? null;
         }
         getRenderedThreadElements() {
           return [];

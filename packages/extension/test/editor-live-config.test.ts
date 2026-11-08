@@ -64,6 +64,9 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
       getBannerMount() {
         return null;
       }
+      getThreadFilterMount() {
+        return this.getRenderedThreadElements()[0]?.element ?? null;
+      }
       getRenderedThreadElements() {
         return [];
       }

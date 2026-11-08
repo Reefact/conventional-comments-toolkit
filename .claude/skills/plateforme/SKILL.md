@@ -345,6 +345,12 @@ telle page n'avait pas été réduite. C'est une page brute : à traiter selon l
   `data-first-thread-comment` est posé exprès.
 - Un nom qui désigne deux choses (`ReviewThreadContainer__…` est un fil ET un commentaire) n'est
   pas une prise.
+- Les candidats d'une chaîne sont des REPLIS ORDONNÉS, pas une union : `queryChainAll` rend les
+  éléments du PREMIER candidat qui trouve. Pour rendre plusieurs sortes d'éléments à la fois
+  (les champs de toutes les zones, tous les boutons d'envoi d'un formulaire), l'union s'écrit
+  en UN candidat, liste de sélecteurs CSS. Aucune garde ne le voit — elles comparent les
+  candidats un à un ; seule une lecture par la fonction réelle (`queryChainAll` sur la capture)
+  le montre. Premier usage : les champs de réponse n'auraient jamais été observés.
 - Un candidat se vérifie TEL QU'IL EST ÉCRIT, sur toutes les captures, avant le commit — pas
   l'exploration qui l'a inspiré. Premier usage : l'exploration avait trouvé une date en
   remontant au parent d'un bloc, le sélecteur écrit la cherchait DANS ce bloc, et ne trouvait

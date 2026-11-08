@@ -151,7 +151,8 @@ rapport trié comme à l'étape 2), `node scripts/check-captured-pages.mjs`, pui
 - `javascript_tool` exécute le script (texte du fichier généré passé tel quel) et rend l'objet
   résumé, `ok: true` et les tailles ;
 - le téléchargement passe sans demande de confirmation de Chrome, dans `~/Downloads`, au nom
-  demandé ; la taille sur disque dépasse de quelques octets `reducedBytes`, qui compte des
+  demandé — mais APRÈS le retour du script, pas avant : le fichier peut manquer à l'instant où
+  `ok: true` arrive. Le chercher à nouveau avant de conclure qu'il n'est pas parti ; la taille sur disque dépasse de quelques octets `reducedBytes`, qui compte des
   caractères, pas des octets UTF-8 ;
 - Claude in Chrome n'ajoute rien au DOM capturé : les enfants de `<body>` de la page réduite
   sont tous de GitLab (vérifié sur la seule page 01 — à refaire si l'extension change) ;

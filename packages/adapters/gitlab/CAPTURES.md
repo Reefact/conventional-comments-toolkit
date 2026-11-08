@@ -59,6 +59,10 @@ never sent):
   to be resolved."). Both are in the DOM even while the menu is closed.
 - No draft survived: after clearing the field and reloading, it was empty, and no localStorage
   key matched `autosave|draft|note`.
+- With **Start thread** selected (`01-…-type-fil.html`, text typed, never sent): the submit
+  button reads "Start thread", and the close button "Start thread and close merge request". Same
+  elements as with "Comment" — only their labels change. Switched back to "Comment" afterwards;
+  after a reload the submit button read "Comment" again.
 
 ## Rich text mode
 

@@ -2,6 +2,8 @@
 
 Browser extension enforcing [Conventional Comments](https://conventionalcomments.org/) in code reviews, for GitHub (github.com, Enterprise Cloud/EMU, Enterprise Server) and Azure DevOps (Services, Server).
 
+GitLab (gitlab.com) gets the authoring assistance and real-time validation, but not the merge guard: the extension cannot read a repository's configuration there yet, so it never blocks on GitLab (specification, annex C). GitLab Self-Managed and Dedicated are not measured yet.
+
 - **Browser extension (component A)** — authoring assistance and real-time validation while writing review comments. Convenience and prevention; bypassable by construction.
 - **Verifier (component B)** — the source of truth the specification describes: it verifies every comment after the fact, computes "blocking threads resolved", and publishes a required status check, so a PR can't be completed with an unresolved blocking comment even without the extension installed. **No verifier ships today.** The companion server that used to fill this role is removed: the specification now requires a verifier that runs *inside* the platform and keeps no state (§6.4), and [issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56) tracks building one for GitHub. Until then, objective O3 is not enforced anywhere.
 

@@ -97,9 +97,9 @@ describe('§4.1, §9.2.3 — Overview : nouveau commentaire général (capture 0
     expect(loggedChains(page)).toEqual([]);
   });
 
-  it('ancre le bandeau sous le titre, et ne déclare pas de forme de corps non mesurée (§5.5)', () => {
+  it('ancre le bandeau sous le titre, et déclare la forme mesurée du corps rendu (§5.5)', () => {
     expect(page.adapter.getBannerMount()?.classList.contains('detail-page-header')).toBe(true);
-    expect(page.adapter.renderedBodyShape()).toBeNull();
+    expect(page.adapter.renderedBodyShape()).toEqual({ paragraphTags: ['P'], lineBreakTag: 'BR' });
   });
 
   it("n'a pas d'étage 0, et lit la configuration du dépôt comme injoignable (§C.4, §C.6)", async () => {

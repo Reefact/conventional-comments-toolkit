@@ -88,8 +88,10 @@ son libellé peut changer champ rempli — d'où une capture champ REMPLI, sans 
 CLAVIER n'a pas d'élément, aucune capture ne le montre, il se teste à la validation finale.
 Taper dans un champ n'est pas publier, mais c'est écrire sur la plateforme : accord de la
 personne d'abord, un texte qui se dit de test, puis champ vidé et rechargement pour vérifier
-qu'aucun brouillon ne reste. Le texte tapé n'est PAS dans la capture (la valeur d'une
-`<textarea>` ne se sérialise pas) : la capture « rempli » montre les boutons, pas le texte.
+qu'aucun brouillon ne reste. Ce que l'utilisateur a CHANGÉ n'est PAS dans la capture : la valeur
+d'une `<textarea>`, l'état coché d'une case ou d'un bouton radio sont des propriétés de l'élément
+vivant, que le HTML ne sérialise pas. Une telle capture ne montre que ce que la page en a
+DÉDUIT (libellés, attributs ARIA, classes) — le noter, et ne pas bâtir de sélecteur sur l'état.
 Et « désactivé » se mesure sur l'élément vivant : `aria-disabled` sans attribut `disabled` est
 courant, et `:disabled` / `:enabled` ne le voient pas.
 

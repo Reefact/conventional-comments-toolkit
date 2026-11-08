@@ -93,8 +93,13 @@ plateforme sans son accord.
 session locale, une étape par message : (1) le clone, sur la branche qui porte la version du
 skill en cours d'amélioration si elle n'est pas fusionnée, puis `npm ci` et `npm run build` ;
 (2) l'extension Claude in Chrome installée et connectée, Conventional Comments désactivée ;
-(3) `claude --chrome` lancé dans le clone, et le skill invoqué. La session locale prend alors
-le relais.
+(3) la CLI Claude Code présente : `claude --version` doit afficher une version. Ne pas la
+supposer installée — un utilisateur de l'application de bureau ou de claude.ai ne l'a pas
+forcément (premier usage, 2026-11-08, Windows : « 'claude' n'est pas reconnu »). L'installer
+selon la documentation Claude Code, « Advanced setup », dont la commande dépend du terminal
+(PowerShell, CMD, macOS/Linux) ; puis ouvrir un NOUVEAU terminal, sans quoi le PATH n'est pas
+relu ; (4) `claude --chrome` lancé dans le clone, et le skill invoqué. La session locale prend
+alors le relais.
 
 Pour chaque état, dans un onglet que la session ouvre elle-même :
 

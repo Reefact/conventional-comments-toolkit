@@ -96,6 +96,27 @@ describe('réduction des pages capturées — ce qui survit', () => {
     expect(root.getAttribute('class')).toBe('js');
   });
 
+  it('retire la requête d’un data-* relatif ou réduit à sa requête — pas celle d’un texte', () => {
+    // Revue Reefact, PR #133 : seuls `/…` et `http(s):…` étaient reconnus, et un jeton passé en
+    // requête relative survivait.
+    const doc = reduced(
+      '<body><div id="a" data-load-url="?token=abc"></div><div id="b" data-load-url="comments?token=abc"></div>' +
+        '<div id="c" data-confirm="Are you sure?"></div></body>'
+    );
+    const value = (id: string) => doc.getElementById(id)!.getAttribute(id === 'c' ? 'data-confirm' : 'data-load-url');
+    expect(value('a')).toBe('');
+    expect(value('b')).toBe('comments');
+    expect(value('c')).toBe('Are you sure?');
+  });
+
+  it('reste un point fixe quand la requête retirée laisse une valeur opaque — mesuré sur GitHub', () => {
+    // `data-timeline-item-src="Reefact/just-dummies/timeline_focused_item?after_cursor=…"` : le
+    // chemin seul fait 42 caractères, et le second passage le retirait.
+    const raw = '<body><div data-timeline-item-src="Reefact/just-dummies/timeline_focused_item?after_cursor=Y3V"></div></body>';
+    const once = serializeReduced(reduced(raw));
+    expect(serializeReduced(reduced(once))).toBe(once);
+  });
+
   it('garde un data-* dont la valeur est un CHEMIN, même long — mesuré sur les fils repliés de GitHub', () => {
     // La première version le tenait pour opaque (40 caractères sans espace) : les fils repliés
     // n'étaient plus reconnus, et deux tests sur pages réelles échouaient.
@@ -167,6 +188,16 @@ describe('garde statique — un sélecteur qui cherche ce que la réduction reti
       'review-thread-collapsible[data-deferred-content-url]',
       'script[type="application/json"][data-target="react-app.embeddedData"]',
     ]) {
+      expect(unreachableByReduction(ok, github), ok).toEqual([]);
+    }
+  });
+
+  it('refuse ce qui vit dans un <svg>, que la réduction vide — et accepte le svg lui-même', () => {
+    // Revue Reefact, PR #133 : `svg path` passait le garde, sa cible étant toujours effacée.
+    for (const ko of ['svg path', 'svg > *', 'svg.octicon use', 'button path']) {
+      expect(unreachableByReduction(ko, github).length, ko).toBeGreaterThan(0);
+    }
+    for (const ok of ['svg.octicon', 'button > svg', 'svg + span', 'svg[aria-hidden="true"]']) {
       expect(unreachableByReduction(ok, github), ok).toEqual([]);
     }
   });

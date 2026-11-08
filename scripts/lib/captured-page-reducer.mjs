@@ -47,6 +47,11 @@ export const BASE_RULES = {
    * retirait `data-deferred-content-url`, et les fils repliés de GitHub n'étaient plus lus). */
   opaqueValue: '[A-Za-z0-9+/_=-]{40,}',
   maxDataValue: 200,
+  /** Une valeur de `data-*` qui a la forme d'une URL, et dont la requête est donc retirée :
+   * absolue, à la racine, ou relative AVEC une requête — `?token=…`, `comments?token=…`. La
+   * première version ne reconnaissait que `/…` et `http(s):…`, et une requête relative passait
+   * entière (revue Reefact, PR #133). Sans espace : `Are you sure?` n'est pas une URL. */
+  urlValue: '^(?:/|https?:|[^\\s?#]*\\?\\S*=)',
   keepMeta: [],
   keepJson: [],
 };
@@ -86,6 +91,7 @@ export function reducePage(doc, rules) {
   const count = (k) => (dropped[k] = (dropped[k] ?? 0) + 1);
   const secretish = new RegExp(rules.secretishName, 'i');
   const opaque = new RegExp(rules.opaqueValue);
+  const urlValue = new RegExp(rules.urlValue);
   // La requête retirée, et RIEN d'autre : la référence garde sa forme. Une première version
   // résolvait l'URL contre une origine factice et recomposait chemin + ancre — `#issue-1`
   // devenait `/#issue-1`, qui vise la racine du site, et l'adaptateur GitHub lit ce `href` tel
@@ -125,10 +131,24 @@ export function reducePage(doc, rules) {
   const reduceAttributes = (el) => {
     for (const a of Array.from(el.attributes)) {
       if (preserved.includes(a.name)) continue;
-      const urlish = a.name.startsWith('data-') && /^(\/|https?:)/.test(a.value) && !secretish.test(a.name);
-      if (rules.urlAttributes.includes(a.name) || urlish) {
+      const urlish = a.name.startsWith('data-') && !secretish.test(a.name) && urlValue.test(a.value);
+      if (rules.urlAttributes.includes(a.name)) {
         const reference = withoutQuery(a.value);
         if (reference !== a.value) el.setAttribute(a.name, reference);
+        continue;
+      }
+      if (urlish) {
+        const reference = withoutQuery(a.value);
+        // Requête retirée, la valeur peut ne plus AVOIR la forme d'une URL (`a/b?c=d` → `a/b`) :
+        // elle passe alors tout de suite par la règle générale, que le passage suivant lui
+        // appliquerait — sans quoi la réduction n'était plus un point fixe (mesuré sur
+        // `data-timeline-item-src`, chemin de 42 caractères retiré au second passage).
+        if (urlValue.test(reference) || keepAttribute(el, a.name, reference)) {
+          if (reference !== a.value) el.setAttribute(a.name, reference);
+        } else {
+          el.removeAttribute(a.name);
+          count('@' + a.name);
+        }
         continue;
       }
       if (!keepAttribute(el, a.name, a.value)) {
@@ -210,6 +230,12 @@ export function reductionMismatches(candidatesByChain, before, after) {
   return out;
 }
 
+/** Les éléments qui n'existent qu'à l'intérieur d'un `<svg>` — vidé par la réduction. */
+const SVG_ONLY = [
+  'path', 'circle', 'rect', 'ellipse', 'line', 'polyline', 'polygon', 'g', 'use', 'defs', 'symbol',
+  'clippath', 'mask', 'lineargradient', 'radialgradient', 'stop', 'tspan', 'foreignobject',
+];
+
 /** Ce qu'un sélecteur cite et que la réduction ne garde pas : la liste des raisons, vide quand
  * il ne cite que ce qui survit. Lecture TEXTUELLE du sélecteur — ce qu'on peut savoir sans la
  * page : un nom d'attribut ou d'élément. Une valeur retirée parce qu'opaque ne s'y voit pas. */
@@ -229,9 +255,16 @@ export function unreachableByReduction(selector, rules) {
     if (!kept) reasons.push(`attribut retiré : ${name}`);
   }
   const bare = unquoted.replace(/\[[^\]]*\]/g, '');
+  // La réduction VIDE chaque `<svg>` : rien ne s'y trouve plus, ni par un descendant (`svg path`,
+  // `svg > *`) ni par un élément qui n'existe que dans un svg (`button path`). Revue Reefact,
+  // PR #133 : le garde ne connaissait que `dropElements`, et acceptait les deux.
+  if (/(?:^|[\s>+~,(])svg(?:[.#:][^\s>+~,()]*)*\s*(?:>\s*|\s+)[^\s,)+~>]/i.test(bare)) {
+    reasons.push('descendant d’un svg, que la réduction vide');
+  }
   for (const [, tag] of bare.matchAll(/(?:^|[\s>+~,(])([a-z][a-z0-9-]*)/gi)) {
     const upper = tag.toUpperCase();
     if (rules.dropElements.includes(upper)) reasons.push(`élément retiré : ${tag.toLowerCase()}`);
+    if (SVG_ONLY.includes(tag.toLowerCase())) reasons.push(`élément intérieur d’un svg : ${tag.toLowerCase()}`);
     if (upper === 'META') {
       const name = selector.match(/\[\s*name\s*=\s*"([^"]*)"/)?.[1];
       if (!name || !rules.keepMeta.includes(name)) reasons.push(`meta non gardé : ${name ?? '(sans nom)'}`);

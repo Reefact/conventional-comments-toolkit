@@ -83,7 +83,7 @@ jobs:
               `Chaînes et pages concernées : ${runUrl}`,
               '',
               'Une capture de la page, extension désactivée, dit ce qu\'elle porte désormais',
-              '(`npm run check:captured-pages -- --redact` avant tout commit). Corriger les',
+              '(`npm run reduce:captured-pages -- github` avant tout commit). Corriger les',
               'candidats, ajouter la capture aux fixtures, puis fermer cette issue.',
             ].join('\n');
 

@@ -345,6 +345,10 @@ telle page n'avait pas été réduite. C'est une page brute : à traiter selon l
   `data-first-thread-comment` est posé exprès.
 - Un nom qui désigne deux choses (`ReviewThreadContainer__…` est un fil ET un commentaire) n'est
   pas une prise.
+- Un candidat se vérifie TEL QU'IL EST ÉCRIT, sur toutes les captures, avant le commit — pas
+  l'exploration qui l'a inspiré. Premier usage : l'exploration avait trouvé une date en
+  remontant au parent d'un bloc, le sélecteur écrit la cherchait DANS ce bloc, et ne trouvait
+  rien ; les gardes passaient, puisqu'un candidat qui ne trouve rien ne les fait pas échouer.
 - Ce qui « distingue » un état se vérifie sur TOUTES les captures où l'élément apparaît, pas sur
   celle où on l'a remarqué : une marque lue sur une page où le champ est seul ne prouve rien
   contre les autres zones. Premier usage : un formulaire pris pour la marque de l'édition portait

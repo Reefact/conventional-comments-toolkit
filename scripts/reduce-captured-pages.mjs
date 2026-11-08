@@ -31,7 +31,7 @@ import { chromium } from 'playwright-core';
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { attributeReads, reducePage, reductionMismatches, rulesFor } from './lib/captured-page-reducer.mjs';
+import { attributeReads, describeMismatch, reducePage, reductionMismatches, rulesFor } from './lib/captured-page-reducer.mjs';
 import { findCapturedPageSecrets } from './lib/captured-page-secrets.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -103,7 +103,7 @@ function inPage({ html, rules, candidates, reduceSource, mark, reads }) {
       out[key] = list.map((c) => {
         try {
           return Array.from(doc.querySelectorAll(c), (el) =>
-            [el.getAttribute(mark), ...reads.map((r) => `${r}=${el.getAttribute(r)}`)].join(' ')
+            [el.getAttribute(mark), Object.fromEntries(reads.map((r) => [r, el.getAttribute(r)]))]
           );
         } catch (err) {
           return `erreur : ${err.message}`;
@@ -141,10 +141,7 @@ try {
     const problems = [];
     if (candidates) {
       for (const m of reductionMismatches(candidates, r.before, r.after)) {
-        const n = (v) => (Array.isArray(v) ? `${v.length} élément(s)` : v);
-        const at = Array.isArray(m.before) && Array.isArray(m.after) ? m.before.findIndex((v, i) => v !== m.after[i]) : -1;
-        const first = at >= 0 ? ` — brut « ${m.before[at]} », réduit « ${m.after[at] ?? '(absent)'} »` : '';
-        problems.push(`${m.key} ${JSON.stringify(m.candidate)} : brut ${n(m.before)}, réduit ${n(m.after)}${first}`);
+        problems.push(describeMismatch(m));
       }
     }
     if (!r.fixedPoint) problems.push('la page réduite, réduite à nouveau, ne revient pas à l’identique');

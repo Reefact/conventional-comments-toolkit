@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 // Garde-fou de la règle du chantier (CLAUDE.md, §11) : « tout critère d'acceptation
 // raisonnablement automatisable est couvert par un test qui cite son identifiant ; la
 // correspondance vit dans docs/ca-matrix-fr.md ». Trois vérifications, dans cet ordre :
@@ -18,9 +19,9 @@
 // Usage : node scripts/check-ca-matrix.mjs   (sort 1 si la matrice a divergé du code)
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MATRIX = join(ROOT, 'docs/ca-matrix-fr.md');
 const SPEC = join(ROOT, 'specifications-fr.md');
 const SKIPPED_DIRS = new Set(['node_modules', 'dist', 'dist-ext', '.git', 'coverage']);
@@ -35,7 +36,7 @@ function* walk(dir) {
 }
 
 const allFiles = [...walk(join(ROOT, 'packages')), ...walk(join(ROOT, 'tests'))];
-const testFiles = allFiles.filter((f) => f.endsWith('.test.ts') && !f.includes('/dist'));
+const testFiles = allFiles.filter((f) => f.endsWith('.test.ts') && !/[\\/]dist/.test(f));
 const testSources = new Map(testFiles.map((f) => [f, readFileSync(f, 'utf8')]));
 
 const matrix = readFileSync(MATRIX, 'utf8');
@@ -74,7 +75,8 @@ for (const id of [...rowIds].sort()) {
 // .test.ts, résolus par suffixe de chemin — la matrice les écrit relativement à packages/.
 const named = new Set([...matrix.matchAll(/`([^`]*\.test\.ts)`/g)].map((m) => m[1]));
 for (const token of [...named].sort()) {
-  const exists = testFiles.some((f) => relative(ROOT, f).endsWith(token));
+  // La matrice écrit des `/` ; sous Windows, `relative` rend des `\`.
+  const exists = testFiles.some((f) => relative(ROOT, f).split(sep).join('/').endsWith(token));
   if (!exists) problems.push(`fichier nommé par la matrice introuvable : ${token}`);
 }
 

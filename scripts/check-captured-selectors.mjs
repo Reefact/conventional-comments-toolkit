@@ -22,10 +22,10 @@ import { chromium } from 'playwright-core';
 import { Window } from 'happy-dom';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { COUNTER_PROOF, matchPaths, parityMismatches } from './lib/selector-parity.mjs';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ADAPTERS = join(ROOT, 'packages', 'adapters');
 const EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 

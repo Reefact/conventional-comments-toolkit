@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 // Réduit EN PLACE les pages capturées d'une plateforme à leur forme stockable
 // (`scripts/lib/captured-page-reducer.mjs` dit ce qu'elle garde, et pourquoi une liste blanche).
 //
@@ -34,7 +35,7 @@ import { describeMismatch, reduceAndVerify, reducePage, reductionMismatches } fr
 import { InputsError, loadReductionInputs } from './lib/captured-page-inputs.mjs';
 import { findCapturedPageSecrets } from './lib/captured-page-secrets.mjs';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 const MARK = 'data-cct-reduce-id';
 

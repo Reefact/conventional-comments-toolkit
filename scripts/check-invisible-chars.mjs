@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 // Garde-fou du piège récurrent (CLAUDE.md) : les caractères invisibles s'écrivent
 // TOUJOURS en échappements \uXXXX dans les sources et les tests — jamais en littéral.
 // Un BOM ou un ZWJ littéral se relit mal, se copie mal, et se perd silencieusement au
@@ -10,7 +11,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /** Répertoires scannés : code de production, tests, spike. */
 const SCANNED = ['packages', 'tests', 'spikes', 'scripts'];
@@ -21,7 +22,8 @@ const SCANNED_EXT = ['.ts', '.tsx', '.mjs', '.js', '.json', '.html'];
  * y met des NBSP et des sélecteurs de variante d'emoji ; les réécrire en échappements ferait
  * de la capture autre chose qu'une capture — et dans un `<script>` ou un attribut, un
  * échappement HTML n'est même pas équivalent. La règle vise ce qu'on rédige. */
-const CAPTURED_PAGES = /\/test\/fixtures\/pages\//;
+// Les deux séparateurs : sous Windows, les chemins parcourus portent des `\`.
+const CAPTURED_PAGES = /[\\/]test[\\/]fixtures[\\/]pages[\\/]/;
 
 /** Les points de code visés, nommés — le message doit dire lequel et où. */
 const FORBIDDEN = new Map([

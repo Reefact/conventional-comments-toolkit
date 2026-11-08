@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 // Le script de navigateur qui réduit la page OUVERTE et en télécharge la seule forme réduite —
 // la voie « session locale avec Claude in Chrome » du skill `plateforme`.
 //
@@ -16,7 +17,7 @@ import { writeFileSync } from 'node:fs';
 import { buildPageReducer } from './lib/captured-page-reducer.mjs';
 import { InputsError, loadReductionInputs } from './lib/captured-page-inputs.mjs';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const args = process.argv.slice(2);
 const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--out');
 const [id, file] = positional;

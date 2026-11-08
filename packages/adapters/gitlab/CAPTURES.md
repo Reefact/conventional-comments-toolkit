@@ -116,7 +116,16 @@ saved, then cancelled — the comment shows no "edited" mark):
 - The comment being edited is the ancestor `li#note_<id>[data-note-id="<id>"]` — a candidate for
   `commentId`.
 
-So far: Overview only. The Changes view still needs its own edit capture.
+In the Changes view (`06-changes-modification-commentaire.html`, pencil on the line-8 comment,
+cancelled): the same `form.edit-note`, the same field attributes, the same buttons. The ancestor
+is `li#note_<id>` again, but WITHOUT `data-note-id` here — the `id` is the attribute both views
+share.
+
+The edit form holds **two** "Cancel" buttons. The first one in document order is not the
+visible one (it sits with the upload controls, as in the new-comment form inventory): clicking
+it left the form open. The visible "Cancel" is the one next to "Save comment". When proving that
+Cancel is not intercepted, test the visible one — and do not take "the first Cancel" as a
+selector.
 
 ## Diff views
 

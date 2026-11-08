@@ -153,6 +153,33 @@ it left the form open. The visible "Cancel" is the one next to "Save comment". W
 Cancel is not intercepted, test the visible one — and do not take "the first Cancel" as a
 selector.
 
+## Published comment forms (state 03, continued)
+
+Four more comments published on !1 (API, owner's agreement): a blocking comment with a
+discussion, a comment with quoted code BEFORE its prefix line, a reply (`ack:`) in the
+`issue: total()…` thread, and a diff-line comment on line 21 holding a native suggestion block.
+Captured in `03-overview-commentaires-discussion.html` and `03-changes-commentaires-discussion.html`
+(Rapid Diffs; only the two diff-line notes appear there).
+
+- **Body container**: Overview `div.note-text.md`; Changes (Rapid Diffs) `div.md` without
+  `note-text`. Inside, each Markdown block is a child: `p`, `ul`, `div.markdown-code-block`.
+- **Prefix line**: its own `p`. With a discussion, it is the first `p`, followed by more `p` and
+  `ul` siblings. With quoted code first, it is the `p` AFTER a `div.markdown-code-block` — not
+  the first child.
+- **Source positions**: rendered blocks keep `data-sourcepos` (`1:1-1:42` = line 1, columns
+  1–42 of the raw Markdown) — the attribute survives the reduction. A candidate for mapping the
+  prefix line of §3.4.1 to its rendered paragraph; to confirm when writing selectors.
+- **Reply**: a separate `li#note_<id>` in the same discussion, after the thread's first note;
+  its body is rendered the same way.
+- **Native suggestion block**: the body container gets the class `suggestions` and
+  `data-testid="suggestions-container"`; the block is
+  `div.markdown-code-block > div.md-suggestion` (header with "Suggested change" and
+  `[data-testid="apply-suggestion-dropdown"]`, then `table.md-suggestion-diff`) — while an
+  ordinary code block is `div.markdown-code-block > pre.code`. Source syntax used:
+  ```` ```suggestion:-0+0 ````. The spec gives no GitLab marker (§A.7, §B.6 cover GitHub and
+  Azure DevOps only), so GitLab has no stage 0 until the owner amends it; this is the
+  measurement such an amendment would need. "Apply suggestion" was not clicked.
+
 ## Review (state 07)
 
 A draft review was started from the main form ("Start review" with a test text), its panel

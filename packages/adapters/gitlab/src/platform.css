@@ -1,19 +1,56 @@
 /* Ce que les rôles de rendu de l'extension valent SUR GITLAB (annexe C).
 
-   **Aucun jeton de THÈME n'est déclaré ici, et ce vide est une réponse.**
+   Ce fichier est la seule chose du produit qui connaisse le nom d'un jeton de GitLab. Les jetons
+   ci-dessous ont été RELEVÉS sur une vraie page de merge request de gitlab.com (2026-11-08, thème
+   sombre `gl-dark`), lus par `getComputedStyle` sur la racine — jamais rappelés de mémoire. Une
+   première version n'en déclarait aucun : les contrôles de l'extension tombaient sur les mots-clés
+   système de la feuille partagée (`ButtonFace`), un gris étranger au thème sombre de GitLab
+   (validation du propriétaire).
 
-   GitLab a ses propres jetons de thème (son système de design, « Pajamas »). Aucun n'a été
-   relevé depuis ce dépôt : les captures de gitlab.com (test/fixtures/pages/) sont RÉDUITES, sans
-   feuille de style, et ne disent rien des couleurs ni des longueurs. Les nommer ici de mémoire
-   serait la faute que la scission des feuilles corrige — une affirmation sur une plateforme se
-   VÉRIFIE, elle ne se rappelle pas.
+   Les NOMS sont relevés en thème sombre ; GitLab change les VALEURS par la classe `gl-dark` de
+   `<html>`. Que les mêmes noms existent en thème clair est à vérifier — d'ici là, si l'un manquait,
+   le repli littéral ci-dessous (repris de la feuille partagée, comme pour GitHub) s'appliquerait :
+   un `var()` sans repli rendrait la déclaration invalide, et la propriété serait perdue.
 
-   Sans surcharge de thème, les valeurs neutres de la feuille partagée s'appliquent — mots-clés
-   système (`ButtonFace`, `Highlight`, `Canvas`, `currentColor`) qui suivent le thème du système
-   d'exploitation et le mode sombre.
+   AUCUNE ÉTOILE SUIVIE D'UNE BARRE OBLIQUE dans ce commentaire (scripts/check-extension-css.mjs). */
+:root[data-cct-platform='gitlab'] {
+  /* Contrôles — un VOILE léger sur le fond de la zone d'édition, avec la bordure de contrôle de
+     GitLab : les boutons se fondent dans leur fond, comme sur GitHub, sans disparaître. Le voile est
+     celui des boutons discrets de GitLab (`tertiary`, état actif) — mesuré en thème sombre :
+     `rgba(255, 255, 255, 0.08)`, un blanc à 8 % ; un jeton de thème, dont la valeur en thème clair
+     est à vérifier. Deux versions l'ont précédé, rejetées à la validation du propriétaire : le fond
+     du bouton « default » (gris translucide, détonnait), puis le fond exact de la zone
+     (`--gl-control-background-color-default`, boutons sans aucun voile). */
+  --cct-control-bg: var(--gl-button-default-tertiary-background-color-active, ButtonFace);
+  --cct-control-bg-flat: var(--gl-button-default-tertiary-background-color-default, transparent);
+  --cct-control-border: var(--gl-control-border-color-default, currentColor);
+  --cct-fg-on-control: var(--gl-button-default-primary-foreground-color-default, ButtonText);
 
-   Pour l'améliorer : relever les jetons de thème sur une page de merge request réelle, en mode
-   clair ET en mode sombre, puis les déclarer ci-dessous sur le modèle de la feuille GitHub. */
+  /* Texte et surfaces. */
+  --cct-fg-default: var(--gl-text-color-default, currentColor);
+  --cct-fg-muted: var(--gl-text-color-subtle, currentColor);
+  --cct-surface-bg: var(--gl-background-color-default, transparent);
+  --cct-overlay-bg: var(--gl-background-color-overlap, Canvas);
+  --cct-border-default: var(--gl-border-color-default, currentColor);
+  --cct-border-plain: var(--gl-border-color-default, currentColor);
+
+  /* Accent — le bouton « confirm », style primaire de GitLab, et l'anneau de focus. */
+  --cct-accent-bg: var(--gl-button-confirm-primary-background-color-default, Highlight);
+  --cct-fg-on-accent: var(--gl-button-confirm-primary-foreground-color-default, HighlightText);
+  --cct-focus-ring: var(--gl-focus-ring-outer-color, Highlight);
+  --cct-accent-line: var(--gl-text-color-link, currentColor);
+
+  /* Verdicts. */
+  --cct-success-ring: var(--gl-status-success-icon-color, #2e7d32);
+  --cct-success-line: var(--gl-text-color-success, currentColor);
+  --cct-attention-ring: var(--gl-status-warning-icon-color, #f9a825);
+  --cct-attention-text: var(--gl-feedback-warning-text-color, #8a6d00);
+  --cct-danger-strong: var(--gl-text-color-danger, #b3261e);
+  --cct-danger-line: var(--gl-text-color-danger, currentColor);
+
+  /* Formes — seul le rayon par défaut a été relevé (0.25rem) ; le petit rayon garde le repli. */
+  --cct-radius-md: var(--gl-border-radius-default, 6px);
+}
 
 /* LES TROIS LONGUEURS DU COMPOSEUR, ET POURQUOI ELLES SONT ICI SANS AVOIR ÉTÉ MESURÉES.
 

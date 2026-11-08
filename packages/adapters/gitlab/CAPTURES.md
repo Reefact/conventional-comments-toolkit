@@ -63,6 +63,12 @@ never sent):
   button reads "Start thread", and the close button "Start thread and close merge request". Same
   elements as with "Comment" — only their labels change. Switched back to "Comment" afterwards;
   after a reload the submit button read "Comment" again.
+- With **internal note** checked (`01-…-note-interne.html`, text typed, never sent): the submit
+  button reads "Add internal note", the close button "Add internal note and close merge request",
+  and the field's placeholder becomes "Write an internal note…". Same elements, same classes.
+  The checkbox's checked state is NOT in the capture (a property, not an attribute): only the
+  labels and the placeholder tell this capture apart. Unchecked and cleared afterwards; after a
+  reload: unchecked, empty, submit "Comment", 6 notes.
 
 ## Rich text mode
 

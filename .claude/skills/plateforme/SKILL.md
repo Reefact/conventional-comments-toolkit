@@ -15,6 +15,24 @@ commentaire de ligne. Aucun garde ne l'avait vu, parce qu'aucun ne regardait une
 Ce protocole ne s'applique pas à un seul sélecteur cassé sur une plateforme déjà capturée :
 là, l'étape 1 se réduit à recapturer l'état concerné, et l'on reprend à l'étape 4.
 
+## Conduite : une étape à la fois
+
+La personne qui capture n'a, en général, jamais suivi ce protocole. **La guider pas à pas** :
+chaque message donne UNE action — une commande, un clic, une vérification —, dit à quoi elle
+reconnaîtra que c'est réussi, puis attend son retour avant la suivante. Ne pas déverser le
+protocole : à la première question, deux ou trois lignes situent le chemin, puis vient la
+première étape. Ce fichier s'adresse à l'agent ; il ne se recopie pas à la personne.
+
+Une décision dont l'étape en cours n'a pas besoin — amendement de la spec, composant B,
+périmètre d'hôtes — attend l'étape où elle sert. La poser d'avance, c'est le gros bloc.
+
+(Retour du propriétaire, 2026-11-08, premier usage du skill, pour GitLab : la première réponse
+avait livré tout le protocole d'un seul bloc.)
+
+**Ce skill s'améliore à l'usage.** Une étape mal décrite, un prérequis oublié, un « à vérifier »
+désormais mesuré : corriger ce fichier au fil de l'eau, dans la même branche, sans attendre la
+fin du chantier.
+
 ## 0. Ce qui ne bouge pas
 
 - **Une PR touche UNE plateforme, ou le code partagé** (`npm run check:pr-scope`). La PR qui
@@ -70,6 +88,13 @@ Prérequis à lui faire vérifier : l'extension Claude in Chrome (1.0.36 ou plus
 même compte et à la même organisation que Claude Code ; l'extension Conventional Comments
 DÉSACTIVÉE dans ce Chrome ; les PR de test créées par elle — ne rien créer ni écrire sur la
 plateforme sans son accord.
+
+**Si la question arrive dans une session cloud**, c'est elle qui mène la personne jusqu'à la
+session locale, une étape par message : (1) le clone, sur la branche qui porte la version du
+skill en cours d'amélioration si elle n'est pas fusionnée, puis `npm ci` et `npm run build` ;
+(2) l'extension Claude in Chrome installée et connectée, Conventional Comments désactivée ;
+(3) `claude --chrome` lancé dans le clone, et le skill invoqué. La session locale prend alors
+le relais.
 
 Pour chaque état, dans un onglet que la session ouvre elle-même :
 

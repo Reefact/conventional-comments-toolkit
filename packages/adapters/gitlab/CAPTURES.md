@@ -193,3 +193,25 @@ missing, and that after switching to classic loading "your preference persists a
 — without saying whether the preference belongs to the account or to the browser. Per the docs,
 then, Rapid Diffs is what a user sees unless they opted out; the classic view is what a user who
 opted out sees.
+
+### Classic view (captured)
+
+With the owner's agreement, "Switch to classic loading" was chosen, three states captured, then
+"Try Rapid Diffs" (a `button` the classic view shows in place of the dropdown) chosen again.
+Measured: the choice survived a reload both ways; after switching back, the page held 18
+`rd-diff` elements and the "Rapid Diffs" dropdown again. A "New! Suggest changes directly"
+popover appeared in the classic view; its "Got it" was NOT clicked (it would record a dismissal
+on the account) — the popover is in `04-changes-classique-…`.
+
+- `04-changes-classique-commentaire-ligne.html` — new comment on line 16: no `rd-diff`; the
+  label reads **"Commenting on lines +16 to +16"** (Rapid Diffs: "Comment on line +16"). The
+  form sits in `.discussion-reply-holder` › `.notes-content` › `.notes_holder` (a
+  `data-testid="notes-holder"` row of `.diff-grid`). No `li#note_…` ancestor.
+- `05-changes-classique-reponse-fil-ligne.html` — reply: the form sits in
+  `li.discussion-reply-holder.is-replying[data-testid="reply-wrapper"]`, as in the Overview
+  (`02`), and has **no** `li#note_…` ancestor — unlike the Rapid Diffs reply (`05`).
+- `06-changes-classique-modification-commentaire.html` — edit: the form sits in `div.note-body`
+  of `li#note_<id>` (`timeline-entry`), as in the Overview edit — unlike the Rapid Diffs edit.
+
+All three: the same `form.edit-note.common-note-form` and the same `reply-field` as everywhere
+else. So the classic view's structure is the Overview's; Rapid Diffs is the odd one.

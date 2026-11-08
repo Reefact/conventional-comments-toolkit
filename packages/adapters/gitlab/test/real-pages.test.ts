@@ -77,7 +77,9 @@ describe('§4.1, §9.2.3 — Overview : nouveau commentaire général (capture 0
 
   it('observe le champ général, en zone conversation, avec ses trois boutons', () => {
     const editor = editorBy(page, 'comment-field');
-    expect(editor.context).toMatchObject({ zone: 'conversation', action: 'compose', canCarryBlockingState: false });
+    // Sur GitLab, le champ général peut ouvrir un fil résoluble (« Start thread », §C.6) : il porte un
+    // état bloquant — décision du propriétaire, à l'inverse de GitHub.
+    expect(editor.context).toMatchObject({ zone: 'conversation', action: 'compose', canCarryBlockingState: true });
     expect(submitLabels(page, editor)).toEqual(['Comment', 'Start review', 'Close merge request']);
   });
 

@@ -324,6 +324,12 @@ telle page n'avait pas été réduite. C'est une page brute : à traiter selon l
   `data-first-thread-comment` est posé exprès.
 - Un nom qui désigne deux choses (`ReviewThreadContainer__…` est un fil ET un commentaire) n'est
   pas une prise.
+- Ce qui « distingue » un état se vérifie sur TOUTES les captures où l'élément apparaît, pas sur
+  celle où on l'a remarqué : une marque lue sur une page où le champ est seul ne prouve rien
+  contre les autres zones. Premier usage : un formulaire pris pour la marque de l'édition portait
+  aussi les réponses et les nouveaux fils, et un ancêtre pris pour le commentaire édité entourait
+  aussi la réponse à ce commentaire — deux affirmations écrites d'après une seule capture,
+  démenties par les suivantes.
 - Explorer les captures par un test jetable de `packages/adapters/<id>/test/` (vitest, happy-dom,
   `DOMParser`) qui écrit son résultat dans le scratchpad, et le supprimer ensuite.
 - Pour un bouton à intercepter : identifier aussi celui qui ANNULE, et prouver qu'il n'est pas

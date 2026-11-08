@@ -12,6 +12,7 @@ import {
   unreachableByReduction,
 } from '../scripts/lib/captured-page-reducer.mjs';
 import { findCapturedPageSecrets } from '../scripts/lib/captured-page-secrets.mjs';
+import { PRINTED_ATTRIBUTES } from '../packages/adapters/shared/src/evidence';
 
 const parse = (html: string) => new DOMParser().parseFromString(html, 'text/html');
 const reduced = (html: string, id = 'github') => {
@@ -132,6 +133,24 @@ describe('réduction des pages capturées — ce qui survit', () => {
   it('retire la valeur d’un champ saisi ou caché', () => {
     const doc = reduced('<body><input type="hidden" name="authenticity_token" value="t"><input name="title" value="texte"></body>');
     for (const input of doc.querySelectorAll('input')) expect(input.hasAttribute('value')).toBe(false);
+  });
+
+  it('garde un data-* qui nomme l’interface, même long — mesuré sur GitHub', () => {
+    // `data-testid="copilot-immersive-embedded-header-button"` était retiré comme opaque.
+    const testid = 'copilot-immersive-embedded-header-button';
+    const doc = reduced(`<body><div id="a" data-testid="${testid}" data-test-selector="${testid}-x"></div></body>`);
+    expect(doc.getElementById('a')!.getAttribute('data-testid')).toBe(testid);
+    expect(doc.getElementById('a')!.getAttribute('data-test-selector')).toBe(`${testid}-x`);
+  });
+
+  it('garde tout ce que le squelette du diagnostic imprime, quelle que soit la valeur', () => {
+    // Le skill `diagnostic` compare un squelette reçu à la capture : un attribut que la réduction
+    // retirerait y passerait pour une différence de la page.
+    const long = 'a'.repeat(48);
+    const attrs = PRINTED_ATTRIBUTES.filter((a) => !['disabled', 'hidden'].includes(a));
+    const doc = reduced(`<body><div id="x" ${attrs.filter((a) => a !== 'id').map((a) => `${a}="${long}"`).join(' ')}></div></body>`);
+    const el = doc.getElementById('x')!;
+    for (const a of attrs.filter((a) => a !== 'id')) expect(el.getAttribute(a), a).toBe(long);
   });
 
   it('retire un data-* dont le nom ou la valeur a la forme d’un secret', () => {

@@ -146,15 +146,23 @@ Ensuite, comme toute capture : `reduce:captured-pages -- <id> --check`, l'audit 
 scripts/check-captured-pages.mjs --audit`, sur au moins deux PR pour une plateforme nouvelle,
 rapport trié comme à l'étape 2), `node scripts/check-captured-pages.mjs`, puis l'étape 3.
 
-**À vérifier au premier usage, et à écrire ici une fois mesuré** — `check:page-reducer` mesure le
-script par `page.evaluate` dans Chromium, pas par l'extension :
-- que `javascript_tool` exécute le script comme `page.evaluate`, et en rend le résultat ;
-- que le téléchargement passe sans demande de confirmation de Chrome ;
-- que Claude in Chrome n'ajoute rien au DOM capturé — chercher, dans la première page réduite,
-  un élément étranger à la plateforme ;
-- la politique de sécurité de la plateforme : sous Trusted Types, le script crée sa propre
-  politique (`cct-reduce-capture`) ; une page qui les interdit toutes le fait échouer
-  explicitement (mesuré dans Chromium), et l'on passe à la voie B.
+**Mesuré au premier usage** (2026-11-08, gitlab.com, Claude in Chrome 1.0.105, Windows) —
+`check:page-reducer` mesure le script par `page.evaluate` dans Chromium, pas par l'extension :
+- `javascript_tool` exécute le script (texte du fichier généré passé tel quel) et rend l'objet
+  résumé, `ok: true` et les tailles ;
+- le téléchargement passe sans demande de confirmation de Chrome, dans `~/Downloads`, au nom
+  demandé ; la taille sur disque dépasse de quelques octets `reducedBytes`, qui compte des
+  caractères, pas des octets UTF-8 ;
+- Claude in Chrome n'ajoute rien au DOM capturé : les enfants de `<body>` de la page réduite
+  sont tous de GitLab (vérifié sur la seule page 01 — à refaire si l'extension change) ;
+- les outils de vérification SOUS WINDOWS : avant le correctif `eb8d6c5`, plusieurs passaient
+  au vert sans rien regarder (`reduce:captured-pages --check` disait « rien à réduire »). Si un
+  garde annonce 0 fichier sur un dossier qui en contient, c'est lui qu'il faut soupçonner.
+
+**Reste à vérifier** : la politique de sécurité d'une plateforme sous Trusted Types — le script
+crée sa propre politique (`cct-reduce-capture`) ; une page qui les interdit toutes le fait
+échouer explicitement (mesuré dans Chromium), et l'on passe à la voie B. gitlab.com n'a pas
+posé la question : le script a réussi sans erreur.
 
 La validation finale passe par la même session : une fois l'adaptateur écrit (étapes 4-5) et
 l'extension construite (`npm run build:extension`), la personne charge `dist-ext/` dans ce

@@ -68,6 +68,16 @@ champ ou INTERCEPTE un envoi : un défaut y change ce qu'elle bloque. 8 et 9 peu
 Un état que la plateforme n'a pas s'écrit « sans objet » dans la PR, avec la raison — jamais
 omis en silence.
 
+**Un éditeur peut avoir plusieurs MODES, et chacun est un état à capturer.** Avant la première
+capture, inventorier les commandes de l'éditeur qui peuvent en changer l'élément ou le
+conteneur : bascule texte brut / texte enrichi, plein écran, aperçu. Sur gitlab.com
+(2026-11-08), sous chaque champ, « Switch to rich text editing » — les captures en mode
+Markdown ne contiennent aucun `contenteditable`, l'autre mode est à capturer avant de conclure
+quoi que ce soit — et, dans la barre d'outils, « Go full screen ». Le bouton `<>` de cette barre
+est « Insert code » (mise en forme), pas un agrandissement. Une variante prend le numéro de son
+état et nomme son mode : `01-overview-nouveau-commentaire-texte-riche.html`. (Question du
+propriétaire, après les captures 01 à 05 : aucune n'avait regardé ces commandes.)
+
 Les captures se prennent **extension Conventional Comments désactivée**, sur des PR de test sans
 contenu privé — dans une organisation de test si possible. Deux voies : **A**, la session locale
 avec Claude in Chrome, qui couvre aussi les étapes 2 et 3 et ne demande à la personne que ce

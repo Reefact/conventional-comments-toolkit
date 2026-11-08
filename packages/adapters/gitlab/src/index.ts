@@ -7,9 +7,7 @@
 //   façon d'y écrire n'est pas mesurée ;
 // - la lecture du fichier de configuration du dépôt n'est pas mesurée (§C.4) : `unreachable`,
 //   et l'extension est en état dégradé au sens du §5.4 — elle assiste sans bloquer ;
-// - pas d'étage 0 : le marqueur du bloc de suggestion n'est pas fixé pour GitLab (§C.6) ;
-// - la forme du corps rendu n'est pas déclarée (§5.5) : une fin de ligne simple dans un
-//   paragraphe n'a pas été capturée.
+// - pas d'étage 0 : le marqueur du bloc de suggestion n'est pas fixé pour GitLab (§C.6).
 
 import type {
   ConfigRead,
@@ -40,6 +38,19 @@ import {
   type SubmitControl,
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
+
+/** La forme du corps rendu de GitLab (§5.5). MESURÉE le 2026-11-08 :
+ *   - paragraphe : `<p>` — corps publiés des captures (03-overview-commentaires-discussion) ;
+ *   - fin de ligne SIMPLE dans un paragraphe : PAS de `<br>` — le `<p>` garde un retour à la ligne
+ *     DANS son nœud de texte, que la page affiche comme une espace. Mesuré sur un commentaire
+ *     publié (« suggestion: sujet de test » suivi d'une ligne collée, !1) et par l'API de rendu
+ *     Markdown de GitLab (`POST /api/v4/markdown`), qui rend la même structure ;
+ *   - saut de ligne FORCÉ (deux espaces ou `\` en fin de ligne) : `<br>` — même API.
+ * D'où `lineBreakTag: 'BR'` : il borne le sujet sur un saut forcé, et la fin de ligne simple est
+ * bornée par le code partagé, qui coupe aussi le sujet sur un retour à la ligne littéral d'un nœud
+ * de texte (`subjectNodes`, extension/src/ui/badges.ts). Une première version rendait `null` faute
+ * de cette mesure : le préfixe restait affiché sous un badge seul (validation du propriétaire). */
+const GITLAB_BODY_SHAPE: RenderedBodyShape = Object.freeze({ paragraphTags: ['P'], lineBreakTag: 'BR' });
 
 /** Chemin d'une merge request : `/<groupe>[/<sous-groupe>…]/<projet>/-/merge_requests/<n>`, suivi
  * de `/diffs` sur l'onglet Changes (URLs des captures). Le groupe peut être imbriqué : tout ce qui
@@ -119,14 +130,9 @@ export class GitlabClientAdapter implements PlatformAdapter {
     return NEUTRAL_EDITOR_CHROME;
   }
 
-  /** §5.5 — `null`. Les captures montrent la ligne de préfixe dans son propre `<p>` quand une
-   * ligne vide la sépare de la suite (03-overview-commentaires-discussion), mais aucune ne montre
-   * ce que devient une fin de ligne SIMPLE à l'intérieur d'un paragraphe. Déclarer `<br>` sans
-   * l'avoir vu ferait passer, sur une mauvaise réponse, une partie de la discussion dans le sujet.
-   * Les badges restent posés ; seuls le masquage du préfixe et la mise en avant du sujet attendent
-   * cette mesure. */
-  renderedBodyShape(): RenderedBodyShape | null {
-    return null;
+  /** §5.5 — la forme MESURÉE du corps rendu de GitLab, `GITLAB_BODY_SHAPE` ci-dessous. */
+  renderedBodyShape(): RenderedBodyShape {
+    return GITLAB_BODY_SHAPE;
   }
 
   /** Les boutons d'envoi du FORMULAIRE de l'éditeur — y compris « … and close merge request »,

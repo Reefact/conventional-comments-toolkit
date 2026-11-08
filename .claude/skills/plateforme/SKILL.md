@@ -54,7 +54,7 @@ dans ses propres écrans :
 |---|---|---|
 | 1 | Nouveau commentaire général ouvert | zone `conversation`, ses boutons d'envoi |
 | 2 | Réponse ouverte dans un fil existant | zone `reply`, l'identifiant du fil |
-| 3 | Commentaires publiés portant un préfixe (`issue:`, `suggestion (non-blocking):`…) | corps rendus, badges (§5.5), auteurs, ancres |
+| 3 | Commentaires publiés portant un préfixe, dans leurs FORMES (voir sous le tableau) | corps rendus, badges (§5.5), auteurs, ancres |
 | 4 | Commentaire ouvert sur une ligne de code | zone `thread-root`, ses boutons |
 | 5 | Réponse ouverte dans un fil sur une ligne | `reply` dans la vue du code |
 | 6 | Modification d'un commentaire existant, dans CHAQUE vue qui le permet | `action: 'edit'`, `commentId` |
@@ -67,6 +67,27 @@ dans ses propres écrans :
 champ ou INTERCEPTE un envoi : un défaut y change ce qu'elle bloque. 8 et 9 peuvent suivre.
 Un état que la plateforme n'a pas s'écrit « sans objet » dans la PR, avec la raison — jamais
 omis en silence.
+
+**L'état 3 n'est pas « un commentaire préfixé » : c'est chaque forme que la spec distingue,
+rendue par la plateforme.** Des commentaires d'une seule ligne `label: sujet` ne montrent pas
+où tombe la ligne de préfixe dans un corps rendu, ni ce que l'adaptateur doit y retrouver pour
+placer les badges (§5.5). Publier au moins :
+- un commentaire préfixé **sans** discussion, et un commentaire **bloquant avec** discussion
+  sur plusieurs blocs — paragraphe, liste (§3.1, et l'avertissement `W-NO-DISCUSSION` du §3.5,
+  qui porte sur le cas sans) ;
+- un commentaire dont la ligne de préfixe n'est **pas** la première : du code cité AVANT elle
+  (§3.1, §3.4.1) ;
+- une **réponse publiée** dans un fil, avec un label de réponse (§3.2) — le champ de réponse
+  ouvert (état 2) ne montre pas une réponse rendue ;
+- si la plateforme en a un, son **bloc de suggestion natif**, accompagné d'une phrase (étage 0,
+  §3.5) : la spec n'en donne le marqueur que plateforme par plateforme (annexes), et le rendu
+  capturé est la mesure dont un amendement aurait besoin — l'amendement, lui, reste une
+  décision du propriétaire.
+
+Les capturer dans chaque vue qui affiche des commentaires. (Premier usage : les trois
+commentaires publiés pour l'état 3 tenaient chacun sur une ligne ; la question du propriétaire —
+« c'est prévu que tu fasses des tests avec un commentaire conventionnel avec body aussi ? » — a
+révélé le manque.)
 
 **Inventorier les commandes de l'éditeur, puis capturer chacune de celles qui changent quelque
 chose.** Le tableau ci-dessus dit QUELS champs capturer ; il ne dit pas dans quels MODES ils

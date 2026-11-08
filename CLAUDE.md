@@ -222,6 +222,8 @@ npm run check:options-journal   # journal de la page d'options : boutons cliquab
 npm run check:composer-layout   # trait d'état, gouttière du texte, pastille — mesurés (§5.1, §5.3)
 npm run check:captured-pages    # aucune page capturée ne garde un secret de session (--redact : masquer)
 npm run check:captured-selectors # happy-dom trouve, sur les pages capturées, exactement ce que trouve Chromium
+npm run reduce:captured-pages -- <id> # réduit les captures à leur forme stockable (--check : vérifier sans écrire)
+npm run check:reduced-selectors # aucun sélecteur ne cherche ce que la réduction des captures retire
 npm run check:github-selectors-live # les chaînes de selectors.ts trouvent encore sur github.com (sans session)
 ```
 

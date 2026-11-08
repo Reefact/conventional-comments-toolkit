@@ -81,6 +81,13 @@ jobs:
       - name: Aucun identifiant de plateforme hors de son paquet (§9.1, §9.4)
         run: npm run check:platform-isolation
 
+      # Les pages capturées se stockent RÉDUITES, la page brute perdue : un sélecteur qui
+      # chercherait un attribut ou un élément que la réduction retire ne trouverait rien sur
+      # les captures, et une assertion négative y passerait à tort. Lit les `dist/` du `build`
+      # plus haut.
+      - name: Aucun sélecteur ne cherche ce que la réduction des captures retire
+        run: npm run check:reduced-selectors
+
       # L'interface GitHub est terminée : une correction Azure DevOps ou la création de GitLab
       # ne doit pas pouvoir la casser. Le paquet d'un adaptateur ne s'exécute que sur sa
       # plateforme ; le code partagé s'exécute sur toutes. Une PR qui touche les deux modifie

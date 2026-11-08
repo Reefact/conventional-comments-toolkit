@@ -17,7 +17,8 @@
 // n'est pas pris ») reste verte si la réduction a retiré l'attribut qui l'aurait fait matcher.
 // Deux gardes le couvrent, chacun pour ce que l'autre ne voit pas :
 //   - à la réduction, tant que la page brute existe, `reduce-captured-pages.mjs` compare les
-//     éléments que trouve chaque candidat AVANT et APRÈS (`reductionMismatches`) ;
+//     éléments que trouve chaque candidat AVANT et APRÈS, et les valeurs que l'adaptateur en lit
+//     (`reductionMismatches`) ;
 //   - ensuite, sans page brute, `check-reduced-selectors.mjs` refuse un sélecteur qui cite un
 //     attribut ou un élément que la réduction ne garde pas (`unreachableByReduction`). Il ne
 //     voit pas une valeur retirée parce qu'opaque : c'est la part de la première comparaison.
@@ -34,8 +35,8 @@ export const BASE_RULES = {
     'hidden', 'open', 'for', 'checked', 'selected', 'multiple', 'readonly', 'required', 'datetime',
     'lang', 'dir', 'tabindex', 'alt', 'colspan', 'rowspan', 'method',
   ],
-  /** Réduits à leur chemin (origine étrangère comprise), requête retirée : c'est là que vivent
-   * les jetons d'une URL signée. */
+  /** Requête retirée, référence gardée sous sa forme — relative, absolue ou simple ancre : c'est
+   * dans la requête que vivent les jetons d'une URL signée. */
   urlAttributes: ['href', 'action'],
   /** `value` ne survit que là où elle est un libellé, jamais une saisie ni un jeton caché. */
   valueTypes: ['submit', 'button', 'checkbox', 'radio'],
@@ -85,13 +86,15 @@ export function reducePage(doc, rules) {
   const count = (k) => (dropped[k] = (dropped[k] ?? 0) + 1);
   const secretish = new RegExp(rules.secretishName, 'i');
   const opaque = new RegExp(rules.opaqueValue);
-  const pathOnly = (value) => {
-    try {
-      const u = new URL(value, 'https://host.invalid');
-      return (u.origin === 'https://host.invalid' ? '' : u.origin) + u.pathname + u.hash;
-    } catch {
-      return null;
-    }
+  // La requête retirée, et RIEN d'autre : la référence garde sa forme. Une première version
+  // résolvait l'URL contre une origine factice et recomposait chemin + ancre — `#issue-1`
+  // devenait `/#issue-1`, qui vise la racine du site, et l'adaptateur GitHub lit ce `href` tel
+  // quel pour l'ancre d'un fil (revue Codex, PR #133). Un `?` placé APRÈS le `#` appartient à
+  // l'ancre, pas à la requête.
+  const withoutQuery = (value) => {
+    const hash = value.indexOf('#');
+    const head = hash < 0 ? value : value.slice(0, hash);
+    return head.replace(/\?.*$/s, '') + (hash < 0 ? '' : value.slice(hash));
   };
   const pick = (obj, paths) => {
     const out = {};
@@ -119,6 +122,21 @@ export function reducePage(doc, rules) {
   };
   // Attributs que la réduction ne touche jamais : le marqueur de comparaison de l'outil.
   const preserved = rules.preserve ?? [];
+  const reduceAttributes = (el) => {
+    for (const a of Array.from(el.attributes)) {
+      if (preserved.includes(a.name)) continue;
+      const urlish = a.name.startsWith('data-') && /^(\/|https?:)/.test(a.value) && !secretish.test(a.name);
+      if (rules.urlAttributes.includes(a.name) || urlish) {
+        const reference = withoutQuery(a.value);
+        if (reference !== a.value) el.setAttribute(a.name, reference);
+        continue;
+      }
+      if (!keepAttribute(el, a.name, a.value)) {
+        el.removeAttribute(a.name);
+        count('@' + a.name);
+      }
+    }
+  };
   const walk = (root) => {
     for (const node of Array.from(root.childNodes)) {
       if (node.nodeType === 8) {
@@ -152,24 +170,7 @@ export function reducePage(doc, rules) {
         count('meta');
         continue;
       }
-      for (const a of Array.from(el.attributes)) {
-        if (preserved.includes(a.name)) continue;
-        const urlish = a.name.startsWith('data-') && /^(\/|https?:)/.test(a.value) && !secretish.test(a.name);
-        if (rules.urlAttributes.includes(a.name) || urlish) {
-          const path = pathOnly(a.value);
-          if (path === null) {
-            el.removeAttribute(a.name);
-            count('@' + a.name);
-          } else if (path !== a.value) {
-            el.setAttribute(a.name, path);
-          }
-          continue;
-        }
-        if (!keepAttribute(el, a.name, a.value)) {
-          el.removeAttribute(a.name);
-          count('@' + a.name);
-        }
-      }
+      reduceAttributes(el);
       // Le dessin d'une icône ne désigne rien : ses chemins sont des coordonnées.
       if (el.tagName.toLowerCase() === 'svg') {
         el.replaceChildren();
@@ -178,6 +179,10 @@ export function reducePage(doc, rules) {
       walk(el.tagName === 'TEMPLATE' ? el.content : el);
     }
   };
+  // `walk` ne traite que les ENFANTS de ce qu'il reçoit : la racine passe d'abord par la même
+  // liste blanche, sans quoi un attribut de `<html>` survivait à toutes les réductions (revue
+  // Codex, PR #133).
+  reduceAttributes(doc.documentElement);
   walk(doc.documentElement);
   return dropped;
 }
@@ -238,9 +243,10 @@ export function unreachableByReduction(selector, rules) {
 /** Les noms d'attributs que le code d'un adaptateur lit par `getAttribute`/`hasAttribute`, et
  * que la réduction ne garde pas. Même lecture textuelle, sur le source. */
 export function unreachableAttributeReads(source, rules) {
-  const out = new Set();
-  for (const [, name] of source.matchAll(/(?:get|has)Attribute\(\s*['"]([^'"]+)['"]/g)) {
-    if (unreachableByReduction(`[${name}]`, rules).length > 0 && name !== 'content') out.add(name);
-  }
-  return [...out];
+  return attributeReads(source).filter((name) => name !== 'content' && unreachableByReduction(`[${name}]`, rules).length > 0);
+}
+
+/** Les noms d'attributs qu'un source lit par `getAttribute`/`hasAttribute`, sans doublon. */
+export function attributeReads(source) {
+  return [...new Set(Array.from(source.matchAll(/(?:get|has)Attribute\(\s*['"]([^'"]+)['"]/g), (m) => m[1]))];
 }

@@ -11,7 +11,10 @@
 // brute existe, donc le seul où l'on peut prouver que la réduction n'a rien retiré qu'un
 // sélecteur lise. Pour chaque page, et avant d'écrire quoi que ce soit :
 //   1. chaque candidat de `selectors.ts` doit trouver les MÊMES éléments avant et après —
-//      l'identité, par un marqueur posé sur la page brute, pas le nombre ;
+//      l'identité, par un marqueur posé sur la page brute, pas le nombre —, et sur chacun les
+//      MÊMES valeurs des attributs que l'adaptateur lit par `getAttribute`. L'identité seule
+//      laissait passer `href="#issue-1"` réécrit en `/#issue-1` : même élément, autre ancre de
+//      fil (revue Codex, PR #133) ;
 //   2. réduire la page réduite doit la rendre à l'identique : une réduction qui n'est pas un
 //      point fixe dirait autre chose à chaque passage.
 // Une page qui échoue à l'un des deux n'est PAS réécrite : elle reste brute, sur cette machine,
@@ -23,7 +26,7 @@ import { chromium } from 'playwright-core';
 import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { reducePage, reductionMismatches, rulesFor } from './lib/captured-page-reducer.mjs';
+import { attributeReads, reducePage, reductionMismatches, rulesFor } from './lib/captured-page-reducer.mjs';
 import { findCapturedPageSecrets } from './lib/captured-page-secrets.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -60,9 +63,16 @@ try {
 }
 
 const rules = rulesFor(id);
+const srcDir = join(ROOT, 'packages', 'adapters', id, 'src');
+let reads = [];
+try {
+  reads = [...new Set(readdirSync(srcDir).filter((f) => f.endsWith('.ts')).flatMap((f) => attributeReads(readFileSync(join(srcDir, f), 'utf8'))))].sort();
+} catch {
+  // pas d'adaptateur : rien n'est lu
+}
 
 /** Exécutée dans la page. Reçoit le SOURCE de `reducePage` : la fonction est autonome. */
-function inPage({ html, rules, candidates, reduceSource, mark }) {
+function inPage({ html, rules, candidates, reduceSource, mark, reads }) {
   const reduce = new Function(`return (${reduceSource})`)();
   const parse = (text) => new DOMParser().parseFromString(text, 'text/html');
   const serialize = (doc) => '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
@@ -72,7 +82,9 @@ function inPage({ html, rules, candidates, reduceSource, mark }) {
     for (const [key, list] of Object.entries(candidates)) {
       out[key] = list.map((c) => {
         try {
-          return Array.from(doc.querySelectorAll(c), (el) => el.getAttribute(mark));
+          return Array.from(doc.querySelectorAll(c), (el) =>
+            [el.getAttribute(mark), ...reads.map((r) => `${r}=${el.getAttribute(r)}`)].join(' ')
+          );
         } catch (err) {
           return `erreur : ${err.message}`;
         }
@@ -105,12 +117,14 @@ try {
   for (const file of files) {
     const path = join(dir, file);
     const html = readFileSync(path, 'utf8');
-    const r = await page.evaluate(inPage, { html, rules, candidates, reduceSource: reducePage.toString(), mark: MARK });
+    const r = await page.evaluate(inPage, { html, rules, candidates, reduceSource: reducePage.toString(), mark: MARK, reads });
     const problems = [];
     if (candidates) {
       for (const m of reductionMismatches(candidates, r.before, r.after)) {
         const n = (v) => (Array.isArray(v) ? `${v.length} élément(s)` : v);
-        problems.push(`${m.key} ${JSON.stringify(m.candidate)} : brut ${n(m.before)}, réduit ${n(m.after)}`);
+        const at = Array.isArray(m.before) && Array.isArray(m.after) ? m.before.findIndex((v, i) => v !== m.after[i]) : -1;
+        const first = at >= 0 ? ` — brut « ${m.before[at]} », réduit « ${m.after[at] ?? '(absent)'} »` : '';
+        problems.push(`${m.key} ${JSON.stringify(m.candidate)} : brut ${n(m.before)}, réduit ${n(m.after)}${first}`);
       }
     }
     if (!r.fixedPoint) problems.push('la page réduite, réduite à nouveau, ne revient pas à l’identique');
@@ -149,6 +163,6 @@ if (check) {
 }
 console.log(
   `\n✓ ${files.length} page(s) réduite(s).` +
-    (candidates ? ' Chaque candidat trouve les mêmes éléments avant et après.' : '') +
+    (candidates ? ' Chaque candidat trouve les mêmes éléments avant et après, et les mêmes valeurs lues.' : '') +
     '\n  Ensuite : node scripts/check-captured-pages.mjs --audit, puis node scripts/check-captured-pages.mjs.'
 );

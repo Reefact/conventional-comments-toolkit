@@ -47,12 +47,21 @@ export const BASE_RULES = {
    * retirait `data-deferred-content-url`, et les fils repliés de GitHub n'étaient plus lus). */
   opaqueValue: '[A-Za-z0-9+/_=-]{40,}',
   maxDataValue: 200,
-  /** Les `data-*` qui NOMMENT l'interface — posés exprès pour être cherchés —, gardés quelle que
-   * soit leur valeur. Mesuré le 2026-11-08 : `data-testid="copilot-immersive-embedded-header-button"`
-   * (et quatre `data-test-selector`) étaient retirés comme « opaques », un nom en kebab-case de
-   * 40 caractères ressemblant à un jeton. Ce sont les prises que le skill `plateforme` recommande,
-   * et celles que le squelette du diagnostic compare (`PRINTED_ATTRIBUTES`, evidence.ts). */
+  /** Les `data-*` qui NOMMENT l'interface — posés exprès pour être cherchés. Mesuré le
+   * 2026-11-08 : `data-testid="copilot-immersive-embedded-header-button"` (et quatre
+   * `data-test-selector`) étaient retirés comme « opaques », un nom en kebab-case de 40
+   * caractères ressemblant à un jeton. Ce sont les prises que le skill `plateforme` recommande, et
+   * celles que le squelette du diagnostic compare (`PRINTED_ATTRIBUTES`, evidence.ts). Leur valeur
+   * échappe à la règle d'opacité quand elle est un IDENTIFIANT STRUCTURÉ (`structuredName`), et
+   * SEULEMENT alors : la première version les exemptait de tout contrôle, si bien qu'un jeton
+   * rangé dans un `data-testid` passait entier (revue Reefact, PR #134). La longueur maximale
+   * vaut pour eux comme pour les autres. */
   interfaceData: ['data-testid', 'data-test-selector', 'data-component', 'data-variant', 'data-status'],
+  /** Un identifiant fait de MOTS : au moins deux, séparés par `-`, `_`, `.` ou `:`, chacun de
+   * lettres éventuellement suivies de chiffres (`item2`), d'au plus 20 caractères. Ni un jeton
+   * d'un seul tenant, ni une empreinte hexadécimale, ni un UUID (`1b4e28ba-2fa1-…` : des
+   * segments où chiffres et lettres alternent) n'en ont la forme. */
+  structuredName: '^[A-Za-z]{1,20}[0-9]*(?:[-_.:][A-Za-z]{1,20}[0-9]*)+$',
   /** Une valeur de `data-*` qui a la forme d'une URL, et dont la requête est donc retirée :
    * absolue, à la racine, ou relative AVEC une requête — `?token=…`, `comments?token=…`. La
    * première version ne reconnaissait que `/…` et `http(s):…`, et une requête relative passait
@@ -98,6 +107,7 @@ export function reducePage(doc, rules) {
   const secretish = new RegExp(rules.secretishName, 'i');
   const opaque = new RegExp(rules.opaqueValue);
   const urlValue = new RegExp(rules.urlValue);
+  const structured = new RegExp(rules.structuredName);
   // La requête retirée, et RIEN d'autre : la référence garde sa forme. Une première version
   // résolvait l'URL contre une origine factice et recomposait chemin + ancre — `#issue-1`
   // devenait `/#issue-1`, qui vise la racine du site, et l'adaptateur GitHub lit ce `href` tel
@@ -124,7 +134,9 @@ export function reducePage(doc, rules) {
   const keepAttribute = (el, name, value) => {
     if (name === 'content') return el.tagName === 'META';
     if (rules.keepAttributes.includes(name) || name.startsWith('aria-')) return true;
-    if (rules.interfaceData.includes(name)) return true;
+    if (rules.interfaceData.includes(name)) {
+      return value.length <= rules.maxDataValue && (!opaque.test(value) || structured.test(value));
+    }
     if (name === 'value') {
       return el.tagName === 'OPTION' || rules.valueTypes.includes((el.getAttribute('type') ?? '').toLowerCase());
     }

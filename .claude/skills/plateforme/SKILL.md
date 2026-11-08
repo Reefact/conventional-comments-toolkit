@@ -80,11 +80,15 @@ session connectée (documentation Claude Code, « Use Claude Code with Chrome »
 2026-11-08). La même session a le terminal, Git, Node ET le navigateur : elle capture, réduit,
 vérifie et commite sans copier-coller.
 
-**Elle exige une session LOCALE DÉMARRÉE avec Chrome** — `claude --chrome`, en CLI ou dans VS
-Code — lancée dans un clone du dépôt (`npm ci`, `npm run build`). `/chrome` dans une session
-démarrée sans ne donne PAS les outils : il affiche « Not enabled in this session » et demande
-de quitter puis de relancer par `claude --chrome --resume` (mesuré le 2026-11-08, Claude Code
-2.1.317, Windows). Le même écran propose « Enabled by default », qui évite d'y repenser. Une session
+**Elle exige une session LOCALE où Chrome est ACTIVÉ** — `claude --chrome`, en CLI ou dans VS
+Code — lancée dans un clone du dépôt (`npm ci`, `npm run build`). Le drapeau ne suffit pas à le
+garantir : au premier usage (2026-11-08, Claude Code 2.1.317, Windows), une session lancée par
+`claude --chrome` n'avait pas les outils, et `/chrome` y affichait « Not enabled in this
+session ». La cause n'est pas établie — à vérifier ; au lancement suivant, un écran « Claude in
+Chrome » attendait « Enter to confirm · Esc to cancel » avant la session. `/chrome` ne rattrape
+pas une session où Chrome n'est pas activé : il demande de quitter et de relancer par
+`claude --chrome --resume`. Faire confirmer à la session, par ToolSearch, la présence des outils
+avant toute autre étape. Une session
 dans le cloud n'a pas les outils `mcp__claude-in-chrome__*` : la chercher par ToolSearch, et
 s'ils manquent, ne rien improviser — proposer à la personne de relancer en local, ou la voie B.
 Prérequis à lui faire vérifier : l'extension Claude in Chrome (1.0.36 ou plus), connectée au

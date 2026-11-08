@@ -188,6 +188,20 @@ field, 6 notes.
 
 Not captured: the preview of a reply, of a diff-line comment, of the review body.
 
+## Closed merge request (state 08)
+
+`08-overview-mr-fermee.html` — !2 closed (API `PUT …/merge_requests/2` with
+`state_event: close`, at the owner's request), captured, then reopened the same way; checked:
+`state: opened`, source branch `test/mr-b` intact.
+
+- The completion control is gone: `button[data-testid="merge-button"]` is present on the open
+  !2 (`01-…-mr2`) and absent here — the expected absence of §9.4.
+- The comment form stays: `textarea[data-testid="comment-field"]` and
+  `button[data-testid="close-reopen-button"]`, which now reads "Reopen merge request".
+- New hooks on the closed page: `data-testid="reopen-merge-request"`, `merged-status-content`.
+
+Not captured: a **merged** merge request (merging is irreversible on the test project).
+
 ## Diff views
 
 The Changes tab shows a "Rapid Diffs (Beta)" dropdown, and the page holds a "Switch to classic

@@ -1,0 +1,34 @@
+/* Ce que les rôles de rendu de l'extension valent SUR GITLAB (annexe C).
+
+   **Aucun jeton de THÈME n'est déclaré ici, et ce vide est une réponse.**
+
+   GitLab a ses propres jetons de thème (son système de design, « Pajamas »). Aucun n'a été
+   relevé depuis ce dépôt : les captures de gitlab.com (test/fixtures/pages/) sont RÉDUITES, sans
+   feuille de style, et ne disent rien des couleurs ni des longueurs. Les nommer ici de mémoire
+   serait la faute que la scission des feuilles corrige — une affirmation sur une plateforme se
+   VÉRIFIE, elle ne se rappelle pas.
+
+   Sans surcharge de thème, les valeurs neutres de la feuille partagée s'appliquent — mots-clés
+   système (`ButtonFace`, `Highlight`, `Canvas`, `currentColor`) qui suivent le thème du système
+   d'exploitation et le mode sombre.
+
+   Pour l'améliorer : relever les jetons de thème sur une page de merge request réelle, en mode
+   clair ET en mode sombre, puis les déclarer ci-dessous sur le modèle de la feuille GitHub. */
+
+/* LES TROIS LONGUEURS DU COMPOSEUR, ET POURQUOI ELLES SONT ICI SANS AVOIR ÉTÉ MESURÉES.
+
+   Ce ne sont PAS des mesures de GitLab. Ce sont celles que la feuille d'Azure DevOps déclare
+   déjà comme REPLI DE COMPATIBILITÉ — elles-mêmes reprises de github.com. La feuille partagée
+   les consomme SANS repli : sans ce bloc, le composeur perdrait ses trois retraits sur GitLab.
+   (Le garde `check:platform-isolation` ne l'aurait pas vu : il vérifie les feuilles présentes,
+   pas l'absence d'une feuille — mesuré à la création de cette plateforme.)
+
+   À remplacer par de vraies mesures : sur une page de merge request, relever le retrait propre
+   du conteneur de commentaire, puis juger la gouttière et l'écart de la pastille. D'ici là, ces
+   chiffres disent « un rendu cohérent avec les autres plateformes », jamais « ce qu'il faut
+   rendre ici ». */
+:root[data-cct-platform='gitlab'] {
+  --cct-frame-padding: 8px;
+  --cct-inner-gutter: 8px;
+  --cct-pastille-gap: 4px;
+}

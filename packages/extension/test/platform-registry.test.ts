@@ -50,8 +50,8 @@ describe('§9.1 — le registre des plateformes, et lui seul', () => {
 
 describe('§9.1 — le routage ne connaît que le registre', () => {
   it('une clé étrangère dans la répartition publiée ne devient pas une plateforme', () => {
-    const extra = { github: [], azdo: [], gitlab: ['gitlab.example.corp'] } as unknown as Parameters<typeof selectPlatform>[1];
-    expect(selectPlatform('gitlab.example.corp', extra)).toBeNull();
+    const extra = { github: [], azdo: [], gitlab: [], bitbucket: ['bitbucket.example.corp'] } as unknown as Parameters<typeof selectPlatform>[1];
+    expect(selectPlatform('bitbucket.example.corp', extra)).toBeNull();
   });
 
   it('la plus précise l’emporte, une égalité au sommet ne tranche pas', () => {

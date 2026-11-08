@@ -14,8 +14,9 @@
 import type { ClientAdapterOptions, PlatformAdapter, PlatformDescriptor } from '@cct/adapter-shared';
 import { azdoDescriptor } from '@cct/adapter-azdo/descriptor';
 import { githubDescriptor } from '@cct/adapter-github/descriptor';
+import { gitlabDescriptor } from '@cct/adapter-gitlab/descriptor';
 
-export const PLATFORMS = [githubDescriptor, azdoDescriptor] as const satisfies readonly PlatformDescriptor[];
+export const PLATFORMS = [githubDescriptor, azdoDescriptor, gitlabDescriptor] as const satisfies readonly PlatformDescriptor[];
 
 /** L'identifiant d'une plateforme du registre. Dérivé des fiches : il n'existe aucune autre
  * liste à tenir à jour. */

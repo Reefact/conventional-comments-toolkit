@@ -8,6 +8,7 @@
 
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { GithubClientAdapter } from '@cct/adapter-github';
+import { GitlabClientAdapter } from '@cct/adapter-gitlab';
 import { bootstrap } from './content-internal.js';
 import type { AdapterFactories } from './platforms.js';
 
@@ -18,6 +19,7 @@ import type { AdapterFactories } from './platforms.js';
 const FACTORIES: AdapterFactories = {
   github: (opts) => new GithubClientAdapter(opts),
   azdo: (opts) => new AzdoClientAdapter(opts),
+  gitlab: (opts) => new GitlabClientAdapter(opts),
 };
 
 declare const chrome: { runtime?: unknown } | undefined;

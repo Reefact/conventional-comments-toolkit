@@ -68,13 +68,13 @@
     },
     "allowedHosts": {
       "title": "Hôtes pré-autorisés",
-      "description": "Domaines GHES / Azure DevOps Server et hôte de configUrl, pré-autorisés par la politique (§10, §A.4, §B.4). Chaque entrée porte OBLIGATOIREMENT sa plateforme : {\"host\": \"ghes.example.corp\", \"platform\": \"github\"}. `platform` vaut `github` (GHES, *.ghe.com), `azdo` (Azure DevOps Server) ou `config` — ce dernier pour l'hôte d'un configUrl seul, accordé sans être reconnu par aucun adaptateur. Cette classification par politique dispense chaque poste de passer par la page d'options. Un joker de sous-domaine est accepté dans `host` (`*.ghe.com`, §A.4).",
+      "description": "Domaines GHES / Azure DevOps Server / GitLab Self-Managed et hôte de configUrl, pré-autorisés par la politique (§10, §A.4, §B.4, §C.4). Chaque entrée porte OBLIGATOIREMENT sa plateforme : {\"host\": \"ghes.example.corp\", \"platform\": \"github\"}. `platform` vaut `github` (GHES, *.ghe.com), `azdo` (Azure DevOps Server), `gitlab` (GitLab Self-Managed, §C.4) ou `config` — ce dernier pour l'hôte d'un configUrl seul, accordé sans être reconnu par aucun adaptateur. Cette classification par politique dispense chaque poste de passer par la page d'options. Un joker de sous-domaine est accepté dans `host` (`*.ghe.com`, §A.4).",
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
           "host": { "type": "string" },
-          "platform": { "type": "string", "enum": ["github", "azdo", "config"] }
+          "platform": { "type": "string", "enum": ["github", "azdo", "gitlab", "config"] }
         },
         "required": ["host", "platform"]
       }

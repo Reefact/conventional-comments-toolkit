@@ -157,11 +157,13 @@ describe('B2 — le SERVICE WORKER calcule la répartition (seul contexte à voi
     expect(await publishExtraHostsByPlatform()).toEqual({
       github: ['ghes.example.corp'],
       azdo: ['azdo.example.corp'],
+      gitlab: [],
     });
     // Publié pour le script de contenu, qui ne peut pas le recalculer.
     expect(local[EXTRA_HOSTS_KEY]).toEqual({
       github: ['ghes.example.corp'],
       azdo: ['azdo.example.corp'],
+      gitlab: [],
     });
   });
 
@@ -170,7 +172,7 @@ describe('B2 — le SERVICE WORKER calcule la répartition (seul contexte à voi
     // liste dans bootstrap()), même pour un domaine Azure DevOps Server.
     installServiceWorkerChrome(['https://untagged.example.corp/*'], {});
     const { publishExtraHostsByPlatform } = await import('../src/background.js');
-    expect(await publishExtraHostsByPlatform()).toEqual({ github: [], azdo: [] });
+    expect(await publishExtraHostsByPlatform()).toEqual({ github: [], azdo: [], gitlab: [] });
   });
 
   it('un hôte étiqueté `config` est exclu des deux adaptateurs — accordé pour lire un configUrl, pas pour être reconnu', async () => {
@@ -178,7 +180,7 @@ describe('B2 — le SERVICE WORKER calcule la répartition (seul contexte à voi
       [HOST_PLATFORMS_KEY]: { 'config.example.corp': 'config' },
     });
     const { publishExtraHostsByPlatform } = await import('../src/background.js');
-    expect(await publishExtraHostsByPlatform()).toEqual({ github: [], azdo: [] });
+    expect(await publishExtraHostsByPlatform()).toEqual({ github: [], azdo: [], gitlab: [] });
   });
 
   it('une étiquette orpheline (permission révoquée depuis) est ignorée', async () => {
@@ -186,7 +188,7 @@ describe('B2 — le SERVICE WORKER calcule la répartition (seul contexte à voi
       [HOST_PLATFORMS_KEY]: { 'revoked.example.corp': 'github' },
     });
     const { publishExtraHostsByPlatform } = await import('../src/background.js');
-    expect(await publishExtraHostsByPlatform()).toEqual({ github: [], azdo: [] });
+    expect(await publishExtraHostsByPlatform()).toEqual({ github: [], azdo: [], gitlab: [] });
   });
 
   it('un hôte pré-autorisé par POLITIQUE est classé sans passer par la page d’options', async () => {
@@ -206,6 +208,7 @@ describe('B2 — le SERVICE WORKER calcule la répartition (seul contexte à voi
     expect(await publishExtraHostsByPlatform()).toEqual({
       github: ['ghes.example.corp'],
       azdo: ['azdo.example.corp'],
+      gitlab: [],
     });
   });
 
@@ -219,6 +222,7 @@ describe('B2 — le SERVICE WORKER calcule la répartition (seul contexte à voi
     expect(await publishExtraHostsByPlatform()).toEqual({
       github: [],
       azdo: ['host.example.corp'],
+      gitlab: [],
     });
   });
 });
@@ -231,21 +235,22 @@ describe('B3 — le SCRIPT DE CONTENU lit la valeur publiée, sans jamais touche
     expect(await readExtraHostsByPlatform()).toEqual({
       github: ['ghes.example.corp'],
       azdo: ['azdo.example.corp'],
+      gitlab: [],
     });
   });
 
   it('rien de publié (premier démarrage) : listes vides, pas d’exception', async () => {
     installContentScriptChrome({});
-    expect(await readExtraHostsByPlatform()).toEqual({ github: [], azdo: [] });
+    expect(await readExtraHostsByPlatform()).toEqual({ github: [], azdo: [], gitlab: [] });
   });
 
   it('valeur stockée malformée : listes vides plutôt qu’un plantage du script de contenu', async () => {
     installContentScriptChrome({ [EXTRA_HOSTS_KEY]: { github: 'pas-un-tableau' } });
-    expect(await readExtraHostsByPlatform()).toEqual({ github: [], azdo: [] });
+    expect(await readExtraHostsByPlatform()).toEqual({ github: [], azdo: [], gitlab: [] });
   });
 
   it('hors contexte d’extension (aucun chrome) : listes vides', async () => {
-    expect(await readExtraHostsByPlatform()).toEqual({ github: [], azdo: [] });
+    expect(await readExtraHostsByPlatform()).toEqual({ github: [], azdo: [], gitlab: [] });
   });
 });
 
@@ -450,7 +455,7 @@ describe('D2 — les publications concurrentes sont sérialisées (service worke
     const second = publishExtraHostsByPlatform();
 
     await Promise.all([first, second]);
-    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: ['ghes.example.corp'], azdo: [] });
+    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: ['ghes.example.corp'], azdo: [], gitlab: [] });
   });
 });
 
@@ -463,7 +468,7 @@ describe('D3 — une étiquette de politique d’entreprise est reconnue sans ge
     ).local;
     const { publishExtraHostsByPlatform } = await import('../src/background.js');
     await publishExtraHostsByPlatform();
-    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: ['azdo.example.corp'] });
+    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: ['azdo.example.corp'], gitlab: [] });
   });
 
   it('une entrée SANS plateforme explicite reste non classée — jamais rabattue sur github', async () => {
@@ -482,7 +487,7 @@ describe('D3 — une étiquette de politique d’entreprise est reconnue sans ge
     ).local;
     const { publishExtraHostsByPlatform } = await import('../src/background.js');
     await publishExtraHostsByPlatform();
-    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: [] });
+    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: [], gitlab: [] });
   });
 
   it('la politique PRIME sur une étiquette locale divergente', async () => {
@@ -493,7 +498,7 @@ describe('D3 — une étiquette de politique d’entreprise est reconnue sans ge
     ).local;
     const { publishExtraHostsByPlatform } = await import('../src/background.js');
     await publishExtraHostsByPlatform();
-    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: ['host.example.corp'] });
+    expect(store[EXTRA_HOSTS_KEY]).toEqual({ github: [], azdo: ['host.example.corp'], gitlab: [] });
   });
 });
 

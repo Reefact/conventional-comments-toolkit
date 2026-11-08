@@ -180,6 +180,22 @@ Captured in `03-overview-commentaires-discussion.html` and `03-changes-commentai
   Azure DevOps only), so GitLab has no stage 0 until the owner amends it; this is the
   measurement such an amendment would need. "Apply suggestion" was not clicked.
 
+## Resolved thread
+
+The `question: faut-il accepter un tableau vide ?` thread was resolved (API `PUT
+…/discussions/:id?resolved=true`, owner's agreement), captured, then unresolved; checked: no
+resolved discussion left on !1.
+
+- `03-overview-fil-resolu.html` — the thread container gets `data-discussion-resolved="true"` and
+  collapses: header kept, notes gone. The header still holds `a.note-timestamp[href="#note_<id>"]`
+  (the first note's id) and "Resolved just now by Sylvain AURAT" with an `a.js-user-link` to
+  `/<username>` (no `data-username` there).
+- `03-changes-fil-resolu.html` (Rapid Diffs) — the resolved thread is **not in the DOM at all**; only
+  an avatar marks the line on screen.
+- Thread ids: the API returns 40-hex discussion ids; the live Overview page carries them on
+  `div[data-discussion-id]` (attribute name checked, value never read out); the reducer strips them
+  as opaque, so the adapter identifies a thread by its first note.
+
 ## Review (state 07)
 
 A draft review was started from the main form ("Start review" with a test text), its panel

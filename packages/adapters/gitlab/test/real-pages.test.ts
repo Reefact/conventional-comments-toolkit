@@ -301,6 +301,18 @@ describe('§5.5, §9.2.3 — Fils et commentaires publiés (captures 03)', () =>
     expect(threads[0]!.root.body.trim()).toBe('issue: total() ignore les prix négatifs.');
   });
 
+  it('lit les réponses publiées d’un fil, après sa racine (§6.1.1 — `replies`)', async () => {
+    const threads = await page.adapter.getThreads();
+    expect(threads.map((t) => t.replies.length)).toEqual([1, 0, 0, 0, 0, 0]);
+    const [reply] = threads[0]!.replies;
+    expect(reply!.id).toMatch(/^note_\d+$/);
+    expect(reply!.id).not.toBe(threads[0]!.root.id);
+    expect(reply!.author.login).toBe('Reefact');
+    expect(reply!.body.trim()).toBe('ack: corrigé dans le prochain commit');
+    // Aucun fil ouvert n'a de résolveur.
+    expect(threads.every((t) => t.resolvedBy === undefined)).toBe(true);
+  });
+
   it('rend sept corps de commentaires — réponse comprise —, ni la description ni un aperçu vide', () => {
     const bodies = page.adapter.getRenderedComments().map((c) => c.bodyText.trim().split('\n')[0]);
     expect(bodies).toHaveLength(7);
@@ -362,6 +374,27 @@ describe('§C.5 — Fil résolu', () => {
     expect(threads.filter((t) => t.resolution === 'resolved').map((t) => t.id)).toEqual(['note_4188016850']);
     expect(threads.filter((t) => t.resolution === 'unresolved')).toHaveLength(5);
     expect(loggedChains(page)).toEqual([]);
+  }, T);
+
+  it('Overview : le résolveur du fil replié est lu sur son lien, les autres fils n’en ont pas (§6.1)', async () => {
+    const page = load('03-overview-fil-resolu.html', MR1);
+    const threads = await page.adapter.getThreads();
+    const resolved = threads.find((t) => t.resolution === 'resolved')!;
+    expect(resolved.resolvedBy).toEqual({ id: 'login:reefact', login: 'Reefact', isServiceAccount: false });
+    expect(threads.filter((t) => t.resolvedBy !== undefined)).toHaveLength(1);
+  }, T);
+
+  it('Overview : le fil replié, sans note rendue, n’est pas offert au filtre — il reste visible (§5.5)', async () => {
+    // Son label est inconnaissable : corps vide, donc label nul, et le filtre le masquait quel
+    // que soit le label choisi — un `issue:` résolu disparaissait sous le filtre `issue`.
+    const page = load('03-overview-fil-resolu.html', MR1);
+    const threads = await page.adapter.getThreads();
+    const rendered = page.adapter.getRenderedThreadElements();
+    expect(rendered.map((t) => t.id)).not.toContain('note_4188016850');
+    expect(rendered).toHaveLength(5);
+    // Même dérivation d'identifiants que getThreads() (contrat de getRenderedThreadElements).
+    const known = new Set(threads.map((t) => t.id));
+    expect(rendered.every((t) => known.has(t.id))).toBe(true);
   }, T);
 
   it('Rapid Diffs : un fil résolu n’est pas dans la page — il n’est pas lu, ni compté résolu (03-changes-fil-resolu)', async () => {

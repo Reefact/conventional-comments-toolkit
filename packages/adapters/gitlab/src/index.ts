@@ -10,6 +10,7 @@
 // - pas d'étage 0 : le marqueur du bloc de suggestion n'est pas fixé pour GitLab (§C.6).
 
 import type {
+  CommentInfo,
   ConfigRead,
   Disposable,
   PlatformProfile,
@@ -166,28 +167,50 @@ export class GitlabClientAdapter implements PlatformAdapter {
     if (!pr) return [];
     return queryChainAll(this.#doc, selectors.thread).map((el, i) => {
       const id = this.#threadId(el) ?? `dom-thread-${i}`;
-      const root = queryChain(el, selectors.noteContainer).element;
-      const bodyEl = root ? queryChain(root, selectors.commentBody).element : null;
-      const login = (root ? queryChain(root, selectors.commentAuthor).element : null)?.getAttribute('data-username') ?? '';
+      // La racine est la PREMIÈRE note du fil, les réponses publiées les suivantes : toutes sont
+      // des `noteContainer`, enfants du même fil (03-overview-commentaires-discussion, la
+      // réponse `ack:`). Un fil résolu de l'Overview est REPLIÉ sans aucune note (§C.5) : racine
+      // au corps vide et aucune réponse, ce qui n'est pas une rupture — la page ne les a pas
+      // rendues.
+      const [root, ...replies] = queryChainAll(el, selectors.noteContainer);
+      const resolver = this.#resolver(el);
       return {
         id,
         pr,
-        root: {
-          id,
-          author: { id: `login:${login.toLowerCase()}`, login, isServiceAccount: false },
-          // Un fil résolu de l'Overview est REPLIÉ sans ses notes (§C.5) : corps vide, ce qui
-          // n'est pas une rupture — la page ne l'a pas rendu.
-          body: bodyEl ? commentBodyText(bodyEl) : '',
-          createdAt: '',
-          permalink: `#${id}`,
-          isSystemGenerated: false,
-          canCarryBlockingState: true,
-        },
-        replies: [],
+        root: { ...this.#comment(root), id, permalink: `#${id}`, canCarryBlockingState: true },
+        replies: replies.map((note) => this.#comment(note)),
         resolution: this.#resolution(el),
+        // Le résolveur est rendu dans l'en-tête d'un fil résolu replié (selectors.ts,
+        // `threadResolver`). Absent ailleurs, et alors non renseigné (§6.1) : le cas d'un fil
+        // résolu DÉPLIÉ n'est pas capturé.
+        ...(resolver ? { resolvedBy: resolver } : {}),
         canCarryBlockingState: true,
       };
     });
+  }
+
+  /** Un commentaire publié, lu dans son conteneur de note ; `undefined` pour une note non rendue. */
+  #comment(note: Element | undefined): CommentInfo {
+    const bodyEl = note ? queryChain(note, selectors.commentBody).element : null;
+    const login = (note ? queryChain(note, selectors.commentAuthor).element : null)?.getAttribute('data-username') ?? '';
+    const id = note?.id ?? '';
+    return {
+      id,
+      author: { id: `login:${login.toLowerCase()}`, login, isServiceAccount: false },
+      body: bodyEl ? commentBodyText(bodyEl) : '',
+      createdAt: '',
+      permalink: `#${id}`,
+      isSystemGenerated: false,
+      canCarryBlockingState: false,
+    };
+  }
+
+  /** Le résolveur se lit sur le chemin de son lien (`href="/<username>"`) : il n'a pas de
+   * `data-username` (selectors.ts, `threadResolver`). */
+  #resolver(thread: Element): UserInfo | undefined {
+    const href = queryChain(thread, selectors.threadResolver).element?.getAttribute('href') ?? '';
+    const login = href.replace(/^\//, '').split('/')[0] ?? '';
+    return login ? { id: `login:${login.toLowerCase()}`, login, isServiceAccount: false } : undefined;
   }
 
   #resolution(thread: Element): ThreadInfo['resolution'] {
@@ -265,11 +288,15 @@ export class GitlabClientAdapter implements PlatformAdapter {
     return this.getRenderedThreadElements()[0]?.element ?? null;
   }
 
+  /** Seuls les fils dont la racine est RENDUE : un fil résolu replié (§C.5) n'a aucune note dans
+   * la page, son label est inconnaissable, et le filtre du §5.5 le masquerait quel que soit le
+   * label choisi — un `issue:` résolu disparaissait sous le filtre `issue`. Hors de cette liste,
+   * le filtre n'y touche pas : il reste visible. Les identifiants restent ceux de `getThreads()`,
+   * l'indice compris. */
   getRenderedThreadElements(): { id: string; element: Element }[] {
-    return queryChainAll(this.#doc, selectors.thread).map((element, i) => ({
-      id: this.#threadId(element) ?? `dom-thread-${i}`,
-      element,
-    }));
+    return queryChainAll(this.#doc, selectors.thread)
+      .map((element, i) => ({ id: this.#threadId(element) ?? `dom-thread-${i}`, element }))
+      .filter(({ element }) => queryChain(element, selectors.noteContainer).element !== null);
   }
 
   currentPr(): PrRef | null {

@@ -86,6 +86,12 @@ bouton —, lister tous les `button`, `input` et `select` du formulaire qui cont
 Deux angles morts à couvrir aussi : le bouton d'envoi d'un champ VIDE est souvent désactivé, et
 son libellé peut changer champ rempli — d'où une capture champ REMPLI, sans envoi ; l'envoi au
 CLAVIER n'a pas d'élément, aucune capture ne le montre, il se teste à la validation finale.
+Taper dans un champ n'est pas publier, mais c'est écrire sur la plateforme : accord de la
+personne d'abord, un texte qui se dit de test, puis champ vidé et rechargement pour vérifier
+qu'aucun brouillon ne reste. Le texte tapé n'est PAS dans la capture (la valeur d'une
+`<textarea>` ne se sérialise pas) : la capture « rempli » montre les boutons, pas le texte.
+Et « désactivé » se mesure sur l'élément vivant : `aria-disabled` sans attribut `disabled` est
+courant, et `:disabled` / `:enabled` ne le voient pas.
 
 Un mode peut être **mémorisé pour le compte** (rechargement, autre vue, autre champ) : le
 mesurer, puis remettre le mode d'origine de la personne et vérifier qu'il tient après

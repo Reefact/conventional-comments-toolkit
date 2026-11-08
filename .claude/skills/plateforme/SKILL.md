@@ -229,6 +229,19 @@ Chrome et l'active ; la session ouvre chaque état sur les PR de test, enregistr
 d'écran et les MONTRE à la personne, qui valide. Ces captures montrent une page connectée : elles
 ne se commitent pas.
 
+Ce que la validation doit regarder, dans CHAQUE vue, et que les tests sur pages réelles ne
+voient pas — premier usage, GitLab, trois défauts trouvés ainsi :
+- le RENDU des commentaires publiés : badge et sujet sur une ligne, préfixe masqué — une forme
+  de corps non déclarée laisse le préfixe sous un badge seul ;
+- les COULEURS de ce que l'extension pose : sans jetons de thème mesurés, ses contrôles tombent
+  sur des couleurs système étrangères à la page ;
+- la PLACE de tout ce qu'elle insère (bandeau, filtre de fils, barre d'outils). Une place qui
+  dépend de la forme de la page est une décision de PLATEFORME : si le code partagé la prend
+  seul, c'est un manque du contrat, et l'adaptateur doit pouvoir y répondre — le filtre de fils
+  tombait au milieu du diff, le contrat a reçu `getThreadFilterMount()`.
+L'interception (blocage d'un envoi) ne se valide que configuration LUE : en état dégradé
+(§5.4), l'extension assiste sans bloquer, et ce qu'on voit ne dit rien du blocage.
+
 ### Voie B — à la main
 
 La consigne à donner à la personne, telle quelle :

@@ -96,8 +96,13 @@ The mode is **remembered for the account**: after switching once, a reload, the 
 a thread reply all opened in rich text. The owner's account was switched back to Markdown and
 checked after a reload.
 
-So far only state 01 is captured in rich text; the other zones (reply, diff-line comment, edit)
-still need a rich text capture.
+Also captured in rich text: `04-…-texte-riche` (new diff-line comment), `05-…-texte-riche`
+(reply in a diff-line thread), `06-overview-…-texte-riche` (editing a comment). In all three the
+`<textarea>` is gone; the field is a `div[contenteditable].tiptap.ProseMirror` with
+`aria-label="Reply to comment"`, and `data-testid="reply-field"` moves to an ancestor and to an
+`input[type=hidden][name="note[note]"]` — the same shift as `comment-field` in `01-…-texte-riche`.
+Ancestor test ids in that mode: `content_editor_editablebox`, `content-editor`, then the field's
+own (`reply-field` / `comment-field`). Not captured in rich text: the review body.
 
 ## Full screen mode
 
@@ -110,10 +115,11 @@ after the click (two attempts).
 
 ## Thread fields
 
-- A new diff-line comment (`04-…`) and a reply in a diff-line thread (`05-…`) use the same field:
-  `data-testid="reply-field"`, `aria-label="Reply to comment"`. Only `04` contains the
-  "Comment on line" label. Telling `thread-root` from `reply` must rely on the surrounding
-  structure — to measure when writing selectors.
+- A new diff-line comment (`04-…`), a reply (`02-…`, `05-…`) and an edit (`06-…`) use the same
+  field: `data-testid="reply-field"`, `aria-label="Reply to comment"`, in the same
+  `form.edit-note`. Only `04` contains the "Comment on line" label. Telling `thread-root`,
+  `reply` and `edit` apart must rely on the surrounding structure — see "Editing a published
+  comment" below.
 - Each published comment also has a hidden `<textarea data-update-url="…/notes/<id>">` holding
   its Markdown source (for editing) — which is why a comment's text appears twice in `03-…`.
 
@@ -124,15 +130,22 @@ saved, then cancelled — the comment shows no "edited" mark):
 
 - The edit field is again `textarea[data-testid="reply-field"][aria-label="Reply to comment"]`
   — the same attributes as a reply and a new diff-line comment. Its `id` is `note_note`.
-- What tells it apart is its form: `form.edit-note` (a new comment's form is
-  `form.new-note … js-main-target-form`). Buttons: "Save comment" and "Cancel".
-- The comment being edited is the ancestor `li#note_<id>[data-note-id="<id>"]` — a candidate for
-  `commentId`.
-
-In the Changes view (`06-changes-modification-commentaire.html`, pencil on the line-8 comment,
-cancelled): the same `form.edit-note`, the same field attributes, the same buttons. The ancestor
-is `li#note_<id>` again, but WITHOUT `data-note-id` here — the `id` is the attribute both views
-share.
+  Buttons: "Save comment" and "Cancel".
+- **Corrected** — a first version of this file said `form.edit-note` tells an edit apart. It
+  does not: checked on every capture holding a `reply-field`, the field sits in
+  `form.edit-note.common-note-form` in ALL of them — reply (`02`, `05`), new diff-line comment
+  (`04`) and edit (`06`). Only the new general comment uses `form.new-note … js-main-target-form`.
+- **Corrected** — the ancestor `li#note_<id>` does not reliably name the edited comment: a reply
+  in a diff-line thread (`05`, both modes) also has `li#note_<id>` of the comment it answers as an
+  ancestor. Taken alone, it would read a reply as an edit of that comment.
+- What the captures do show around the form (to confirm when writing selectors):
+  - reply: the form's ancestors include `[data-testid="reply-wrapper"]` (`02`: inside
+    `li.discussion-reply-holder`; `05`: a `div`), which an edit does not have;
+  - edit, Overview: the form sits in `div.note-body` of the edited `li#note_<id>[data-note-id]`;
+  - edit, Changes: the form sits directly in `li[data-testid="noteable-note-container"]#note_<id>`
+    (no `data-note-id` there), with no `reply-wrapper`;
+  - new diff-line comment: no `li#note_…` ancestor at all; the form sits in
+    `.rd-diff-line-discussions-list`.
 
 The edit form holds **two** "Cancel" buttons. The first one in document order is not the
 visible one (it sits with the upload controls, as in the new-comment form inventory): clicking
@@ -164,5 +177,10 @@ Not captured: the review drawer in rich text mode; the drawer opened from the Ch
 
 ## Diff views
 
-The Changes tab offers a "Rapid Diffs (Beta)" view next to the classic one. All captures so far
-use the classic view. Whether to capture Rapid Diffs too is open.
+The Changes tab shows a "Rapid Diffs (Beta)" dropdown, and the page holds a "Switch to classic
+loading" button. **Corrected** — an earlier note (and the commit message of `04`) said the
+captures use the classic view; that was not checked. The Changes captures (`04`, `05`, `06-changes`
+and their variants) contain Rapid Diffs markup: `<diff-file>` elements and `rd-diff-…` classes
+(`rd-diff-file`, `rd-discussion-row`, `rd-diff-line-discussions-list`). Whether Rapid Diffs is
+this account's default, gitlab.com's default, or was switched on earlier is not measured; the
+classic view is not captured. Open: capture the classic view too, or state it as not measured.

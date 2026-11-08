@@ -47,6 +47,12 @@ export const BASE_RULES = {
    * retirait `data-deferred-content-url`, et les fils repliés de GitHub n'étaient plus lus). */
   opaqueValue: '[A-Za-z0-9+/_=-]{40,}',
   maxDataValue: 200,
+  /** Les `data-*` qui NOMMENT l'interface — posés exprès pour être cherchés —, gardés quelle que
+   * soit leur valeur. Mesuré le 2026-11-08 : `data-testid="copilot-immersive-embedded-header-button"`
+   * (et quatre `data-test-selector`) étaient retirés comme « opaques », un nom en kebab-case de
+   * 40 caractères ressemblant à un jeton. Ce sont les prises que le skill `plateforme` recommande,
+   * et celles que le squelette du diagnostic compare (`PRINTED_ATTRIBUTES`, evidence.ts). */
+  interfaceData: ['data-testid', 'data-test-selector', 'data-component', 'data-variant', 'data-status'],
   /** Une valeur de `data-*` qui a la forme d'une URL, et dont la requête est donc retirée :
    * absolue, à la racine, ou relative AVEC une requête — `?token=…`, `comments?token=…`. La
    * première version ne reconnaissait que `/…` et `http(s):…`, et une requête relative passait
@@ -118,6 +124,7 @@ export function reducePage(doc, rules) {
   const keepAttribute = (el, name, value) => {
     if (name === 'content') return el.tagName === 'META';
     if (rules.keepAttributes.includes(name) || name.startsWith('aria-')) return true;
+    if (rules.interfaceData.includes(name)) return true;
     if (name === 'value') {
       return el.tagName === 'OPTION' || rules.valueTypes.includes((el.getAttribute('type') ?? '').toLowerCase());
     }

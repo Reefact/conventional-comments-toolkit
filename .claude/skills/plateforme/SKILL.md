@@ -96,6 +96,16 @@ même compte et à la même organisation que Claude Code ; l'extension Conventio
 DÉSACTIVÉE dans ce Chrome ; les PR de test créées par elle — ne rien créer ni écrire sur la
 plateforme sans son accord.
 
+Les PR de test vivent dans un projet PERSONNEL sans contenu privé — jamais dans l'organisation
+d'un employeur, même quand la personne y travaille sur la même plateforme. Il en faut au moins
+deux (audit, étape 2), chacune ajoutant un petit fichier de code, pour qu'un commentaire de ligne
+soit possible. Si la personne délègue leur création, la session peut les créer depuis l'onglet,
+par l'API de la plateforme avec la session du navigateur : mesuré sur gitlab.com le 2026-11-08,
+`fetch` vers `/api/v4/projects/:id/repository/commits` puis `/merge_requests`, en-tête
+`X-CSRF-Token` lu dans la page et utilisé sans être renvoyé — le script ne rend que les statuts
+(201) et les numéros. Un projet privé suffit aux captures ; il interdit seulement le canari
+anonyme (étape 6).
+
 **Si la question arrive dans une session cloud**, c'est elle qui mène la personne jusqu'à la
 session locale, une étape par message : (1) le clone, sur la branche qui porte la version du
 skill en cours d'amélioration si elle n'est pas fusionnée, puis `npm ci` et `npm run build` ;

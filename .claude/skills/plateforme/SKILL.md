@@ -78,7 +78,10 @@ ProseMirror (`aria-label="Comment"`), et `data-testid="comment-field"` passe sur
 `input type=hidden` — et le choix est MÉMORISÉ pour le compte : rechargement, autre vue, autre
 éditeur, tous ouvrent dans le dernier mode choisi. Remettre le mode d'origine de la personne
 après la capture, et vérifier qu'il tient après rechargement. Dans la barre d'outils, aussi,
-« Go full screen ». Le bouton `<>` de cette barre
+« Go full screen » : MESURÉ (capture `01-…-plein-ecran`), la `<textarea>` reste la même, aux
+mêmes classes ; seul son conteneur prend `zen-backdrop … fullscreen`, `<html>` prend
+`zen-mode-fullscreen`, et les boutons d'envoi, masqués à l'écran, restent dans le DOM. Qu'il
+soit mémorisé n'est PAS mesuré — l'état ne se lisait pas de façon fiable juste après le clic. Le bouton `<>` de cette barre
 est « Insert code » (mise en forme), pas un agrandissement. Une variante prend le numéro de son
 état et nomme son mode : `01-overview-nouveau-commentaire-texte-riche.html`. (Question du
 propriétaire, après les captures 01 à 05 : aucune n'avait regardé ces commandes.)

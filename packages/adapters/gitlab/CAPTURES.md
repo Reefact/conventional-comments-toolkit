@@ -175,6 +175,19 @@ review" button, 6 notes as before.
 
 Not captured: the review drawer in rich text mode; the drawer opened from the Changes view.
 
+## Preview (state 09)
+
+`09-overview-apercu.html` — main form, text typed (`suggestion (non-blocking): brouillon de
+capture, ne pas envoyer`, never sent), then "Preview (Shift+Ctrl+P)". The rendered body is
+`p` inside **`div.md` inside `div.js-vue-md-preview.md-preview-holder`**, inside
+`div[data-testid="markdown-field"]` of `form.new-note[data-testid="comment-form"]`. The
+`textarea[data-testid="comment-field"]` stays in the DOM. The toolbar button reads "Continue
+editing" while the preview is shown. Unlike the typed value, the rendered preview IS in the
+capture — it is HTML the page built from the text. Cleared afterwards; after a reload: empty
+field, 6 notes.
+
+Not captured: the preview of a reply, of a diff-line comment, of the review body.
+
 ## Diff views
 
 The Changes tab shows a "Rapid Diffs (Beta)" dropdown, and the page holds a "Switch to classic

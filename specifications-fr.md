@@ -26,7 +26,7 @@ L'équipe a adopté [Conventional Comments](https://conventionalcomments.org/) p
 - Ne concerne **pas** les messages de commit (voir Conventional Commits, sujet distinct).
 - Ne remplace **pas** les linters, analyseurs statiques ou revues automatisées par IA.
 - Ne juge **pas** la qualité ou la pertinence du contenu d'un commentaire, uniquement sa **forme**.
-- Ne gère pas Bitbucket ou Gerrit (extensibilité prévue, implémentation hors périmètre — voir §9.2). GitLab, d'abord rangé ici, entre dans le périmètre : décision du propriétaire, 2026-11-08, annexe C.
+- Ne gère pas Bitbucket ou Gerrit (extensibilité prévue, implémentation hors périmètre — voir §9.2). GitLab, d'abord rangé ici, entre dans le périmètre : décision du propriétaire, 2026-11-08, annexe C. Ce qui rend l'ajout d'une plateforme envisageable n'est pas qu'il soit devenu moins exigeant, mais qu'il soit outillé : un adaptateur se construit désormais avec l'assistance d'une IA, en suivant un protocole qui mesure la plateforme avant d'écrire une ligne (captures réduites, sélecteurs justifiés par une capture, tests sur pages réelles), et le même protocole sert à anticiper ses évolutions (canari en ligne, recapture d'un état). Une plateforme de plus reste une décision du propriétaire, et passe par sa propre annexe.
 
 ---
 

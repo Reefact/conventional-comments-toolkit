@@ -80,10 +80,67 @@ export const selectors = {
 
   /** Conteneur d'un commentaire publié — `li#note_<id>`. MESURÉ dans les trois vues (03, 05, 06) ;
    * `data-testid="noteable-note-container"` y est partout, `data-note-id` seulement dans l'Overview
-   * et la vue classique : l'identifiant se lit sur l'`id` (`note_<id>`), commun aux trois. */
+   * et la vue classique : l'identifiant se lit sur l'`id` (`note_<id>`), commun aux trois.
+   * PAS de repli sur `li[id^="note_"]` : une NOTE SYSTÈME (« closed », 08) a cette forme —
+   * `li#note_<empreinte>.system-note`, sans le `data-testid` — et le repli la prendrait pour un
+   * commentaire, quand le §4.2 exempte les messages de plateforme. */
   noteContainer: {
     name: 'note-container',
-    candidates: ['li[data-testid="noteable-note-container"]', 'li[id^="note_"]'],
+    candidates: ['li[data-testid="noteable-note-container"]'],
+  } satisfies SelectorChain,
+
+  /** Un FIL (discussion) rendu. MESURÉ dans les trois vues : Overview `div.discussion` (03, 06),
+   * vue classique idem (05-, 06-changes-classique), Rapid Diffs `li.js-discussion-container`
+   * (03-changes, 05, 06-changes) — tous portent `data-testid="discussion-content"` et
+   * `data-discussion-resolvable`. Ses notes sont les `noteContainer` qu'il contient, la première
+   * étant la racine du fil, les suivantes ses réponses (03-overview-commentaires-discussion).
+   *
+   * Aucun IDENTIFIANT de fil n'est lisible sur les captures : il est à vérifier — non mesuré —
+   * que GitLab en pose un, sous une forme que la réduction retire comme opaque (une empreinte de
+   * 40 caractères ne passe pas `opaqueValue`). L'identifiant d'un fil est donc celui de sa PREMIÈRE
+   * note (`note_<id>`), conservé et commun aux trois vues. */
+  thread: {
+    name: 'thread',
+    candidates: ['[data-testid="discussion-content"]'],
+  } satisfies SelectorChain,
+
+  /** Corps RENDU d'un commentaire publié, cherché DANS son `noteContainer`. MESURÉ : `.note-text.md`
+   * dans l'Overview et la vue classique (03, 05-, 06-changes-classique), `.md` seul en Rapid Diffs
+   * (03-changes) ; un commentaire portant un bloc de suggestion a `.md.suggestions` SANS
+   * `.note-text`, même dans l'Overview (03-overview-commentaires-discussion). D'où un seul candidat
+   * qui couvre les deux formes, plutôt qu'une chaîne dont le premier maillon matcherait la
+   * plupart des notes et ferait manquer les autres.
+   * Chaque bloc Markdown y est un enfant direct (`p`, `ul`, `div.markdown-code-block`), avec son
+   * `data-sourcepos` ; la ligne de préfixe est un `p`, pas forcément le premier (code cité avant). */
+  commentBody: {
+    name: 'comment-body',
+    candidates: ['div.note-text, div.md'],
+  } satisfies SelectorChain,
+
+  /** Bloc de suggestion natif (§C.6), dans un corps rendu. MESURÉ : 03-overview- et
+   * 03-changes-commentaires-discussion — `div.md-suggestion`, alors qu'un bloc de code ordinaire est
+   * `div.markdown-code-block > pre.code` (même capture). La spec n'en fixe pas encore le marqueur
+   * pour GitLab : cette chaîne MESURE le rendu, elle ne déclenche pas l'étage 0. */
+  suggestionBlock: {
+    name: 'suggestion-block',
+    candidates: ['div.md-suggestion'],
+  } satisfies SelectorChain,
+
+  /** Auteur d'un commentaire, DANS son `noteContainer` : `data-username` du lien d'utilisateur.
+   * MESURÉ dans les trois vues (03, 05, 06) — `a.author-name-link` n'existe pas en Rapid Diffs,
+   * `a.js-user-link[data-username]` partout. */
+  commentAuthor: {
+    name: 'comment-author',
+    candidates: ['a.js-user-link[data-username]'],
+  } satisfies SelectorChain,
+
+  /** Corps de l'APERÇU d'un commentaire en cours de rédaction (§5.5). MESURÉ : 09-overview-apercu —
+   * `div.md` dans `.md-preview-holder`, à l'intérieur du formulaire. Le porteur EXISTE dans tout
+   * formulaire, aperçu fermé (03, 06, 07…) : il y est alors VIDE (texte de longueur nulle, mesuré).
+   * Trouver l'élément ne dit donc pas qu'un aperçu est affiché ; son contenu, si. */
+  previewBody: {
+    name: 'preview-body',
+    candidates: ['.md-preview-holder > div.md'],
   } satisfies SelectorChain,
 
   /** Panneau de soumission de revue — zone `review-body`. MESURÉ : 07-overview-panneau-revue et

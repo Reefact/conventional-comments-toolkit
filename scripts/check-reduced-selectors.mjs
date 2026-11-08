@@ -23,7 +23,7 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const ADAPTERS = join(ROOT, 'packages', 'adapters');
 
 // La contre-épreuve d'abord : un garde qui laisse passer ceux-là ne prouve rien ailleurs.
-const COUNTER_PROOF = ['link[rel="stylesheet"]', '[nonce]', 'meta[name="request-id"]', 'input[value="x"]'];
+const COUNTER_PROOF = ['link[rel="stylesheet"]', '[nonce]', 'meta[name="request-id"]', 'input[value="x"]', 'svg path'];
 const inert = COUNTER_PROOF.filter((s) => unreachableByReduction(s, rulesFor('github')).length === 0);
 if (inert.length > 0) {
   console.error(`✗ garde inerte : ${inert.join(', ')} passe(nt) alors que la réduction le(s) retire.`);

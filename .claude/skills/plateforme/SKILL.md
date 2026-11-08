@@ -87,8 +87,10 @@ mêmes éléments avant et après.
 La réduction se fait sur la machine de qui a capturé, parce que c'est le SEUL moment où la page
 brute existe : l'outil y prouve, page par page, que chaque candidat trouve les mêmes éléments
 avant et après, et que la page réduite est un point fixe ; une page qui échoue n'est pas
-réécrite, et ne part pas. Elle demande Node, Git et un Chromium (`playwright-core`). La consigne
-à donner, telle quelle :
+réécrite, et ne part pas. Des sélecteurs introuvables (build oublié) font ÉCHOUER l'outil ; une
+plateforme qui n'a pas encore de `selectors.ts` se réduit avec `--no-selectors`, sans
+comparaison, et l'outil le dit. Elle demande Node, Git et un Chromium (`playwright-core`). La
+consigne à donner, telle quelle :
 
 > ```
 > git clone --depth 1 https://github.com/Reefact/conventional-comments-toolkit cct-captures

@@ -1,11 +1,16 @@
 // Réduit EN PLACE les pages capturées d'une plateforme à leur forme stockable
 // (`scripts/lib/captured-page-reducer.mjs` dit ce qu'elle garde, et pourquoi une liste blanche).
 //
-// Usage : node scripts/reduce-captured-pages.mjs <id> [--check]
+// Usage : node scripts/reduce-captured-pages.mjs <id> [--check] [--no-selectors]
+//   (pages de packages/adapters/<id>/test/fixtures/pages/ ; sélecteurs COMPILÉS : `npm run
+//   build` d'abord.)
 //   --check : n'écrit rien, et échoue si une page n'est pas DÉJÀ sous sa forme réduite — ce que
 //   doit vérifier qui reçoit des captures (la réduction est un point fixe).
-//   (pages de packages/adapters/<id>/test/fixtures/pages/ ; sélecteurs COMPILÉS : `npm run
-//   build` d'abord, faute de quoi la comparaison avant/après est sautée — et dit l'être).
+//   --no-selectors : réduire SANS comparaison, pour une plateforme qui n'a pas encore de
+//   `selectors.ts`. Refusé si elle en a un. Sans ce drapeau, des sélecteurs introuvables ou
+//   illisibles font ÉCHOUER l'outil : la première version avertissait et écrivait quand même,
+//   si bien qu'un build oublié livrait des pages sans la comparaison promise (revue Reefact,
+//   PR #133).
 //
 // Se lance sur la machine de qui a capturé, AVANT tout envoi : c'est le seul moment où la page
 // brute existe, donc le seul où l'on peut prouver que la réduction n'a rien retiré qu'un
@@ -23,7 +28,7 @@
 // Le tout dans Chromium, JavaScript coupé et réseau refusé, par `DOMParser` comme les tests.
 
 import { chromium } from 'playwright-core';
-import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { attributeReads, reducePage, reductionMismatches, rulesFor } from './lib/captured-page-reducer.mjs';
@@ -34,9 +39,10 @@ const EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 const MARK = 'data-cct-reduce-id';
 
 const check = process.argv.includes('--check');
+const noSelectors = process.argv.includes('--no-selectors');
 const id = process.argv.slice(2).find((a) => !a.startsWith('--'));
 if (!id) {
-  console.error('Usage : node scripts/reduce-captured-pages.mjs <id> [--check]   (github, azdo…)');
+  console.error('Usage : node scripts/reduce-captured-pages.mjs <id> [--check] [--no-selectors]   (github, azdo…)');
   process.exit(2);
 }
 const dir = join(ROOT, 'packages', 'adapters', id, 'test', 'fixtures', 'pages');
@@ -51,15 +57,29 @@ if (files.length === 0) {
   process.exit(0);
 }
 
+// La comparaison est la PREUVE de la réduction : elle ne se saute que sur demande explicite, et
+// seulement là où il n'y a rien à comparer.
+const hasSelectors = existsSync(join(ROOT, 'packages', 'adapters', id, 'src', 'selectors.ts'));
 let candidates = null;
-try {
-  const { selectors } = await import(pathToFileURL(join(ROOT, 'packages', 'adapters', id, 'dist', 'selectors.js')).href);
-  candidates = Object.fromEntries(Object.entries(selectors).map(([k, c]) => [k, c.candidates]));
-} catch {
-  console.log(
-    `⚠ pas de sélecteurs compilés pour « ${id} » : comparaison avant/après SAUTÉE.\n` +
-      '  Sur une plateforme qui a déjà un adaptateur, lancer `npm run build` et recommencer.'
-  );
+if (noSelectors) {
+  if (hasSelectors) {
+    console.error(`✗ --no-selectors refusé : « ${id} » a un selectors.ts, la comparaison est due.`);
+    process.exit(2);
+  }
+  console.log(`⚠ « ${id} » n'a pas de selectors.ts : réduction SANS comparaison avant/après (--no-selectors).`);
+} else {
+  try {
+    const { selectors } = await import(pathToFileURL(join(ROOT, 'packages', 'adapters', id, 'dist', 'selectors.js')).href);
+    candidates = Object.fromEntries(Object.entries(selectors).map(([k, c]) => [k, c.candidates]));
+  } catch (err) {
+    console.error(
+      `✗ sélecteurs compilés de « ${id} » introuvables ou illisibles (${err.message.split('\n')[0]}).\n` +
+        (hasSelectors
+          ? '  Lancer `npm run build` et recommencer : sans eux, la réduction ne peut pas être vérifiée.'
+          : `  « ${id} » n'a pas encore de selectors.ts : relancer avec --no-selectors pour réduire sans comparaison.`)
+    );
+    process.exit(1);
+  }
 }
 
 const rules = rulesFor(id);
@@ -163,6 +183,8 @@ if (check) {
 }
 console.log(
   `\n✓ ${files.length} page(s) réduite(s).` +
-    (candidates ? ' Chaque candidat trouve les mêmes éléments avant et après, et les mêmes valeurs lues.' : '') +
+    (candidates
+      ? ' Chaque candidat trouve les mêmes éléments avant et après, et les mêmes valeurs lues.'
+      : ' SANS comparaison avant/après (--no-selectors) : elle se fera quand les sélecteurs existeront.') +
     '\n  Ensuite : node scripts/check-captured-pages.mjs --audit, puis node scripts/check-captured-pages.mjs.'
 );

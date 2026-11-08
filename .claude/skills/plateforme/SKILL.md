@@ -68,37 +68,34 @@ champ ou INTERCEPTE un envoi : un défaut y change ce qu'elle bloque. 8 et 9 peu
 Un état que la plateforme n'a pas s'écrit « sans objet » dans la PR, avec la raison — jamais
 omis en silence.
 
-**Un éditeur peut avoir plusieurs MODES, et chacun est un état à capturer.** Avant la première
-capture, inventorier les commandes de l'éditeur qui peuvent en changer l'élément ou le
-conteneur : bascule texte brut / texte enrichi, plein écran, aperçu. Sur gitlab.com
-(2026-11-08), sous chaque champ, « Switch to rich text editing » — les captures en mode
-Markdown ne contiennent aucun `contenteditable` ; en texte enrichi, MESURÉ (capture
-`01-…-texte-riche`), la `<textarea>` disparaît au profit d'un `div[contenteditable]`
-ProseMirror (`aria-label="Comment"`), et `data-testid="comment-field"` passe sur un `div` et un
-`input type=hidden` — et le choix est MÉMORISÉ pour le compte : rechargement, autre vue, autre
-éditeur, tous ouvrent dans le dernier mode choisi. Remettre le mode d'origine de la personne
-après la capture, et vérifier qu'il tient après rechargement. Dans la barre d'outils, aussi,
-« Go full screen » : MESURÉ (capture `01-…-plein-ecran`), la `<textarea>` reste la même, aux
-mêmes classes ; seul son conteneur prend `zen-backdrop … fullscreen`, `<html>` prend
-`zen-mode-fullscreen`, et les boutons d'envoi, masqués à l'écran, restent dans le DOM. Qu'il
-soit mémorisé n'est PAS mesuré — l'état ne se lisait pas de façon fiable juste après le clic.
+**Inventorier les commandes de l'éditeur, puis capturer chacune de celles qui changent quelque
+chose.** Le tableau ci-dessus dit QUELS champs capturer ; il ne dit pas dans quels MODES ils
+s'affichent. Après la première capture, et sur elle — pas de mémoire, ni d'après l'icône d'un
+bouton —, lister tous les `button`, `input` et `select` du formulaire qui contient le champ
+(happy-dom, depuis le scratchpad), avec leur nom accessible, puis les trier :
 
-L'inventaire se fait sur la PREMIÈRE capture, pas de mémoire : lister tous les `button`, `input`
-et `select` du formulaire qui contient le champ (happy-dom, depuis le scratchpad), puis les
-trier en deux familles. Ceux qui n'écrivent que du TEXTE dans le champ (gras, tableau, liste,
-modèle de commentaire, pièce jointe…) n'appellent aucune capture. Ceux qui changent l'ÉLÉMENT,
-son CONTENEUR ou le CHEMIN D'ENVOI en appellent une chacun. Sur gitlab.com (2026-11-08), la
-seconde famille compte, en plus des deux modes ci-dessus : l'aperçu (état 9) ; le bouton
-scindé « Comment » / « Comment type » (menu qui change l'envoi) ; « Start review » (état 7) ;
-la case « internal note » ; « Close merge request », dans le même formulaire, dont le libellé
-est à mesurer champ rempli ; le bouton d'envoi lui-même, désactivé champ vide — d'où une
-capture champ REMPLI, sans envoi. L'envoi au clavier (`Ctrl+Entrée`) n'a pas d'élément : aucune
-capture ne le montre, il se teste à la validation finale. (Question du propriétaire : « tu t'es
-assuré que tu as testé toutes les possibilités de l'éditeur ? » — non, l'inventaire n'avait
-pas été fait.) Le bouton `<>` de cette barre
-est « Insert code » (mise en forme), pas un agrandissement. Une variante prend le numéro de son
-état et nomme son mode : `01-overview-nouveau-commentaire-texte-riche.html`. (Question du
-propriétaire, après les captures 01 à 05 : aucune n'avait regardé ces commandes.)
+- **ce qui n'écrit que du TEXTE dans le champ** (mise en forme, insertion, modèle, pièce
+  jointe) : aucune capture ;
+- **ce qui change l'ÉLÉMENT de saisie** (bascule texte brut / texte enrichi : une `<textarea>`
+  peut devenir un `contenteditable`, et l'extension ne verrait plus le champ), **son CONTENEUR**
+  (plein écran, panneau, fenêtre), **ou le CHEMIN D'ENVOI** (bouton scindé ou menu de type
+  d'envoi, case qui change la nature du commentaire, bouton d'une autre action placé dans le
+  même formulaire, revue en lot) : une capture chacun, sous le numéro de son état, le mode dans
+  le nom — `NN-<vue>-<état>-<mode>.html`.
+
+Deux angles morts à couvrir aussi : le bouton d'envoi d'un champ VIDE est souvent désactivé, et
+son libellé peut changer champ rempli — d'où une capture champ REMPLI, sans envoi ; l'envoi au
+CLAVIER n'a pas d'élément, aucune capture ne le montre, il se teste à la validation finale.
+
+Un mode peut être **mémorisé pour le compte** (rechargement, autre vue, autre champ) : le
+mesurer, puis remettre le mode d'origine de la personne et vérifier qu'il tient après
+rechargement. Un mode mémorisé n'est pas un cas marginal — qui l'a choisi une fois y reste.
+
+Les mesures elles-mêmes — quel bouton, quel élément, quel attribut — appartiennent à
+l'adaptateur, pas à ce skill : `packages/adapters/<id>/CAPTURES.md`. (Questions du
+propriétaire, premier usage : après les captures 01 à 05, aucune n'avait regardé ces
+commandes ; puis « tu t'es assuré que tu as testé toutes les possibilités de l'éditeur ? » —
+non, l'inventaire n'avait pas été fait ; enfin, le skill doit rester générique.)
 
 Les captures se prennent **extension Conventional Comments désactivée**, sur des PR de test sans
 contenu privé — dans une organisation de test si possible. Deux voies : **A**, la session locale
@@ -132,11 +129,10 @@ Les PR de test vivent dans un projet PERSONNEL sans contenu privé — jamais da
 d'un employeur, même quand la personne y travaille sur la même plateforme. Il en faut au moins
 deux (audit, étape 2), chacune ajoutant un petit fichier de code, pour qu'un commentaire de ligne
 soit possible. Si la personne délègue leur création, la session peut les créer depuis l'onglet,
-par l'API de la plateforme avec la session du navigateur : mesuré sur gitlab.com le 2026-11-08,
-`fetch` vers `/api/v4/projects/:id/repository/commits` puis `/merge_requests`, en-tête
-`X-CSRF-Token` lu dans la page et utilisé sans être renvoyé — le script ne rend que les statuts
-(201) et les numéros. Un projet privé suffit aux captures ; il interdit seulement le canari
-anonyme (étape 6).
+par l'API de la plateforme avec la session du navigateur (`fetch` depuis la page ; un jeton
+anti-CSRF éventuel se lit dans la page et s'utilise sans jamais être renvoyé) : le script ne
+rend que des statuts et des numéros. Les appels exacts vont dans `CAPTURES.md` de l'adaptateur.
+Un projet privé suffit aux captures ; il interdit seulement le canari anonyme (étape 6).
 
 **Si la question arrive dans une session cloud**, c'est elle qui mène la personne jusqu'à la
 session locale, une étape par message : (1) le clone, sur la branche qui porte la version du
@@ -178,7 +174,7 @@ Ensuite, comme toute capture : `reduce:captured-pages -- <id> --check`, l'audit 
 scripts/check-captured-pages.mjs --audit`, sur au moins deux PR pour une plateforme nouvelle,
 rapport trié comme à l'étape 2), `node scripts/check-captured-pages.mjs`, puis l'étape 3.
 
-**Mesuré au premier usage** (2026-11-08, gitlab.com, Claude in Chrome 1.0.105, Windows) —
+**Mesuré au premier usage** (2026-11-08, Claude in Chrome 1.0.105, Windows) —
 `check:page-reducer` mesure le script par `page.evaluate` dans Chromium, pas par l'extension :
 - `javascript_tool` exécute le script (texte du fichier généré passé tel quel) et rend l'objet
   résumé, `ok: true` et les tailles ;
@@ -187,15 +183,16 @@ rapport trié comme à l'étape 2), `node scripts/check-captured-pages.mjs`, pui
   `ok: true` arrive. Le chercher à nouveau avant de conclure qu'il n'est pas parti ; la taille sur disque dépasse de quelques octets `reducedBytes`, qui compte des
   caractères, pas des octets UTF-8 ;
 - Claude in Chrome n'ajoute rien au DOM capturé : les enfants de `<body>` de la page réduite
-  sont tous de GitLab (vérifié sur la seule page 01 — à refaire si l'extension change) ;
+  appartiennent tous à la plateforme (vérifié sur une seule page — à refaire si l'extension
+  change) ;
 - les outils de vérification SOUS WINDOWS : avant le correctif `eb8d6c5`, plusieurs passaient
   au vert sans rien regarder (`reduce:captured-pages --check` disait « rien à réduire »). Si un
   garde annonce 0 fichier sur un dossier qui en contient, c'est lui qu'il faut soupçonner.
 
 **Reste à vérifier** : la politique de sécurité d'une plateforme sous Trusted Types — le script
 crée sa propre politique (`cct-reduce-capture`) ; une page qui les interdit toutes le fait
-échouer explicitement (mesuré dans Chromium), et l'on passe à la voie B. gitlab.com n'a pas
-posé la question : le script a réussi sans erreur.
+échouer explicitement (mesuré dans Chromium), et l'on passe à la voie B. Aucune plateforme
+capturée par cette voie ne l'a encore posée.
 
 La validation finale passe par la même session : une fois l'adaptateur écrit (étapes 4-5) et
 l'extension construite (`npm run build:extension`), la personne charge `dist-ext/` dans ce

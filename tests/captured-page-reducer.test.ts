@@ -143,10 +143,27 @@ describe('réduction des pages capturées — ce qui survit', () => {
     expect(doc.getElementById('a')!.getAttribute('data-test-selector')).toBe(`${testid}-x`);
   });
 
-  it('garde tout ce que le squelette du diagnostic imprime, quelle que soit la valeur', () => {
+  it('retire pourtant un jeton rangé dans un data-* d’interface', () => {
+    // Revue Reefact, PR #134 : l'exception gardait TOUTE valeur, jeton compris.
+    const values = {
+      a: 'Y3Vyc29yOnYyOpPPAAABoX2cZWABqzM0MzcxNzk4NDg5YWJj', // jeton d'un seul tenant, 48 car.
+      b: 'session-1b4e28ba2fa111d2883f0016d3cca427abcdef00', // un mot, puis une empreinte
+      c: '1b4e28ba-2fa1-11d2-883f-0016d3cca427-0016d3cca427', // UUID allongé
+      d: `${'word-'.repeat(45)}end`, // structuré, mais au-delà de la longueur maximale
+    };
+    const doc = reduced(
+      `<body>${Object.entries(values).map(([id, v]) => `<div id="${id}" data-testid="${v}" data-status="${v}"></div>`).join('')}</body>`
+    );
+    for (const id of Object.keys(values)) {
+      expect(doc.getElementById(id)!.hasAttribute('data-testid'), id).toBe(false);
+      expect(doc.getElementById(id)!.hasAttribute('data-status'), id).toBe(false);
+    }
+  });
+
+  it('garde tout ce que le squelette du diagnostic imprime, nom d’interface long compris', () => {
     // Le skill `diagnostic` compare un squelette reçu à la capture : un attribut que la réduction
     // retirerait y passerait pour une différence de la page.
-    const long = 'a'.repeat(48);
+    const long = 'interface-element-with-a-long-structured-name';
     const attrs = PRINTED_ATTRIBUTES.filter((a) => !['disabled', 'hidden'].includes(a));
     const doc = reduced(`<body><div id="x" ${attrs.filter((a) => a !== 'id').map((a) => `${a}="${long}"`).join(' ')}></div></body>`);
     const el = doc.getElementById('x')!;

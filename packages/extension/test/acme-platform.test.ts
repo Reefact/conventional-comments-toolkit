@@ -164,6 +164,10 @@ class AcmeClientAdapter implements PlatformAdapter {
     return this.#doc.getElementById('acme-header');
   }
 
+  getThreadFilterMount(): Element | null {
+    return this.getRenderedThreadElements()[0]?.element ?? null;
+  }
+
   getRenderedThreadElements(): { id: string; element: Element }[] {
     return [...this.#doc.querySelectorAll('article.acme-thread')].map((element) => ({ id: element.id, element }));
   }

@@ -315,6 +315,18 @@ describe('§5.5, §9.2.3 — Fils et commentaires publiés (captures 03)', () =>
     expect(quoted?.element.firstElementChild?.classList.contains('markdown-code-block')).toBe(true);
   });
 
+  it('le filtre de fils se place avant le premier fil de l’Overview (§5.5)', () => {
+    expect(page.adapter.getThreadFilterMount()).toBe(page.adapter.getRenderedThreadElements()[0]!.element);
+  });
+
+  it('pas de filtre de fils dans l’onglet Changes : les fils y sont intercalés dans le diff (§5.5)', () => {
+    for (const file of ['03-changes-commentaires-discussion.html', '04-changes-classique-commentaire-ligne.html']) {
+      const changes = load(file, `${MR1}/diffs`);
+      expect(changes.adapter.getRenderedThreadElements().length).toBeGreaterThan(0);
+      expect(changes.adapter.getThreadFilterMount()).toBeNull();
+    }
+  }, T);
+
   it('les fils de Rapid Diffs se lisent aussi, sans lien d’horodatage (03-changes)', async () => {
     const changes = load('03-changes-commentaires-discussion.html', `${MR1}/diffs`);
     expect((await changes.adapter.getThreads()).map((t) => [t.id, t.resolution])).toEqual([

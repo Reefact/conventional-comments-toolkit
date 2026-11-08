@@ -1809,7 +1809,10 @@ async function renderPrChrome(
       selectedLabel = null;
       filterState.set(null);
     }
-    if (rendered.length > 0 && filterLabelIds.length > 0) {
+    // La place du filtre est une réponse de la PLATEFORME (§5.5, `getThreadFilterMount`) : une vue
+    // où les fils ne forment pas de liste — un diff — peut répondre `null`, et n'a pas de filtre.
+    const filterMount = rendered.length > 0 ? adapter.getThreadFilterMount() : null;
+    if (filterMount !== null && filterLabelIds.length > 0) {
       const filter = renderThreadFilter({
         labels: filterLabelIds,
         lang,
@@ -1822,7 +1825,7 @@ async function renderPrChrome(
           }
         },
       });
-      rendered[0]!.element.insertAdjacentElement('beforebegin', filter);
+      filterMount.insertAdjacentElement('beforebegin', filter);
       // Réapplique le filtre restauré aux fils de PAGE — renderThreadFilter n'a positionné
       // que l'état des puces, pas le `display` des fils (§5.5).
       if (selectedLabel !== null) applyLabelFilter(rendered, labelOfThread, selectedLabel);

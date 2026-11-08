@@ -306,6 +306,13 @@ export interface PlatformAdapter {
    * n'apparie : le code partagé se replie sur le haut du document plutôt que de ne rien
    * afficher. */
   getBannerMount(): Element | null;
+  /** §5.5 — l'élément AVANT lequel insérer le filtre local par label, ou `null` : pas de filtre
+   * sur cette vue. Une décision de PLATEFORME, comme la place du bandeau : la liste des fils n'a
+   * pas la même forme partout. Le code partagé la prenait lui-même — « avant le premier fil
+   * rendu » —, ce qui supposait des fils rangés en liste : vrai de la Conversation de GitHub,
+   * faux d'une vue de diff, où les fils sont intercalés entre les lignes et où le filtre tombait
+   * au milieu du code (validation sur GitLab, décision du propriétaire, 2026-11-08). */
+  getThreadFilterMount(): Element | null;
   /** §5.5 — les conteneurs de fils rendus, pour le filtre local. Les `id` sont CEUX de
    * `getThreads()`, même dérivation : c'est par eux que le filtre retrouve le label d'un fil, et
    * deux dérivations qui divergeraient masqueraient les mauvais fils sans rien dire. */

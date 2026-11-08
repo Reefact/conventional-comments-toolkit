@@ -27,6 +27,7 @@ const complete: PlatformAdapter = {
   getCurrentUser: async () => ({ id: 'login:x', login: 'x', isServiceAccount: false }),
   readPublishedResult: () => null,
   getBannerMount: () => null,
+  getThreadFilterMount: () => null,
   getRenderedThreadElements: () => [],
   getRenderedComments: () => [],
   getRenderedCommentElements: () => [],
@@ -56,4 +57,8 @@ const { getEditorChrome: _getEditorChrome, ...withoutChrome } = complete;
 // @ts-expect-error — `getEditorChrome` est obligatoire depuis la PR #65, et le reste (§9.2.3).
 const incomplete6: PlatformAdapter = withoutChrome;
 
-export const proofs = [incomplete1, incomplete2, incomplete3, incomplete4, incomplete5, incomplete6];
+const { getThreadFilterMount: _getThreadFilterMount, ...withoutFilterMount } = complete;
+// @ts-expect-error — sans `getThreadFilterMount`, le code partagé déciderait seul où poser le filtre (§5.5).
+const incomplete7: PlatformAdapter = withoutFilterMount;
+
+export const proofs = [incomplete1, incomplete2, incomplete3, incomplete4, incomplete5, incomplete6, incomplete7];

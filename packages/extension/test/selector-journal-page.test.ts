@@ -106,6 +106,9 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
           getBannerMount() {
             return null;
           },
+          getThreadFilterMount() {
+            return this.getRenderedThreadElements()[0]?.element ?? null;
+          },
           getRenderedThreadElements() {
             // UNE fois : une panne persistante traverserait aussi le rendu asynchrone, dont la chaîne
             // de promesses n'a pas de `.catch` — un rejet non géré, qui ferait échouer toute la suite.

@@ -336,6 +336,25 @@ describe('§5.5, §9.2.3 — Fils et commentaires publiés (captures 03)', () =>
   }, T);
 });
 
+describe('§5.5 — Forme du corps rendu : la fin de ligne simple (capture 03-overview-fin-de-ligne-simple)', () => {
+  it('reste DANS le texte du paragraphe, sans <br> — ce que la forme déclarée et le code partagé bornent', () => {
+    // « suggestion: sujet de test » suivi d'une ligne collée, sans ligne vide (publié sur !1).
+    // C'est cette structure qui a fondé `GITLAB_BODY_SHAPE` : la fin de ligne simple est un
+    // retour à la ligne littéral dans le nœud de texte (borné par `subjectNodes`, côté partagé),
+    // le saut forcé un <br> (`lineBreakTag`). Une première version déclarait `null` faute de la
+    // mesurer, et le préfixe restait affiché sous un badge seul.
+    const page = load('03-overview-fin-de-ligne-simple.html', MR1);
+    const body = page.doc.querySelector('#note_4188393376 div.note-text')!;
+    expect([...body.children].map((c) => c.tagName)).toEqual(['P']);
+    const paragraph = body.firstElementChild!;
+    expect(paragraph.querySelector('br')).toBeNull();
+    // `\r?` : sous Windows, Git extrait la capture en CRLF (`core.autocrlf`) — c'est ce qui casse
+    // deux tests GitHub sur ce poste ; la fin de ligne reste simple dans les deux cas.
+    expect(paragraph.textContent).toMatch(/sujet de test\r?\nseconde ligne collée/);
+    expect(page.adapter.renderedBodyShape()).toEqual({ paragraphTags: ['P'], lineBreakTag: 'BR' });
+  }, T);
+});
+
 describe('§C.5 — Fil résolu', () => {
   it('Overview : le fil replié est lu résolu, sous l’identifiant de sa première note (03-overview-fil-resolu)', async () => {
     const page = load('03-overview-fil-resolu.html', MR1);

@@ -237,6 +237,46 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
+  /** Élément après lequel insérer le bandeau du §5.5 — « en tête de MR », sous le titre, dans le
+   * flux de la page. MESURÉ : `.detail-page-header` (titre `h1[data-testid="title-content"]`) dans
+   * l'Overview, Rapid Diffs et la vue classique (01, 04, 04-changes-classique, 08). */
+  bannerMount: {
+    name: 'banner-mount',
+    candidates: ['.detail-page-header'],
+  } satisfies SelectorChain,
+
+  /** État de la merge request, QUEL QU'IL SOIT — un FAIT, recopié dans le relevé d'une ligne du
+   * journal, qui ne décide rien. MESURÉ : le badge de l'en-tête collant porte l'état dans son
+   * `aria-label` — « Open » (01, 04, 04-changes-classique), « Closed » (08). C'est un texte
+   * d'interface, donc localisé : il dit un fait à qui lit le journal, il ne sert à aucune décision. */
+  prStateLabel: {
+    name: 'pr-state-label',
+    candidates: ['.merge-request-sticky-header .gl-badge[aria-label]'],
+  } satisfies SelectorChain,
+
+  /** Utilisateur courant (§6.1) — le nom se lit sur le CHEMIN du lien de son menu (`href="/<username>"`),
+   * qui ne porte pas de `data-username`. MESURÉ sur toutes les vues (01, 04, 04-changes-classique,
+   * 08). */
+  currentUser: {
+    name: 'current-user',
+    candidates: ['a[data-testid="user-menu-toggle"][href]'],
+  } satisfies SelectorChain,
+
+  /** Date de CRÉATION de la merge request (§6.2.3) — c'est elle qui la range avant ou après
+   * `activatedAt`. MESURÉ : la ligne « … requested to merge … » de l'en-tête porte un
+   * `time[datetime]`, ENFANT DIRECT de `.detail-page-description` à côté du bloc de l'auteur — et
+   * unique dans ce bloc, sur toutes les captures (une première écriture le cherchait DANS le bloc de
+   * l'auteur et ne trouvait rien). Valeur : 18:24:04Z pour !1, 18:24:06Z pour !2, égale au
+   * `created_at` de l'API à la seconde près — alors que !1 avait été modifiée à 20:44, et que !2,
+   * fermée (08), garde la même date. Présent dans les trois vues. UN SEUL candidat : aucun repli
+   * générique sur la première `time` du document, qui porterait une autre date sans le dire
+   * (même leçon que GitHub). */
+  prCreatedAt: {
+    name: 'pr-created-at',
+    problem: 'pr-creation-date',
+    candidates: ['.detail-page-description > time[datetime]'],
+  } satisfies SelectorChain,
+
   /** Contrôle de complétion — le bouton de fusion (§6.5, §9.4). MESURÉ : présent sur une merge
    * request ouverte (01, 01-…-mr2), absent sur une merge request fermée (08) : son absence y est
    * la NORME, pas une rupture de sélecteur. */

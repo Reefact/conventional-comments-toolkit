@@ -188,8 +188,17 @@ Chromium in both views.
 
 ## Found while measuring, not fixed here
 
-On all 21 captures, two chains find nothing: `checkRunTitles` (so the published `cc/1` line is
-never read from the page) and `draftBadge`.
+On all 21 captures, `draftBadge` finds nothing.
+
+`checkRunTitles` found nothing either, so the published `cc/1` line was never read from the page.
+**Measured and fixed on 2026-11-09** on PR 551 (CodeQL publishes a check title there): in both
+views, each check of the list carries `span.titleDescription__…`, rendering its state then its
+title (`Successful in 5s — No new alerts in code changed by this pull request`). Captures
+`03-overview-checks-deplies.html` and `03-conversation-checks-deplies.html`. **Limit:** the checks
+list is collapsed by default when every check is green, and a collapsed title is not in the DOM, in
+either view. Whether GitHub expands it by itself when a check fails — what the #113 skeleton
+suggests (`Collapse checks`) — and whether a full `cc/1` line survives the rendering both remain to
+be checked once a verifier publishes on a measured repository.
 
 Fixed in the same pull request, because the final validation showed them in both views:
 

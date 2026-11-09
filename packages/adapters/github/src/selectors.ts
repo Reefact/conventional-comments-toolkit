@@ -602,6 +602,18 @@ export const selectors = {
       '.merge-status-item .status-meta',
       '.merge-status-item',
       '.branch-action-item .status-meta',
+      // MESURÉ le 2026-11-09 (`03-conversation-checks-deplies.html`, `03-overview-checks-deplies.html`,
+      // PR 551) : les quatre candidats ci-dessus ne trouvent rien sur aucune capture. Dans les DEUX
+      // vues, chaque check de la liste porte un `span.titleDescription__…` qui rend son état PUIS
+      // son titre — « Successful in 5s — No new alerts in code changed by this pull request » pour
+      // CodeQL. `readPublishedResult()` y cherche `cc/1 ` où qu'il soit : l'état en tête ne gêne pas.
+      //
+      // LIMITE, mesurée dans Chromium : la liste des checks est REPLIÉE par défaut quand tous sont
+      // verts, et un titre replié n'est PAS dans le DOM — ni dans l'une ni dans l'autre vue. Qu'elle
+      // se déplie d'elle-même quand un check échoue (ce que suggère le squelette du #113, qui montrait
+      // « Collapse checks ») reste à vérifier sur une vraie ligne `cc/1` en échec ; aucun vérificateur
+      // ne publie encore sur un dépôt mesuré.
+      '[class*="titleDescription__"]',
     ],
   } satisfies SelectorChain,
 

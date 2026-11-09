@@ -533,11 +533,31 @@ export const OWN_BADGES = ':scope > .cct-badge, :scope > .cct-badge-host > .cct-
  * plusieurs badges, il faut tous les retirer, pas seulement le premier trouvé.
  *
  * Le sujet mis en avant (`.cct-subject`), lui, n'est JAMAIS retiré : ce wrapper n'ajoute
- * aucun texte, il enveloppe celui que l'auteur a écrit. */
+ * aucun texte, il enveloppe celui que l'auteur a écrit.
+ *
+ * Les blocs de code et les citations sont rendus à leur forme SOURCE — délimiteurs ```` ``` ````
+ * autour d'un `<pre>`, `> ` devant chaque ligne d'un `<blockquote>` —, parce que c'est elle que le
+ * prétraitement du §3.4.1 sait écarter pour trouver la ligne de préfixe. Le `textContent` brut
+ * les rendait en texte nu : un commentaire qui cite du code AVANT son préfixe, forme que le §3.4.1
+ * nomme comme courante, avait pour ligne de préfixe la première ligne du code, et ne recevait aucun
+ * badge (MESURÉ le 2026-11-09 sur les captures GitHub 03, dans les deux vues). Du HTML standard,
+ * qu'aucune plateforme ne nomme : le Markdown rendu l'emploie partout. Limite assumée : un bloc de
+ * code INDENTÉ (quatre espaces) se rend aussi en `<pre>`, et se trouve donc écarté comme un bloc
+ * délimité — la source, elle, le distingue. */
 export function commentBodyText(element: Element): string {
-  if (!element.querySelector(OWN_BADGES)) return element.textContent ?? '';
+  if (!element.querySelector(`${OWN_BADGES}, pre, blockquote`)) return element.textContent ?? '';
   const clone = element.cloneNode(true) as Element;
   clone.querySelectorAll(OWN_BADGES).forEach((badge) => badge.remove());
+  const text = (s: string) => clone.ownerDocument.createTextNode(s);
+  for (const pre of clone.querySelectorAll('pre')) {
+    pre.replaceWith(text(`\n\`\`\`\n${(pre.textContent ?? '').replace(/^\n+|\n+$/g, '')}\n\`\`\`\n`));
+  }
+  // Les citations les plus profondes d'abord : la citation qui les contient relit alors leur
+  // forme source, et chaque niveau ajoute son `> `.
+  for (const quote of [...clone.querySelectorAll('blockquote')].reverse()) {
+    const lines = (quote.textContent ?? '').split('\n').filter((line) => line.trim() !== '');
+    quote.replaceWith(text(`\n${lines.map((line) => `> ${line.trim()}`).join('\n')}\n`));
+  }
   return clone.textContent ?? '';
 }
 

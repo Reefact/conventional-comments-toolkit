@@ -1085,7 +1085,9 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     // autre commentaire cité) est un texte normal, pas notre propre badge.
     const el = document.createElement('div');
     el.innerHTML = '<blockquote><span class="cct-badge">🐛 issue</span></blockquote>issue: x';
-    expect(commentBodyText(el)).toBe(el.textContent);
+    // Le texte cité reste dans le corps relu, sous sa forme SOURCE (`> `) depuis que le §3.4.1 doit
+    // pouvoir écarter une citation placée avant le préfixe.
+    expect(commentBodyText(el)).toBe('\n> 🐛 issue\nissue: x');
   });
 
   it('un .cct-badge dans le <p> d’une CITATION n’est pas exclu non plus — l’exclusion s’arrête au premier niveau', () => {
@@ -1095,7 +1097,9 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     // le corps relu du texte cité, et analyze() jugerait un commentaire tronqué.
     const el = document.createElement('div');
     el.innerHTML = '<blockquote><p><span class="cct-badge">🐛 issue</span></p></blockquote><p>issue: x</p>';
-    expect(commentBodyText(el)).toBe(el.textContent);
+    // Le texte cité reste dans le corps relu, sous sa forme SOURCE (`> `) depuis que le §3.4.1 doit
+    // pouvoir écarter une citation placée avant le préfixe.
+    expect(commentBodyText(el)).toBe('\n> 🐛 issue\nissue: x');
   });
 
   it('GithubClientAdapter.getThreads() relit le vrai corps même après un badge posé par decorateComment', async () => {

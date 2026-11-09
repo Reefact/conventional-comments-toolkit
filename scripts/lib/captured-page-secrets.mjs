@@ -54,10 +54,30 @@ const SECRET_TEXT = [
 /** Une adresse e-mail en clair — une donnée PERSONNELLE, pas un secret de session, mais qui n'a
  * pas davantage sa place dans une fixture publique. MESURÉ le 2026-11-09 : le menu de compte
  * Microsoft d'Azure DevOps mettait celle du compte connecté dans chaque capture, et ni ce module
- * ni l'audit ne la voyaient. (1) ce qui précède, (2) l'adresse. Exceptées : `noreply@` (les
- * lignes `Co-Authored-By` des commits que GitHub affiche, seule adresse des captures GitHub) et
- * `git@` (une URL de clonage SSH). */
-const EMAIL = /(^|[^A-Za-z0-9._%+-])((?!noreply@|git@)[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})/g;
+ * ni l'audit ne la voyaient. (1) ce qui précède, (2) l'adresse.
+ *
+ * Lettres et chiffres UNICODE, pas seulement ASCII : une adresse internationalisée
+ * (`δοκιμή@example.com`, `user@bücher.de`) est une adresse comme une autre, et la première
+ * version la laissait passer (revue, PR #145). Une étiquette de domaine en punycode (`xn--…`) est
+ * couverte par la même classe. Les EXCEPTIONS ne sont pas dans l'expression : elles dépendent du
+ * contexte de l'adresse, que `exemptEmail` lit. */
+const EMAIL = /(^|[^\p{L}\p{N}._%+-])([\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.(?:\p{L}{2,}|xn--[\p{L}\p{N}-]+))/gu;
+
+/** Une adresse trouvée qui ne désigne personne, reconnue à son CONTEXTE et non à son seul début —
+ * la première version exemptait tout `noreply@…` et tout `git@…`, même dans le texte d'une page
+ * (revue, PR #145) :
+ *  - `git@hôte` suivi de `:chemin` — une URL de clonage SSH (`git@github.com:owner/repo.git`) ;
+ *  - `noreply@…` dans une ligne `Co-Authored-By: Nom <…>` — la mention d'un commit que GitHub
+ *    affiche (`&lt;` dans le HTML), seule adresse des captures GitHub.
+ * `start` est la position de l'adresse dans `html`. */
+function exemptEmail(html, start, address) {
+  if (address.startsWith('git@')) return /^:[^\s:]/.test(html.slice(start + address.length, start + address.length + 2));
+  if (address.startsWith('noreply@')) {
+    const lineStart = html.lastIndexOf('\n', start - 1) + 1;
+    return /co-authored-by:[^\n]*?(?:<|&lt;)$/i.test(html.slice(lineStart, start));
+  }
+  return false;
+}
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -87,7 +107,9 @@ export function findCapturedPageSecrets(html) {
   // L'identifiant numérique du compte dans l'URL du socket accompagne la session : masqué
   // aussi, et contrôlé par la même règle (`0` est la valeur de masquage, un nombre restant).
   for (const m of html.matchAll(/_sockets\/u\/(\d+)\/ws/g)) if (m[1] !== '0') keep('socket user id', m[1]);
-  for (const m of html.matchAll(EMAIL)) keep('adresse e-mail', m[2]);
+  for (const m of html.matchAll(EMAIL)) {
+    if (!exemptEmail(html, m.index + m[1].length, m[2])) keep('adresse e-mail', m[2]);
+  }
   return found;
 }
 
@@ -104,6 +126,7 @@ export function secretFinderSource() {
   const SECRET_METAS = ${JSON.stringify(SECRET_METAS)};
   const SECRET_TEXT = [${SECRET_TEXT.map(literal).join(', ')}];
   const EMAIL = ${literal(EMAIL)};
+  const exemptEmail = ${exemptEmail.toString()};
   const esc = ${esc.toString()};
   return ${findCapturedPageSecrets.toString()};
 })()`;
@@ -125,7 +148,10 @@ export function redactCapturedPage(html) {
   });
   for (const re of SECRET_TEXT) out = out.replace(re, `$1${MASK}`);
   out = out.replace(/(_sockets\/u\/)\d+(\/ws)/g, '$10$2');
-  out = out.replace(EMAIL, `$1${MASK}`);
+  // Le contexte est lu sur la page AVANT masquage de l'adresse : `offset` est sa position d'origine.
+  out = out.replace(EMAIL, (match, before, address, offset, page) =>
+    exemptEmail(page, offset + before.length, address) ? match : `${before}${MASK}`
+  );
   return out;
 }
 

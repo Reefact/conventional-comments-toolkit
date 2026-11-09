@@ -5,7 +5,6 @@
 import { describe, expect, it } from 'vitest';
 import { SelectorLog, type EditorHandle } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '@cct/adapter-github';
-import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { applyLabelFilter } from '../src/ui/thread-filter.js';
 import { mergeDirectShortcuts, writeDegradedState } from '../src/content-internal.js';
 
@@ -13,7 +12,7 @@ function setLocation(url: string): void {
   Object.defineProperty(document, 'location', { value: new URL(url), configurable: true });
 }
 
-function collectEditors(adapter: GithubClientAdapter | AzdoClientAdapter): EditorHandle[] {
+function collectEditors(adapter: GithubClientAdapter): EditorHandle[] {
   const handles: EditorHandle[] = [];
   const d = adapter.observeEditors((h) => handles.push(h));
   d.dispose();
@@ -184,114 +183,5 @@ describe('résidu E — GitHub : ancre de fil centralisée (§9.4) et commentId/
     const [handle] = collectEditors(adapter);
     expect(handle!.context.zone).toBe('reply'); // désactivation locale, jamais silencieuse
     expect(log.failures.some((f) => f.chain === 'rendered-comment')).toBe(true);
-  });
-});
-
-describe('résidu F — AzDO : détection d’édition sans collision, URLs historiques et on-premise', () => {
-  it('composer dans .repos-discussion-comment-editor est une COMPOSITION (« comment-edit » ne matche plus « comment-editor »)', () => {
-    setLocation('https://dev.azure.com/org/proj/_git/repo/pullrequest/7');
-    document.body.innerHTML = `
-      <div class="repos-discussion-comment-editor"><textarea class="comment-textarea"></textarea></div>`;
-    const adapter = new AzdoClientAdapter({ documentRef: document });
-    const [handle] = collectEditors(adapter);
-    expect(handle!.context.action).toBe('compose');
-  });
-
-  it('une RÉPONSE composée dans le conteneur du premier commentaire reste zone reply (§4.1)', () => {
-    setLocation('https://dev.azure.com/org/proj/_git/repo/pullrequest/7');
-    document.body.innerHTML = `
-      <div class="repos-discussion-thread" id="t2">
-        <div class="repos-discussion-comment" id="c3">
-          <div class="repos-discussion-comment-editor"><textarea class="comment-textarea"></textarea></div>
-        </div>
-      </div>`;
-    const adapter = new AzdoClientAdapter({ documentRef: document });
-    const [handle] = collectEditors(adapter);
-    expect(handle!.context).toMatchObject({ zone: 'reply', action: 'compose', canCarryBlockingState: false });
-  });
-
-  it('édition de la racine : thread-root, commentId/threadId renseignés (§9.2.3)', () => {
-    setLocation('https://dev.azure.com/org/proj/_git/repo/pullrequest/7');
-    document.body.innerHTML = `
-      <div class="repos-discussion-thread" id="t1">
-        <div class="repos-discussion-comment" id="c1">
-          <div class="repos-discussion-comment--editing"><textarea class="comment-textarea"></textarea></div>
-        </div>
-        <div class="repos-discussion-comment" id="c2"></div>
-      </div>`;
-    const adapter = new AzdoClientAdapter({ documentRef: document });
-    const [handle] = collectEditors(adapter);
-    expect(handle!.context).toMatchObject({
-      zone: 'thread-root',
-      action: 'edit',
-      threadId: 't1',
-      commentId: 'c1',
-      canCarryBlockingState: true,
-    });
-  });
-
-  it('génération héritée vc- : le conteneur d’envoi est trouvé, le blocage §5.4 reste armé', () => {
-    setLocation('https://dev.azure.com/org/proj/_git/repo/pullrequest/7');
-    document.body.innerHTML = `
-      <div class="vc-discussion-comment-editor">
-        <div class="inner"><textarea aria-label="Comment"></textarea></div>
-        <div class="btns"><button class="bolt-button primary">Comment</button></div>
-      </div>`;
-    const adapter = new AzdoClientAdapter({ documentRef: document });
-    const [handle] = collectEditors(adapter);
-    expect(adapter.getSubmitControls(handle!)).toHaveLength(1);
-  });
-
-  it('*.visualstudio.com : l’organisation vit dans le sous-domaine, jamais répétée dans l’URL d’API (§B.1, §B.4)', async () => {
-    setLocation('https://myorg.visualstudio.com/MyProject/_git/MyRepo/pullrequest/123');
-    document.body.innerHTML = '';
-    const urls: string[] = [];
-    const adapter = new AzdoClientAdapter({
-      documentRef: document,
-      fetchImpl: (async (url: string | URL | Request) => {
-        urls.push(String(url));
-        return new Response('{}', { status: 200 });
-      }) as typeof fetch,
-    });
-    const pr = adapter.currentPr()!;
-    expect(pr.scope).toEqual(['myorg', 'MyProject', 'MyRepo']);
-    await adapter.getRepoConfig(pr);
-    expect(urls[0]).toBe(
-      'https://myorg.visualstudio.com/MyProject/_apis/git/repositories/MyRepo/items?path=%2F.conventional-comments.json&api-version=7.1'
-    );
-  });
-
-  it('*.visualstudio.com avec DefaultCollection : la collection n’est pas prise pour l’organisation', async () => {
-    setLocation('https://myorg.visualstudio.com/DefaultCollection/MyProject/_git/MyRepo/pullrequest/9');
-    document.body.innerHTML = '';
-    const urls: string[] = [];
-    const adapter = new AzdoClientAdapter({
-      documentRef: document,
-      fetchImpl: (async (url: string | URL | Request) => {
-        urls.push(String(url));
-        return new Response('{}', { status: 200 });
-      }) as typeof fetch,
-    });
-    const pr = adapter.currentPr()!;
-    expect(pr.scope).toEqual(['myorg', 'MyProject', 'MyRepo']);
-    await adapter.getRepoConfig(pr);
-    expect(urls[0]).toContain('https://myorg.visualstudio.com/DefaultCollection/MyProject/_apis/');
-  });
-
-  it('Azure DevOps Server (/tfs/…) : l’adaptateur n’est plus inerte sur la forme on-premise (§B.1, §B.4)', async () => {
-    setLocation('https://tfs.example.corp/tfs/DefaultCollection/Proj/_git/Repo/pullrequest/5');
-    document.body.innerHTML = '';
-    const urls: string[] = [];
-    const adapter = new AzdoClientAdapter({
-      documentRef: document,
-      fetchImpl: (async (url: string | URL | Request) => {
-        urls.push(String(url));
-        return new Response('{}', { status: 200 });
-      }) as typeof fetch,
-    });
-    const pr = adapter.currentPr()!;
-    expect(pr.scope).toEqual(['DefaultCollection', 'Proj', 'Repo']);
-    await adapter.getRepoConfig(pr);
-    expect(urls[0]).toContain('https://tfs.example.corp/tfs/DefaultCollection/Proj/_apis/git/repositories/Repo/items');
   });
 });

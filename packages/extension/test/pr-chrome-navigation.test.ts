@@ -2430,7 +2430,10 @@ describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut sign
     document.body.innerHTML =
       '<div data-testid="comment-body"><p>issue: un sujet de test</p></div>' +
       '<div data-testid="review-thread"><div class="comment-body"><p>nitpick: un autre sujet</p></div></div>' +
-      '<div class="markdown-content"><p>issue: un sujet Azure</p></div>';
+      // Forme MESURÉE sur les captures Azure DevOps (packages/adapters/azdo/CAPTURES.md) : le corps
+      // d'un commentaire est un `.markdown-content` DANS son `.repos-discussion-comment` ; un
+      // `.markdown-content` isolé est la description de la PR, que l'adaptateur écarte.
+      '<div class="repos-discussion-comment"><div class="markdown-content"><p>issue: un sujet Azure</p></div></div>';
 
     const github = new GithubClientAdapter({ documentRef: document, fetchImpl });
     expect(github.getRenderedCommentElements()).toEqual(github.getRenderedComments().map((c) => c.element));

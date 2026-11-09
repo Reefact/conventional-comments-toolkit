@@ -190,6 +190,50 @@ field is still there. A COMPLETED (merged) pull request was not captured.
 No editor has a *Preview* tab or button (inventories of the new-comment, line, reply and edit
 editors).
 
+## What the adapter reads, and where (measured while writing `src/selectors.ts`)
+
+- **Thread id.** No attribute of a thread carries it, except the class `threadId-<n>` of its
+  COLLAPSED reply `<input>` — `n` is the API thread id (1 to 9 on the captures, each in the thread
+  the API names so). A new-thread editor carries `threadId--1`. When the reply is OPEN, the
+  collapsed input is replaced and the id is gone from the page (02). The adapter remembers it per
+  thread element, and falls back on the root comment's `time[datetime]` (to the millisecond).
+- **Comment number in its thread**: `button#__bolt-delete-comment-<n>` (1 = root). Rendered on
+  one's OWN comments only, and removed from a comment being edited (06).
+- **Author**: display name in `aria-label` of `.repos-comment-header-persona`; no account id in the
+  page. The current user's display name is on the persona next to each collapsed reply field.
+- **Thread state**: no structural mark. Classes, attributes and markup of active and resolved
+  threads are identical (compared on 03-overview-fils-resolus); only localized TEXT differs — the
+  state label (`Active`, `Pending`, `Resolved` for `fixed`, `Won't fix`, `Closed`, and `Unknown` for
+  `byDesign`) and the footer button (`Resolve` on active/pending, `Reactivate` on every resolved
+  status, `byDesign` included). Read in English; any other UI language gives `unknown`.
+- **Rendered body shape** (§5.5), measured in the live page on a test comment (PR 1, thread 11):
+  every line end of a paragraph is a `<br>`, simple or forced; paragraphs are `<p>`.
+- **Editor footer**: *Cancel* is ALWAYS the first button of the row, on the four kinds of editor;
+  the send buttons follow (primary = plain send, the other = send and resolve).
+- **PR creation date**: the LAST row of the activity feed (`tr.bolt-timeline-last-row
+  time.activity-card-time`), equal to the API creation date to the millisecond. The only date in
+  the header is that of the last state change (21:13 on the abandoned PR). No creation date in the
+  Files view.
+- **PR state**: the header pill has `pr-status-active` / `pr-status-abandoned`. On the abandoned PR
+  the *Complete* slot holds *Reactivate*. Full screen is marked by `.full-screen`, and has no
+  *Complete* button.
+- **Code blocks** render a *Copy to clipboard* button INSIDE the body
+  (`.copy-btn-container > button.copy-btn`, then `pre.hljs`); the native suggestion renders as a
+  diff table in `div[id^="md-transform-replacement-"]`, not as a `<pre>`.
+
+## Not measured
+
+- Hosts `{org}.visualstudio.com` and Azure DevOps Server: not captured, NOT recognized by the
+  adapter (owner's decision, 2026-11-09).
+- A COMPLETED (merged) pull request; a comment by another user (the *Delete* button, the persona);
+  an interface in another language than English.
+- Reading the repository config from a content script (§B.4): `getRepoConfig()` answers
+  `unreachable`. Note for §10: the REST API DID accept the browser's session cookies from the
+  page (every test pull request and comment was created that way) — the premise "les API
+  publiques n'acceptent pas l'authentification par cookie de session" does not hold for Azure
+  DevOps from the page. Whether it holds from a content script is not measured.
+- The editor chrome (styles, geometry): neutral answer.
+
 ## Personal data in the captures
 
 The Microsoft account menu (`.mectrl_root`, `#mectrl_currentAccount_secondary`) is in the DOM of

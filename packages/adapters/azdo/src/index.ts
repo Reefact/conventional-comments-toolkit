@@ -1,22 +1,24 @@
 // Adaptateur client Azure DevOps (composant A, §9.2.3, annexe B).
-// Deux points restent à établir par le spike P1' et sont traités par leurs replis
-// normatifs en attendant :
-// - le type réel de l'éditeur (§B.2) — la stratégie d'écriture commune du §9.3 est
-//   employée, et la dégradation de sélecteur couvre l'échec de détection ;
-// - la lecture du fichier de configuration sur la seule session (§B.4) — tentée via le
-//   point d'API `items` avec les cookies de session ; en échec, `unreachable` et
-//   l'extension est en état dégradé au sens du §5.4 : elle assiste sans bloquer.
+//
+// Réécrit le 2026-11-09 sur les captures de dev.azure.com (test/fixtures/pages/, CAPTURES.md) : la
+// version précédente avait été écrite de mémoire et n'avait jamais fonctionné. Tout ce qu'il lit
+// vient des chaînes de selectors.ts, MESURÉES. Ce que les captures n'ont pas établi prend la
+// réponse prudente du contrat, écrite à l'endroit où elle s'applique :
+// - la lecture du fichier de configuration du dépôt n'est pas mesurée (§B.4) : `unreachable`, et
+//   l'extension est en état dégradé au sens du §5.4 — elle assiste sans bloquer ;
+// - le châssis de l'éditeur n'est pas mesuré : réponse neutre (§5.1, §5.3) ;
+// - l'état d'un fil n'a pas de marque de structure, seulement un libellé localisé : lu en
+//   anglais, `unknown` sinon (selectors.ts, `threadStateLabel`).
 
-import {
-  decodeSummary,
-  SUMMARY_PREFIX,
-  type ConfigRead,
-  type Disposable,
-  type PlatformProfile,
-  type PrRef,
-  type PublishedSummary,
-  type ThreadInfo,
-  type UserInfo,
+import type {
+  CommentInfo,
+  ConfigRead,
+  Disposable,
+  PlatformProfile,
+  PrRef,
+  PublishedSummary,
+  ThreadInfo,
+  UserInfo,
 } from '@cct/core';
 import {
   adapterFetch,
@@ -27,16 +29,49 @@ import {
   writeToTextField,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
-  type EntryGuard,
   type ClientAdapterOptions,
   type EditorChrome,
-  type RenderedBodyShape,
   type EditorContext,
   type EditorHandle,
+  type EntryGuard,
   type PlatformAdapter,
+  type RenderedBodyShape,
   type SubmitControl,
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
+
+/** La forme du corps rendu d'Azure DevOps (§5.5). MESURÉE le 2026-11-09, dans la page, sur un
+ * commentaire de test publié pour cela (PR 1, fil 11) — fin de ligne simple, saut forcé (deux
+ * espaces), puis un second paragraphe : `P(#text BR #text BR #text BR #text)`, puis `P(#text)`.
+ * Azure DevOps rend donc CHAQUE fin de ligne d'un paragraphe par un `<br>`, simple ou forcée, et
+ * chaque paragraphe par un `<p>` (aussi 03 : `issue (blocking)` = `P, P, UL`). */
+const AZDO_BODY_SHAPE: RenderedBodyShape = Object.freeze({ paragraphTags: ['P'], lineBreakTag: 'BR' });
+
+/** Les libellés d'état MESURÉS, interface en anglais (selectors.ts, `threadStateLabel`). `Unknown`
+ * n'y est pas : c'est ce que la page affiche pour un fil `byDesign`, résolu — le pied du fil le
+ * dit (`threadFooterButton`). Toute autre langue rend `unknown`, compté non résolu (§5.5, §B.5) :
+ * une vue locale qui en compte trop, jamais trop peu. */
+const STATE_LABELS: Readonly<Record<string, ThreadInfo['resolution']>> = {
+  active: 'unresolved',
+  pending: 'unresolved',
+  resolved: 'resolved',
+  "won't fix": 'resolved',
+  closed: 'resolved',
+  'by design': 'resolved',
+};
+const FOOTER_LABELS: Readonly<Record<string, ThreadInfo['resolution']>> = {
+  resolve: 'unresolved',
+  reactivate: 'resolved',
+};
+
+/** Chemin d'une PR sur `dev.azure.com` : `/<org>/<projet>/_git/<dépôt>/pullrequest/<n>` (URLs des
+ * captures), la vue se lisant dans `?_a=` (descriptor.ts). Les organisations `*.visualstudio.com`
+ * et Azure DevOps Server ne sont pas capturées : ni leur hôte ni leurs chemins ne sont reconnus
+ * (décision du propriétaire, 2026-11-09), plutôt que des sélecteurs que personne n'y a mesurés.
+ * L'HÔTE est vérifié, pas seulement le chemin : `{org}.visualstudio.com/DefaultCollection/<projet>/…`
+ * a la même forme, la collection à la place de l'organisation. */
+const PR_HOST = 'dev.azure.com';
+const PR_PATH = /^\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)\/?$/;
 
 export class AzdoClientAdapter implements PlatformAdapter {
   #fetch: typeof fetch;
@@ -45,10 +80,11 @@ export class AzdoClientAdapter implements PlatformAdapter {
   readonly log: SelectorLog;
   #guardEntry: EntryGuard;
   #editorSeq = 0;
-  /** Préfixe de chemin devant l'organisation/collection pour les routes d'API, établi par
-   * currentPr() : '' sur dev.azure.com, '/DefaultCollection' éventuel sur
-   * *.visualstudio.com, '/tfs' sur un Azure DevOps Server d'installation par défaut. */
-  #apiPrefix = '';
+  /** Identifiant natif de chaque fil, retenu quand il a été LU : il disparaît de la page quand la
+   * réponse au fil est ouverte (selectors.ts, `threadIdCarrier`). Que la page garde le même
+   * élément de fil entre les deux états n'est pas mesuré : sinon, l'identifiant de repli prend
+   * le relais. */
+  #threadIds = new WeakMap<Element, string>();
 
   constructor(opts: ClientAdapterOptions = {}) {
     this.#fetch = adapterFetch(opts.fetchImpl);
@@ -58,44 +94,26 @@ export class AzdoClientAdapter implements PlatformAdapter {
     this.#guardEntry = opts.guardEntry ?? ((fn) => fn);
   }
 
+  /** Étage 0 : le bouton *Insert a suggestion* de l'éditeur de ligne insère un bloc
+   * `` ```suggestion `` (MESURÉ le 2026-11-09, CAPTURES.md) — le marqueur que le §B.6 laissait à
+   * établir, le même que sur GitHub. */
   platformProfile(): PlatformProfile {
-    // Pas d'étage 0 tant que l'info string du bloc de suggestion n'est pas établie
-    // (§B.6) ; aucune commande native, ni slash ni mention (§B.6).
-    return { id: 'azdo', suggestionInfoString: null };
+    return { id: 'azdo', suggestionInfoString: 'suggestion' };
   }
 
-  /** §B.4 — pas de route de fichier brut : tentative sur le point d'API `items`, sur la
-   * session de l'utilisateur. En échec, `unreachable` → état dégradé (§5.4).
-   * Sur *.visualstudio.com, l'organisation vit dans le SOUS-DOMAINE : la répéter comme
-   * segment de chemin produit une URL 404 — et un 404 sur une URL fausse se lirait
-   * `absent`, jamais `unreachable` (§8.1.5). Sur Azure DevOps Server, le répertoire
-   * virtuel (`/tfs`) précède la collection ; `#apiPrefix` vient de currentPr(). */
-  async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
-    const [org, project, repo] = pr.scope;
-    // `pr.host` peut porter un port (§B.4, instance auto-hébergée) : comparer sur le seul
-    // nom d'hôte, sans quoi un `*.visualstudio.com:443` explicite manquerait la branche.
-    const base = pr.host.replace(/:\d+$/, '').endsWith('.visualstudio.com')
-      ? `https://${pr.host}${this.#apiPrefix}/${project}`
-      : `https://${pr.host}${this.#apiPrefix}/${org}/${project}`;
-    const url = `${base}/_apis/git/repositories/${repo}/items?path=${encodeURIComponent('/.conventional-comments.json')}&api-version=7.1`;
-    try {
-      const res = await this.#fetch(url, { credentials: 'include' });
-      if (res.status === 404) return { status: 'absent' };
-      if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
-      const text = await res.text();
-      // Une page de connexion HTML signifierait que la session n'autorise pas cette
-      // route : l'affirmer atteignable serait transformer une hypothèse en certitude.
-      if (text.trimStart().startsWith('<')) return { status: 'unreachable', reason: 'session route not usable' };
-      return { status: 'found', text };
-    } catch (e) {
-      return { status: 'unreachable', reason: String(e) };
-    }
+  /** §B.4 — non mesurée. L'API REST répond à la session du navigateur depuis la PAGE (mesuré le
+   * 2026-11-09 en créant les PR de test, CAPTURES.md) ; ce qu'elle fait depuis un SCRIPT DE
+   * CONTENU (cookies, CORS, redirections) n'a pas été mesuré, et le dépôt a appris ce que coûte
+   * une lecture supposée (`check:content-script-cors`). D'ici là : `unreachable`, donc état
+   * dégradé — l'extension assiste sans bloquer (§5.4). */
+  async getRepoConfig(_pr: PrRef): Promise<ConfigRead> {
+    return { status: 'unreachable', reason: 'Azure DevOps repository config read not measured yet (spec §B.4)' };
   }
 
   async getOrgConfig(url: string | null): Promise<ConfigRead> {
     if (url === null) return { status: 'absent' };
     // `null` : l'appelant décline pour CETTE url (même origine que la page) — la lecture
-    // directe ci-dessous est alors la bonne, et la seule qui aboutisse.
+    // directe ci-dessous est alors la bonne.
     const relayed = this.#readOrgConfig?.(url);
     if (relayed) return relayed;
     try {
@@ -108,17 +126,16 @@ export class AzdoClientAdapter implements PlatformAdapter {
     }
   }
 
-  /** Pas d'équivalent de Turbo : MutationObserver sur le conteneur racine (§B.3). */
+  /** SPA sans équivalent de Turbo : `MutationObserver` sur la racine (§B.3). Les éditeurs
+   * apparaissent au clic sur un champ replié, et les fils au défilement — le fil d'activité est
+   * virtualisé (CAPTURES.md) : tout arrive TARD, l'observateur est le seul chemin. */
   observeEditors(cb: (editor: EditorHandle) => void): Disposable {
     const seen = new WeakSet<Element>();
-    // Le balayage est le POINT D'ENTRÉE — le premier appel et l'observateur de mutations : une
-    // exception est relevée « pendant la détection des champs » au lieu de rester sans contexte.
     const scan = this.#guardEntry(() => {
       for (const el of queryChainAll(this.#doc, selectors.editors)) {
         if (seen.has(el)) continue;
-        // Marquer « vu » APRÈS #toHandle() : un élément balayé avant que currentPr() ne
-        // trouve de PR (page pas encore navigée) doit rester réexaminable au prochain
-        // balayage, pas définitivement ignoré (§9.2.3).
+        // Marqué « vu » APRÈS #toHandle() : un champ balayé avant que la page ne désigne une PR
+        // reste réexaminable au balayage suivant (§9.2.3).
         const handle = this.#toHandle(el);
         if (!handle) continue;
         seen.add(el);
@@ -131,64 +148,26 @@ export class AzdoClientAdapter implements PlatformAdapter {
     return { dispose: () => observer.disconnect() };
   }
 
-  /** Le châssis de cet éditeur (§5.1, §5.3). **On ne se prononce pas, et c'est une réponse,
-   * pas un trou** : la boîte de commentaire d'Azure DevOps n'a jamais été mesurée dans ce
-   * dépôt, et le seul cadre dont on connaisse la forme est celui de GitHub. Nommer ici un
-   * conteneur, ou reprendre les chiffres relevés sur github.com, serait affirmer sur cette
-   * plateforme ce qu'on n'a pas regardé — exactement le défaut que l'élargissement du contrat
-   * corrige.
-   *
-   * Le code partagé applique donc ses règles géométriques, qui exploitent les styles calculés
-   * et, pour le rognage, la géométrie des éléments (`getBoundingClientRect`) : pour le cadre à
-   * parer, pour le point d'insertion de la barre et de la pastille (`mount`), pour le trait
-   * d'état rentré (`ringInset`). Le jour où quelqu'un mesure un vrai
-   * tenant (A-FAIRE-fr.md, point 9), c'est ICI que le résultat se pose — un `mount` déclaré
-   * remplace la règle pour Azure DevOps seul —, et nulle part ailleurs. */
+  /** Le châssis de l'éditeur n'a pas été mesuré (styles, géométrie) : réponse neutre, et le code
+   * partagé applique ses règles géométriques. */
   getEditorChrome(_editor: EditorHandle): EditorChrome {
     return NEUTRAL_EDITOR_CHROME;
   }
 
-  /** §5.5 — **`null` : la forme du corps rendu d'Azure DevOps n'a pas été mesurée.**
-   *
-   * Rendre `MARKDOWN_HTML_BODY_SHAPE` ici aurait été confortable et faux : c'est le couple
-   * `<p>`/`<br>` RELEVÉ SUR GITHUB, et déplacer une hypothèse dans l'adaptateur ne la rend pas
-   * vraie (revue Reefact, PR #66). Le commentaire d'à côté disait d'ailleurs qu'on n'avait rien
-   * mesuré, pendant que le code affirmait le contraire.
-   *
-   * Ce que ça coûte, écrit franchement : sur Azure DevOps, le préfixe n'est plus masqué et le
-   * sujet n'est plus mis en avant. Les badges, eux, restent posés — ils ne dépendent d'aucune
-   * de ces deux balises. Le corps s'affiche entier, jamais tronqué ni réordonné.
-   *
-   * Ce que ça évite : une mauvaise valeur de `lineBreakTag` ne borne pas le sujet là où il faut,
-   * et fait passer une partie de la discussion en gras dans le sujet. Un rendu incomplet se
-   * corrige ; un rendu faux se remarque après coup.
-   *
-   * Ce que ça n'est PAS : une dégradation de sélecteur. Rien n'est journalisé ici, et ce serait
-   * une faute de le faire — le §9.4 trace un ÉCHEC DE DÉTECTION, alors que cette plateforme
-   * RÉPOND, et répond qu'elle ne sait pas. La tenir pour dégradée la mettrait en échec permanent
-   * et écrirait une entrée par commentaire rendu (revue Reefact, PR #65).
-   *
-   * Pour l'activer : mesurer un corps de commentaire rendu sur un vrai tenant (A-FAIRE-fr.md,
-   * point 9), et déclarer ici les deux balises observées. Rien d'autre à toucher. */
-  renderedBodyShape(): RenderedBodyShape | null {
-    return null;
+  renderedBodyShape(): RenderedBodyShape {
+    return AZDO_BODY_SHAPE;
   }
 
+  /** Les boutons d'envoi de l'éditeur : tous ceux de sa rangée sauf le premier, *Cancel*
+   * (selectors.ts, `submitButtons`). Le primaire publie ; l'autre — *Reply & resolve*, *Update &
+   * resolve* — publie ET change l'état du fil (§B.6, §4.3). */
   getSubmitControls(editor: EditorHandle): SubmitControl[] {
-    // Chaîne centralisée, parcourue dans l'ordre (§9.4) : la génération héritée « vc- »
-    // doit trouver son conteneur au même titre que « repos- » — sans quoi aucun bouton
-    // n'est intercepté et le blocage du §5.4 est désarmé sur cette génération.
-    const container =
-      closestChain(editor.element, selectors.submitContainer).element ?? editor.element.parentElement;
-    if (!container) return [];
-    return queryChainAll(container, selectors.submitButtons).map((element) => {
-      const label = (element.textContent ?? '').toLowerCase();
-      return {
-        element,
-        // « Comment & resolve » combine publication et résolution : couvert aussi (§4.3).
-        kind: label.includes('resolve') ? ('submit-and-resolve' as const) : ('submit' as const),
-      };
-    });
+    const box = closestChain(editor.element, selectors.editorContainer).element;
+    if (!box) return [];
+    return queryChainAll(box, selectors.submitButtons).map((element) => ({
+      element,
+      kind: element.matches(selectors.primarySubmit.candidates[0]!) ? ('submit' as const) : ('submit-and-resolve' as const),
+    }));
   }
 
   readValue(editor: EditorHandle): string {
@@ -199,199 +178,217 @@ export class AzdoClientAdapter implements PlatformAdapter {
     writeToTextField(editor.element as HTMLTextAreaElement, text, caret); // §9.3
   }
 
+  /** Fils lus dans le DOM uniquement (§9.2.3, §10) — les seuls PUBLIÉS : un fil en cours de
+   * création (nouveau commentaire, 01 et 04) n'a aucun commentaire et n'est pas un fil. Un fil
+   * que la page n'a pas encore rendu — fil d'activité virtualisé — n'est pas rapporté : ni
+   * résolu, ni `unknown`. */
   async getThreads(): Promise<ThreadInfo[]> {
     const pr = this.currentPr();
     if (!pr) return [];
-    return queryChainAll(this.#doc, selectors.renderedThreads).map((el, i) => {
-      const id = el.id || `dom-thread-${i}`;
-      const statusText = queryChain(el, selectors.threadStatus).element?.textContent?.toLowerCase() ?? '';
-      const resolution = /resolved|fixed|closed|won't fix|by design/.test(statusText)
-        ? ('resolved' as const)
-        : /active|pending/.test(statusText)
-          ? ('unresolved' as const)
-          : ('unknown' as const); // non rendu → unknown, compté non résolu (§5.5, §B.5)
-      const bodyEl = queryChain(el, selectors.commentBody).element;
-      const body = bodyEl ? commentBodyText(bodyEl) : '';
+    return this.#publishedThreads().map(({ id, element }) => {
+      const [root, ...replies] = queryChainAll(element, selectors.comment);
+      // Tout fil d'Azure DevOps a un état et un bouton *Resolve* — le commentaire général comme
+      // le fil de ligne (03) : tous portent un état bloquant (§4.1).
       return {
         id,
         pr,
-        root: {
-          id: `${id}-root`,
-          author: { id: 'dom-unknown', login: '', isServiceAccount: false },
-          body,
-          createdAt: '',
-          permalink: `#${id}`,
-          isSystemGenerated: false,
-          canCarryBlockingState: true,
-        },
-        replies: [],
-        resolution,
+        root: { ...this.#comment(root!, id), permalink: '', canCarryBlockingState: true },
+        replies: replies.map((c) => this.#comment(c, id)),
+        resolution: this.#resolution(element),
         canCarryBlockingState: true,
       };
     });
   }
 
+  /** Un commentaire publié. `permalink` vide : aucune ancre de fil ou de commentaire n'a été
+   * mesurée sur Azure DevOps, et le bandeau ne doit pas pointer vers une adresse supposée. */
+  #comment(comment: Element, threadId: string): CommentInfo {
+    const bodyEl = queryChain(comment, selectors.commentBody).element;
+    const name = queryChain(comment, selectors.commentAuthor).element?.getAttribute('aria-label') ?? '';
+    const n = this.#commentNumber(comment);
+    return {
+      id: n ? `${threadId}/${n}` : '',
+      author: displayUser(name),
+      body: bodyEl ? azdoBodyText(bodyEl) : '',
+      createdAt: queryChain(comment, selectors.commentTime).element?.getAttribute('datetime') ?? '',
+      permalink: '',
+      isSystemGenerated: false,
+      canCarryBlockingState: false,
+    };
+  }
+
+  /** Numéro du commentaire dans son fil, lu sur son bouton *Delete* — rendu sur ses propres
+   * commentaires seulement, et retiré pendant leur modification (06) : `undefined` alors. */
+  #commentNumber(comment: Element): string | undefined {
+    const id = queryChain(comment, selectors.commentDeleteButton).element?.id ?? '';
+    return /^__bolt-delete-comment-(\d+)$/.exec(id)?.[1];
+  }
+
+  /** L'état d'un fil, lu sur son libellé, puis sur le bouton de son pied — deux textes
+   * d'interface (selectors.ts). Le libellé disparaît pendant la modification de la racine (06),
+   * le pied pendant une réponse (02) : l'un supplée l'autre. */
+  #resolution(thread: Element): ThreadInfo['resolution'] {
+    const read = (chain: typeof selectors.threadStateLabel, labels: typeof STATE_LABELS) =>
+      labels[(queryChain(thread, chain).element?.textContent ?? '').trim().toLowerCase()];
+    return read(selectors.threadStateLabel, STATE_LABELS) ?? read(selectors.threadFooterButton, FOOTER_LABELS) ?? 'unknown';
+  }
+
+  /** Identifiant d'un fil : le natif, lu sur `threadIdCarrier` et retenu ; sinon la date de sa
+   * racine, à la milliseconde, qui ne change pas d'un balayage à l'autre. `undefined` pour un fil
+   * sans commentaire — un nouveau fil n'a pas d'identifiant (`threadId--1`). */
+  #threadId(thread: Element): string | undefined {
+    const carrier = queryChain(thread, selectors.threadIdCarrier).element;
+    const native = carrier ? /(?:^|\s)threadId-(\d+)(?:\s|$)/.exec(carrier.className)?.[1] : undefined;
+    if (native) {
+      this.#threadIds.set(thread, native);
+      return native;
+    }
+    const known = this.#threadIds.get(thread);
+    if (known) return known;
+    const root = queryChain(thread, selectors.comment).element;
+    const at = root ? queryChain(root, selectors.commentTime).element?.getAttribute('datetime') : null;
+    return at ? `dom-thread-${at}` : undefined;
+  }
+
+  #publishedThreads(): { id: string; element: Element }[] {
+    return queryChainAll(this.#doc, selectors.thread)
+      .filter((element) => queryChain(element, selectors.comment).element !== null)
+      .map((element, i) => ({ id: this.#threadId(element) ?? `dom-thread-${i}`, element }));
+  }
+
+  /** Le bouton *Complete*. Son absence est la NORME sur une PR abandonnée — où le même
+   * emplacement porte *Reactivate*, qui ne doit jamais être intercepté — et en plein écran ; elle
+   * n'est journalisée qu'ailleurs (selectors.ts). */
   getCompletionControl(): SubmitControl | null {
+    if (queryChain(this.#doc, selectors.prSettledState).element) return null;
     const { element } = queryChain(this.#doc, selectors.completeButton);
     if (!element) {
-      this.log.degraded(selectors.completeButton);
+      if (!queryChain(this.#doc, selectors.fullScreen).element) this.log.degraded(selectors.completeButton);
       return null;
     }
+    this.log.recovered(selectors.completeButton);
     return { element, kind: 'complete-pr' };
   }
 
+  /** Le nom AFFICHÉ de l'utilisateur, seule identité que la page porte — la même que celle des
+   * auteurs (`commentAuthor`), si bien que les deux se comparent. Vide dans une vue qui ne rend
+   * aucun champ replié (Files sans fil, MESURÉ). */
   async getCurrentUser(): Promise<UserInfo> {
-    const { element } = queryChain(this.#doc, selectors.currentUser);
-    const name = element?.getAttribute('alt') ?? '';
-    return { id: `display:${name.toLowerCase()}`, login: name, isServiceAccount: false };
+    return displayUser(queryChain(this.#doc, selectors.currentUser).element?.getAttribute('aria-label') ?? '');
   }
 
-  /** Ligne cc/1 dans la description d'un PR Status rendu sur la page (§B.7). */
+  /** Aucun vérificateur n'est livré pour Azure DevOps (§B.7) : aucune ligne cc/1 à lire. */
   readPublishedResult(): PublishedSummary | null {
-    for (const el of queryChainAll(this.#doc, selectors.statusDescriptions)) {
-      const text = el.textContent ?? '';
-      const idx = text.indexOf(SUMMARY_PREFIX + ' ');
-      if (idx === -1) continue;
-      const summary = decodeSummary(text.slice(idx).split('\n')[0]!.trim());
-      if (summary) return summary;
-    }
     return null;
   }
 
-  /** Commentaires rendus sur la page, pour les badges du §5.5. */
   getRenderedComments(): { element: Element; bodyText: string }[] {
-    return queryChainAll(this.#doc, selectors.commentBody).map((element) => ({
-      element,
-      bodyText: commentBodyText(element),
-    }));
+    return this.getRenderedCommentElements().map((element) => ({ element, bodyText: azdoBodyText(element) }));
   }
 
-  /** Les corps rendus, éléments seuls, sans `bodyText` (§9.2.3) — la sonde des signatures de
-   * reprise ; voir le même commentaire côté GithubClientAdapter. */
+  /** Les corps des commentaires PUBLIÉS, cherchés dans chaque commentaire — jamais à l'échelle du
+   * document, où `commentBody` attraperait aussi la description de la PR (03). */
   getRenderedCommentElements(): Element[] {
-    return queryChainAll(this.#doc, selectors.commentBody);
+    return queryChainAll(this.#doc, selectors.comment)
+      .map((comment) => queryChain(comment, selectors.commentBody).element)
+      .filter((el): el is Element => el !== null);
   }
 
-  /** Élément après lequel insérer le bandeau (§5.5, §9.2.3). Null quand rien n'apparie :
-   * l'appelant se replie sur le haut du document plutôt que de ne rien afficher. */
   getBannerMount(): Element | null {
     return queryChain(this.#doc, selectors.bannerMount).element;
   }
 
-  /** §5.5 — avant le premier fil rendu : la place que le code partagé choisissait lui-même avant
-   * que le contrat ne la demande à la plateforme. Comportement inchangé. */
+  /** §5.5 — dans l'Overview, avant le premier fil publié : les fils y forment le fil d'activité.
+   * Dans Files, AUCUN filtre (`null`) : les fils y sont intercalés dans le diff, et un filtre
+   * posé avant le premier tomberait au milieu du code (même décision que GitLab, 2026-11-08). */
   getThreadFilterMount(): Element | null {
-    return this.getRenderedThreadElements()[0]?.element ?? null;
+    if (this.#isFilesView()) return null;
+    return this.#publishedThreads()[0]?.element ?? null;
   }
 
-  /** Conteneurs de fils rendus, pour le filtre local du §5.5 — même dérivation
-   * d'identifiant que getThreads(). */
   getRenderedThreadElements(): { id: string; element: Element }[] {
-    return queryChainAll(this.#doc, selectors.renderedThreads).map((el, i) => ({
-      id: el.id || `dom-thread-${i}`,
-      element: el,
-    }));
+    return this.#publishedThreads();
   }
 
   currentPr(): PrRef | null {
     const loc = this.#doc.location;
-    if (!loc) return null;
-    const path = loc.pathname;
-    // La lecture DOM ne se fait qu'à la construction d'une PrRef effective — jamais sur le
-    // chemin d'échec (page hors PR) : depuis que l'activation par hôte (§2) arme les observateurs
-    // sur tout l'hôte, `currentPr()` est appelé à chaque mutation même hors PR (listes,
-    // work items, wiki), et cette route ne doit y coûter qu'un test d'expression régulière.
-    const mk = (scope: [string, string, string], number: string): PrRef => {
-      const { element } = queryChain(this.#doc, selectors.prCreatedAt);
-      return {
-        platform: 'azdo',
-        createdAt: element?.getAttribute('datetime') ?? '',
-        // `host` et non `hostname` : il PORTE LE PORT quand il est non standard. `pr.host`
-        // bâtit les URL d'API (`https://${pr.host}${apiPrefix}/…`) ; un Azure DevOps Server
-        // servi sur un port non standard verrait sinon ses appels partir au port 443
-        // (revue Codex, PR #29). La reconnaissance d'hôte reste sur `hostname` — les motifs
-        // de correspondance de Chrome ignorent le port.
-        host: loc.host,
-        scope,
-        number: Number(number),
-      };
+    if (loc?.hostname !== PR_HOST) return null;
+    const m = PR_PATH.exec(loc.pathname);
+    if (!m) return null;
+    // Lecture DOM seulement une fois la PR reconnue (§9.2.3) : hors PR, currentPr() ne coûte
+    // qu'une expression régulière.
+    const createdAt =
+      queryChainAll(this.#doc, selectors.prCreatedAt)
+        .find((el) => !closestChain(el, selectors.activityCard).element)
+        ?.getAttribute('datetime') ?? '';
+    if (createdAt) this.log.recovered(selectors.prCreatedAt);
+    // Une date inconnue vaut mieux qu'une date fausse : l'extension ne bloque alors jamais. La
+    // vue Files ne porte AUCUNE date de création (MESURÉ) : son absence n'y est pas une rupture.
+    else if (!this.#isFilesView()) this.log.degraded(selectors.prCreatedAt);
+    return {
+      platform: 'azdo',
+      createdAt,
+      // `host` et non `hostname` : il porte le port d'une instance non standard.
+      host: loc!.host,
+      scope: [decodeURIComponent(m[1]!), decodeURIComponent(m[2]!), decodeURIComponent(m[3]!)],
+      number: Number(m[4]),
     };
-    // Forme historique : {org}.visualstudio.com/[DefaultCollection/]{project}/_git/{repo}
-    // /pullrequest/{id} — l'organisation vit dans le SOUS-DOMAINE (§B.1) ; un segment de
-    // collection peut précéder le projet, et la forme moderne ne doit JAMAIS s'y essayer :
-    // elle prendrait la collection pour l'organisation.
-    if (loc.hostname.endsWith('.visualstudio.com')) {
-      const m = /^\/(DefaultCollection\/)?([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
-      if (m) {
-        this.#apiPrefix = m[1] ? '/DefaultCollection' : '';
-        return mk([loc.hostname.split('.')[0]!, m[2]!, m[3]!], m[4]!);
-      }
-      return null;
-    }
-    // Azure DevOps Server, installation par défaut (§B.1, hôte déclaré dans les options,
-    // §B.4) : /tfs/{collection}/{project}/_git/{repo}/pullrequest/{id}.
-    let m = /^\/tfs\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
-    if (m) {
-      this.#apiPrefix = '/tfs';
-      return mk([m[1]!, m[2]!, m[3]!], m[4]!);
-    }
-    // Forme moderne : dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}
-    m = /^\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)/i.exec(path);
-    if (m) {
-      this.#apiPrefix = '';
-      return mk([m[1]!, m[2]!, m[3]!], m[4]!);
-    }
-    return null;
+  }
+
+  #isFilesView(): boolean {
+    return new URLSearchParams(this.#doc.location?.search ?? '').get('_a') === 'files';
   }
 
   #toHandle(el: Element): EditorHandle | null {
     const pr = this.currentPr();
     if (!pr) return null;
     this.#editorSeq++;
-    // L'édition est un point de sortie au même titre que la création (§4.3) ; l'édition
-    // d'une RACINE de fil reste zone 'thread-root' — la classer 'reply' la soustrairait
-    // à la validation par défaut (§4.1). Chaînes parcourues dans l'ordre (§9.4), et la
-    // chaîne editForm ne matche jamais un conteneur de composition (selectors.ts).
-    const action: 'compose' | 'edit' = closestChain(el, selectors.editForm).element ? 'edit' : 'compose';
-    const editedId =
-      action === 'edit' ? closestChain(el, selectors.renderedComment).element?.id || undefined : undefined;
-    const inThread = closestChain(el, selectors.threadContainer).element;
-    let context: EditorContext;
-    if (inThread) {
-      let isRootEdit = false;
-      if (action === 'edit') {
-        // MÊME candidat pour la liste des commentaires du fil et pour l'ancêtre du champ
-        // édité — deux stratégies divergentes reclasseraient une racine en réponse.
-        let comments: Element[] = [];
-        let editedComment: Element | null = null;
-        for (const candidate of selectors.renderedComment.candidates) {
-          const found = [...inThread.querySelectorAll(candidate)];
-          if (found.length > 0) {
-            comments = found;
-            editedComment = el.closest(candidate);
-            break;
-          }
-        }
-        if (comments.length > 0 && editedComment === null) this.log.degraded(selectors.renderedComment); // §9.4
-        isRootEdit = comments.length > 0 && editedComment === comments[0];
-      }
-      const threadId = inThread.id || editedId;
-      context = isRootEdit
-        ? { zone: 'thread-root', action, pr, threadId, commentId: editedId, canCarryBlockingState: true, inScope: true }
-        : {
-            zone: 'reply',
-            action,
-            pr,
-            threadId,
-            ...(action === 'edit' ? { commentId: editedId } : {}),
-            canCarryBlockingState: false,
-            inScope: true,
-          };
-    } else {
-      // Hors fil : sur une édition, le commentaire édité est son propre fil (§9.2.3).
-      const editIds = action === 'edit' ? { threadId: editedId, commentId: editedId } : {};
-      context = { zone: 'thread-root', action, pr, ...editIds, canCarryBlockingState: true, inScope: true };
-    }
-    return { id: `azdo-editor-${this.#editorSeq}`, element: el, context };
+    return { id: `azdo-editor-${this.#editorSeq}`, element: el, context: this.#contextOf(el, pr) };
   }
+
+  /** Zone du champ (§4.1). Règle MESURÉE sur les éditeurs des captures (01, 02, 04, 05, 06, dans
+   * les deux vues et les trois modes) :
+   *   1. dans un commentaire publié → MODIFICATION de ce commentaire ;
+   *   2. sinon, dans un fil qui a des commentaires → RÉPONSE ;
+   *   3. sinon, nouveau fil : de LIGNE dans le diff de Files, GÉNÉRAL dans l'Overview. */
+  #contextOf(el: Element, pr: PrRef): EditorContext {
+    const thread = closestChain(el, selectors.thread).element;
+    const comments = thread ? queryChainAll(thread, selectors.comment) : [];
+    const threadId = thread ? this.#threadId(thread) : undefined;
+    const edited = closestChain(el, selectors.comment).element;
+    if (edited) {
+      const n = this.#commentNumber(edited);
+      const commentId = n && threadId ? `${threadId}/${n}` : undefined;
+      // La RACINE d'un fil reste 'thread-root' (§4.1, §4.3) : la classer 'reply' la soustrairait
+      // à la validation par défaut.
+      return comments[0] === edited
+        ? { zone: 'thread-root', action: 'edit', pr, threadId, commentId, canCarryBlockingState: true, inScope: true }
+        : { zone: 'reply', action: 'edit', pr, threadId, commentId, canCarryBlockingState: false, inScope: true };
+    }
+    if (comments.length > 0) {
+      return { zone: 'reply', action: 'compose', pr, threadId, canCarryBlockingState: false, inScope: true };
+    }
+    if (closestChain(el, selectors.diffDiscussion).element) {
+      return { zone: 'thread-root', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
+    }
+    // Commentaire général : sur Azure DevOps, c'est un FIL, avec un état et un bouton *Resolve*
+    // (03, les fils 1 à 4) — il porte donc un état bloquant, comme sur GitLab et contrairement à
+    // GitHub.
+    return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
+  }
+}
+
+function displayUser(name: string): UserInfo {
+  return { id: `display:${name.toLowerCase()}`, login: name, isServiceAccount: false };
+}
+
+/** Le texte d'un corps rendu, sans le bouton *Copy to clipboard* qu'Azure DevOps pose DANS le
+ * corps devant chaque bloc de code (selectors.ts, `codeCopyButton`) : son texte deviendrait la
+ * ligne de préfixe d'un commentaire qui cite du code avant elle (§3.4.1). La page n'est pas
+ * touchée : le bouton est retiré d'une copie. */
+function azdoBodyText(body: Element): string {
+  if (!queryChain(body, selectors.codeCopyButton).element) return commentBodyText(body);
+  const clone = body.cloneNode(true) as Element;
+  for (const button of queryChainAll(clone, selectors.codeCopyButton)) button.remove();
+  return commentBodyText(clone);
 }

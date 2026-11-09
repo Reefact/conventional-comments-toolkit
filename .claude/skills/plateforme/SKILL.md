@@ -429,13 +429,32 @@ SOURCES écrites dans son prompt : une plateforme sans source n'y produit qu'une
 `platform-watch: no changelog source for <id>`, et n'est pas surveillée. C'est ce qui est arrivé
 à GitLab, inscrit au registre sans que la tâche le sache.
 
-À la création d'une plateforme — et à sa remise à niveau si la source a changé d'adresse —,
-trouver le flux ou la page de notes de version officiel, l'OUVRIR pour vérifier qu'il répond et
-à quel rythme il publie (un flux mensuel est vide la plupart des semaines, ce n'est pas une
-panne), puis rédiger la ligne à ajouter à la liste des sources du prompt, sur le modèle des
-lignes existantes. Un agent ne peut pas modifier cette tâche (elle n'a pas été créée par un
-agent) : donner la ligne au propriétaire, avec le lien de la tâche, et le dire dans la PR —
-« veille : source ajoutée » ou « veille : ligne à ajouter par le propriétaire ».
+À la création d'une plateforme — et à sa remise à niveau si sa source a changé d'adresse —,
+trouver le flux ou la page de notes de version officiel, et l'OUVRIR pour vérifier qu'il répond
+et à quel rythme il publie (un flux mensuel est vide la plupart des semaines, ce n'est pas une
+panne). Puis rédiger le changement du prompt, qui n'est pas le même dans les deux cas :
+
+- **création** : une ligne à AJOUTER à la liste « Plateformes et sources » ;
+- **adresse changée** : la ligne existante de la plateforme à REMPLACER, citée telle qu'elle est,
+  suivie de sa remplaçante. Ajouter sans retirer laisserait la tâche lire l'ancienne adresse
+  aussi, pour des doublons ou des erreurs sur un flux retiré.
+
+La ligne suit cette forme, qui est celle des lignes existantes :
+
+```
+- **<Nom>** (`<id du registre>`) : <nature de la source et URL vérifiée> (<rythme de publication ;
+  comment filtrer : sur le CONTENU touchant les pages de revue, pas sur une étiquette>).
+  <Source complémentaire éventuelle.> <Ce qu'une semaine vide signifie pour cette source.>
+```
+
+Le prompt et le lien de la tâche ne sont pas dans le dépôt. Un agent qui a accès aux tâches
+planifiées du compte (outil de liste des tâches) y lit le prompt actuel, pour reprendre la forme
+et, en cas de remplacement, la ligne exacte à retirer. Sinon, il ne suppose rien : il demande au
+propriétaire le lien de la tâche, ou la ligne actuelle de la plateforme, et rédige malgré tout
+la ligne nouvelle sur la forme ci-dessus. Dans les deux cas, un agent ne peut pas MODIFIER la
+tâche (elle n'a pas été créée par un agent) : le changement va au propriétaire, et la PR dit
+où il en est — « veille : source ajoutée », « veille : source remplacée », ou « veille :
+changement à appliquer par le propriétaire ».
 
 ## 7. La PR
 

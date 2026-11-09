@@ -233,3 +233,22 @@ describe('§4.1, §5.5 — Overview : corps de revue soumis en lot (captures de 
     expect(submitLabels(page, editor)).toEqual(['Update review']);
   }, T);
 });
+
+describe('§5.5, §9.2.3 — Overview : état de résolution des fils', () => {
+  it('lit les fils OUVERTS comme non résolus, et non plus inconnus (captures 03 et 02, PR 548)', async () => {
+    for (const file of ['03-overview-commentaires-prefixes.html', '02-overview-reponse-fil.html']) {
+      const page = load(file, PR548);
+      const threads = await page.adapter.getThreads();
+      expect(threads).toHaveLength(2);
+      expect(threads.map((t) => t.resolution)).toEqual(['unresolved', 'unresolved']);
+    }
+  }, T);
+
+  it('un fil RÉSOLU n’est pas rendu comme fil : il n’entre pas dans les fils lus (PR 530)', async () => {
+    // Son groupe ne porte que « Unresolve conversation in … », dans le corps de sa revue, sans
+    // `[data-testid="review-thread"]` : rien à lire, rien à compter comme bloquant.
+    const page = load('03-overview-corps-de-revue-publies.html', PR530);
+    expect(page.doc.querySelector('button[aria-label^="Unresolve conversation in "]')).not.toBeNull();
+    expect(await page.adapter.getThreads()).toEqual([]);
+  }, T);
+});

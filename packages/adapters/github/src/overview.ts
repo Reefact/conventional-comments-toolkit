@@ -66,6 +66,16 @@ export function overviewContext(el: Element, pr: PrRef): EditorContext | null {
   return null;
 }
 
+/** L'état de résolution que le GROUPE d'un fil de l'Overview déclare, ou `null` s'il ne le
+ * déclare pas (`overviewThreadResolvedFlag`, `overviewThreadUnresolvedFlag`). */
+export function overviewResolution(thread: Element): 'resolved' | 'unresolved' | null {
+  const group = closestChain(thread, selectors.overviewThreadGroup).element;
+  if (!group) return null;
+  if (queryChain(group, selectors.overviewThreadResolvedFlag).element) return 'resolved';
+  if (queryChain(group, selectors.overviewThreadUnresolvedFlag).element) return 'unresolved';
+  return null;
+}
+
 /** Le champ est-il celui de la DESCRIPTION de la PR — hors périmètre (§4.1) ? */
 export function inOverviewPrDescription(el: Element): boolean {
   return closestChain(el, selectors.overviewPrDescription).element !== null;

@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url';
 // Garde-fou du piège récurrent (CLAUDE.md) : les caractères invisibles s'écrivent
 // TOUJOURS en échappements \uXXXX dans les sources et les tests — jamais en littéral.
 // Un BOM ou un ZWJ littéral se relit mal, se copie mal, et se perd silencieusement au
@@ -10,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 

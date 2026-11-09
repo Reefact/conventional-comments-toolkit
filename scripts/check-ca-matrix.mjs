@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url';
 // Garde-fou de la règle du chantier (CLAUDE.md, §11) : « tout critère d'acceptation
 // raisonnablement automatisable est couvert par un test qui cite son identifiant ; la
 // correspondance vit dans docs/ca-matrix-fr.md ». Trois vérifications, dans cet ordre :
@@ -20,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MATRIX = join(ROOT, 'docs/ca-matrix-fr.md');

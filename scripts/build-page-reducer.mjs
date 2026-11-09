@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url';
 // Le script de navigateur qui réduit la page OUVERTE et en télécharge la seule forme réduite —
 // la voie « session locale avec Claude in Chrome » du skill `plateforme`.
 //
@@ -14,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 // `check:page-reducer` tient les deux voies pour équivalentes, octet pour octet, dans Chromium.
 
 import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { buildPageReducer } from './lib/captured-page-reducer.mjs';
 import { InputsError, loadReductionInputs } from './lib/captured-page-inputs.mjs';
 

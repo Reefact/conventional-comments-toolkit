@@ -159,7 +159,8 @@ export class GitlabClientAdapter implements PlatformAdapter {
   }
 
   /** Fils lus dans le DOM uniquement (§9.2.3, §10). L'état : `resolved` sur la marque de
-   * résolution, `unresolved` sur celle d'un fil ouvert, `unknown` sinon. En Rapid Diffs, un fil
+   * résolution, `unresolved` sur celle d'un fil ouvert, `unknown` sinon — et alors le fil n'est
+   * pas résoluble, donc ne porte pas d'état bloquant (voir plus bas). En Rapid Diffs, un fil
    * résolu n'est pas dans le DOM (§C.5) : il n'est pas rendu ici du tout, ce qui ne le compte
    * pas pour résolu. */
   async getThreads(): Promise<ThreadInfo[]> {
@@ -174,17 +175,24 @@ export class GitlabClientAdapter implements PlatformAdapter {
       // rendues.
       const [root, ...replies] = queryChainAll(el, selectors.noteContainer);
       const resolver = this.#resolver(el);
+      const resolution = this.#resolution(el);
+      // Un fil ne porte un état bloquant que s'il est RÉSOLUBLE (§4.1) : la page le dit par
+      // `data-discussion-resolvable`, que portent tous les fils capturés, résolus ou ouverts
+      // (`threadResolved`, `threadUnresolved`). Sans cette marque — une note simple publiée par
+      // *Comment*, attendue non résoluble (§C.6, à vérifier) —, le fil n'en porte pas : compté
+      // `unknown`, donc non résolu, il resterait bloquant sans que GitLab permette de le résoudre.
+      const resolvable = resolution !== 'unknown';
       return {
         id,
         pr,
-        root: { ...this.#comment(root), id, permalink: `#${id}`, canCarryBlockingState: true },
+        root: { ...this.#comment(root), id, permalink: `#${id}`, canCarryBlockingState: resolvable },
         replies: replies.map((note) => this.#comment(note)),
-        resolution: this.#resolution(el),
+        resolution,
         // Le résolveur est rendu dans l'en-tête d'un fil résolu replié (selectors.ts,
         // `threadResolver`). Absent ailleurs, et alors non renseigné (§6.1) : le cas d'un fil
         // résolu DÉPLIÉ n'est pas capturé.
         ...(resolver ? { resolvedBy: resolver } : {}),
-        canCarryBlockingState: true,
+        canCarryBlockingState: resolvable,
       };
     });
   }

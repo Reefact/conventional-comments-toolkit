@@ -44,7 +44,10 @@ export const selectors = {
    * choisi ce mode — choix mémorisé pour son compte (§C.2). MESURÉ : 01-…-texte-riche,
    * 04-…-texte-riche, 05-…-texte-riche, 06-overview-…-texte-riche ; `aria-label` « Comment » ou
    * « Reply to comment » selon la zone, comme la <textarea> qu'il remplace. L'écriture y est à
-   * établir (§C.2) : cette chaîne sert à le RECONNAÎTRE, pas à y écrire. */
+   * établir (§C.2), et l'adaptateur ne le lit pas : aucun code livré ne consulte cette chaîne.
+   * Elle sert aux tests sur pages réelles, qui établissent que l'éditeur est là ET qu'aucun champ
+   * n'est observé, et à `check:captured-selectors` ; le jour où l'écriture sera mesurée, c'est
+   * par elle que l'adaptateur le reconnaîtra. */
   richTextEditors: {
     name: 'rich-text-editors',
     candidates: ['div[contenteditable="true"].ProseMirror'],
@@ -255,10 +258,12 @@ export const selectors = {
     candidates: ['.detail-page-header'],
   } satisfies SelectorChain,
 
-  /** État de la merge request, QUEL QU'IL SOIT — un FAIT, recopié dans le relevé d'une ligne du
-   * journal, qui ne décide rien. MESURÉ : le badge de l'en-tête collant porte l'état dans son
-   * `aria-label` — « Open » (01, 04, 04-changes-classique), « Closed » (08). C'est un texte
-   * d'interface, donc localisé : il dit un fait à qui lit le journal, il ne sert à aucune décision. */
+  /** État de la merge request, QUEL QU'IL SOIT. MESURÉ : le badge de l'en-tête collant porte
+   * l'état dans son `aria-label` — « Open » (01, 04, 04-changes-classique), « Closed » (08). C'est
+   * un texte d'interface, donc localisé : il ne peut servir à aucune décision. **Aucun code ne le
+   * lit encore** : l'adaptateur GitHub recopie ce fait dans le relevé d'une ligne du journal
+   * (§9.4), l'adaptateur GitLab journalise sans relevé. La chaîne est mesurée et contrôlée par
+   * `check:captured-selectors`, en attente de ce branchement. */
   prStateLabel: {
     name: 'pr-state-label',
     candidates: ['.merge-request-sticky-header .gl-badge[aria-label]'],

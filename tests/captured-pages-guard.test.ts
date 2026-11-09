@@ -73,6 +73,29 @@ describe('pages capturées — secrets de session', () => {
     expect(redactCapturedPage(html)).toBe(html);
   });
 
+  it('trouve et masque une adresse INTERNATIONALISÉE — partie locale ou domaine hors ASCII (revue, PR #145)', () => {
+    for (const address of ['δοκιμή@example.com', 'user@bücher.de', 'josé.garcía@correo.es', 'user@xn--bcher-kva.de']) {
+      const html = `<p>${address}</p>`;
+      expect(findCapturedPageSecrets(html).map((s: { value: string }) => s.value), address).toEqual([address]);
+      const masked = redactCapturedPage(html);
+      expect(masked, address).toBe(`<p>${MASK}</p>`);
+      expect(findCapturedPageSecrets(masked), address).toEqual([]);
+    }
+  });
+
+  it('git@ et noreply@ ne sont exemptées que DANS leur contexte — ailleurs, une adresse comme une autre (revue, PR #145)', () => {
+    for (const html of [
+      '<p>git@private.example.com</p>',
+      '<p>write to git@private.example.com: it is read</p>',
+      '<p>noreply@private.example.com</p>',
+      // Une ligne qui ne commence pas une mention de commit, même avec un chevron.
+      '<p>Contact &lt;noreply@private.example.com&gt;</p>',
+    ]) {
+      expect(kinds(html), html).toEqual(['adresse e-mail']);
+      expect(redactCapturedPage(html), html).not.toContain('@private.example.com');
+    }
+  });
+
   it('est idempotent : une page masquée revient identique', () => {
     const html = '<input value="x" data-csrf="true"><meta name="request-id" content="r">';
     const once = redactCapturedPage(html);

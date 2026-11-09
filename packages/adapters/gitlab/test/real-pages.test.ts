@@ -15,8 +15,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { EditorHandle } from '@cct/adapter-shared';
+import { queryChain, type EditorHandle } from '@cct/adapter-shared';
 import { GitlabClientAdapter } from '../src/index.js';
+import { selectors } from '../src/selectors.js';
 
 const PAGES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'pages');
 const MR1 = '/Reefact/testing-conventional-comments/-/merge_requests/1';
@@ -152,7 +153,7 @@ describe('§C.2 — Texte enrichi : ni observé, ni lu, ni écrit', () => {
   ] as const) {
     it(`aucun champ observé, alors que l'éditeur ProseMirror est là (${file})`, () => {
       const page = load(file, path);
-      expect(page.doc.querySelector('div[contenteditable="true"].ProseMirror')).not.toBeNull();
+      expect(queryChain(page.doc, selectors.richTextEditors).element).not.toBeNull();
       expect(page.editors).toEqual([]);
     }, T);
   }
@@ -312,6 +313,19 @@ describe('§5.5, §9.2.3 — Fils et commentaires publiés (captures 03)', () =>
     // Aucun fil ouvert n'a de résolveur.
     expect(threads.every((t) => t.resolvedBy === undefined)).toBe(true);
   });
+
+  it('un fil porte un état bloquant s’il est résoluble, et seulement alors (§4.1, §C.6)', async () => {
+    expect((await page.adapter.getThreads()).every((t) => t.canCarryBlockingState)).toBe(true);
+    // Une note simple publiée par *Comment* n'est pas capturée : on retire la marque de
+    // résolubilité d'un fil de la capture, seul trait qui l'en distinguerait (à vérifier, §C.6).
+    const plain = load('03-overview-commentaires-discussion.html', MR1);
+    plain.doc.querySelector('[data-testid="discussion-content"]')!.removeAttribute('data-discussion-resolvable');
+    const [first, ...others] = await plain.adapter.getThreads();
+    expect(first!.resolution).toBe('unknown');
+    expect(first!.canCarryBlockingState).toBe(false);
+    expect(first!.root.canCarryBlockingState).toBe(false);
+    expect(others.every((t) => t.canCarryBlockingState)).toBe(true);
+  }, T);
 
   it('rend sept corps de commentaires — réponse comprise —, ni la description ni un aperçu vide', () => {
     const bodies = page.adapter.getRenderedComments().map((c) => c.bodyText.trim().split('\n')[0]);

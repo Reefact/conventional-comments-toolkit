@@ -250,6 +250,29 @@ rapport trié comme à l'étape 2), `node scripts/check-captured-pages.mjs`, pui
   à 9. Une sonde écrite d'après l'issue aurait fait taire toute rupture. La mesurer sur les
   captures avant d'écrire.
 
+**Mesuré au troisième usage** (2026-11-09, Azure DevOps, Windows) :
+- `npm run build:page-reducer` refuse `--no-selectors` tant qu'un `selectors.ts` existe, même
+  écrit de mémoire : la comparaison avant/après porte alors sur les anciens candidats — sans
+  danger, et sans valeur de mesure.
+- Le `(0, eval)` de `window.__cctReduce` échappe à la CSP de dev.azure.com quand il s'exécute
+  dans le corps synchrone de l'appel `javascript_tool` ; APRÈS un `await` du même appel, la CSP
+  le refuse (`EvalError … 'unsafe-eval'`). Appeler `__cctReduce` dans un appel séparé, ou avant
+  tout `await`.
+- Un fil d'activité VIRTUALISÉ ne rend les corps que près de l'écran : compter les corps rendus
+  avant la capture, faire défiler jusqu'au bout, recompter. Une capture prise sans cela manque
+  des fils, et les tests ne le verraient jamais.
+- **Une capture réduite peut porter des DONNÉES PERSONNELLES**, que l'audit (valeurs opaques
+  communes à deux PR) ne voit pas : le menu de compte Microsoft, présent fermé dans le DOM de
+  chaque page, y met l'adresse e-mail du compte. Chercher, avant tout envoi, adresses e-mail,
+  GUID et descripteurs d'identité dans les pages réduites
+  (`grep -ohE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}"`).
+- `resize_window` est sans effet sur une fenêtre en plein écran (F11) ; et un panneau latéral
+  ou des DevTools ancrés réduisent la page sans réduire la fenêtre — mesurer `innerWidth`, pas
+  la taille demandée.
+- Sur une plateforme dont les boutons d'un commentaire n'apparaissent qu'au survol, cliquer par
+  le nom accessible (`aria-label="Edit"`, via `javascript_tool`) plutôt qu'aux coordonnées :
+  *Delete* est collé à *Edit*, et un clic décalé ouvre la confirmation de suppression.
+
 **Reste à vérifier** : la politique de sécurité d'une plateforme sous Trusted Types — le script
 crée sa propre politique (`cct-reduce-capture`) ; une page qui les interdit toutes le fait
 échouer explicitement (mesuré dans Chromium), et l'on passe à la voie B. Aucune plateforme

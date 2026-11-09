@@ -2153,7 +2153,7 @@ Application à vues dynamiques : les onglets *Overview* et *Changes* d'une merge
 
 Les fils portent un bouton *Resolve thread*. Mesuré le 2026-11-08 sur un fil résolu puis rouvert (captures `03-overview-fil-resolu`, `03-changes-fil-resolu`) :
 
-- **État résolu.** Dans l'Overview, le conteneur du fil porte `data-discussion-resolved="true"` et se replie : son en-tête reste, ses notes ne sont plus dans le DOM. **Dans la vue Rapid Diffs de *Changes*, un fil résolu n'est pas dans le DOM du tout.** `getThreads()` ne peut donc lire l'état de résolution que dans l'Overview ou la vue classique ; ailleurs, un fil absent n'est pas un fil résolu, et l'état reste `unknown`.
+- **État résolu.** Dans l'Overview, le conteneur du fil porte `data-discussion-resolved="true"` et se replie : son en-tête reste, ses notes ne sont plus dans le DOM. **Dans la vue Rapid Diffs de *Changes*, un fil résolu n'est pas dans le DOM du tout.** `getThreads()` ne peut donc lire l'état de résolution que dans l'Overview ou la vue classique ; ailleurs, un fil absent n'est pas rapporté : ni résolu, ni `unknown` — qui le compterait non résolu (§5.5) et ferait reparaître comme bloquant un fil déjà résolu.
 - **Auteur de la résolution : exposé dans la page.** L'en-tête replié affiche « Resolved … by » suivi d'un lien vers le compte qui a résolu. La règle de gouvernance du §6.1 peut donc s'appuyer sur lui, sous réserve de ce que la page affiche quand ce compte n'est plus accessible — à vérifier.
 - **Qui a le droit de résoudre un fil** : non mesuré, à vérifier.
 

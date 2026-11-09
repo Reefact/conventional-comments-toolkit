@@ -1,0 +1,17 @@
+{
+  "$schema": "https://conventional-comments-toolkit.dev/schema/v1.json",
+  "version": 1,
+  "labels": [
+    {
+      "id": "summary",
+      "enabled": true,
+      "kind": "remark",
+      "blockingByDefault": false,
+      "alwaysNonBlocking": true,
+      "icon": "📋",
+      "color": "#B160C9",
+      "description": "Summarizes the current state of a review or of one review pass, without introducing a new finding, replying to a specific finding, or closing the review.",
+      "usage": "Recap a review pass: what was verified, what remains open. It never closes the review: that is reviewed:."
+    }
+  ]
+}

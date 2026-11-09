@@ -203,6 +203,8 @@ describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () =>
       at: 't1',
       firstAt: 't1',
       count: 1,
+      // Écrite par cette version : elle dit que son relevé n'est pas (encore) rattrapé (#116).
+      latestRecovered: false,
     });
   });
 
@@ -231,6 +233,7 @@ describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () =>
       urls: ['https://x/1', 'https://x/2'],
       // t1 n'a jamais été rattrapé : il reste lisible (#116).
       unrecovered: { at: 't1', url: 'https://x/1' },
+      latestRecovered: false,
     });
   });
 
@@ -472,7 +475,7 @@ describe('#116 — le relevé jamais rattrapé survit aux relevés suivants', ()
     line = mergeJournalEntry(line, seen('2', 'sk-2')); // 1 non rattrapé → gardé
     line = mergeJournalEntry(line, seen('3', 'sk-3')); // 2 non rattrapé non plus → le remplace
     expect(line.unrecovered?.at).toBe('2');
-    expect(line.latestRecovered).toBeUndefined();
+    expect(line.latestRecovered).toBe(false);
   });
 
   it('toutes les visites rattrapées : rien à garder', () => {
@@ -486,5 +489,32 @@ describe('#116 — le relevé jamais rattrapé survit aux relevés suivants', ()
     line = markRecovered(mergeJournalEntry(line, seen('2', 'sk-2')), 5);
     expect(skeletonsOf(line)).toEqual(['sk-2', 'sk-1']);
     expect(skeletonsOf({ kind: 'error', message: 'x', at: 't' })).toEqual([]);
+  });
+});
+
+describe('#116 — une ligne laissée par une version ANTÉRIEURE (revue Reefact, PR #141)', () => {
+  // Ces lignes n'ont pas `latestRecovered` : on n'en tire que ce que leurs compteurs prouvent.
+  const legacy = (extra: Partial<SelectorFailure>): SelectorFailure => ({
+    chain: 'merge-button',
+    at: 't1',
+    url: 'https://github.com/acme/demo/pull/1',
+    skeleton: 'sk-1',
+    ...extra,
+  });
+  const next: SelectorFailure = { chain: 'merge-button', at: 't2', skeleton: 'sk-2' };
+
+  it('toutes ses visites rattrapées : son relevé n’est PAS gardé comme non rattrapé', () => {
+    const line = mergeJournalEntry(legacy({ count: 1, recoveredVisits: 1 }), next);
+    expect(line.unrecovered).toBeUndefined();
+  });
+
+  it('aucune visite rattrapée : son relevé est gardé', () => {
+    const line = mergeJournalEntry(legacy({ count: 2 }), next);
+    expect(line.unrecovered).toMatchObject({ at: 't1', skeleton: 'sk-1' });
+  });
+
+  it('certaines rattrapées, on ne sait pas lesquelles : rien n’est affirmé', () => {
+    const line = mergeJournalEntry(legacy({ count: 3, recoveredVisits: 1 }), next);
+    expect(line.unrecovered).toBeUndefined();
   });
 });

@@ -282,6 +282,9 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
       'count',
       'evidence',
       'firstAt',
+      // Le dernier relevé n'est pas (encore) rattrapé : explicite, pour qu'une ligne d'une version
+      // antérieure, qui ne porte pas ce champ, s'en distingue (#116, revue Reefact, PR #141).
+      'latestRecovered',
       'platform',
       'problem',
       'skeleton',

@@ -103,7 +103,9 @@ export function entryKey(entry: JournalEntry): string {
 /** La ligne écrite remplace la précédente de la même clé, mais lui reprend ce qu'elle sait.
  * Une ligne écrite avant ces champs compte pour un relevé, daté de son propre `at`. */
 export function mergeJournalEntry<T extends JournalEntry>(previous: T | undefined, next: T): T {
-  if (previous === undefined) return { ...next, firstAt: next.at, count: 1, ...urlsOf(undefined, next) };
+  if (previous === undefined) {
+    return { ...next, ...notYetRecovered(next), firstAt: next.at, count: 1, ...urlsOf(undefined, next) };
+  }
   // Les rattrapages se cumulent comme `count` : ils comptent des visites passées, que la ligne
   // nouvelle ne connaît pas. Une ligne d'exception n'en porte jamais.
   const recovery =
@@ -114,21 +116,39 @@ export function mergeJournalEntry<T extends JournalEntry>(previous: T | undefine
   // l'a été : le dernier non rattrapé déjà gardé reste en place.
   const kept =
     previous.kind !== 'error' && next.kind !== 'error'
-      ? previous.latestRecovered
-        ? previous.unrecovered
-        : observationOf(previous)
+      ? latestWasUnrecovered(previous)
+        ? observationOf(previous)
+        : previous.unrecovered
       : undefined;
-  const merged = {
+  return {
     ...next,
     ...recovery,
     ...(kept ? { unrecovered: kept } : {}),
+    ...notYetRecovered(next),
     firstAt: previous.firstAt ?? previous.at,
     count: (previous.count ?? 1) + 1,
     ...urlsOf(previous, next),
   };
-  // Le relevé nouveau n'a encore été rattrapé par rien.
-  delete (merged as { latestRecovered?: boolean }).latestRecovered;
-  return merged;
+}
+
+/** Une ligne de sélecteur ÉCRITE par cette version dit toujours si son dernier relevé a été
+ * rattrapé : `false` à l'écriture, `true` au rattrapage (`markRecovered`). Un champ ABSENT désigne
+ * donc une ligne laissée par une version antérieure, et c'est ce qui la distingue (revue Reefact,
+ * PR #141). */
+function notYetRecovered(entry: JournalEntry): { latestRecovered?: false } {
+  return entry.kind === 'error' ? {} : { latestRecovered: false };
+}
+
+/** Le dernier relevé de cette ligne est-il CERTAINEMENT non rattrapé ?
+ *
+ * Écrite par cette version, la ligne le dit. Écrite par une version antérieure, elle n'en garde que
+ * ses compteurs, et l'on n'en tire que ce qu'ils prouvent : aucun rattrapage (`recoveredVisits`
+ * absent) — le dernier relevé ne l'a pas été ; autant de rattrapages que de relevés — tous l'ont
+ * été. Entre les deux, on ne sait pas LEQUEL l'a été : ne rien affirmer, plutôt que de présenter
+ * comme une rupture le relevé d'une visite rattrapée (revue Reefact, PR #141). */
+function latestWasUnrecovered(entry: SelectorFailure): boolean {
+  if (entry.latestRecovered !== undefined) return !entry.latestRecovered;
+  return (entry.recoveredVisits ?? 0) === 0;
 }
 
 function observationOf(entry: SelectorFailure): Observation {

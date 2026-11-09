@@ -17,6 +17,20 @@ import { selectors } from './selectors.js';
  * L'ordre suit l'emboîtement mesuré : un champ d'édition DANS un fil est aussi dans son groupe,
  * d'où le renvoi au code commun dès qu'il est dans un fil. */
 export function overviewContext(el: Element, pr: PrRef): EditorContext | null {
+  // Édition du CORPS d'une revue : le champ est dans l'`article` de la revue (capture 06
+  // `-corps-de-revue`). Personne ne résout un corps de revue (§4.1) : `review-body`.
+  const review = closestChain(el, selectors.overviewReviewBody).element;
+  if (review) {
+    return {
+      zone: 'review-body',
+      action: 'edit',
+      pr,
+      threadId: review.id,
+      commentId: review.id,
+      canCarryBlockingState: false,
+      inScope: true,
+    };
+  }
   // Édition d'un commentaire GÉNÉRAL : le champ est dans l'`article` du commentaire (capture 06).
   const general = closestChain(el, selectors.overviewGeneralComment).element;
   if (general) {

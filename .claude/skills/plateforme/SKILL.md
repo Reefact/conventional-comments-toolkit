@@ -84,6 +84,17 @@ placer les badges (§5.5). Publier au moins :
   capturé est la mesure dont un amendement aurait besoin — l'amendement, lui, reste une
   décision du propriétaire.
 
+Cette liste est un MINIMUM, pas l'inventaire. Avant de déclarer l'état 3 complet, ouvrir une PR
+réelle et chargée de la plateforme (plusieurs revues, réponses, fils résolus, bots) et lister
+**toutes les sortes de commentaires qu'elle rend** — un script qui énumère les conteneurs de corps
+rendus et leurs ancêtres porteurs d'identifiant suffit —, puis capturer chaque sorte absente des
+captures. Au minimum, en plus de la liste ci-dessus : le **corps d'une revue soumise en lot**
+(revue publiée AVEC un texte, comme un `reviewed:`), qui n'est ni un commentaire général ni un
+fil. (Deuxième usage, 2026-11-09, page Overview de GitHub : aucune revue avec corps n'avait été
+publiée sur la PR de test ; les tests, écrits sur ces captures, passaient tous ; le propriétaire a
+trouvé à la validation que les `reviewed:` n'avaient aucun badge sur la nouvelle vue. Un test ne
+prouve rien sur ce que ses captures ne contiennent pas.)
+
 Les capturer dans chaque vue qui affiche des commentaires. (Premier usage : les trois
 commentaires publiés pour l'état 3 tenaient chacun sur une ligne ; la question du propriétaire —
 « c'est prévu que tu fasses des tests avec un commentaire conventionnel avec body aussi ? » — a
@@ -260,6 +271,17 @@ voient pas — premier usage, GitLab, trois défauts trouvés ainsi :
   dépend de la forme de la page est une décision de PLATEFORME : si le code partagé la prend
   seul, c'est un manque du contrat, et l'adaptateur doit pouvoir y répondre — le filtre de fils
   tombait au milieu du diff, le contrat a reçu `getThreadFilterMount()`.
+**L'audit croisé sur PR réelles, AVANT de montrer quoi que ce soit au propriétaire.** Les captures
+et les tests ne couvrent que ce qu'on a pensé à capturer. Extension active, en lecture seule, sur
+une quinzaine de PR réelles et VARIÉES de la plateforme (revues en lot, réponses, suggestions, fils
+résolus et obsolètes, bots, PR ouvertes et fermées), un script relève pour CHAQUE corps de
+commentaire rendu : son genre (ancêtre porteur d'identifiant), si sa ligne de préfixe (§3.4.1)
+porte un label, et si l'extension y a posé un badge. Tout corps préfixé sans badge est un défaut.
+Quand la plateforme a plusieurs vues d'une même page, l'audit compare les vues : la vue déjà
+validée sert de référence, et tout écart est un défaut de la nouvelle. Le tableau complet — PR,
+vue, genre, préfixe, badge — est remis au propriétaire tel quel, défauts compris ; chaque genre
+défaillant reçoit ensuite sa capture, son correctif, son test et sa preuve par retrait.
+
 L'interception (blocage d'un envoi) ne se valide que configuration LUE : en état dégradé
 (§5.4), l'extension assiste sans bloquer, et ce qu'on voit ne dit rien du blocage.
 

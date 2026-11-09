@@ -353,8 +353,13 @@ export const selectors = {
       // lirait jamais ; mais la réduction des captures retire leur requête, et ce candidat,
       // comparé sur la page entière, lisait un `href` changé : la capture était refusée. MESURÉ le
       // 2026-11-09 (`03-overview-commentaires-prefixes.html`) ; le candidat gagnant reste le même,
-      // fil par fil, sur toutes les captures antérieures.
-      'a[href*="#"]:not([href$="#overview-comments"])',
+      // fil par fil, sur toutes les captures antérieures. Le second `:not(…)`, pour la même raison
+      // le même jour (`03-overview-corps-de-revue-publies.html`, PR 530) : l'en-tête d'un fil
+      // résolu replié porte des liens de FICHIER `…/pull/N/changes/<sha>?new_files_changed=…#r…`,
+      // hors du fil. Exclus par leur chemin, que la réduction garde — jamais par leur requête,
+      // qu'elle retire. Un permalien de commentaire s'écrit `…/changes#r…`, sans barre après.
+      // Candidat gagnant et `href` lu identiques, fil par fil, sur toutes les captures.
+      'a[href*="#"]:not([href$="#overview-comments"]):not([href*="/changes/"])',
     ],
   } satisfies SelectorChain,
 
@@ -875,6 +880,21 @@ export const selectors = {
     candidates: ['article[id^="issuecomment-"]'],
   } satisfies SelectorChain,
 
+  /** Le CORPS d'une revue soumise en lot (un `reviewed:`, un `note:` de revue) :
+   * `article[id^="pullrequestreview-"]`, MESURÉ le 2026-11-09 sur
+   * `03-overview-corps-de-revue-publies.html` (PR 530). Ni un commentaire général, ni un fil : la
+   * première version de ce bloc l'ignorait, et l'audit croisé des deux vues sur onze PR réelles a
+   * relevé 0 badge sur 18 corps de revue préfixés dans l'Overview, contre 18 sur 18 dans la vue
+   * classique. Son champ d'édition est DEDANS (`06-overview-modification-corps-de-revue.html`,
+   * boutons *Cancel* et *Update review*) : zone `review-body`, et non le repli `thread-root`.
+   *
+   * Aucun recouvrement avec les fils : l'`article` d'un fil n'a pas d'`id`, c'est le GROUPE autour
+   * qui porte `pullrequestreview-…` (`overviewThreadGroup`), et ce groupe est un `div`. */
+  overviewReviewBody: {
+    name: 'overview-review-body',
+    candidates: ['article[id^="pullrequestreview-"]'],
+  } satisfies SelectorChain,
+
   /** La description de la PR — hors périmètre (§4.1), comme `prDescription` sur la vue classique.
    * MESURÉ : `section[aria-label="Description"]` sur toutes les captures Overview, qui contient le
    * corps rendu de la description et rien d'autre. Son ÉDITION n'a pas été capturée : l'exclusion
@@ -933,6 +953,7 @@ export const selectors = {
     problem: 'comment-text',
     candidates: [
       'article[id^="issuecomment-"] .markdown-body[class*="safe-html-box__"], ' +
+        'article[id^="pullrequestreview-"] .markdown-body[class*="safe-html-box__"], ' +
         '[data-testid="review-thread"] [class*="SafeHTMLBox__"]',
     ],
   } satisfies SelectorChain,

@@ -96,6 +96,7 @@ close the PR or resolve the thread without a comment, and the guard never blocks
 | Edit of a general comment | `article[id^="issuecomment-"]` | `conversation`, `edit`; `commentId` = the article's `id` |
 | Edit of a thread root / reply | inside `[data-testid="review-thread"]`, in the comment's `div[id^="discussion_r"]` | `thread-root` / `reply`, `edit` — the shared code path, as on Files changed |
 | Review body | the panel overlay | `review-body`, `compose` |
+| Edit of a published review body | `article[id^="pullrequestreview-"]` (capture `06-…-corps-de-revue`, PR 530; *Cancel*, *Update review*) | `review-body`, `edit`; `commentId` = the article's `id` |
 
 The group carries the REVIEW id (`pullrequestreview-…`), not the thread id. Permalinks on the
 Overview read `#discussion_r…`, like the classic view (Files changed writes `#r…`).
@@ -104,6 +105,9 @@ Overview read `#discussion_r…`, like the classic view (Files changed writes `#
 
 - General comment body: `article[id^="issuecomment-"] .markdown-body.safe-html-box__…`.
 - Thread comment body: `[data-testid="review-thread"] .SafeHTMLBox__…`.
+- Published review body (a review submitted with a text, e.g. `reviewed:`):
+  `article[id^="pullrequestreview-"] .markdown-body.safe-html-box__…` (PR 530). The group around a
+  line thread also carries `pullrequestreview-…`, but it is a `div`, and its `article` has no `id`.
 - PR description: `section[aria-label="Description"] .markdown-body.safe-html-box__…` — in no
   `article`, hence excluded by construction.
 
@@ -124,6 +128,23 @@ every earlier capture.
 | Classic (03 `-pr-ouverte`) | `[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-variant="primary"]`, *Rebase and merge* | merged/closed/draft (`prSettledState`); a failing required check: mergeability icon `aria-label="Checks failing"` (diagnostic skeleton of #113) — nominal |
 | Overview (03) | `[data-testid="for-you-item-row"][data-item-id="ready-to-merge"] button[data-variant="primary"]`, *Rebase and merge* | checks running: row `data-item-id="pending-checks"`, only *Enable auto-merge (rebase)*, `default` (01) — nominal; merged (08) |
 | Files changed (04 `-pr-ouverte`) | none, on an open PR | always — the tab is not probed (#103) |
+
+## Cross-view audit on real pull requests (2026-11-09)
+
+The first capture series had no published review body, and every test passed. The owner found
+the gap at validation. A scripted, read-only audit then ran with the extension enabled on 11
+closed or open PRs of `just-dummies` (#132, #173, #198, #331, #342, #424, #508, #530, #537, #548),
+in both views: for every rendered Markdown body, its kind, whether its prefix line (§3.4.1) holds a
+label, and whether a badge was set — reading the page, not the adapter's selectors.
+
+| Kind | Overview | Classic |
+|---|---|---|
+| general comment | 20/20 | 20/20 |
+| thread comment | 6/6 | 6/6 |
+| **review body** | **0/18** before the fix | 18/18 |
+
+No badge on an unprefixed body. Collapsed (resolved or outdated) threads render no body until
+expanded, in either view, and are not counted.
 
 ## Not measured
 

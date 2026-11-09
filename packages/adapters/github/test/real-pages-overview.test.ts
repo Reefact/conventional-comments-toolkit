@@ -20,6 +20,7 @@ import { editorOf, load, submitLabels, T } from './helpers/real-pages.js';
 
 const PR548 = '/Reefact/just-dummies/pull/548';
 const PR547 = '/Reefact/just-dummies/pull/547';
+const PR530 = '/Reefact/just-dummies/pull/530';
 
 /** L'éditeur dont le champ contient ce texte — un champ d'édition est prérempli, mais la valeur
  * d'une `<textarea>` n'est pas dans le HTML capturé : on le désigne par son contexte. */
@@ -197,5 +198,38 @@ describe('§5.5 — Overview : aperçu d’une modification (capture 09)', () =>
     const rendered = page.adapter.getRenderedComments().map((c) => c.element);
     expect(rendered).toContain(preview);
     expect(page.adapter.getRenderedCommentElements()).toContain(preview);
+  }, T);
+});
+
+describe('§4.1, §5.5 — Overview : corps de revue soumis en lot (captures de la PR 530)', () => {
+  // L'audit croisé des deux vues sur onze PR réelles (2026-11-09) : 0 badge sur 18 corps de revue
+  // préfixés dans l'Overview, 18 sur 18 dans la vue classique. Aucune capture de la première série
+  // ne contenait de revue publiée avec un corps.
+  const REVIEWED = 'reviewed: the rare-seed sweep now reports failures from every step';
+  const NOTE = 'note: The documentation review remains open pending the inline finding.';
+
+  it('rend les corps de revue pour les badges, comme la vue classique', () => {
+    const page = load('03-overview-corps-de-revue-publies.html', PR530);
+    const firstLines = page.adapter.getRenderedComments().map((c) => c.bodyText.trim().split('\n')[0]);
+    expect(firstLines).toContain(REVIEWED);
+    expect(firstLines).toContain(NOTE);
+  }, T);
+
+  it('la vue classique de la même PR, référence de cette comparaison', () => {
+    const page = load('03-conversation-corps-de-revue-publies.html', PR530); // CLASSIQUE
+    const firstLines = page.adapter.getRenderedComments().map((c) => c.bodyText.trim().split('\n')[0]);
+    expect(firstLines).toContain(REVIEWED);
+    expect(firstLines).toContain(NOTE);
+  }, T);
+
+  it("l'édition d'un corps de revue : zone review-body, son identifiant, « Update review »", () => {
+    const page = load('06-overview-modification-corps-de-revue.html', PR530);
+    const editor = editorWhere(page, (c) => c.action === 'edit');
+    expect(editor.context).toMatchObject({
+      zone: 'review-body',
+      commentId: 'pullrequestreview-5788962752',
+      canCarryBlockingState: false,
+    });
+    expect(submitLabels(page, editor)).toEqual(['Update review']);
   }, T);
 });

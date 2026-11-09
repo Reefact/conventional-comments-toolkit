@@ -44,7 +44,7 @@ import {
   inClassicPrDescription,
 } from './classic.js';
 import { configCredentials } from './descriptor.js';
-import { inOverviewPrDescription, overviewCompletion, overviewContext } from './overview.js';
+import { inOverviewPrDescription, overviewCompletion, overviewContext, overviewResolution } from './overview.js';
 import { selectors } from './selectors.js';
 import { ALL_EDITORS, SURFACES, type GithubSurface } from './surfaces.js';
 import { githubView, isPullRequestPath } from './view.js';
@@ -505,7 +505,8 @@ export class GithubClientAdapter implements PlatformAdapter {
    * Conversation), puis les marqueurs rendus dedans ou à côté. `unknown` seulement quand la
    * page ne rend l'état nulle part (§9.2.3). */
   #resolution(thread: Element): ThreadInfo['resolution'] {
-    const declared = classicResolutionFlag(thread);
+    const declared =
+      githubView(this.#doc) === 'overview' ? overviewResolution(thread) : classicResolutionFlag(thread);
     if (declared) return declared;
     const marker = queryChain(thread, selectors.resolvedMarker).element ?? this.#resolvedMarkerBeside(thread);
     return marker ? 'resolved' : 'unknown';

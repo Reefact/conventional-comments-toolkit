@@ -172,8 +172,11 @@ Chromium in both views.
 
 ## Not measured
 
-- **Resolution state of an Overview thread.** No capture shows a resolved thread on the Overview;
-  `getThreads()` reads `resolution: 'unknown'` there, which the banner counts as unresolved.
+- ~~Resolution state of an Overview thread~~ — **measured 2026-11-09.** An open thread's group
+  carries a button named `Resolve conversation in …` (captures 02 and 03 of PR 548), and now reads
+  `unresolved`. A resolved thread is not rendered as a thread at all, only referenced inside its
+  review body with `Unresolve conversation in …` (PR 530; checked in Chromium by expanding it), so
+  it never enters `getThreads()`.
 - **Editing the PR description on the Overview.** The exclusion rests on the ancestor
   `section[aria-label="Description"]`, not on the field.
 - **Merge states other than ready / checks running / checks failing:** conflicts, review

@@ -885,6 +885,26 @@ export const selectors = {
     candidates: ['[data-testid="review-thread-focus-target"]'],
   } satisfies SelectorChain,
 
+  /** L'état de résolution d'un fil de l'Overview, que son GROUPE porte dans le nom accessible d'un
+   * bouton — évalué dans le groupe (`overviewThreadGroup`), jamais sur la page entière.
+   *
+   * MESURÉ le 2026-11-09. Un fil OUVERT est rendu, et son groupe porte « Resolve conversation in
+   * <fichier>… » (captures 02 et 03 de la PR 548, deux groupes chacune). Un fil RÉSOLU n'est PAS
+   * rendu comme fil — ni déplié, ni sur demande : une référence dans le corps de sa revue, sans
+   * `[data-testid="review-thread"]` — et porte « Unresolve conversation in … »
+   * (`03-overview-corps-de-revue-publies.html`, PR 530 ; vérifié dans Chromium en le dépliant).
+   * Sans ces deux sondes, les fils de l'Overview se lisaient `unknown`, que le repli local du
+   * bandeau compte comme non résolus (§5.5). Des noms accessibles, posés exprès ; GitHub ne
+   * traduit pas son interface. */
+  overviewThreadResolvedFlag: {
+    name: 'overview-thread-resolved-flag',
+    candidates: ['button[aria-label^="Unresolve conversation in "]'],
+  } satisfies SelectorChain,
+  overviewThreadUnresolvedFlag: {
+    name: 'overview-thread-unresolved-flag',
+    candidates: ['button[aria-label^="Resolve conversation in "]'],
+  } satisfies SelectorChain,
+
   /** Un commentaire de fil, porteur de son identifiant : `div[id^="discussion_r"]`, MESURÉ sur
    * les captures 02, 03 et 06 (`…-fil-racine`, `…-fil-reponse`). Le PREMIER d'un groupe est la
    * racine du fil, et son `id` est l'identifiant du fil — même forme que sur la vue classique

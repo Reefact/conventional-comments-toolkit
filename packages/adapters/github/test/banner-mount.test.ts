@@ -15,8 +15,14 @@ import { PAGES, T } from './helpers/real-pages.js';
 describe('§5.5 — le point d’insertion du bandeau', () => {
   it.each(readdirSync(PAGES).filter((f) => f.endsWith('.html')))('%s : l’en-tête qui porte le titre', (file) => {
     const doc = new DOMParser().parseFromString(readFileSync(join(PAGES, file), 'utf8'), 'text/html');
+    Object.defineProperty(doc, 'location', { value: new URL('https://github.com/Reefact/just-dummies/pull/548'), configurable: true });
     const mount = new GithubClientAdapter({ documentRef: doc }).getBannerMount();
-    expect(mount?.tagName).toBe('HEADER');
-    expect(mount?.querySelector('h1')).not.toBeNull();
+    if (file.includes('-overview-')) {
+      // Sur l'Overview : après la carte d'état de la PR, dans la colonne du contenu.
+      expect(mount?.className).toContain('CondensedForYouContainer__');
+    } else {
+      expect(mount?.tagName).toBe('HEADER');
+      expect(mount?.querySelector('h1')).not.toBeNull();
+    }
   }, T);
 });

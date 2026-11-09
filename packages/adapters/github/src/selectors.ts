@@ -957,4 +957,21 @@ export const selectors = {
     name: 'overview-not-mergeable',
     candidates: ['[data-testid="for-you-item-row"][data-item-id="pending-checks"]'],
   } satisfies SelectorChain,
+
+  /** Élément après lequel insérer le bandeau du §5.5 sur l'Overview.
+   *
+   * Le candidat commun de `bannerMount`, l'en-tête de page, y est la bonne place VERTICALE mais
+   * pas la bonne largeur : MESURÉ le 2026-11-09 dans Chromium, extension chargée, l'en-tête
+   * occupe toute la fenêtre (x = 32) et centre son contenu en lui-même, quand la colonne du
+   * contenu commence à x = 275 — le bandeau collait au bord gauche. Sur la Conversation classique,
+   * le même en-tête est déjà contraint à la colonne, et le bandeau y est aligné.
+   *
+   * La colonne de l'Overview s'ouvre sur un `div.position-absolute` sans rôle (aucune prise), puis
+   * sur la carte d'état de la PR — fusion, checks, commentaires, approbations —,
+   * `[class*="CondensedForYouContainer__"]`, présente sur les 11 captures Overview, PR ouverte comme
+   * fusionnée. Le bandeau va juste après elle : en tête de la PR, avant sa description. */
+  overviewBannerMount: {
+    name: 'banner-mount',
+    candidates: ['[class*="CondensedForYouContainer__"]'],
+  } satisfies SelectorChain,
 };

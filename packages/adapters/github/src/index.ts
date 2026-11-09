@@ -653,6 +653,12 @@ export class GithubClientAdapter implements PlatformAdapter {
   /** Élément après lequel insérer le bandeau (§5.5, §9.2.3). Null quand rien n'apparie :
    * l'appelant se replie sur le haut du document plutôt que de ne rien afficher. */
   getBannerMount(): Element | null {
+    // L'Overview a sa propre place : son en-tête n'est pas contraint à la colonne du contenu
+    // (`overviewBannerMount`). L'en-tête commun reste son repli.
+    if (githubView(this.#doc) === 'overview') {
+      const own = queryChain(this.#doc, selectors.overviewBannerMount).element;
+      if (own) return own;
+    }
     return queryChain(this.#doc, selectors.bannerMount).element;
   }
 

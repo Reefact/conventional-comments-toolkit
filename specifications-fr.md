@@ -2054,10 +2054,10 @@ Couvre Azure DevOps Services et Azure DevOps Server.
 
 ### B.2 Éditeur et écriture programmatique
 
-- Éditeur : **à établir par le spike** (§14, `P1'`). L'hypothèse de travail est un éditeur riche piloté par un état applicatif interne plutôt qu'un simple `<textarea>`, mais elle n'est pas vérifiée — et la documentation Microsoft présente l'éditeur de commentaires de PR comme un éditeur Markdown aligné sur le reste du produit, ce qui n'est pas concluant dans un sens ou dans l'autre. **La première tâche du spike est de déterminer le type d'élément**, pas seulement la méthode d'écriture.
-- Écriture programmatique : dès lors que l'éditeur est piloté par un état applicatif, l'affectation directe de `value` ne suffit pas — voir la stratégie commune décrite en §9.3, qui s'applique à toutes les plateformes.
+- Éditeur : **une `<textarea>` Markdown**, dans toutes les zones — nouveau commentaire général, réponse, commentaire de ligne, modification —, mesuré sur un vrai tenant le 2026-11-09 (`packages/adapters/azdo/CAPTURES.md`). L'hypothèse d'un éditeur riche n'est pas vérifiée : aucune bascule vers un éditeur riche n'existe dans la barre d'outils, dont toutes les commandes n'écrivent que du texte. Chaque éditeur porte une **seconde** `<textarea>`, cachée, qui recopie la saisie pour calculer la hauteur : ce n'est pas un champ. Avant le clic, le champ général et chaque champ de réponse sont un `<input>` de façade, que le clic remplace par l'éditeur.
+- Écriture programmatique : la `<textarea>` est contrôlée par l'application de la page, si bien que l'affectation directe de `value` ne suffit pas — la stratégie commune du §9.3 s'applique, et c'est celle de l'adaptateur.
 
-**Risque à lever :** si l'éditeur est bien piloté par un état applicatif interne, l'écriture programmatique présente un **risque de désynchronisation entre le DOM et cet état** — l'affichage peut sembler correct alors que le contenu soumis à la plateforme diverge.
+**Risque de désynchronisation entre le DOM et l'état de la page — levé pour l'état, pas pour l'envoi.** Mesuré le 2026-11-09 : sur un champ vide, l'écriture par la stratégie du §9.3 (un préfixe inséré par la barre d'outils) a été vue par la page — son bouton *Comment*, inactif champ vide, est devenu actif, et la `<textarea>` cachée a recopié la valeur écrite. Le contenu effectivement PUBLIÉ après une écriture programmatique, lui, n'a pas été mesuré : aucun envoi n'a été fait pendant la validation. Le risque reste donc ouvert sur ce seul point, et se vérifie au premier envoi réel.
 
 ### B.3 Navigation
 

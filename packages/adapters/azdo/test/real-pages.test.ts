@@ -161,10 +161,22 @@ describe('§5.5, §9.2.3 — Overview : commentaires publiés (capture 03)', () 
     expect(bodies.some((b) => b.includes('Test pull request for Conventional Comments'))).toBe(false);
   });
 
-  it('bandeau sous l’en-tête, filtre avant le premier fil, bouton Complete', () => {
+  it('bandeau sous l’en-tête, bouton Complete', () => {
     expect(page.adapter.getBannerMount()?.classList.contains('repos-pr-header')).toBe(true);
-    expect(page.adapter.getThreadFilterMount()).toBe(page.adapter.getRenderedThreadElements()[0]!.element);
     expect(page.adapter.getCompletionControl()?.element.textContent?.trim()).toBe('Complete');
+  });
+
+  it('filtre AVANT le fil d’activité, jamais dans la carte d’un fil (validation du propriétaire, 2026-11-09)', () => {
+    const mount = page.adapter.getThreadFilterMount()!;
+    expect(mount.tagName).toBe('TABLE');
+    expect(mount.classList.contains('activity-feed-list')).toBe(true);
+    expect(mount.closest('.bolt-card')).toBeNull();
+  });
+
+  it('ce que le filtre masque : la LIGNE du fil d’activité, carte comprise, une par fil', () => {
+    const rows = page.adapter.getRenderedThreadElements();
+    expect(rows.map((r) => r.element.tagName)).toEqual(['TR', 'TR', 'TR', 'TR', 'TR']);
+    expect(rows.every((r) => r.element.querySelectorAll('.repos-discussion-thread').length === 1)).toBe(true);
   });
 
   it('la date de création est celle de la dernière ligne du fil d’activité', () => {

@@ -233,6 +233,23 @@ export const selectors = {
     candidates: ['tr.bolt-timeline-last-row time.activity-card-time[datetime]'],
   } satisfies SelectorChain,
 
+  /** Le FIL D'ACTIVITÉ de l'Overview — un tableau dont chaque ligne est un événement ou un fil
+   * (01, 02, 03, 06, 08). Le filtre du §5.5 se pose AVANT lui : posé avant le premier fil, il
+   * tombait DANS la carte de ce fil, une rangée flex, ses boutons étirés en pastilles verticales
+   * à gauche du commentaire (validation du propriétaire, 2026-11-09). */
+  activityFeed: {
+    name: 'activity-feed',
+    candidates: ['table.activity-feed-list'],
+  } satisfies SelectorChain,
+
+  /** Ligne du fil d'activité qui CONTIENT un fil (03) — carte, frise et fil compris. C'est elle
+   * que le filtre masque dans l'Overview : masquer le seul `thread` laisserait la carte vide et
+   * le point de la frise. Absente de Files, où le fil est intercalé dans le diff. */
+  timelineRow: {
+    name: 'timeline-row',
+    candidates: ['tr.bolt-timeline-row'],
+  } satisfies SelectorChain,
+
   /** Carte d'un fil dans le fil d'activité (03) — l'événement de création n'en a pas. Sert à
    * écarter de `prCreatedAt` la date d'en-tête d'un fil. */
   activityCard: {

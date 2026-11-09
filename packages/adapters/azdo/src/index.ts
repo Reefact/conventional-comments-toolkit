@@ -298,16 +298,22 @@ export class AzdoClientAdapter implements PlatformAdapter {
     return queryChain(this.#doc, selectors.bannerMount).element;
   }
 
-  /** §5.5 — dans l'Overview, avant le premier fil publié : les fils y forment le fil d'activité.
-   * Dans Files, AUCUN filtre (`null`) : les fils y sont intercalés dans le diff, et un filtre
-   * posé avant le premier tomberait au milieu du code (même décision que GitLab, 2026-11-08). */
+  /** §5.5 — dans l'Overview, avant le fil d'activité (selectors.ts, `activityFeed`) : posé avant
+   * le premier fil, il tombait dans la carte de ce fil. Dans Files, AUCUN filtre (`null`) : les
+   * fils y sont intercalés dans le diff (même décision que GitLab, 2026-11-08). */
   getThreadFilterMount(): Element | null {
     if (this.#isFilesView()) return null;
-    return this.#publishedThreads()[0]?.element ?? null;
+    return queryChain(this.#doc, selectors.activityFeed).element;
   }
 
+  /** Ce que le filtre MASQUE : dans l'Overview, la ligne du fil d'activité qui porte le fil —
+   * carte et frise comprises —, ailleurs le fil lui-même (selectors.ts, `timelineRow`). Les
+   * identifiants restent ceux de `getThreads()`. */
   getRenderedThreadElements(): { id: string; element: Element }[] {
-    return this.#publishedThreads();
+    return this.#publishedThreads().map(({ id, element }) => ({
+      id,
+      element: closestChain(element, selectors.timelineRow).element ?? element,
+    }));
   }
 
   currentPr(): PrRef | null {

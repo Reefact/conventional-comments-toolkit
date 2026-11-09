@@ -397,6 +397,19 @@ describe('§C.5 — Fil résolu', () => {
     expect(rendered.every((t) => known.has(t.id))).toBe(true);
   }, T);
 
+  it('Overview : le filtre se place avant le premier fil, même replié (§5.5)', () => {
+    // La capture n'a pas de fil replié en tête : on y remet le sien, déplacé tel quel dans la
+    // même liste d'activité (ses voisins sont les éléments de la même liste).
+    const page = load('03-overview-fil-resolu.html', MR1);
+    const collapsed = page.doc.querySelector('[data-discussion-resolved="true"]')!;
+    const firstItem = page.doc.querySelector('[data-testid="discussion-content"]')!.closest('li')!;
+    const collapsedItem = collapsed.closest('li')!;
+    expect(collapsedItem.parentElement).toBe(firstItem.parentElement);
+    firstItem.before(collapsedItem);
+    expect(page.adapter.getRenderedThreadElements()[0]!.element).not.toBe(collapsed);
+    expect(page.adapter.getThreadFilterMount()).toBe(collapsed);
+  }, T);
+
   it('Rapid Diffs : un fil résolu n’est pas dans la page — il n’est pas lu, ni compté résolu (03-changes-fil-resolu)', async () => {
     const page = load('03-changes-fil-resolu.html', `${MR1}/diffs`);
     const threads = await page.adapter.getThreads();

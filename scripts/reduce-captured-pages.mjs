@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url';
 // Réduit EN PLACE les pages capturées d'une plateforme à leur forme stockable
 // (`scripts/lib/captured-page-reducer.mjs` dit ce qu'elle garde, et pourquoi une liste blanche).
 //
@@ -31,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describeMismatch, reduceAndVerify, reducePage, reductionMismatches } from './lib/captured-page-reducer.mjs';
 import { InputsError, loadReductionInputs } from './lib/captured-page-inputs.mjs';
 import { findCapturedPageSecrets } from './lib/captured-page-secrets.mjs';

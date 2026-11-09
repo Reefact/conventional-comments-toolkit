@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url';
 // Garde des pages capturées : aucune ne doit porter un secret de session non masqué
 // (scripts/lib/captured-page-secrets.mjs dit lesquels et pourquoi).
 //
@@ -17,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { findCapturedPageSecrets, redactCapturedPage, sharedOpaqueFields } from './lib/captured-page-secrets.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));

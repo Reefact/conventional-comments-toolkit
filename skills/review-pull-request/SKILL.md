@@ -235,6 +235,9 @@ Never copy one of these examples as is, and never let the sentence claim more th
 review: examine the new changes, and post a new `reviewed` only once every closing condition
 holds again.
 
+`reviewed` is your last comment on the state it covers. A recap of a pass belongs before it,
+never after: posted after it, it reads as if the review had reopened.
+
 `reviewed` is not an approval. Do not use GitHub's *Approve* or *Request changes* states: publish
 your review as comments only. Approving and merging belong to the humans responsible for the
 pull request.
@@ -247,6 +250,15 @@ for the review. Do not change the code and do not merge.
 After each pass, report: the new findings with their priority, the fixes you verified, the points
 still open, what you could not check, and the state of your review — **open**, or **closed with
 `reviewed`**.
+
+**A review body is a comment too.** The body of a submitted review, or any recap of a pass you
+publish, starts with a label like every other comment. It raises no finding: use the label whose
+`description` or `usage` in the repository's configuration says it is for recaps, if there is
+one, and `note` otherwise. It never stands in for `reviewed`.
+
+**Correct a comment by editing it, not by posting it again.** A duplicate leaves two versions on
+the pull request, and the later one lands out of order. Where you cannot edit it, say so to
+whoever you work for rather than posting a restatement.
 
 Never claim to have published, run or verified something you have not.
 

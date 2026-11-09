@@ -247,3 +247,26 @@ describe('§5.5 — le filtre de fils se place au niveau de la LISTE, hors des b
     expect(mount?.parentElement?.closest(item)).toBeNull();
   }, T);
 });
+
+describe('§6.3.1, §6.5 — la ligne cc/1 se relit dans le titre d’un check (captures de la PR 551)', () => {
+  // Aucun vérificateur ne publie encore sur un dépôt mesuré : la ligne est substituée au titre que
+  // CodeQL a réellement publié, à l'endroit exact où GitHub le rend, listes de checks dépliées.
+  const LINE =
+    'cc/1 state=failure draft=0 exempt=0 mode=enforce activated=- core=1.0.0 cfg=deadbeef t=2 c=1 w=0';
+  it.each([
+    ['03-overview-checks-deplies.html'],
+    ['03-conversation-checks-deplies.html'], // CLASSIQUE
+  ])('%s : lue dans le titre rendu, état du check en tête', (file) => {
+    const page = load(file, '/Reefact/just-dummies/pull/551');
+    const title = Array.from(page.doc.querySelectorAll('[class*="titleDescription__"]')).find((e) =>
+      e.textContent?.includes('No new alerts in code changed by this pull request')
+    )!;
+    title.textContent = `Successful in 5s — ${LINE}`;
+    expect(page.adapter.readPublishedResult()).toMatchObject({
+      state: 'failure',
+      mode: 'enforce',
+      unresolvedBlockingCount: 2,
+      nonCompliantCommentCount: 1,
+    });
+  }, T);
+});

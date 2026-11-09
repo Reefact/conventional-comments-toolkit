@@ -188,7 +188,8 @@ export class AzdoClientAdapter implements PlatformAdapter {
     return this.#publishedThreads().map(({ id, element }) => {
       const [root, ...replies] = queryChainAll(element, selectors.comment);
       // Tout fil d'Azure DevOps a un état et un bouton *Resolve* — le commentaire général comme
-      // le fil de ligne (03) : tous portent un état bloquant (§4.1).
+      // le fil de ligne (03) : tous portent un état bloquant. Pour le commentaire général, c'est
+      // une exception au §4.1, décidée par le propriétaire et écrite au §B.6 (2026-11-10).
       return {
         id,
         pr,
@@ -381,7 +382,8 @@ export class AzdoClientAdapter implements PlatformAdapter {
     }
     // Commentaire général : sur Azure DevOps, c'est un FIL, avec un état et un bouton *Resolve*
     // (03, les fils 1 à 4) — il porte donc un état bloquant, comme sur GitLab et contrairement à
-    // GitHub.
+    // GitHub. Exception au §4.1, décision du propriétaire écrite au §B.6 (2026-11-10, revue de
+    // la PR #146).
     return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
   }
 }

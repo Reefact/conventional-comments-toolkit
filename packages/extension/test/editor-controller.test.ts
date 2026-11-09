@@ -30,7 +30,7 @@ function setup(
 ) {
   const host = document.createElement('div');
   const textarea = document.createElement('textarea');
-  const submit = document.createElement('button');
+  let submit = document.createElement('button');
   submit.type = 'submit';
   host.append(textarea, submit);
   document.body.appendChild(host);
@@ -78,6 +78,15 @@ function setup(
     textarea,
     submit,
     host,
+    /** Remplace le bouton par un NOUVEL élément, comme React le fait sur la page Overview de
+     * GitHub quand le champ se remplit ; l'adaptateur répond ensuite par le nouveau. */
+    replaceSubmit: (): HTMLButtonElement => {
+      const next = document.createElement('button');
+      next.type = 'submit';
+      submit.replaceWith(next);
+      submit = next;
+      return next;
+    },
     /** Ce que l'adaptateur répondra au prochain `attach()` — `null` valant « je ne me
      * prononce pas », la seule réponse d'une plateforme non mesurée. */
     setFramedContainer: (el: Element | null) => {
@@ -187,6 +196,24 @@ describe('§5 — contrôleur d’éditeur', () => {
     submit.addEventListener('click', () => (clicked = true));
     submit.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
     expect(clicked).toBe(false); // interception en capture
+    controller.dispose();
+  });
+
+  it('§5.4 : un bouton RECRÉÉ par la page après attach() reste intercepté', async () => {
+    // MESURÉ le 2026-11-09 sur la page Overview de GitHub : React remplace l'élément du bouton
+    // *Comment* quand le champ se remplit. Un écouteur posé à attach() restait sur l'ancien, et
+    // un commentaire non conforme se publiait d'un clic sous `enforce`.
+    const { controller, textarea, replaceSubmit } = setup('enforce');
+    controller.attach();
+    const fresh = replaceSubmit();
+    writeToTextField(textarea, 'pas de label ici');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    expect(fresh.getAttribute('aria-disabled')).toBe('true');
+    let clicked = false;
+    fresh.addEventListener('click', () => (clicked = true));
+    const notCanceled = fresh.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(clicked).toBe(false);
+    expect(notCanceled).toBe(false);
     controller.dispose();
   });
 

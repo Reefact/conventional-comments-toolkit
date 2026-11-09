@@ -62,6 +62,17 @@ export const selectors = {
     candidates: ['.markdown-content'],
   } satisfies SelectorChain,
 
+  /** APERÇU d'un commentaire en cours de rédaction (§5.5) — Azure DevOps le rend EN DIRECT sous
+   * l'éditeur dès que le champ a du texte, sans onglet *Preview* : un `.markdown-content` dans la
+   * rangée de l'éditeur (01-, 02-, 04-, 05-…-rempli), absent champ vide (01, 02, 04, 05). En
+   * MODIFICATION, l'aperçu est le corps affiché dans le commentaire modifié (06) : `commentBody`
+   * le lit déjà. (Validation du propriétaire, 2026-11-09 : l'état 9 avait d'abord été déclaré
+   * « sans objet », faute d'onglet.) */
+  previewBody: {
+    name: 'preview-body',
+    candidates: ['.repos-discussion-thread-reply .markdown-content'],
+  } satisfies SelectorChain,
+
   /** Bouton « Copy to clipboard » qu'Azure DevOps pose DANS le corps rendu, avant chaque bloc de
    * code (03, le commentaire à code cité) : son texte précéderait la ligne de préfixe à la
    * lecture du corps. Retiré du texte lu, jamais de la page. */

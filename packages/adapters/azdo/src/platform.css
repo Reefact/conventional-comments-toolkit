@@ -1,26 +1,52 @@
-/* Ce que les rôles de rendu de l'extension valent SUR AZURE DEVOPS (§B).
+/* Ce que les rôles de rendu de l'extension valent SUR AZURE DEVOPS (annexe B).
 
-   **Aucun jeton de THÈME n'est déclaré ici, et ce vide est une réponse.**
+   Ce fichier est la seule chose du produit qui connaisse le nom d'un jeton d'Azure DevOps. Les
+   jetons ci-dessous ont été RELEVÉS sur une vraie page de PR de dev.azure.com (2026-11-09, thème
+   sombre `ms-vss-web-vsts-theme-dark` sur `<body>`), lus par `getComputedStyle` sur la racine, et
+   choisis d'après les règles de la feuille d'Azure DevOps elle-même — `.bolt-button` prend son fond
+   dans `--palette-black-alpha-6` et son texte dans `--text-primary-color`, `.bolt-button.primary`
+   dans `--communication-background` et `--text-on-communication-background`, `.bolt-textfield`
+   dans `--background-color` et `--text-secondary-color`. Jamais rappelés de mémoire. La version
+   précédente de ce fichier n'en déclarait aucun : les boutons de la barre d'outils tombaient sur
+   les mots-clés système de la feuille partagée (`ButtonFace`), des pastilles gris clair sur le thème
+   sombre (validation du propriétaire, 2026-11-09).
 
-   Azure DevOps a ses propres jetons de thème. Les nommer ici de mémoire serait exactement la
-   faute que la scission des feuilles corrige : ce dépôt a déjà écrit trois affirmations sur le
-   navigateur qui se sont révélées fausses, et la règle qui en est sortie est qu'une
-   affirmation sur une plateforme se VÉRIFIE, elle ne se rappelle pas. Aucun jeton d'Azure
-   DevOps n'a été observé depuis ce dépôt.
+   Les NOMS sont relevés en thème sombre. Les replis que la feuille d'Azure DevOps écrit pour ces
+   mêmes noms sont des valeurs CLAIRES (`--text-primary-color` replié sur `rgba(0,0,0,.9)`) : les
+   mêmes noms servent vraisemblablement aux deux thèmes — à vérifier en thème clair. D'ici là, si
+   l'un manquait, le repli littéral ci-dessous (celui de la feuille partagée) s'appliquerait.
 
-   Sans surcharge de thème, les valeurs neutres de la feuille partagée s'appliquent — mots-clés
-   système (`ButtonFace`, `Highlight`, `Canvas`, `currentColor`) qui suivent le thème du système
-   d'exploitation et le mode sombre. C'est EXACTEMENT ce que l'extension rendait sur Azure
-   DevOps avant la scission, puisque aucun jeton Primer n'y était défini et que seul le dernier
-   repli s'appliquait.
+   AUCUNE ÉTOILE SUIVIE D'UNE BARRE OBLIQUE dans ce commentaire (scripts/check-extension-css.mjs). */
+:root[data-cct-platform='azdo'] {
+  /* Contrôles — le bouton ordinaire d'Azure DevOps (*Resolve*, *Show everything*) : un voile à 8 %
+     en thème sombre, `rgba(255, 255, 255, 0.08)`, sans bordure visible. La bordure de nos
+     contrôles prend la bordure discrète du thème, du même ordre. */
+  --cct-control-bg: var(--palette-black-alpha-6, ButtonFace);
+  --cct-control-border: var(--border-subtle-color, currentColor);
+  --cct-fg-on-control: var(--text-primary-color, ButtonText);
 
-   Ce qu'il faut faire pour l'améliorer, quand quelqu'un aura accès à un vrai tenant
-   (A-FAIRE-fr.md, point 9) : relever les jetons de thème sur une page de PR réelle, en mode
-   clair ET en mode sombre, puis les déclarer ci-dessous sur le modèle de la feuille GitHub.
+  /* Texte et surfaces. */
+  --cct-fg-default: var(--text-primary-color, currentColor);
+  --cct-fg-muted: var(--text-secondary-color, currentColor);
+  --cct-surface-bg: var(--background-color, transparent);
+  --cct-overlay-bg: var(--callout-background-color, Canvas);
+  --cct-border-default: var(--border-subtle-color, currentColor);
+  --cct-border-plain: var(--border-subtle-color, currentColor);
 
-   Le fichier existe malgré ce vide plutôt que d'être absent : sa présence est ce qui rend la
-   question visible. Un fichier manquant se lit comme un oubli ; un fichier qui explique
-   pourquoi il est vide se lit comme une décision. */
+  /* Accent — le bouton primaire (*Complete*, *Comment*), et l'anneau de focus de `bolt-button`. */
+  --cct-accent-bg: var(--communication-background, Highlight);
+  --cct-fg-on-accent: var(--text-on-communication-background, HighlightText);
+  --cct-focus-ring: var(--focus-border-color, Highlight);
+  --cct-accent-line: var(--communication-foreground, currentColor);
+
+  /* Verdicts — les couleurs de statut du thème. */
+  --cct-success-ring: var(--status-success-foreground, #2e7d32);
+  --cct-success-line: var(--status-success-text, currentColor);
+  --cct-attention-ring: var(--status-warning-foreground, #f9a825);
+  --cct-attention-text: var(--status-warning-text, #8a6d00);
+  --cct-danger-strong: var(--status-error-strong, #b3261e);
+  --cct-danger-line: var(--status-error-text, currentColor);
+}
 
 /* LES TROIS LONGUEURS DU COMPOSEUR, ET POURQUOI ELLES SONT ICI SANS AVOIR ÉTÉ MESURÉES.
 

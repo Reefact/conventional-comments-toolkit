@@ -665,7 +665,12 @@ export class GithubClientAdapter implements PlatformAdapter {
   /** §5.5 — avant le premier fil rendu : la place que le code partagé choisissait lui-même avant
    * que le contrat ne la demande à la plateforme. Comportement inchangé. */
   getThreadFilterMount(): Element | null {
-    return this.getRenderedThreadElements()[0]?.element ?? null;
+    const first = this.getRenderedThreadElements()[0]?.element;
+    if (!first) return null;
+    // Avant l'élément de CHRONOLOGIE qui contient le premier fil, pas avant le fil lui-même : le
+    // filtre porte sur tous les fils, il se place au niveau de la liste (`threadFilterItem`). Sans
+    // cet ancêtre — vue non mesurée —, la place d'avant, plutôt que pas de filtre.
+    return closestChain(first, selectors.threadFilterItem).element ?? first;
   }
 
   /** Conteneurs de fils rendus, pour le filtre local du §5.5 (§9.2.3) — même dérivation

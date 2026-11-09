@@ -168,7 +168,13 @@ export const selectors = {
     name: 'submit-buttons',
     candidates: [
       'button[type="submit"][data-testid*="submit"]',
-      'button[type="submit"].btn-primary', // CLASSIQUE
+      // CLASSIQUE — l'union est MESURÉE le 2026-11-09 sur les captures 01 et 03 de la
+      // Conversation : *Close with comment* (*Close pull request* champ vide) est un
+      // `button[type="submit"][name="comment_and_close"]` SANS `btn-primary`. Le candidat ne
+      // retenait que *Comment*, la chaîne s'arrêtait là, et sous `enforce` un commentaire non
+      // conforme se publiait par *Close with comment* — vérifié dans Chromium, extension chargée.
+      // Par le NOM, posé exprès, plutôt qu'un `button[type="submit"]` général.
+      'button[type="submit"].btn-primary, button[type="submit"][name="comment_and_close"]',
       'button[type="submit"]', // CLASSIQUE
       // MESURÉ sur la vue `…/changes`, boîte de réponse ouverte : les boutons de Primer sont
       // `type="button"`, donc invisibles aux trois candidats ci-dessus. Le pied en porte
@@ -568,6 +574,23 @@ export const selectors = {
       // « en tête de PR, sous le titre » (§5.5). Commun à la Conversation classique, à l'Overview
       // et à Files changed.
       'header[data-component="SplitPageLayout.Header"]',
+    ],
+  } satisfies SelectorChain,
+
+  /** L'élément de CHRONOLOGIE qui contient un fil — ce AVANT quoi le filtre local du §5.5 se place,
+   * au niveau de la liste et hors de toute boîte.
+   *
+   * MESURÉ le 2026-11-09. Le filtre se plaçait avant le premier FIL rendu : sur la Conversation
+   * classique, il tombait dans le bloc de la revue qui porte ce fil et semblait ne concerner que
+   * lui ; sur l'Overview, dans la boîte même du premier fil (remarque du propriétaire, à la
+   * validation). L'ancêtre qui est un élément de la liste est
+   * `div[data-testid="timeline-item"]` sur l'Overview (capture 03, trois niveaux au-dessus du fil)
+   * et `div.js-timeline-item` sur la Conversation classique (captures 01 et 03, cinq niveaux). */
+  threadFilterItem: {
+    name: 'thread-filter-item',
+    candidates: [
+      '[data-testid="timeline-item"]',
+      '.js-timeline-item', // CLASSIQUE
     ],
   } satisfies SelectorChain,
 

@@ -230,3 +230,20 @@ describe('§3.4.1, §5.5 — un préfixe placé après un bloc de code cité (C3
   }, T);
 });
 
+
+describe('§5.5 — le filtre de fils se place au niveau de la LISTE, hors des boîtes (captures 03, PR 548)', () => {
+  // Il se plaçait avant le premier fil rendu : dans le bloc de la revue (classique), dans la boîte
+  // même du premier fil (Overview). Remarque du propriétaire à la validation, 2026-11-09.
+  it.each([
+    ['03-overview-commentaires-prefixes.html', '[data-testid="timeline-item"]'],
+    ['03-conversation-commentaires-prefixes-pr-ouverte.html', '.js-timeline-item'], // CLASSIQUE
+  ])('%s : avant l’élément de chronologie qui contient le premier fil', (file, item) => {
+    const page = load(file, '/Reefact/just-dummies/pull/548');
+    const mount = page.adapter.getThreadFilterMount();
+    const first = page.adapter.getRenderedThreadElements()[0]!.element;
+    expect(mount?.matches(item)).toBe(true);
+    expect(mount?.contains(first)).toBe(true);
+    // Hors de toute boîte de fil ou de revue : aucun ancêtre n'est un élément de chronologie.
+    expect(mount?.parentElement?.closest(item)).toBeNull();
+  }, T);
+});

@@ -148,7 +148,10 @@ Fixed in the same pull request, because the final validation showed them in both
 - `previewBody` found nothing (`previewViewerWrapper__`, capture 09): previews had no badges.
 - `bannerMount` found nothing, and the banner fell back to the very top of the document, above
   GitHub's header. The PR page header is `header[data-component="SplitPageLayout.Header"]`, one
-  per capture, holding the title, the state and the tabs; the banner goes right after it.
+  per capture, holding the title, the state and the tabs; the banner goes right after it. On the
+  Overview that header spans the whole window and centres its content inside itself (x = 32
+  against a content column at x = 275, measured in Chromium with the extension loaded): the banner
+  goes there after the PR status card, `[class*="CondensedForYouContainer__"]`, instead.
 - A comment that quotes code BEFORE its prefix line (C3) got no badge: the rendered body was read
   as plain text, the code block lost its fences, and its first line became the prefix line
   (§3.4.1). `commentBodyText` (shared) now restores fences around `<pre>` and `> ` before quoted

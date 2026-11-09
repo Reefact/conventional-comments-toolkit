@@ -53,6 +53,26 @@ describe('pages capturées — secrets de session', () => {
     expect(redactCapturedPage(html)).toBe(html.replace('value="" data-csrf', `value="${MASK}" data-csrf`));
   });
 
+  it('trouve et masque une adresse e-mail en clair — le menu de compte Microsoft, mesuré sur Azure DevOps', () => {
+    const html =
+      '<div id="mectrl_currentAccount_primary">Ada Lovelace</div>' +
+      '<div id="mectrl_currentAccount_secondary" class="mectrl_truncate">ada.lovelace@example.com</div>';
+    expect(kinds(html)).toEqual(['adresse e-mail']);
+    const masked = redactCapturedPage(html);
+    expect(masked).toContain(`class="mectrl_truncate">${MASK}</div>`);
+    expect(findCapturedPageSecrets(masked)).toEqual([]);
+    expect(redactCapturedPage(masked)).toBe(masked);
+  });
+
+  it('laisse les adresses qui ne désignent personne : noreply@ des commits, git@ des URL SSH', () => {
+    const html = [
+      'Co-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;',
+      'git clone git@github.com:Reefact/conventional-comments-toolkit.git',
+    ].join('\n');
+    expect(kinds(html)).toEqual([]);
+    expect(redactCapturedPage(html)).toBe(html);
+  });
+
   it('est idempotent : une page masquée revient identique', () => {
     const html = '<input value="x" data-csrf="true"><meta name="request-id" content="r">';
     const once = redactCapturedPage(html);

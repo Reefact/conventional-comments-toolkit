@@ -55,6 +55,19 @@ describe('réduction des pages capturées — ce qui survit', () => {
     expect(reduced('<head><meta name="release" content="abc"></head>', 'azdo').querySelector('meta')).toBeNull();
   });
 
+  it('retire une région déclarée par la plateforme, texte compris — le menu de compte Microsoft d’Azure DevOps', () => {
+    const page =
+      '<body><div class="mectrl_root mectrl_theme_dark"><button id="mectrl_main_trigger" aria-label="Account manager for Ada">A</button>' +
+      '<div id="mectrl_currentAccount_secondary">ada.lovelace@example.com</div></div>' +
+      '<div class="repos-pr-header"><p>title</p></div></body>';
+    const doc = reduced(page, 'azdo');
+    expect(doc.querySelector('.mectrl_root')).toBeNull();
+    expect(serializeReduced(doc)).not.toContain('ada.lovelace');
+    expect(doc.querySelector('.repos-pr-header p')!.textContent).toBe('title');
+    // Une plateforme qui ne la déclare pas la garde : c'est une règle de plateforme.
+    expect(reduced(page, 'github').querySelector('#mectrl_currentAccount_secondary')).not.toBeNull();
+  });
+
   it('ne garde du JSON embarqué que les clés listées — le jeton client disparaît', () => {
     const data = {
       payload: { pullRequestsLayoutRoute: { pullRequest: { number: 7, createdTime: 't', title: 'x' } } },
@@ -275,6 +288,15 @@ describe('garde statique — un sélecteur qui cherche ce que la réduction reti
     for (const ok of ['svg.octicon', 'button > svg', 'svg + span', 'svg[aria-hidden="true"]']) {
       expect(unreachableByReduction(ok, github), ok).toEqual([]);
     }
+  });
+
+  it('refuse une région que la plateforme retire, citée telle qu’elle est déclarée', () => {
+    const azdo = rulesFor('azdo');
+    expect(unreachableByReduction('.mectrl_root', azdo)).toEqual(['région retirée : .mectrl_root']);
+    expect(unreachableByReduction('div.mectrl_root button', azdo)).toEqual(['région retirée : .mectrl_root']);
+    // Un nom qui ne fait que COMMENCER par celui de la région n'est pas elle.
+    expect(unreachableByReduction('.mectrl_root-like', azdo)).toEqual([]);
+    expect(unreachableByReduction('.mectrl_root', github)).toEqual([]);
   });
 
   it('le JSON embarqué n’est gardé que là où la plateforme le déclare', () => {

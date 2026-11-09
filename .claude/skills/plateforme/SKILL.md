@@ -282,6 +282,19 @@ validée sert de référence, et tout écart est un défaut de la nouvelle. Le t
 vue, genre, préfixe, badge — est remis au propriétaire tel quel, défauts compris ; chaque genre
 défaillant reçoit ensuite sa capture, son correctif, son test et sa preuve par retrait.
 
+**Mesurer l'interception sans jamais publier.** Ne déclencher un envoi (clic, raccourci clavier)
+que sur un texte NON CONFORME, que l'extension doit arrêter. Un écouteur « de sécurité » ajouté
+par la session ne protège rien : la plateforme peut écouter sur le champ ou le bouton lui-même,
+avec un écouteur posé AVANT le sien, et publier avant qu'il ne s'exécute (deuxième usage, GitHub
+classique : `Ctrl+Entrée` sur un texte conforme a publié un commentaire de test, à supprimer
+ensuite). Qu'un texte conforme passe se vérifie sans l'envoyer : le bouton n'est pas grisé, la
+pastille dit conforme. Et vérifier par l'API, après chaque série, qu'aucun commentaire n'est parti.
+
+**Un bouton peut être RECRÉÉ par la page.** Mesuré sur l'Overview de GitHub : React remplace
+l'élément *Comment* quand le champ se remplit. Une interception posée sur les boutons présents à
+l'ouverture du champ restait sur l'ancien — grisage juste, blocage absent. Le test d'interception
+se fait donc champ REMPLI, sur l'élément présent à cet instant.
+
 L'interception (blocage d'un envoi) ne se valide que configuration LUE : en état dégradé
 (§5.4), l'extension assiste sans bloquer, et ce qu'on voit ne dit rien du blocage.
 

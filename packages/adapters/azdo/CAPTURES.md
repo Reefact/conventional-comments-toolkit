@@ -160,8 +160,8 @@ Overview.
 (root, Overview), `06-overview-modification-reponse.html` (a reply, Overview). The hover toolbar
 of one's own comment has *Edit*, *Delete*, *Like this comment*, *Copy link* — *Delete* sits
 right next to *Edit* and opens an in-page confirmation (not a native dialog). In edit mode the
-`<textarea>` sits INSIDE the `.repos-discussion-comment` being edited, the rendered body stays
-displayed below it, and the buttons are *Cancel* / *Update & resolve* / *Update* — both send.
+`<textarea>` sits INSIDE the `.repos-discussion-comment` being edited, the body displayed below
+it is the LIVE PREVIEW of the edit (see state 9), and the buttons are *Cancel* / *Update & resolve* / *Update* — both send.
 
 ## Diff modes (Files) — memorized for the account
 
@@ -185,10 +185,14 @@ PR 2 abandoned by the API (`PATCH …/pullrequests/2`, `status: abandoned`):
 `08-overview-pr-abandonnee.html`. *Complete* is replaced by *Reactivate*; the *Add a comment...*
 field is still there. A COMPLETED (merged) pull request was not captured.
 
-## State 9 — preview: not applicable
+## State 9 — preview: a LIVE preview, no tab
 
-No editor has a *Preview* tab or button (inventories of the new-comment, line, reply and edit
-editors).
+No editor has a *Preview* tab or button — but Azure DevOps renders a live preview UNDER the
+editor as soon as the field has text: a `.markdown-content` in `.repos-discussion-thread-reply`
+(in the `-rempli` captures 01, 02, 04, 05; absent when the field is empty). In edit mode, the body
+shown in the edited comment is that preview. This state was first declared "not applicable"
+for want of a tab; the owner saw the preview at validation (2026-11-09). The captures already held
+it: one more `.markdown-content` in every `-rempli` page.
 
 ## What the adapter reads, and where (measured while writing `src/selectors.ts`)
 
@@ -232,7 +236,8 @@ editors).
   page (every test pull request and comment was created that way) — the premise "les API
   publiques n'acceptent pas l'authentification par cookie de session" does not hold for Azure
   DevOps from the page. Whether it holds from a content script is not measured.
-- The editor chrome (styles, geometry): neutral answer.
+- The editor chrome (styles, geometry): neutral answer. Theme TOKENS were measured on 2026-11-09
+  in dark theme (`src/platform.css`); the light theme is not measured.
 
 ## Personal data in the captures
 

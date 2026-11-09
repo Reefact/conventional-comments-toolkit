@@ -245,6 +245,31 @@ describe('§5.5 — Files : fils de ligne (03-files)', () => {
   }, T);
 });
 
+describe('§5.5 — l’aperçu EN DIRECT d’une composition est un corps décoré (état 9, captures « -rempli »)', () => {
+  // Azure DevOps rend l'aperçu sous l'éditeur dès que le champ a du texte, sans onglet : l'état 9
+  // avait d'abord été déclaré « sans objet » (validation du propriétaire, 2026-11-09).
+  it.each([
+    ['01-overview-nouveau-commentaire-rempli.html', 1, undefined, 'test draft - filled field, not sent'],
+    ['02-overview-reponse-fil-rempli.html', 1, undefined, 'test draft reply - not sent'],
+    ['04-files-commentaire-ligne-rempli.html', 1, 'files', 'test draft line comment - not sent'],
+    ['05-files-reponse-fil-ligne-rempli.html', 1, 'files', 'test draft line reply - not sent'],
+  ] as const)('%s : l’aperçu en fait partie', (file, pr, view, typed) => {
+    const page = load(file, PR(pr, view));
+    expect(page.adapter.getRenderedComments().map((c) => c.bodyText.trim())).toContain(typed);
+  }, T);
+
+  it.each(['01-overview-nouveau-commentaire.html', '02-overview-reponse-fil.html', '04-files-commentaire-ligne.html'])(
+    '%s : champ vide, aucun aperçu',
+    (file) => {
+      const page = load(file, PR(1, file.includes('-files-') ? 'files' : undefined));
+      const published = page.adapter.getRenderedComments().length;
+      expect(page.adapter.getRenderedCommentElements().filter((e) => e.closest('.repos-discussion-thread-reply'))).toEqual([]);
+      expect(published).toBe(page.doc.querySelectorAll('.repos-discussion-comment .markdown-content').length);
+    },
+    T
+  );
+});
+
 describe('§4.1 — Files : nouveau commentaire de ligne (capture 04)', () => {
   it.each(['04-files-commentaire-ligne.html', '04-files-commentaire-ligne-rempli.html', '04-files-commentaire-ligne-cote-a-cote.html'])(
     '%s : zone thread-root, un bouton Comment',

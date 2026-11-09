@@ -287,11 +287,13 @@ export class AzdoClientAdapter implements PlatformAdapter {
   }
 
   /** Les corps des commentaires PUBLIÉS, cherchés dans chaque commentaire — jamais à l'échelle du
-   * document, où `commentBody` attraperait aussi la description de la PR (03). */
+   * document, où `commentBody` attraperait aussi la description de la PR (03) —, plus les
+   * APERÇUS en direct d'une composition (`previewBody`, §5.5). */
   getRenderedCommentElements(): Element[] {
-    return queryChainAll(this.#doc, selectors.comment)
+    const published = queryChainAll(this.#doc, selectors.comment)
       .map((comment) => queryChain(comment, selectors.commentBody).element)
       .filter((el): el is Element => el !== null);
+    return [...published, ...queryChainAll(this.#doc, selectors.previewBody)];
   }
 
   getBannerMount(): Element | null {

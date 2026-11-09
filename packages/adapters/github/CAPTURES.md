@@ -146,6 +146,30 @@ label, and whether a badge was set — reading the page, not the adapter's selec
 No badge on an unprefixed body. Collapsed (resolved or outdated) threads render no body until
 expanded, in either view, and are not counted.
 
+## Submit interception, validated in Chromium (2026-11-09)
+
+Under `enforce` (temporary configuration on `just-dummies`), extension loaded, NON-compliant text
+only — a compliant `Ctrl+Enter` test posted a comment on the classic view once, deleted since:
+
+| View | Field | Blocked |
+|---|---|---|
+| Overview | new comment | *Comment*, *Close with comment*, `Ctrl+Enter` |
+| Overview | edit of a general comment | *Update comment*, `Ctrl+Enter`; *Cancel* stays free |
+| Overview | reply | not validated by default (`scope.validateReplies: false`) |
+| Classic | new comment | *Comment*, *Close with comment*, `Ctrl+Enter` |
+
+Two defects found that way and fixed: React RECREATES the Overview *Comment* button once the field
+is filled, so a guard bound at attach time stayed on the old element (shared editor controller);
+and the classic *Close with comment* (`button[name="comment_and_close"]`) was never in the
+submit chain.
+
+## Thread filter placement
+
+The filter used to sit before the first rendered thread: inside that review's block (classic),
+inside the first thread's box (Overview). It now goes before the timeline item holding the first
+thread — `[data-testid="timeline-item"]` (Overview), `.js-timeline-item` (classic) — checked in
+Chromium in both views.
+
 ## Not measured
 
 - **Resolution state of an Overview thread.** No capture shows a resolved thread on the Overview;

@@ -17,7 +17,9 @@ describe('§4.1, §9.2.3 — Conversation : nouveau commentaire (capture 01)', (
   it('observe le champ de nouveau commentaire, en zone conversation', () => {
     const editor = editorOf(page, page.doc.getElementById('new_comment_field'));
     expect(editor.context).toMatchObject({ zone: 'conversation', action: 'compose', canCarryBlockingState: false });
-    expect(submitLabels(page, editor)).toEqual(['Comment']);
+    // *Close pull request* (*Close with comment* champ rempli) publie le commentaire : intercepté
+    // aussi. Cette attente valait `['Comment']` — elle figeait le trou.
+    expect(submitLabels(page, editor)).toEqual(['Close pull request', 'Comment']);
   });
 
   it("n'observe PAS la description de la PR, ouverte en édition sur cette capture (§4.1)", () => {

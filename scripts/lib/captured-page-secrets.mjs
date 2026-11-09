@@ -51,6 +51,14 @@ const SECRET_TEXT = [
   /(_sockets\/u\/\d+\/ws\?session=)([^"&]*)/g,
 ];
 
+/** Une adresse e-mail en clair — une donnée PERSONNELLE, pas un secret de session, mais qui n'a
+ * pas davantage sa place dans une fixture publique. MESURÉ le 2026-11-09 : le menu de compte
+ * Microsoft d'Azure DevOps mettait celle du compte connecté dans chaque capture, et ni ce module
+ * ni l'audit ne la voyaient. (1) ce qui précède, (2) l'adresse. Exceptées : `noreply@` (les
+ * lignes `Co-Authored-By` des commits que GitHub affiche, seule adresse des captures GitHub) et
+ * `git@` (une URL de clonage SSH). */
+const EMAIL = /(^|[^A-Za-z0-9._%+-])((?!noreply@|git@)[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})/g;
+
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Toutes les occurrences secrètes de la page, sous la forme `{ kind, value }`. Une valeur
@@ -79,6 +87,7 @@ export function findCapturedPageSecrets(html) {
   // L'identifiant numérique du compte dans l'URL du socket accompagne la session : masqué
   // aussi, et contrôlé par la même règle (`0` est la valeur de masquage, un nombre restant).
   for (const m of html.matchAll(/_sockets\/u\/(\d+)\/ws/g)) if (m[1] !== '0') keep('socket user id', m[1]);
+  for (const m of html.matchAll(EMAIL)) keep('adresse e-mail', m[2]);
   return found;
 }
 
@@ -94,6 +103,7 @@ export function secretFinderSource() {
   const SECRET_INPUTS = [${SECRET_INPUTS.map(literal).join(', ')}];
   const SECRET_METAS = ${JSON.stringify(SECRET_METAS)};
   const SECRET_TEXT = [${SECRET_TEXT.map(literal).join(', ')}];
+  const EMAIL = ${literal(EMAIL)};
   const esc = ${esc.toString()};
   return ${findCapturedPageSecrets.toString()};
 })()`;
@@ -115,6 +125,7 @@ export function redactCapturedPage(html) {
   });
   for (const re of SECRET_TEXT) out = out.replace(re, `$1${MASK}`);
   out = out.replace(/(_sockets\/u\/)\d+(\/ws)/g, '$10$2');
+  out = out.replace(EMAIL, `$1${MASK}`);
   return out;
 }
 

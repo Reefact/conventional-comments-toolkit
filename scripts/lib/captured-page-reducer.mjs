@@ -71,11 +71,25 @@ export const BASE_RULES = {
   urlValue: '^(?:/|https?:|[^\\s?#]*\\?\\S*=)',
   keepMeta: [],
   keepJson: [],
+  /** Des RÉGIONS entières retirées, sous-arbre compris, désignées par un sélecteur CSS. La liste
+   * blanche ne trie que des attributs : le TEXTE d'un élément gardé survit toujours, si bien
+   * qu'une région qui affiche une donnée personnelle la garde. Vide par défaut. */
+  dropSelectors: [],
 };
 
 /** Ce que chaque plateforme lit en plus, hors de la liste commune. Un ajout ici se justifie par
- * le code de l'adaptateur qui le lit — et impose de recapturer, la page brute étant perdue. */
+ * le code de l'adaptateur qui le lit — et impose de recapturer, la page brute étant perdue. Un
+ * RETRAIT (`dropSelectors`) n'impose rien de tel : réduire une page réduite suffit. */
 export const PLATFORM_RULES = {
+  azdo: {
+    // Le menu de compte Microsoft (« mectrl »), présent FERMÉ dans le DOM de chaque page
+    // d'Azure DevOps, affiche en texte l'adresse e-mail du compte connecté
+    // (`#mectrl_currentAccount_secondary`). MESURÉ le 2026-11-09 sur les 25 premières captures :
+    // l'adresse était dans chacune, et aucun audit ne l'avait signalée — elle n'est ni un
+    // attribut ni une valeur opaque. Aucun sélecteur de l'adaptateur n'a à y chercher quoi que
+    // ce soit : c'est l'en-tête du site, pas la PR.
+    dropSelectors: ['.mectrl_root'],
+  },
   github: {
     // `selectors.ts` : siteRelease, currentUser, repositoryPublicMeta.
     keepMeta: ['release', 'user-login', 'octolytics-dimension-repository_public'],
@@ -204,6 +218,12 @@ export function reducePage(doc, rules) {
       if (rules.dropElements.includes(el.tagName)) {
         el.remove();
         count(el.tagName.toLowerCase());
+        continue;
+      }
+      const region = rules.dropSelectors.find((s) => el.matches(s));
+      if (region) {
+        el.remove();
+        count(region);
         continue;
       }
       if (el.tagName === 'META' && !rules.keepMeta.includes(el.getAttribute('name'))) {
@@ -416,6 +436,13 @@ export function unreachableByReduction(selector, rules) {
     if (!kept) reasons.push(`attribut retiré : ${name}`);
   }
   const bare = unquoted.replace(/\[[^\]]*\]/g, '');
+  // Une région retirée, citée telle qu'elle est déclarée. Lecture textuelle : un sélecteur qui
+  // vise un DESCENDANT de la région par un autre nom (`#mectrl_currentAccount_secondary`) ne s'y
+  // voit pas — la région est déclarée pour ce qu'aucun adaptateur n'a à lire.
+  for (const region of rules.dropSelectors ?? []) {
+    const escaped = region.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`${escaped}(?![-\\w])`).test(bare)) reasons.push(`région retirée : ${region}`);
+  }
   // La réduction VIDE chaque `<svg>` : rien ne s'y trouve plus, ni par un descendant (`svg path`,
   // `svg > *`) ni par un élément qui n'existe que dans un svg (`button path`). Revue Reefact,
   // PR #133 : le garde ne connaissait que `dropElements`, et acceptait les deux.

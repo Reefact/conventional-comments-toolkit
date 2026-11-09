@@ -92,6 +92,20 @@ function summaryLine(unresolvedBlockingCount: number): string {
   return `cc/1 state=success draft=0 exempt=0 mode=assist activated=- core=1.0.0 cfg=deadbeef t=${unresolvedBlockingCount} c=0 w=0`;
 }
 
+/** Le check du vérificateur tel que GitHub le rend dans la liste des checks — FORME MESURÉE le
+ * 2026-11-09 sur un vrai check `conventional-comments` (adapters/github/CAPTURES.md) : un `li` nommé
+ * `<workflow> / conventional-comments (<événement>)`, dont un `span.titleDescription__…` porte
+ * l'état puis le titre. */
+function verifierCheck(line: string): HTMLElement {
+  const li = document.createElement('li');
+  li.setAttribute('aria-label', 'Some workflow / conventional-comments (pull_request) ');
+  const title = document.createElement('span');
+  title.className = 'titleDescription__AbC12';
+  title.textContent = `— ${line}`;
+  li.appendChild(title);
+  return li;
+}
+
 /** Adaptateur factice, COMPLET au sens du contrat (§9.2.3) : `currentPr()` reflète la PR
  * « affichée » par la page à un instant donné, au gré des mutations simulées ci-dessous ; les
  * surfaces d'affichage qu'un test ne fournit pas répondent « rien » — liste vide, `null` —,
@@ -381,9 +395,7 @@ describe('D1 — bootstrap(document, testFactories()) choisit l’adaptateur par
       value: new URL('https://github.com/acme/demo/pull/42'),
       configurable: true,
     });
-    const check = document.createElement('div');
-    check.setAttribute('data-testid', 'check-run-item');
-    check.textContent = summaryLine(2);
+    const check = verifierCheck(summaryLine(2));
     document.body.appendChild(check); // la mutation qui signale la navigation SPA (Turbo/React, §A.3)
     await flushAll();
 
@@ -2276,9 +2288,7 @@ describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut sign
     // Résumé publié présent dès le départ : ce rendu a donc « montré quelque chose » quoi
     // qu'il arrive, et seule la signature de NOTRE sortie peut encore remarquer la mise à
     // jour du commentaire.
-    const check = document.createElement('div');
-    check.setAttribute('data-testid', 'check-run-item');
-    check.textContent = summaryLine(0);
+    const check = verifierCheck(summaryLine(0));
     document.body.appendChild(check);
     const adapter = new GithubClientAdapter({ documentRef: document, fetchImpl });
 
@@ -2339,9 +2349,7 @@ describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut sign
   it('le masquage du préfixe SEUL défait — texte et badges intacts — est reposé (revue Reefact, PR #42)', async () => {
     onPullRequest();
     const body = conversationComment('un sujet de test');
-    const check = document.createElement('div');
-    check.setAttribute('data-testid', 'check-run-item');
-    check.textContent = summaryLine(0);
+    const check = verifierCheck(summaryLine(0));
     document.body.appendChild(check);
     const adapter = new GithubClientAdapter({ documentRef: document, fetchImpl });
 
@@ -2385,9 +2393,7 @@ describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut sign
     // existait, n'y voyait rien. Le sujet perdait son gras jusqu'au rechargement de la page.
     onPullRequest();
     const body = conversationComment('un sujet de test');
-    const check = document.createElement('div');
-    check.setAttribute('data-testid', 'check-run-item');
-    check.textContent = summaryLine(0);
+    const check = verifierCheck(summaryLine(0));
     document.body.appendChild(check);
     const adapter = new GithubClientAdapter({ documentRef: document, fetchImpl });
 

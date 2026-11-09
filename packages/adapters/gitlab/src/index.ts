@@ -282,10 +282,12 @@ export class GitlabClientAdapter implements PlatformAdapter {
   /** §5.5 — dans l'Overview, avant le premier fil : les fils y forment la liste d'activité, et le
    * filtre la précède. Dans l'onglet Changes, AUCUN filtre (`null`) : les fils y sont intercalés
    * entre les lignes du diff, et un filtre posé avant le premier tombait au milieu du code
-   * (validation du propriétaire, 2026-11-08). */
+   * (validation du propriétaire, 2026-11-08). Le premier fil DE LA PAGE, replié compris — pas le
+   * premier de `getRenderedThreadElements()`, qui écarte les fils repliés : le filtre tombait
+   * sinon après un premier fil replié, au milieu de la liste. */
   getThreadFilterMount(): Element | null {
     if (MR_PATH.exec(this.#doc.location?.pathname ?? '')?.[4] !== undefined) return null;
-    return this.getRenderedThreadElements()[0]?.element ?? null;
+    return queryChain(this.#doc, selectors.thread).element;
   }
 
   /** Seuls les fils dont la racine est RENDUE : un fil résolu replié (§C.5) n'a aucune note dans

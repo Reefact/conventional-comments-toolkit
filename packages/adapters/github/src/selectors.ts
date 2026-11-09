@@ -8,34 +8,22 @@
 
 import type { SelectorChain } from '@cct/adapter-shared';
 
-export const selectors = {
-  /** Zones de saisie de la génération REACT — jamais observée en direct dans ce dépôt,
-   * conservée parce que rien ne prouve qu'elle ne décrive aucune vue.
-   *
-   * Les trois chaînes de composeur qui suivent sont assemblées en SURFACES par `surfaces.ts` :
-   * `/pull/N` et `/pull/N/changes` coexistent, et une chaîne unique rendait invisible le
-   * composeur de la seconde (une chaîne rend les éléments du premier candidat qui matche).
-   * Les sélecteurs restent ici — le §9.4 les veut « centralisés dans un fichier unique par
-   * adaptateur », et un second fichier de sélecteurs enfreindrait la règle que cette
-   * modélisation sert à honorer. `surfaces.ts` ne porte que la STRUCTURE. */
-  editorsReact: {
-    name: 'editors',
-    candidates: [
-      'textarea[aria-label*="omment"][class*="CommentBox"]',
-      'div[data-testid*="comment-composer"] textarea',
-    ],
-  } satisfies SelectorChain,
+// L'objet est découpé en TROIS blocs, et la frontière est mesurée, pas supposée (#131) :
+//
+//   - COMMUN : ce qui sert à plusieurs vues — Files changed (`/pull/N/changes`), l'en-tête de
+//     page, les métadonnées, et les fils de revue, que Files changed et l'Overview rendent avec
+//     le même composant ;
+//   - VUE CLASSIQUE : ce que seule la Conversation d'avant l'Overview porte ;
+//   - VUE OVERVIEW : ce que seule la page Overview porte (préversion du 2026-11-05).
+//
+// Un seul objet, et non trois exports : le §9.4 veut un fichier unique, et l'outillage des
+// captures (réduction, `check:captured-selectors`, `check:reduced-selectors`) lit `selectors` et
+// lui seul — un bloc exporté à part échapperait à toutes ses vérifications.
 
-  /** Zones de saisie de la génération HÉRITÉE. */
-  editorsLegacy: {
-    name: 'editors',
-    candidates: [
-      'textarea[name="comment[body]"]',
-      'textarea[name="pull_request_review_comment[body]"]',
-      'textarea[name="pull_request_review[body]"]',
-      'textarea.js-comment-field',
-    ],
-  } satisfies SelectorChain,
+export const selectors = {
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // COMMUN
+  // ═══════════════════════════════════════════════════════════════════════════════════════
 
   /** Zones de saisie de la NOUVELLE VUE DES FICHIERS MODIFIÉS (`/pull/N/changes`).
    *
@@ -114,50 +102,6 @@ export const selectors = {
     candidates: ['[class*="CommentBox"]'],
   } satisfies SelectorChain,
 
-  /** **Description de la PR — hors périmètre** (§4.1, dernière ligne du tableau : format non
-   * validé, aucun état bloquant). L'éditeur qu'on y ouvre n'est pas une zone du §4.1 : il ne
-   * doit recevoir ni barre d'outils, ni saisie rapide, ni garde d'envoi. Sans cette chaîne, il
-   * tombait dans le REPLI de `#contextOf()` — « ni fil, ni corps de revue, ni conversation,
-   * donc commentaire de ligne de diff » — et se retrouvait classé `thread-root`, la zone la
-   * plus privilégiée : en mode `enforce`, mettre à jour la description d'une PR devenait
-   * impossible, faute d'un `label:` en tête.
-   *
-   * MESURÉ sur `https://github.com/Reefact/conventional-comments-toolkit/pull/39` (page
-   * anonyme, 2026-09), où les trois candidats matchent **un seul** élément chacun, tous
-   * ancêtres du formulaire d'édition de la description, et aucun ancêtre d'un autre
-   * commentaire :
-   *
-   *   <div class="TimelineItem … js-command-palette-pull-body">      ← candidat 1
-   *     <div class="timeline-comment-group …" id="issue-5321598100">
-   *       <div id="pullrequest-4420243102" class="… js-comment …">   ← candidat 2
-   *         …
-   *         <form class="js-comment-update" id="issue-5321598100-edit-form">  ← candidat 3
-   *           <include-fragment src="…/edit_form?textarea_id=issue-5321598100-body">
-   *
-   * Les trois ne sont donc PAS trois générations de DOM (§A.5) mais trois emboîtements du
-   * MÊME rendu : `closestChain` s'arrêtant au premier qui matche, un renommage de la classe
-   * la plus extérieure laisse les deux autres attraper le cas.
-   *
-   * Deux limites, écrites parce qu'elles ne sont pas mesurées et ne doivent pas être crues :
-   * le `<textarea>` lui-même est servi par le `<include-fragment>` ci-dessus, que GitHub
-   * refuse sans session — ses attributs propres n'ont donc pas été observés, et c'est
-   * précisément pourquoi l'exclusion porte sur les ANCÊTRES, qui le seront quels qu'ils
-   * soient ; la génération React de la page de conversation, elle, n'a pas été observée du
-   * tout (la page mesurée est rendue côté serveur), et si elle nomme autrement ce conteneur,
-   * aucun candidat ne matchera — l'éditeur redeviendra visible comme avant ce correctif,
-   * jamais pire.
-   *
-   * `[id^="issue-"]` ne matche pas `issuecomment-…` — vérifié sur la page mesurée, qui porte
-   * les deux : le candidat 3 y compte exactement une occurrence. */
-  prDescription: {
-    name: 'pr-description',
-    candidates: [
-      '.js-command-palette-pull-body',
-      '[id^="pullrequest-"].js-comment',
-      'form.js-comment-update[id^="issue-"]',
-    ],
-  } satisfies SelectorChain,
-
   /** Visibilité du dépôt affiché — MESURÉE sur une page réelle de github.com (2026-09) :
    * `<meta name="octolytics-dimension-repository_public" content="true">`, en un exemplaire.
    * Ne sert qu'à interpréter un 404 de la lecture sans session (§8.2) : sur un dépôt privé,
@@ -176,28 +120,19 @@ export const selectors = {
    * d'avant : il ne peut pas mettre un bandeau là où il n'y en avait pas. */
   repositoryVisibilityLabel: {
     name: 'repository-visibility-label',
-    candidates: ['span.Label--secondary', 'span.Label'],
+    candidates: [
+      'span.Label--secondary', // CLASSIQUE
+      'span.Label', // CLASSIQUE
+    ],
   } satisfies SelectorChain,
 
   /** Conteneur d'un fil existant — décide de la zone `reply` (§4.1). */
   threadContainer: {
     name: 'thread-container',
-    candidates: ['[data-testid="review-thread"]', '.js-resolvable-timeline-thread-container', '.review-thread-component'],
-  } satisfies SelectorChain,
-
-  /** Zone de conversation générale (issue comment) — zone `conversation` (§4.1). */
-  conversationForm: {
-    name: 'conversation-form',
     candidates: [
-      '#new_comment_form',
-      'form.js-new-comment-form',
-      // L'ÉDITION d'un commentaire général, MESURÉE le 2026-10-28
-      // (`test/fixtures/pages/06-conversation-modification-commentaire.html`) : son champ est
-      // dans le commentaire publié, pas dans le formulaire de nouveau commentaire. Sans ce
-      // candidat, elle tombait dans le repli de `#contextOf()` et se lisait `thread-root` —
-      // réputée porter un état bloquant, sans `W-NOT-BLOCKABLE` (§4.1). L'identifiant
-      // `issuecomment-` la distingue d'un corps de revue, qui s'écrit `pullrequestreview-`.
-      '.timeline-comment-group[id^="issuecomment-"]',
+      '[data-testid="review-thread"]',
+      '.js-resolvable-timeline-thread-container', // CLASSIQUE
+      '.review-thread-component', // CLASSIQUE
     ],
   } satisfies SelectorChain,
 
@@ -233,8 +168,8 @@ export const selectors = {
     name: 'submit-buttons',
     candidates: [
       'button[type="submit"][data-testid*="submit"]',
-      'button[type="submit"].btn-primary',
-      'button[type="submit"]',
+      'button[type="submit"].btn-primary', // CLASSIQUE
+      'button[type="submit"]', // CLASSIQUE
       // MESURÉ sur la vue `…/changes`, boîte de réponse ouverte : les boutons de Primer sont
       // `type="button"`, donc invisibles aux trois candidats ci-dessus. Le pied en porte
       // trois — *Cancel*, *Reply*, *Start a review* — et il faut intercepter les deux qui
@@ -267,30 +202,6 @@ export const selectors = {
       // a changé de NOM, pas seulement de préfixe : `SubmitReviewButton__…`.
       '[class*="childrenStyling__"] > div:not(:first-child) button',
       '[class*="SubmitReviewButton__"]',
-    ],
-  } satisfies SelectorChain,
-
-  /** Bouton de complétion/merge (§6.5) — jamais intercepté, grisé visuellement seulement.
-   *
-   * MESURÉ le 2026-10-29 sur `test/fixtures/pages/01` — la seule capture d'une PR OUVERTE : le
-   * bouton est un bouton Primer React, `button.prc-Button-ButtonBase-… [data-variant="primary"]`
-   * libellé « Rebase and merge », premier item d'un `[data-component="ButtonGroup"]` (le second,
-   * vide sur ce dépôt, porte le choix de la méthode quand il y en a plusieurs). Aucun `.btn-primary`
-   * nulle part : aucun des candidats suivants ne matchait, et le §6.5 ne grisait plus rien sur
-   * github.com. Le journal le disait — `merge-button`, sur chaque page —, noyé dans les entrées
-   * des PR fusionnées où l'absence est la norme (cf. `prSettledState`).
-   *
-   * Non mesuré : l'étape de confirmation qui suit le clic, si GitHub en rend une. Le grisage ne
-   * porte que sur le bouton affiché à l'arrivée sur la page. */
-  mergeButton: {
-    name: 'merge-button',
-    problem: 'completion-control',
-    candidates: [
-      '[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-variant="primary"]', // MESURÉ
-      '[data-testid="mergebox-partial"] button.btn-primary',
-      'button[data-testid*="merge-button"]',
-      '.merge-message button.btn-group-merge',
-      'button.js-merge-commit-button',
     ],
   } satisfies SelectorChain,
 
@@ -412,47 +323,10 @@ export const selectors = {
   /** Fils rendus sur la page — pour les ancres du bandeau (§5.5). */
   renderedThreads: {
     name: 'rendered-threads',
-    candidates: ['[data-testid="review-thread"]', '.js-resolvable-timeline-thread-container'],
-  } satisfies SelectorChain,
-
-  /** Sonde « ce fil est REPLIÉ, son contenu n'est pas dans la page » — elle ne sert qu'à
-   * DÉCIDER si un fil sans corps ni auteur lisibles est une dégradation (§9.4) ou le cas
-   * nominal, comme `editingSurfaces` pour `editors`.
-   *
-   * MESURÉ le 2026-10-29 sur les captures 01, 02 et 06 (vue Conversation) : chaque fil y est un
-   * `<review-thread-collapsible>`, et un fil résolu ou obsolète arrive REPLIÉ — un en-tête
-   * « Comment thread », le lien du fichier, « Outdated » —, son contenu n'étant chargé qu'au
-   * dépliage, depuis `data-deferred-content-url`. La correspondance est exacte sur les 28 fils
-   * des trois captures : les 21 qui portent l'attribut n'ont ni corps ni auteur, les 7 qui ne le
-   * portent pas (dépliés une fois, l'attribut disparaît avec le chargement) ont les deux.
-   * `getThreads()` journalisait donc `comment-body` et `comment-author` sur toute PR ayant un
-   * fil résolu — deux entrées qui ne disaient rien d'autre que « GitHub a replié un fil ».
-   *
-   * Si la sonde pourrit, elle ne matche plus, et le fil replié est journalisé comme avant :
-   * du bruit, jamais du silence. */
-  deferredThread: {
-    name: 'deferred-thread',
-    candidates: ['review-thread-collapsible[data-deferred-content-url]'], // MESURÉ
-  } satisfies SelectorChain,
-
-  /** L'état de résolution que le conteneur du fil porte LUI-MÊME — évalué sur le conteneur,
-   * jamais sur ses descendants (`matchesChain`).
-   *
-   * MESURÉ le 2026-10-29 : sur la vue Conversation (captures 01, 02, 06), chaque
-   * `<review-thread-collapsible>` porte `data-resolved="true"` ou `"false"`, replié ou non, et
-   * aucun des marqueurs de `resolvedMarker` : les 28 fils y étaient lus `unknown`, donc comptés
-   * NON résolus par le repli local du bandeau (§5.5) — deux fils `issue (blocking)` résolus de
-   * la capture 01 y passaient pour bloquants. Le §9.2.3 réserve `unknown` à l'état « non rendu »
-   * ; celui-ci l'est. Recoupé avec la vue Files changed de la MÊME PR (capture 05, lue par
-   * `resolvedMarker`) : `r4398202547` y est résolu et porte `"true"` sur la capture 01,
-   * `r4397911246` ne l'est pas et porte `"false"`. */
-  threadResolvedFlag: {
-    name: 'thread-resolved-flag',
-    candidates: ['review-thread-collapsible[data-resolved="true"]'], // MESURÉ
-  } satisfies SelectorChain,
-  threadUnresolvedFlag: {
-    name: 'thread-unresolved-flag',
-    candidates: ['review-thread-collapsible[data-resolved="false"]'], // MESURÉ
+    candidates: [
+      '[data-testid="review-thread"]',
+      '.js-resolvable-timeline-thread-container', // CLASSIQUE
+    ],
   } satisfies SelectorChain,
 
   /** Permalien d'ancrage d'un fil rendu — l'ancre du bandeau (§5.5). Le repli large
@@ -473,7 +347,14 @@ export const selectors = {
       // qu'aucun autre lien à fragment n'apparaisse plus haut dans le fil.
       '[class*="ActivityHeader-module__HeaderLink"]',
       '[class*="HeaderLink__"]', // MESURÉ le 2026-10-28, `test/fixtures/pages/05`
-      'a[href*="#"]',
+      // Le `:not(…)` est imposé par l'OVERVIEW (il survit donc à la vue classique) : sa carte
+      // d'état porte des liens `…/pull/N?comments:mode=…#overview-comments` (« View unresolved
+      // comments »), hors de tout fil. L'adaptateur ne cherche l'ancre que DANS un fil et ne les
+      // lirait jamais ; mais la réduction des captures retire leur requête, et ce candidat,
+      // comparé sur la page entière, lisait un `href` changé : la capture était refusée. MESURÉ le
+      // 2026-11-09 (`03-overview-commentaires-prefixes.html`) ; le candidat gagnant reste le même,
+      // fil par fil, sur toutes les captures antérieures.
+      'a[href*="#"]:not([href$="#overview-comments"])',
     ],
   } satisfies SelectorChain,
 
@@ -539,7 +420,7 @@ export const selectors = {
       // s'appelle `form.js-comment-update`, et `.js-comment-edit-form` n'existe plus sur la
       // page. La description de la PR porte la même classe, mais elle est écartée avant toute
       // classification (`observeEditors`, `prDescription`).
-      'form.js-comment-update',
+      'form.js-comment-update', // CLASSIQUE
     ],
   } satisfies SelectorChain,
 
@@ -550,8 +431,8 @@ export const selectors = {
     problem: 'rendered-comment-ancestor',
     candidates: [
       '[data-testid="review-thread-comment"]',
-      '.review-comment',
-      '.js-comment',
+      '.review-comment', // CLASSIQUE
+      '.js-comment', // CLASSIQUE
       '[class*="ReviewThreadComment-module__ReviewThreadContainer"]', // MESURÉ
       '[data-first-thread-comment]', // MESURÉ le 2026-10-28 — voir `editForm`
     ],
@@ -563,7 +444,7 @@ export const selectors = {
     problem: 'comment-text',
     candidates: [
       '[data-testid="comment-body"]',
-      '.comment-body',
+      '.comment-body', // CLASSIQUE
       '[class*="ReviewThreadComment-module__SafeHTMLBox"]', // MESURÉ — porte aussi `.markdown-body`
       '[class*="SafeHTMLBox__"]', // MESURÉ le 2026-10-28, `test/fixtures/pages/05`
     ],
@@ -623,6 +504,13 @@ export const selectors = {
     candidates: [
       '[class*="MarkdownEditor-module__previewViewerWrapper"] .markdown-body',
       '[class*="MarkdownEditor-module__previewViewerWrapper"] [class*="MarkdownViewer-module__markdownBody"]',
+      // MESURÉ le 2026-11-09 (`test/fixtures/pages/09-overview-apercu.html`) : les deux candidats
+      // ci-dessus ne trouvent plus rien sur AUCUNE capture — le préfixe de module a disparu, comme
+      // pour les chaînes du relevé du 2026-10-28 (« Les classes de modules CSS ont perdu leur
+      // préfixe »). L'enveloppe s'appelle `previewViewerWrapper__…`, le corps porte toujours
+      // `markdown-body`. L'éditeur est le même composant sur Files changed et sur l'Overview ;
+      // seule la seconde a une capture d'aperçu.
+      '[class*="previewViewerWrapper__"] .markdown-body',
     ],
   } satisfies SelectorChain,
 
@@ -632,7 +520,7 @@ export const selectors = {
     problem: 'comment-writer',
     candidates: [
       '[data-testid="comment-author"]',
-      '.author',
+      '.author', // CLASSIQUE
       '[data-testid="avatar-link"]', // MESURÉ — le lien du NOM de l'auteur, pas son image
     ],
   } satisfies SelectorChain,
@@ -641,38 +529,6 @@ export const selectors = {
   currentUser: {
     name: 'current-user',
     candidates: ['meta[name="user-login"]'],
-  } satisfies SelectorChain,
-
-  /** Date de création de la PR — lisible dans la page (§6.2.3), et décisive : c'est elle qui
-   * range une PR avant ou après `activatedAt`, donc hors ou dans le périmètre où l'extension
-   * bloque.
-   *
-   * MESURÉ le 2026-10-28 (`test/fixtures/pages/`, #84) : la chaîne d'avant finissait par
-   * `relative-time` tout court, et c'est lui seul qui répondait, partout — la PREMIÈRE date du
-   * document. L'en-tête de la page n'en porte pas sur une PR ouverte (capture 01), et sur une PR
-   * fusionnée il porte la date de FUSION (« Reefact merged 9 commits… », captures 02 à 07) : la
-   * même PR #331 se lisait 07:18 sur une page, 09:17 sur les autres. Le repli générique est
-   * retiré : il trouvait toujours quelque chose, si bien qu'aucune rupture ne pouvait atteindre
-   * le journal (§9.4). Mieux vaut une date inconnue — l'extension ne bloque alors jamais
-   * (`resolveInScope`) — qu'une date fausse.
-   *
-   * L'horodatage de la DESCRIPTION de la PR est sa date de création : elle est publiée à
-   * l'ouverture, et une modification ne le change pas. Mesuré sur deux PR où une seconde source
-   * permettait de le vérifier (`pullRequestsLayoutRoute.pullRequest.createdTime`, voir
-   * `prEmbeddedData`) : 07:18:01Z pour #331, 12:15:37Z pour #292, identiques. Sur la vue des
-   * fichiers modifiés, aucun élément de la page ne porte cette date : c'est `prEmbeddedData`
-   * qui prend le relais.
-   *
-   * UN SEUL candidat, et c'est voulu. Les deux d'en-tête qui suivaient
-   * (`.gh-header-meta relative-time`, `[data-testid="pr-header"] relative-time`) ne matchent rien
-   * sur les captures ; mais sur une page où ils matcheraient, rien ne dit qu'ils portent la
-   * création plutôt que la FUSION — c'est précisément ce que porte l'en-tête mesuré —, et ils
-   * passaient avant les données embarquées sans rien journaliser (revue Reefact, PR #86). Un
-   * candidat n'entre ici que s'il désigne une date identifiable comme celle de la création. */
-  prCreatedAt: {
-    name: 'pr-created-at',
-    problem: 'pr-creation-date',
-    candidates: ['[id^="pullrequest-"] relative-time'],
   } satisfies SelectorChain,
 
   /** Les données que la vue React embarque dans la page, en JSON — la seule source de la date
@@ -713,5 +569,380 @@ export const selectors = {
   draftBadge: {
     name: 'draft-badge',
     candidates: ['.State--draft', '[data-testid="draft-label"]'],
+  } satisfies SelectorChain,
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // VUE CLASSIQUE — l'onglet Conversation d'avant l'Overview (`/pull/N`, `?overview=false`).
+  //
+  // Chaque chaîne de ce bloc ne trouve quelque chose QUE sur les captures de la Conversation
+  // classique (`test/fixtures/pages/*-conversation-*`, `03-pr-fusionnee-*`) : ni sur Files
+  // changed, ni sur l'Overview. MESURÉ le 2026-11-09, candidat par candidat, sur les 21 captures.
+  // Les candidats propres à cette vue dans une chaîne COMMUNE portent, eux, la marque
+  // `// CLASSIQUE` en bout de ligne.
+  //
+  // Le jour où l'Overview sera la seule version : supprimer ce bloc, les candidats marqués
+  // `// CLASSIQUE`, `classic.ts`, les captures classiques, et l'aiguillage de `view.ts`.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+
+  /** Zones de saisie de la génération REACT — jamais observée en direct dans ce dépôt,
+   * conservée parce que rien ne prouve qu'elle ne décrive aucune vue.
+   *
+   * Les trois chaînes de composeur qui suivent sont assemblées en SURFACES par `surfaces.ts` :
+   * `/pull/N` et `/pull/N/changes` coexistent, et une chaîne unique rendait invisible le
+   * composeur de la seconde (une chaîne rend les éléments du premier candidat qui matche).
+   * Les sélecteurs restent ici — le §9.4 les veut « centralisés dans un fichier unique par
+   * adaptateur », et un second fichier de sélecteurs enfreindrait la règle que cette
+   * modélisation sert à honorer. `surfaces.ts` ne porte que la STRUCTURE. */
+  editorsReact: {
+    name: 'editors',
+    candidates: [
+      'textarea[aria-label*="omment"][class*="CommentBox"]',
+      'div[data-testid*="comment-composer"] textarea',
+    ],
+  } satisfies SelectorChain,
+
+  /** Zones de saisie de la génération HÉRITÉE. */
+  editorsLegacy: {
+    name: 'editors',
+    candidates: [
+      'textarea[name="comment[body]"]',
+      'textarea[name="pull_request_review_comment[body]"]',
+      'textarea[name="pull_request_review[body]"]',
+      'textarea.js-comment-field',
+    ],
+  } satisfies SelectorChain,
+
+  /** **Description de la PR — hors périmètre** (§4.1, dernière ligne du tableau : format non
+   * validé, aucun état bloquant). L'éditeur qu'on y ouvre n'est pas une zone du §4.1 : il ne
+   * doit recevoir ni barre d'outils, ni saisie rapide, ni garde d'envoi. Sans cette chaîne, il
+   * tombait dans le REPLI de `#contextOf()` — « ni fil, ni corps de revue, ni conversation,
+   * donc commentaire de ligne de diff » — et se retrouvait classé `thread-root`, la zone la
+   * plus privilégiée : en mode `enforce`, mettre à jour la description d'une PR devenait
+   * impossible, faute d'un `label:` en tête.
+   *
+   * MESURÉ sur `https://github.com/Reefact/conventional-comments-toolkit/pull/39` (page
+   * anonyme, 2026-09), où les trois candidats matchent **un seul** élément chacun, tous
+   * ancêtres du formulaire d'édition de la description, et aucun ancêtre d'un autre
+   * commentaire :
+   *
+   *   <div class="TimelineItem … js-command-palette-pull-body">      ← candidat 1
+   *     <div class="timeline-comment-group …" id="issue-5321598100">
+   *       <div id="pullrequest-4420243102" class="… js-comment …">   ← candidat 2
+   *         …
+   *         <form class="js-comment-update" id="issue-5321598100-edit-form">  ← candidat 3
+   *           <include-fragment src="…/edit_form?textarea_id=issue-5321598100-body">
+   *
+   * Les trois ne sont donc PAS trois générations de DOM (§A.5) mais trois emboîtements du
+   * MÊME rendu : `closestChain` s'arrêtant au premier qui matche, un renommage de la classe
+   * la plus extérieure laisse les deux autres attraper le cas.
+   *
+   * Deux limites, écrites parce qu'elles ne sont pas mesurées et ne doivent pas être crues :
+   * le `<textarea>` lui-même est servi par le `<include-fragment>` ci-dessus, que GitHub
+   * refuse sans session — ses attributs propres n'ont donc pas été observés, et c'est
+   * précisément pourquoi l'exclusion porte sur les ANCÊTRES, qui le seront quels qu'ils
+   * soient ; la génération React de la page de conversation, elle, n'a pas été observée du
+   * tout (la page mesurée est rendue côté serveur), et si elle nomme autrement ce conteneur,
+   * aucun candidat ne matchera — l'éditeur redeviendra visible comme avant ce correctif,
+   * jamais pire.
+   *
+   * `[id^="issue-"]` ne matche pas `issuecomment-…` — vérifié sur la page mesurée, qui porte
+   * les deux : le candidat 3 y compte exactement une occurrence. */
+  prDescription: {
+    name: 'pr-description',
+    candidates: [
+      '.js-command-palette-pull-body',
+      '[id^="pullrequest-"].js-comment',
+      'form.js-comment-update[id^="issue-"]',
+    ],
+  } satisfies SelectorChain,
+
+  /** Zone de conversation générale (issue comment) — zone `conversation` (§4.1). */
+  conversationForm: {
+    name: 'conversation-form',
+    candidates: [
+      '#new_comment_form',
+      'form.js-new-comment-form',
+      // L'ÉDITION d'un commentaire général, MESURÉE le 2026-10-28
+      // (`test/fixtures/pages/06-conversation-modification-commentaire.html`) : son champ est
+      // dans le commentaire publié, pas dans le formulaire de nouveau commentaire. Sans ce
+      // candidat, elle tombait dans le repli de `#contextOf()` et se lisait `thread-root` —
+      // réputée porter un état bloquant, sans `W-NOT-BLOCKABLE` (§4.1). L'identifiant
+      // `issuecomment-` la distingue d'un corps de revue, qui s'écrit `pullrequestreview-`.
+      '.timeline-comment-group[id^="issuecomment-"]',
+    ],
+  } satisfies SelectorChain,
+
+  /** Bouton de complétion/merge (§6.5) — jamais intercepté, grisé visuellement seulement.
+   *
+   * MESURÉ le 2026-10-29 sur `test/fixtures/pages/01` — la seule capture d'une PR OUVERTE : le
+   * bouton est un bouton Primer React, `button.prc-Button-ButtonBase-… [data-variant="primary"]`
+   * libellé « Rebase and merge », premier item d'un `[data-component="ButtonGroup"]` (le second,
+   * vide sur ce dépôt, porte le choix de la méthode quand il y en a plusieurs). Aucun `.btn-primary`
+   * nulle part : aucun des candidats suivants ne matchait, et le §6.5 ne grisait plus rien sur
+   * github.com. Le journal le disait — `merge-button`, sur chaque page —, noyé dans les entrées
+   * des PR fusionnées où l'absence est la norme (cf. `prSettledState`).
+   *
+   * Non mesuré : l'étape de confirmation qui suit le clic, si GitHub en rend une. Le grisage ne
+   * porte que sur le bouton affiché à l'arrivée sur la page. */
+  mergeButton: {
+    name: 'merge-button',
+    problem: 'completion-control',
+    candidates: [
+      '[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-variant="primary"]', // MESURÉ
+      '[data-testid="mergebox-partial"] button.btn-primary',
+      'button[data-testid*="merge-button"]',
+      '.merge-message button.btn-group-merge',
+      'button.js-merge-commit-button',
+    ],
+  } satisfies SelectorChain,
+
+  /** Sonde « ce fil est REPLIÉ, son contenu n'est pas dans la page » — elle ne sert qu'à
+   * DÉCIDER si un fil sans corps ni auteur lisibles est une dégradation (§9.4) ou le cas
+   * nominal, comme `editingSurfaces` pour `editors`.
+   *
+   * MESURÉ le 2026-10-29 sur les captures 01, 02 et 06 (vue Conversation) : chaque fil y est un
+   * `<review-thread-collapsible>`, et un fil résolu ou obsolète arrive REPLIÉ — un en-tête
+   * « Comment thread », le lien du fichier, « Outdated » —, son contenu n'étant chargé qu'au
+   * dépliage, depuis `data-deferred-content-url`. La correspondance est exacte sur les 28 fils
+   * des trois captures : les 21 qui portent l'attribut n'ont ni corps ni auteur, les 7 qui ne le
+   * portent pas (dépliés une fois, l'attribut disparaît avec le chargement) ont les deux.
+   * `getThreads()` journalisait donc `comment-body` et `comment-author` sur toute PR ayant un
+   * fil résolu — deux entrées qui ne disaient rien d'autre que « GitHub a replié un fil ».
+   *
+   * Si la sonde pourrit, elle ne matche plus, et le fil replié est journalisé comme avant :
+   * du bruit, jamais du silence. */
+  deferredThread: {
+    name: 'deferred-thread',
+    candidates: ['review-thread-collapsible[data-deferred-content-url]'], // MESURÉ
+  } satisfies SelectorChain,
+
+  /** L'état de résolution que le conteneur du fil porte LUI-MÊME — évalué sur le conteneur,
+   * jamais sur ses descendants (`matchesChain`).
+   *
+   * MESURÉ le 2026-10-29 : sur la vue Conversation (captures 01, 02, 06), chaque
+   * `<review-thread-collapsible>` porte `data-resolved="true"` ou `"false"`, replié ou non, et
+   * aucun des marqueurs de `resolvedMarker` : les 28 fils y étaient lus `unknown`, donc comptés
+   * NON résolus par le repli local du bandeau (§5.5) — deux fils `issue (blocking)` résolus de
+   * la capture 01 y passaient pour bloquants. Le §9.2.3 réserve `unknown` à l'état « non rendu »
+   * ; celui-ci l'est. Recoupé avec la vue Files changed de la MÊME PR (capture 05, lue par
+   * `resolvedMarker`) : `r4398202547` y est résolu et porte `"true"` sur la capture 01,
+   * `r4397911246` ne l'est pas et porte `"false"`. */
+  threadResolvedFlag: {
+    name: 'thread-resolved-flag',
+    candidates: ['review-thread-collapsible[data-resolved="true"]'], // MESURÉ
+  } satisfies SelectorChain,
+
+  threadUnresolvedFlag: {
+    name: 'thread-unresolved-flag',
+    candidates: ['review-thread-collapsible[data-resolved="false"]'], // MESURÉ
+  } satisfies SelectorChain,
+
+  /** Date de création de la PR — lisible dans la page (§6.2.3), et décisive : c'est elle qui
+   * range une PR avant ou après `activatedAt`, donc hors ou dans le périmètre où l'extension
+   * bloque.
+   *
+   * MESURÉ le 2026-10-28 (`test/fixtures/pages/`, #84) : la chaîne d'avant finissait par
+   * `relative-time` tout court, et c'est lui seul qui répondait, partout — la PREMIÈRE date du
+   * document. L'en-tête de la page n'en porte pas sur une PR ouverte (capture 01), et sur une PR
+   * fusionnée il porte la date de FUSION (« Reefact merged 9 commits… », captures 02 à 07) : la
+   * même PR #331 se lisait 07:18 sur une page, 09:17 sur les autres. Le repli générique est
+   * retiré : il trouvait toujours quelque chose, si bien qu'aucune rupture ne pouvait atteindre
+   * le journal (§9.4). Mieux vaut une date inconnue — l'extension ne bloque alors jamais
+   * (`resolveInScope`) — qu'une date fausse.
+   *
+   * L'horodatage de la DESCRIPTION de la PR est sa date de création : elle est publiée à
+   * l'ouverture, et une modification ne le change pas. Mesuré sur deux PR où une seconde source
+   * permettait de le vérifier (`pullRequestsLayoutRoute.pullRequest.createdTime`, voir
+   * `prEmbeddedData`) : 07:18:01Z pour #331, 12:15:37Z pour #292, identiques. Sur la vue des
+   * fichiers modifiés, aucun élément de la page ne porte cette date : c'est `prEmbeddedData`
+   * qui prend le relais.
+   *
+   * UN SEUL candidat, et c'est voulu. Les deux d'en-tête qui suivaient
+   * (`.gh-header-meta relative-time`, `[data-testid="pr-header"] relative-time`) ne matchent rien
+   * sur les captures ; mais sur une page où ils matcheraient, rien ne dit qu'ils portent la
+   * création plutôt que la FUSION — c'est précisément ce que porte l'en-tête mesuré —, et ils
+   * passaient avant les données embarquées sans rien journaliser (revue Reefact, PR #86). Un
+   * candidat n'entre ici que s'il désigne une date identifiable comme celle de la création. */
+  prCreatedAt: {
+    name: 'pr-created-at',
+    problem: 'pr-creation-date',
+    candidates: ['[id^="pullrequest-"] relative-time'],
+  } satisfies SelectorChain,
+
+  /** Sonde « cette PR ouverte ne peut PAS être fusionnée maintenant » — elle ne sert qu'à DÉCIDER
+   * si l'absence de `mergeButton` est le cas nominal, comme `prSettledState` (#113).
+   *
+   * MESURÉ sur le squelette du rapport de diagnostic du 2026-10-31 (branche
+   * `diagnostic/2026-10-31-merge-button`, `skeletons/mvw7201i-4sm6c7.txt`), PR ouverte dont un
+   * check requis échoue : la zone de fusion ne contient AUCUN bouton de fusion, et l'icône de
+   * mergeabilité porte `aria-label="Checks failing"`. Sur la capture
+   * `03-conversation-commentaires-prefixes-pr-ouverte.html`, où la fusion est possible, la même
+   * icône porte `aria-label="Ready to merge"` et le bouton est là.
+   *
+   * Une liste POSITIVE des états mesurés, jamais « tout sauf Ready to merge » : un état non mesuré
+   * (conflits, revue requise, file de fusion) reste journalisé — du bruit, jamais du silence. */
+  classicNotMergeable: {
+    name: 'classic-not-mergeable',
+    candidates: ['[data-testid="mergebox-partial"] [data-testid="mergeability-icon-wrapper"] svg[aria-label="Checks failing"]'],
+  } satisfies SelectorChain,
+
+  /** Sonde « le contenu de ce fil n'est pas dans la page » (#117) — cherchée DANS le fil, qui est
+   * lui-même le `review-thread-collapsible`.
+   *
+   * MESURÉ sur le squelette du rapport du 2026-10-31 (branche `diagnostic/2026-10-31-comment-body`,
+   * `skeletons/mvwpatfe-xunl01.txt`) : un fil replié dont le chargement a commencé n'a plus
+   * `data-deferred-content-url` (`deferredThread`), et son contenu est un `<include-fragment>` dans
+   * un `div[hidden]`, enfant direct du fil.
+   *
+   * La FORME compte, pas le seul élément, et c'est mesuré le 2026-11-09 sur les captures 01, 02,
+   * 06 et `03-conversation-…-pr-ouverte` : un fil DÉPLIÉ contient lui aussi de 3 à 9
+   * `include-fragment` (pour autre chose que ses commentaires), si bien qu'une sonde sur
+   * `include-fragment` seul faisait taire toute rupture de `comment-body`. La forme
+   * `review-thread-collapsible > div[hidden] > include-fragment` se trouve sur les 21 fils repliés
+   * de ces captures, et sur aucun des 10 fils dépliés. Voir `classicThreadNotRendered()`. */
+  classicLoadingThread: {
+    name: 'classic-loading-thread',
+    candidates: ['review-thread-collapsible > div[hidden] > include-fragment'],
+  } satisfies SelectorChain,
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // VUE OVERVIEW — la page « Overview » des pull requests, préversion publique du 2026-11-05
+  // (#131), servie par `?overview=true` à un compte inscrit.
+  //
+  // MESURÉ le 2026-11-09 sur les captures `test/fixtures/pages/*-overview-*` (PR 548 ouverte et
+  // PR 547 fusionnée de `Reefact/just-dummies`). Les fils de revue y sont rendus par le MÊME
+  // composant que sur Files changed (`[data-testid="review-thread"]`, `SafeHTMLBox__`,
+  // `data-first-thread-comment`) : ce sont les chaînes COMMUNES qui les lisent. Ce bloc ne porte
+  // que ce que l'Overview a en propre — le composeur général, les commentaires généraux, le
+  // groupe qui entoure un fil et sa réponse, le pied de ses éditeurs, la rangée de fusion.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+
+  /** La page est-elle l'Overview ? MESURÉ : le titre de la section des commentaires porte
+   * `id="overview-comments"` sur les 13 captures Overview, et sur aucune autre (`view.ts`). */
+  overviewPage: {
+    name: 'overview-page',
+    candidates: ['#overview-comments'],
+  } satisfies SelectorChain,
+
+  /** Le formulaire du nouveau commentaire général — zone `conversation` (§4.1). MESURÉ : le
+   * champ est dans `form[aria-label="Add comment form"]`, sur toutes les captures Overview ; les
+   * champs de réponse, d'édition et du panneau de revue n'ont, eux, aucun `form` (captures 02, 06,
+   * 07). Un nom accessible plutôt qu'une classe : posé exprès, et GitHub ne traduit pas son
+   * interface. */
+  overviewConversationForm: {
+    name: 'overview-conversation-form',
+    candidates: ['form[aria-label="Add comment form"]'],
+  } satisfies SelectorChain,
+
+  /** Le GROUPE qui porte un fil de revue ET son champ de réponse — zone `reply` (§4.1).
+   *
+   * MESURÉ sur `02-overview-reponse-fil.html` : le champ de réponse n'est PAS dans
+   * `[data-testid="review-thread"]` (la chaîne commune `threadContainer`), mais à côté, sous
+   * `div[id^="pullrequestreview-"][data-testid="review-thread-focus-target"]`. Sans ce candidat,
+   * une réponse se lisait `thread-root`, réputée porter un état bloquant. */
+  overviewThreadGroup: {
+    name: 'overview-thread-group',
+    candidates: ['[data-testid="review-thread-focus-target"]'],
+  } satisfies SelectorChain,
+
+  /** Un commentaire de fil, porteur de son identifiant : `div[id^="discussion_r"]`, MESURÉ sur
+   * les captures 02, 03 et 06 (`…-fil-racine`, `…-fil-reponse`). Le PREMIER d'un groupe est la
+   * racine du fil, et son `id` est l'identifiant du fil — même forme que sur la vue classique
+   * (`discussion_r4512962375`, capture `03-conversation-…-pr-ouverte`). Le groupe, lui, porte
+   * l'identifiant de la REVUE (`pullrequestreview-…`), qui n'est pas celui du fil. */
+  overviewThreadComment: {
+    name: 'overview-thread-comment',
+    candidates: ['[id^="discussion_r"]'],
+  } satisfies SelectorChain,
+
+  /** Un commentaire GÉNÉRAL publié : `article[id^="issuecomment-"]`, MESURÉ sur la capture 03.
+   * Son champ d'édition est DEDANS (capture 06) — c'est ce qui distingue l'édition d'un
+   * commentaire général de la composition d'un nouveau, et son `id` est le `commentId`. */
+  overviewGeneralComment: {
+    name: 'overview-general-comment',
+    candidates: ['article[id^="issuecomment-"]'],
+  } satisfies SelectorChain,
+
+  /** La description de la PR — hors périmètre (§4.1), comme `prDescription` sur la vue classique.
+   * MESURÉ : `section[aria-label="Description"]` sur toutes les captures Overview, qui contient le
+   * corps rendu de la description et rien d'autre. Son ÉDITION n'a pas été capturée : l'exclusion
+   * porte sur l'ancêtre, qu'elle aura quel que soit le champ. À vérifier. */
+  overviewPrDescription: {
+    name: 'overview-pr-description',
+    candidates: ['section[aria-label="Description"]'],
+  } satisfies SelectorChain,
+
+  /** Boutons d'envoi des éditeurs de l'Overview (§4.3, §5.4).
+   *
+   * MESURÉ sur les captures 01 (vide et rempli), 02 (vide et rempli), 06 et 07. Tous les pieds
+   * d'éditeur sont `[data-testid="markdown-editor-footer"]`, et dans son `childrenStyling__` :
+   *
+   *   - *Cancel* est TOUJOURS un `<button>` nu, PREMIER enfant (réponse, édition) ;
+   *   - *Comment* (nouveau commentaire) et *Update comment* (édition) sont des `<button>` nus,
+   *     en SECONDE position — ce que le candidat commun `> div:not(:first-child) button` ne voit
+   *     pas : il exige une enveloppe ;
+   *   - *Close with comment* (`#pull-request-state-button`) est enveloppé, mais PREMIER ;
+   *   - *Reply*, *Reply and resolve* et *Start a review* sont enveloppés.
+   *
+   * Sur une PR FUSIONNÉE (capture 08), il n'y a plus de *Close…* : *Comment* est alors nu et
+   * PREMIER, à la place exacte de *Cancel* ailleurs. Ce qui les sépare sur toutes les captures :
+   * *Cancel* est `data-variant="default"`, *Comment* `primary`.
+   *
+   * D'où une union en UN candidat : tout bouton enveloppé, tout bouton nu qui n'est pas le
+   * premier, et tout bouton nu `primary` — c'est-à-dire tout, sauf *Cancel*. Le sens d'erreur à
+   * surveiller : si GitHub passait *Cancel* en `primary`, on l'intercepterait, et l'auteur d'un
+   * commentaire non conforme ne pourrait plus l'abandonner. *Close with comment* et *Reply and resolve*
+   * PUBLIENT le commentaire : ils doivent être interceptés comme les autres. Champ vide, ils
+   * s'appellent *Close pull request* et *Resolve*, et la garde ne bloque jamais un corps vide
+   * (`isExempt`, CA-19) : fermer une PR sans commentaire reste possible.
+   *
+   * Le panneau « Finish your review » range ses boutons hors du pied (capture 07) : le candidat
+   * commun `SubmitReviewButton__` les y trouve, d'où le second candidat. */
+  overviewSubmitButtons: {
+    name: 'overview-submit-buttons',
+    candidates: [
+      '[data-testid="markdown-editor-footer"] [class*="childrenStyling__"] > div button, ' +
+        '[data-testid="markdown-editor-footer"] [class*="childrenStyling__"] > button:not(:first-child), ' +
+        '[data-testid="markdown-editor-footer"] [class*="childrenStyling__"] > button[data-variant="primary"]',
+      '[class*="SubmitReviewButton__"]',
+    ],
+  } satisfies SelectorChain,
+
+  /** Corps des commentaires publiés de l'Overview — badges du §5.5.
+   *
+   * MESURÉ sur la capture 03 : un commentaire général rend son corps dans
+   * `article[id^="issuecomment-"] .markdown-body.safe-html-box__…`, un commentaire de fil dans
+   * `[data-testid="review-thread"] .SafeHTMLBox__…`. La chaîne commune `commentBody` trouve
+   * d'abord les seconds et s'arrête là (premier candidat qui matche) : les commentaires généraux
+   * n'avaient jamais de badges. Les deux familles en UN candidat, donc. La description de la PR,
+   * qui porte aussi `safe-html-box__`, n'est dans aucun `article` : exclue par construction. */
+  overviewCommentBody: {
+    name: 'overview-comment-body',
+    problem: 'comment-text',
+    candidates: [
+      'article[id^="issuecomment-"] .markdown-body[class*="safe-html-box__"], ' +
+        '[data-testid="review-thread"] [class*="SafeHTMLBox__"]',
+    ],
+  } satisfies SelectorChain,
+
+  /** Bouton de fusion de l'Overview (§6.5) — jamais intercepté, grisé visuellement seulement.
+   *
+   * MESURÉ sur la capture 03 (PR 548 ouverte, fusion possible) : il n'y a pas de
+   * `mergebox-partial`. Le bouton « Rebase and merge » est dans une rangée « action recommandée »,
+   * `li[data-testid="for-you-item-row"][data-item-id="ready-to-merge"]`, `data-variant="primary"`
+   * (#127). La rangée se nomme elle-même : `data-item-id` est l'état de mergeabilité. */
+  overviewMergeButton: {
+    name: 'merge-button',
+    problem: 'completion-control',
+    candidates: ['[data-testid="for-you-item-row"][data-item-id="ready-to-merge"] button[data-variant="primary"]'],
+  } satisfies SelectorChain,
+
+  /** Sonde « pas fusionnable maintenant » de l'Overview, comme `classicNotMergeable`. MESURÉ sur
+   * la capture 01 (checks en cours) : la rangée porte `data-item-id="pending-checks"` et n'offre
+   * qu'« Enable auto-merge », `data-variant="default"` — que le §6.5 ne vise pas. Liste POSITIVE
+   * des états mesurés : un autre état (checks en échec, conflits) reste journalisé. */
+  overviewNotMergeable: {
+    name: 'overview-not-mergeable',
+    candidates: ['[data-testid="for-you-item-row"][data-item-id="pending-checks"]'],
   } satisfies SelectorChain,
 };

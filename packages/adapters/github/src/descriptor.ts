@@ -52,7 +52,11 @@ export const githubDescriptor = {
   // un sous-domaine par client, inconnu à la compilation.
   inferHost: (host: string) => host === 'github.com' || host === 'ghe.com' || host.endsWith('.ghe.com'),
   configCredentials: rawRouteCredentials,
-  viewParams: [],
+  // `overview` choisit, pour un compte inscrit à la préversion du 2026-11-05, entre la Conversation
+  // classique (`?overview=false`) et la page Overview (`?overview=true`) — deux pages sans rapport
+  // à la même adresse (#131). Sans lui, le journal de la page d'options les confondait. Limite
+  // connue : l'adresse NUE sert l'une ou l'autre selon le compte, et reste une seule marque.
+  viewParams: ['overview'],
   // Marque GitHub — tracé d'Octicons (`mark-github`), la forme officielle.
   glyph: {
     viewBox: '0 0 16 16',

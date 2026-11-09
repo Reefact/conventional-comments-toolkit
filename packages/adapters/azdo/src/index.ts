@@ -4,8 +4,6 @@
 // version précédente avait été écrite de mémoire et n'avait jamais fonctionné. Tout ce qu'il lit
 // vient des chaînes de selectors.ts, MESURÉES. Ce que les captures n'ont pas établi prend la
 // réponse prudente du contrat, écrite à l'endroit où elle s'applique :
-// - la lecture du fichier de configuration du dépôt n'est pas mesurée (§B.4) : `unreachable`, et
-//   l'extension est en état dégradé au sens du §5.4 — elle assiste sans bloquer ;
 // - le châssis de l'éditeur n'est pas mesuré : réponse neutre (§5.1, §5.3) ;
 // - l'état d'un fil n'a pas de marque de structure, seulement un libellé localisé : lu en
 //   anglais, `unknown` sinon (selectors.ts, `threadStateLabel`).
@@ -102,13 +100,38 @@ export class AzdoClientAdapter implements PlatformAdapter {
     return { id: 'azdo', suggestionInfoString: 'suggestion' };
   }
 
-  /** §B.4 — non mesurée. L'API REST répond à la session du navigateur depuis la PAGE (mesuré le
-   * 2026-11-09 en créant les PR de test, CAPTURES.md) ; ce qu'elle fait depuis un SCRIPT DE
-   * CONTENU (cookies, CORS, redirections) n'a pas été mesuré, et le dépôt a appris ce que coûte
-   * une lecture supposée (`check:content-script-cors`). D'ici là : `unreachable`, donc état
-   * dégradé — l'extension assiste sans bloquer (§5.4). */
-  async getRepoConfig(_pr: PrRef): Promise<ConfigRead> {
-    return { status: 'unreachable', reason: 'Azure DevOps repository config read not measured yet (spec §B.4)' };
+  /** §B.4 — le point d'API `items` du dépôt, qui sert le fichier de la branche par défaut.
+   * MESURÉ le 2026-11-10 sur dev.azure.com, depuis une page de PR connectée (CAPTURES.md,
+   * « Repository config read ») :
+   *   - fichier présent, avec la session : 200, SANS redirection, le contenu BRUT du fichier — à
+   *     condition de ne pas demander `Accept: application/json`, qui rend des métadonnées ;
+   *   - fichier absent : 404 (`TF401174`), sans redirection ;
+   *   - sans session : redirection vers `*.vssps.visualstudio.com/_signin`, 203 et une page HTML.
+   * La requête reste donc de MÊME ORIGINE de bout en bout pour une session ouverte — le cas que
+   * `check:content-script-cors` mesure dans Chromium pour un script de contenu sans permission
+   * d'hôte : il passe, cookies compris. `same-origin` suffit, et il ne porte pas la session hors
+   * de dev.azure.com si la plateforme redirige vers la connexion.
+   * Un 404 est fiable : la plateforme ne masque pas un dépôt privé derrière un 404 pour un
+   * visiteur sans session, elle le REDIRIGE — contrairement à GitHub (son adaptateur). */
+  async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
+    const [org, project, repo] = pr.scope.map((s) => encodeURIComponent(s));
+    const url =
+      `https://${pr.host}/${org}/${project}/_apis/git/repositories/${repo}/items` +
+      `?path=${encodeURIComponent('/.conventional-comments.json')}&api-version=7.1`;
+    try {
+      const res = await this.#fetch(url, { credentials: 'same-origin' });
+      if (res.status === 404) return { status: 'absent' };
+      // Session expirée : la plateforme redirige vers la connexion, qui répond 203 et du HTML
+      // (mesuré). Ni `found` ni `absent` — on ne sait rien du fichier.
+      if (res.status !== 200) return { status: 'unreachable', reason: `HTTP ${res.status}` };
+      const text = await res.text();
+      // Une page HTML n'est jamais un fichier de configuration JSON : la connexion, servie sans
+      // redirection visible par un intermédiaire, se lirait sinon comme une configuration invalide.
+      if (text.trimStart().startsWith('<')) return { status: 'unreachable', reason: 'HTML instead of the file' };
+      return { status: 'found', text };
+    } catch (e) {
+      return { status: 'unreachable', reason: String(e) };
+    }
   }
 
   async getOrgConfig(url: string | null): Promise<ConfigRead> {

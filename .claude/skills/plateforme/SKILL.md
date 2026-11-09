@@ -218,6 +218,27 @@ rapport trié comme à l'étape 2), `node scripts/check-captured-pages.mjs`, pui
   au vert sans rien regarder (`reduce:captured-pages --check` disait « rien à réduire »). Si un
   garde annonce 0 fichier sur un dossier qui en contient, c'est lui qu'il faut soupçonner.
 
+**Mesuré au deuxième usage** (2026-11-09, GitHub, page Overview, Windows) :
+- Chrome **bloque sans rien dire** les téléchargements automatiques qui suivent le premier sans
+  geste de l'utilisateur entre eux : le script rend `ok: true`, et le fichier n'arrive jamais. Un
+  rechargement n'y change rien une fois le blocage posé. Remède, que seule la personne peut
+  appliquer (réglage de SON navigateur) : `chrome://settings/content/automaticDownloads`, ajouter
+  `[*.]<hôte>` aux sites autorisés. Le lui demander AVANT la série de captures, et vérifier
+  l'arrivée de chaque fichier avant de passer à l'état suivant.
+- Le script de réduction pèse ~20 Ko et se renvoie à chaque navigation complète. `javascript_tool`
+  évalue dans un contexte qui échappe à la CSP de la page (mesuré sur github.com : `(0, eval)`
+  y passe) : l'installer une fois comme `window.__cctReduce(fichier)`, en garder la source dans le
+  `sessionStorage` de l'onglet, et la réévaluer après chaque navigation. Effacer cette clé à la fin.
+- Un champ qu'on vient de remplir se VIDE avant d'être annulé : *Cancel* sur un brouillon peut
+  ouvrir une confirmation native, qui bloquerait la session (non mesuré — précaution).
+- Sous Windows, `core.autocrlf=true` extrait les captures en CRLF : `reduce:captured-pages
+  --check` les dit « non réduites » et des tests échouent sur des `\r`. À voir AVANT de conclure à
+  une rupture : `git ls-files --eol` montre `i/lf w/crlf`.
+- Une affirmation d'issue de diagnostic est une hypothèse, pas une mesure : #117 disait les fils
+  repliés des captures « sans `include-fragment` » ; ils en ont tous un, et les fils dépliés de 3
+  à 9. Une sonde écrite d'après l'issue aurait fait taire toute rupture. La mesurer sur les
+  captures avant d'écrire.
+
 **Reste à vérifier** : la politique de sécurité d'une plateforme sous Trusted Types — le script
 crée sa propre politique (`cct-reduce-capture`) ; une page qui les interdit toutes le fait
 échouer explicitement (mesuré dans Chromium), et l'on passe à la voie B. Aucune plateforme

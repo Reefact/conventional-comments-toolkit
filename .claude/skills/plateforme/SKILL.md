@@ -418,8 +418,27 @@ Pour Azure DevOps, l'issue #50 affirme qu'une PR n'y est pas lisible sans authen
 C'est À VÉRIFIER avant de conclure qu'aucun canari en ligne n'y est possible : la plateforme
 connaît des projets publics, et ce qu'ils montrent à un visiteur n'a pas été mesuré.
 
+### Anticiper : la veille des changelogs
+
+Le canari constate une dérive après coup ; la veille la voit venir. Une tâche planifiée du
+compte du propriétaire, « Veille hebdomadaire des changelogs de plateformes » (claude.ai, onglet
+des routines — elle ne vit PAS dans le dépôt, aucune revue de PR ne la verra), lit chaque
+dimanche les annonces des plateformes du registre et ouvre une issue `platform-watch` par
+plateforme concernée. Elle relit le registre à chaque exécution, mais ne connaît que les
+SOURCES écrites dans son prompt : une plateforme sans source n'y produit qu'une issue
+`platform-watch: no changelog source for <id>`, et n'est pas surveillée. C'est ce qui est arrivé
+à GitLab, inscrit au registre sans que la tâche le sache.
+
+À la création d'une plateforme — et à sa remise à niveau si la source a changé d'adresse —,
+trouver le flux ou la page de notes de version officiel, l'OUVRIR pour vérifier qu'il répond et
+à quel rythme il publie (un flux mensuel est vide la plupart des semaines, ce n'est pas une
+panne), puis rédiger la ligne à ajouter à la liste des sources du prompt, sur le modèle des
+lignes existantes. Un agent ne peut pas modifier cette tâche (elle n'a pas été créée par un
+agent) : donner la ligne au propriétaire, avec le lien de la tâche, et le dire dans la PR —
+« veille : source ajoutée » ou « veille : ligne à ajouter par le propriétaire ».
+
 ## 7. La PR
 
 Une plateforme, et rien d'autre. Elle liste les états capturés, ceux qui sont « sans objet » et
-pourquoi, ce que le canari surveille, et ce qui reste non mesuré — un point non mesuré s'écrit,
-il ne se comble pas par une supposition.
+pourquoi, ce que le canari surveille, la source de veille de la plateforme (§6), et ce qui reste
+non mesuré — un point non mesuré s'écrit, il ne se comble pas par une supposition.

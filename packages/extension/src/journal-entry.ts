@@ -55,6 +55,23 @@ export interface SelectorFailure extends EntryBase {
   /** Identifiant du squelette de page pris au DERNIER relevé (`skeletons.ts`), stocké à part.
    * Il peut avoir été évincé depuis par le budget : l'archive de diagnostic le dit. */
   skeleton?: string;
+  /** Le DERNIER relevé, celui des champs ci-dessus, a-t-il été rattrapé plus tard dans sa visite ?
+   * Posé par `markRecovered`, retiré par chaque relevé nouveau. */
+  latestRecovered?: boolean;
+  /** Le dernier relevé JAMAIS rattrapé, quand un relevé plus récent l'a remplacé dans les champs
+   * ci-dessus (#116). Un relevé rattrapé est une chaîne sondée trop tôt ; celui qui ne l'a pas été
+   * est le seul qui puisse montrer une rupture, et c'était justement lui que le relevé suivant —
+   * souvent un chargement encore en cours — écrasait. Absent : aucun relevé non rattrapé n'a été
+   * remplacé. */
+  unrecovered?: Observation;
+}
+
+/** Ce qu'un relevé a vu, sans ses compteurs. */
+export interface Observation {
+  at: string;
+  url?: string;
+  evidence?: SelectorEvidence;
+  skeleton?: string;
 }
 
 /** Une exception levée par le code de l'extension, attrapée par personne d'autre. */
@@ -93,13 +110,42 @@ export function mergeJournalEntry<T extends JournalEntry>(previous: T | undefine
     previous.kind !== 'error' && previous.recoveredVisits !== undefined
       ? { recoveredVisits: previous.recoveredVisits, lastRecoveredAfterMs: previous.lastRecoveredAfterMs }
       : {};
-  return {
+  // Le relevé que `next` va remplacer n'a pas été rattrapé : il passe en `unrecovered` (#116). Il
+  // l'a été : le dernier non rattrapé déjà gardé reste en place.
+  const kept =
+    previous.kind !== 'error' && next.kind !== 'error'
+      ? previous.latestRecovered
+        ? previous.unrecovered
+        : observationOf(previous)
+      : undefined;
+  const merged = {
     ...next,
     ...recovery,
+    ...(kept ? { unrecovered: kept } : {}),
     firstAt: previous.firstAt ?? previous.at,
     count: (previous.count ?? 1) + 1,
     ...urlsOf(previous, next),
   };
+  // Le relevé nouveau n'a encore été rattrapé par rien.
+  delete (merged as { latestRecovered?: boolean }).latestRecovered;
+  return merged;
+}
+
+function observationOf(entry: SelectorFailure): Observation {
+  return {
+    at: entry.at,
+    ...(entry.url !== undefined ? { url: entry.url } : {}),
+    ...(entry.evidence !== undefined ? { evidence: entry.evidence } : {}),
+    ...(entry.skeleton !== undefined ? { skeleton: entry.skeleton } : {}),
+  };
+}
+
+/** Les squelettes qu'une ligne désigne : celui du dernier relevé, et celui du dernier relevé non
+ * rattrapé (#116). Ce qu'une ligne désigne est ce que le budget garde et ce que l'archive emporte. */
+export function skeletonsOf(entry: unknown): string[] {
+  const e = entry as { kind?: unknown; skeleton?: unknown; unrecovered?: { skeleton?: unknown } } | null;
+  if (!e || e.kind === 'error') return [];
+  return [e.skeleton, e.unrecovered?.skeleton].filter((id): id is string => typeof id === 'string');
 }
 
 export const MAX_URLS = 5;
@@ -114,5 +160,10 @@ function urlsOf(previous: JournalEntry | undefined, next: JournalEntry): { urls?
  * Elle ne change ni de place ni de date : c'est la même observation, complétée. */
 export function markRecovered<T extends JournalEntry>(entry: T, msSinceVisit: number): T {
   if (entry.kind === 'error') return entry;
-  return { ...entry, recoveredVisits: (entry.recoveredVisits ?? 0) + 1, lastRecoveredAfterMs: msSinceVisit };
+  return {
+    ...entry,
+    recoveredVisits: (entry.recoveredVisits ?? 0) + 1,
+    lastRecoveredAfterMs: msSinceVisit,
+    latestRecovered: true,
+  };
 }

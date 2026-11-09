@@ -26,7 +26,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SelectorLog } from '@cct/adapter-shared';
 import { appendToJournal, updateJournalEntry } from '../src/storage.js';
-import { mergeJournalEntry, entryKey, markRecovered, type JournalEntry, type SelectorFailure } from '../src/journal-entry.js';
+import { mergeJournalEntry, entryKey, markRecovered, skeletonsOf, type JournalEntry, type SelectorFailure } from '../src/journal-entry.js';
 
 const chain = (name: string) => ({ name, candidates: ['.absent'] });
 
@@ -229,6 +229,8 @@ describe('§9.4 — la fusion transmet ce que la ligne remplacée savait', () =>
       firstAt: 't1',
       count: 4,
       urls: ['https://x/1', 'https://x/2'],
+      // t1 n'a jamais été rattrapé : il reste lisible (#116).
+      unrecovered: { at: 't1', url: 'https://x/1' },
     });
   });
 
@@ -425,8 +427,64 @@ describe('§9.4 — la ligne garde les dernières pages et ses rattrapages', () 
 
     expect(store['selectorFailures']).toEqual([
       { chain: 'a', at: 't1' },
-      { chain: 'merge-button', at: 't2', count: 3, recoveredVisits: 1, lastRecoveredAfterMs: 120 },
+      { chain: 'merge-button', at: 't2', count: 3, recoveredVisits: 1, lastRecoveredAfterMs: 120, latestRecovered: true },
       { chain: 'b', at: 't3' },
     ]);
+  });
+});
+
+describe('#116 — le relevé jamais rattrapé survit aux relevés suivants', () => {
+  // Le rapport du 2026-10-31 : `merge-button`, cinq visites, quatre rattrapées. La ligne ne montrait
+  // que le DERNIER relevé — une zone de fusion encore en chargement, rattrapée ensuite — et avait
+  // perdu celui de la seule visite jamais rattrapée, le seul qui pouvait montrer une rupture.
+  const seen = (at: string, skeleton: string): SelectorFailure => ({
+    chain: 'merge-button',
+    at,
+    url: `https://github.com/acme/demo/pull/${at}`,
+    evidence: { trace: `relevé ${at}` },
+    skeleton,
+  });
+
+  it('un relevé non rattrapé, remplacé par un relevé rattrapé, reste lisible en `unrecovered`', () => {
+    let line = mergeJournalEntry<SelectorFailure>(undefined, seen('1', 'sk-1')); // jamais rattrapé
+    line = mergeJournalEntry(line, seen('2', 'sk-2'));
+    line = markRecovered(line, 5); // la visite 2 a fini par trouver son bouton
+    expect(line).toMatchObject({ at: '2', skeleton: 'sk-2', latestRecovered: true });
+    expect(line.unrecovered).toEqual({
+      at: '1',
+      url: 'https://github.com/acme/demo/pull/1',
+      evidence: { trace: 'relevé 1' },
+      skeleton: 'sk-1',
+    });
+  });
+
+  it('il n’est PAS remplacé par un relevé rattrapé plus récent', () => {
+    let line = mergeJournalEntry<SelectorFailure>(undefined, seen('1', 'sk-1'));
+    for (const at of ['2', '3', '4']) {
+      line = markRecovered(mergeJournalEntry(line, seen(at, `sk-${at}`)), 5);
+    }
+    expect(line.unrecovered?.at).toBe('1');
+    expect(line).toMatchObject({ count: 4, recoveredVisits: 3 });
+  });
+
+  it('un relevé non rattrapé plus récent prend sa place', () => {
+    let line = mergeJournalEntry<SelectorFailure>(undefined, seen('1', 'sk-1'));
+    line = mergeJournalEntry(line, seen('2', 'sk-2')); // 1 non rattrapé → gardé
+    line = mergeJournalEntry(line, seen('3', 'sk-3')); // 2 non rattrapé non plus → le remplace
+    expect(line.unrecovered?.at).toBe('2');
+    expect(line.latestRecovered).toBeUndefined();
+  });
+
+  it('toutes les visites rattrapées : rien à garder', () => {
+    let line = markRecovered(mergeJournalEntry<SelectorFailure>(undefined, seen('1', 'sk-1')), 5);
+    line = markRecovered(mergeJournalEntry(line, seen('2', 'sk-2')), 5);
+    expect(line.unrecovered).toBeUndefined();
+  });
+
+  it('les deux squelettes restent désignés : le budget les garde, l’archive les emporte', () => {
+    let line = mergeJournalEntry<SelectorFailure>(undefined, seen('1', 'sk-1'));
+    line = markRecovered(mergeJournalEntry(line, seen('2', 'sk-2')), 5);
+    expect(skeletonsOf(line)).toEqual(['sk-2', 'sk-1']);
+    expect(skeletonsOf({ kind: 'error', message: 'x', at: 't' })).toEqual([]);
   });
 });

@@ -12,7 +12,7 @@
 import type { ConfigRead, EffectiveConfig, Floor, PrRef, PublishedSummary } from '@cct/core';
 import { pageSkeleton, SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
 import { captureErrors, guarded } from './error-capture.js';
-import { entryKey, markRecovered, mergeJournalEntry, type JournalEntry } from './journal-entry.js';
+import { entryKey, markRecovered, mergeJournalEntry, skeletonsOf, type JournalEntry } from './journal-entry.js';
 import { analyze, enabledLabels } from '@cct/core';
 import { ClientConfigResolver, resolveUiLanguage, type ResolvedClientConfig } from './config-resolver.js';
 import {
@@ -368,7 +368,8 @@ function takeSkeleton(doc: Document): string | null {
 }
 
 function isReferenced(journal: unknown, id: string): boolean {
-  return Array.isArray(journal) && journal.some((e) => (e as { skeleton?: unknown } | null)?.skeleton === id);
+  // Le squelette du dernier relevé, ou celui du dernier relevé non rattrapé (#116, `skeletonsOf`).
+  return Array.isArray(journal) && journal.some((e) => skeletonsOf(e).includes(id));
 }
 
 /** La chaîne journalisée pendant cette visite a fini par trouver son élément : la ligne le dit
@@ -963,7 +964,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
       releaseDetached();
       for (const entry of knownEditors) void reconcile(entry, resolved);
     }
-  });
+  }, CONFIG_POLL_INTERVAL_MS, CONFIG_POLL_MIN_INTERVAL_MS, (fn) => log.quietly(fn));
 
   // Vidange : périodique, et à la fermeture de l'onglet. `pagehide` et non `unload` —
   // celui-ci empêche la mise en cache arrière/avant et n'est plus fiable ; `keepalive`
@@ -1343,7 +1344,11 @@ export function observePrChromeNavigation(
    * qu'elle est SÉPARÉE de lui (voir `CONFIG_POLL_MIN_INTERVAL_MS`) : un test qui veut
    * vérifier qu'un TTL COURT borne la cadence a besoin d'un plancher tout aussi court, sous
    * peine que le plancher de production (5 s) masque l'effet du TTL qu'il teste. */
-  configPollMinIntervalMs: number = CONFIG_POLL_MIN_INTERVAL_MS
+  configPollMinIntervalMs: number = CONFIG_POLL_MIN_INTERVAL_MS,
+  /** Exécute une sonde sans rien journaliser (`SelectorLog.quietly`). Le journal n'est pas dans
+   * le contrat de l'adaptateur : c'est `bootstrap()`, qui l'a construit, qui le prête ici. Par
+   * défaut, la sonde s'exécute telle quelle — le comportement d'avant #124. */
+  quietly: <T>(fn: () => T) => T = (fn) => fn()
   /** Révoque l'observation : déconnecte l'observateur et annule un rattrapage en attente.
    * Sans emploi en production — l'observateur vit le temps de l'onglet — mais nécessaire à
    * tout appelant qui n'est PAS un onglet : deux observations concurrentes sur le même
@@ -1469,7 +1474,12 @@ export function observePrChromeNavigation(
       missedMutation = true; // traité en une seule relance temporisée à la fin du rendu en cours
       return;
     }
-    const key = prKeyFor(adapter.currentPr());
+    // La clé ne demande que l'hôte, le dépôt et le numéro ; `currentPr()` lit pourtant aussi la
+    // date de création, et journaliserait son échec dans la visite PRÉCÉDENTE, que la nouvelle
+    // n'a pas encore remplacée — puis une seconde fois après `newVisit()` : une navigation
+    // comptait pour deux visites (#124). Ces deux sondes-là se taisent ; la première sonde de la
+    // nouvelle visite dira ce qu'il y a à dire.
+    const key = prKeyFor(quietly(() => adapter.currentPr()));
     const nowMs = now();
     const navigated = !hasRendered || key !== lastPrKey;
     if (navigated) {
@@ -1477,7 +1487,7 @@ export function observePrChromeNavigation(
       lastPrKey = key;
       // AVANT tout rendu : c'est ici que la PR affichée change, et l'armement de la
       // télémétrie doit suivre ce changement-là, pas celui d'un éditeur.
-      onPrChange(adapter.currentPr(), true, null);
+      onPrChange(quietly(() => adapter.currentPr()), true, null);
       showedSomething = false;
       lastOwnSig = null;
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;

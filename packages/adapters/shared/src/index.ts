@@ -619,10 +619,32 @@ export class SelectorLog {
     this.#visitStart = Date.now();
   }
 
+  // Profondeur des appels `quietly()` en cours : une sonde n'y journalise rien, n'y rattrape rien.
+  #quiet = 0;
+
+  /** Exécute `fn` sans que rien n'y soit journalisé ni marqué rattrapé — pour une sonde dont on
+   * ne veut que la RÉPONSE, posée avant de savoir à quelle visite elle appartient (#124).
+   *
+   * Le cas qui l'a demandé : pour savoir si la page affichée a changé de PR, le code partagé
+   * demande `currentPr()` à l'adaptateur AVANT de déclarer la nouvelle visite (`newVisit`). Or
+   * `currentPr()` lit aussi la date de création, et la journalisait en cas d'échec — dans la
+   * visite PRÉCÉDENTE, puis encore une fois dans la nouvelle : une sonde trop précoce comptait
+   * pour deux visites, et seule la seconde pouvait être marquée rattrapée. Ce que la sonde
+   * aurait dû dire, la nouvelle visite le dira elle-même au premier appel suivant. */
+  quietly<T>(fn: () => T): T {
+    this.#quiet++;
+    try {
+      return fn();
+    } finally {
+      this.#quiet--;
+    }
+  }
+
   /** Une chaîne journalisée PENDANT CETTE VISITE vient de trouver son élément. Le rappel ne
    * part qu'une fois par chaîne et par visite, et jamais pour une chaîne qui n'a pas échoué :
    * l'appel est fait à chaque succès, il ne doit rien coûter dans le cas nominal. */
   recovered(chain: SelectorChain): void {
+    if (this.#quiet > 0) return;
     if (!this.#seen.has(chain.name) || this.#recoveredThisVisit.has(chain.name)) return;
     this.#recoveredThisVisit.add(chain.name);
     this.#recovered?.(chain, Date.now() - this.#visitStart);
@@ -654,6 +676,7 @@ export class SelectorLog {
    * méthode est appelée à chaque mutation du DOM, et la trace interroge la page candidat par
    * candidat. */
   degraded(chain: SelectorChain, evidence?: () => SelectorEvidence): void {
+    if (this.#quiet > 0) return;
     if (this.#seen.has(chain.name)) return;
     this.#seen.add(chain.name);
     // UNE entrée par chaîne, rafraîchie plutôt qu'ajoutée. `#seen` ne suffit plus à borner

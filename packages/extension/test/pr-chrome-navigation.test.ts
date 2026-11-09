@@ -44,7 +44,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
-import { commentBodyText, type PlatformAdapter, type SubmitControl, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
+import { commentBodyText, SelectorLog, type PlatformAdapter, type SubmitControl, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { defaultConfig, fingerprint, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver, type ResolvedClientConfig } from '../src/config-resolver.js';
 import { decorateWithHtmlShape, HTML_SHAPE } from './helpers/decorate.js';
@@ -2420,5 +2420,41 @@ describe('§5.5 — un commentaire MIS À JOUR retrouve ses badges (défaut sign
     const azdo = new AzdoClientAdapter({ documentRef: document });
     expect(azdo.getRenderedCommentElements()).toEqual(azdo.getRenderedComments().map((c) => c.element));
     expect(azdo.getRenderedCommentElements().length).toBeGreaterThan(0);
+  });
+});
+
+describe('#124 — une navigation est UNE visite pour le journal', () => {
+  // Le rapport du 2026-11-04 : `pr-created-at` journalisé `count: 2` pour une seule navigation,
+  // à 1 ms d'écart. `run()` demandait `currentPr()` — qui lit la date de création — pour savoir
+  // si la PR avait changé, AVANT que `onPrChange` ne déclare la nouvelle visite : la sonde
+  // journalisait dans la visite précédente, puis à nouveau dans la nouvelle.
+  it('la sonde qui détecte la navigation ne journalise pas : une seule ligne, dans la nouvelle visite', async () => {
+    const chain = { name: 'pr-created-at', candidates: ['[id^="pullrequest-"] relative-time'] };
+    const writes: string[] = [];
+    const log = new SelectorLog(null, (c) => writes.push(c.name));
+    let current: PrRef | null = pr(90);
+    // La page n'est pas encore celle de la PR : la date est introuvable à chaque appel.
+    const adapter = makeAdapter(() => {
+      log.degraded(chain);
+      return current;
+    });
+    observePrChromeNavigation(
+      adapter,
+      new ClientConfigResolver(async () => null),
+      document,
+      Date.now,
+      (_pr, changed) => {
+        if (changed) log.newVisit();
+      },
+      0,
+      undefined,
+      (fn) => log.quietly(fn)
+    );
+    await flushAll();
+    expect(writes).toEqual(['pr-created-at']);
+    // Neutralise l'observateur : la page ne montre plus de PR.
+    current = null;
+    document.body.appendChild(document.createElement('div'));
+    await flushAll();
   });
 });

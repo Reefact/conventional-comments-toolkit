@@ -9,7 +9,7 @@
 // commentaire ; PRIVACY.md dit ce qu'il contient, et pourquoi le rapport se relit avant d'être
 // partagé.
 
-import type { JournalEntry } from '../journal-entry.js';
+import { skeletonsOf, type JournalEntry } from '../journal-entry.js';
 import type { RegistrationEvent } from '../registration-log.js';
 import { decompressSkeleton, type StoredSkeleton } from '../skeletons.js';
 import { zip, type ZipEntry } from './zip.js';
@@ -82,7 +82,8 @@ export async function diagnosticArchive(
     { name: 'README.txt', data: encoder.encode(readme) },
     { name: 'report.json', data: encoder.encode(JSON.stringify(report, null, 2)) },
   ];
-  const wanted = new Set(entries.flatMap((e) => (e.kind !== 'error' && e.skeleton ? [e.skeleton] : [])));
+  // Les squelettes que les lignes désignent, celui du dernier relevé non rattrapé compris (#116).
+  const wanted = new Set(entries.flatMap(skeletonsOf));
   for (const stored of skeletons) {
     if (!wanted.has(stored.id)) continue;
     const text = await decompressSkeleton(stored.gz);

@@ -354,9 +354,7 @@ export class EditorController {
     this.#disposers.push(() => this.deps.editor.element.removeEventListener('input', onInput));
 
     // §5.4 — interception de chaque point de sortie, raccourci clavier compris (§4.3).
-    for (const control of this.deps.adapter.getSubmitControls(this.deps.editor)) {
-      this.#guardControl(control);
-    }
+    this.#guardSubmitControls();
     const onKeydown = (e: Event) => {
       const ke = e as KeyboardEvent;
       // Raccourcis directs (§5.2) : Alt+<lettre> insère le label correspondant.
@@ -574,8 +572,26 @@ export class EditorController {
     this.#feedback?.announceBlocked(this.#lastAnalysis?.diagnostics ?? []);
   }
 
-  #guardControl(control: SubmitControl): void {
+  /** Un SEUL écouteur, en capture sur le DOCUMENT, qui demande à l'adaptateur au moment du clic
+   * quels sont les contrôles d'envoi de cet éditeur — et non un écouteur posé, à `attach()`, sur
+   * chacun des contrôles d'alors.
+   *
+   * La première forme supposait des boutons stables. MESURÉ le 2026-11-09 dans Chromium, page
+   * Overview de GitHub (préversion du 2026-11-05) : quand on tape dans le champ, React REMPLACE
+   * l'élément du bouton *Comment* par un nouveau. L'écouteur restait sur l'ancien, hors de la page :
+   * sous `enforce`, un commentaire non conforme se publiait d'un clic, alors que `refresh()` —
+   * qui redemande les contrôles à chaque saisie — grisait bien le nouveau bouton. Le blocage
+   * paraissait posé, et ne l'était pas.
+   *
+   * La capture au niveau du document passe avant tout gestionnaire de la page : ceux de React
+   * écoutent sur leur racine, plus bas dans l'arbre, et un `stopPropagation` ici les prive du clic. */
+  #guardSubmitControls(): void {
+    const doc = this.deps.editor.element.ownerDocument;
     const onClick = (e: Event) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      const controls: SubmitControl[] = this.deps.adapter.getSubmitControls(this.deps.editor);
+      if (!controls.some((c) => c.element === target || c.element.contains(target))) return;
       if (this.#shouldBlockNow()) {
         e.preventDefault();
         e.stopPropagation();
@@ -583,7 +599,7 @@ export class EditorController {
       }
     };
     const guardedClick = guarded('editor', onClick);
-    control.element.addEventListener('click', guardedClick, true);
-    this.#disposers.push(() => control.element.removeEventListener('click', guardedClick, true));
+    doc.addEventListener('click', guardedClick, true);
+    this.#disposers.push(() => doc.removeEventListener('click', guardedClick, true));
   }
 }

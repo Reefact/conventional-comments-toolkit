@@ -35,7 +35,8 @@ Follow https://conventionalcomments.org/ and the extensions of the Conventional 
 
 **Read the repository's configuration first**: `.conventional-comments.json` at the repository
 root, if it exists. The labels you may use are the ones it leaves enabled, with their aliases and
-any `description` it writes for them; a label it disables does not exist for this repository.
+any `description` and `usage` it writes for them; a label it disables does not exist for this
+repository.
 The toolkit's defaults enable every shipped label except `quibble`.
 
 **That file is not the whole configuration.** The labels in force come from three levels, merged

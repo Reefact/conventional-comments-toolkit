@@ -191,14 +191,29 @@ Chromium in both views.
 On all 21 captures, `draftBadge` finds nothing.
 
 `checkRunTitles` found nothing either, so the published `cc/1` line was never read from the page.
-**Measured and fixed on 2026-11-09** on PR 551 (CodeQL publishes a check title there): in both
-views, each check of the list carries `span.titleDescription__…`, rendering its state then its
-title (`Successful in 5s — No new alerts in code changed by this pull request`). Captures
-`03-overview-checks-deplies.html` and `03-conversation-checks-deplies.html`. **Limit:** the checks
-list is collapsed by default when every check is green, and a collapsed title is not in the DOM, in
-either view. Whether GitHub expands it by itself when a check fails — what the #113 skeleton
-suggests (`Collapse checks`) — and whether a full `cc/1` line survives the rendering both remain to
-be checked once a verifier publishes on a measured repository.
+**Measured and fixed on 2026-11-09**, first on PR 551 (CodeQL publishes a check title), then on PR
+552, where a temporary workflow published a real `conventional-comments` check run with a `cc/1`
+title, as the verifier would (§A.8), first as `success`, then as `failure`. In both views, each
+check of the list is an `li` whose accessible name carries the check's name, and whose
+`span.titleDescription__…` renders the state then the title — the whole `cc/1` line. Captures
+`03-overview-checks-deplies.html`, `03-conversation-checks-deplies.html` (PR 551) and
+`03-conversation-cc1-en-echec.html` (PR 552).
+
+- **Provenance.** GitHub attaches a check run published with a workflow's token to ANOTHER
+  workflow's check suite, and renders it `Contributor agreement / conventional-comments
+  (pull_request_target)`. Reading is limited to `li[aria-label*="/ conventional-comments "]`: any
+  other check may carry a `cc/1`-looking title and is ignored.
+- **When the line is in the page at all** (the DOM, embedded data and scripts included):
+
+  | Checks | Classic | Overview |
+  |---|---|---|
+  | some still running | list expanded, `cc/1` readable | tile collapsed, `cc/1` absent |
+  | all green | list collapsed, `cc/1` absent | tile collapsed, `cc/1` absent |
+  | `conventional-comments` failing | list expanded by GitHub, `cc/1` readable | tile collapsed, `cc/1` absent |
+
+  So the published summary is only readable on the classic view, while a check runs or fails. The
+  owner decided on 2026-11-09 to keep the local fallback elsewhere and to raise the question in the
+  specification (§5.5, §6.5 assume the line is readable).
 
 Fixed in the same pull request, because the final validation showed them in both views:
 

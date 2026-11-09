@@ -594,27 +594,32 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
-  /** Titres de checks rendus sur la page — c'est là que vit la ligne cc/1 (§6.3.1, §A.8). */
+  /** Le TITRE du check run du vérificateur — c'est là que vit la ligne cc/1 (§6.3.1, §A.8).
+   *
+   * MESURÉ le 2026-11-09 sur un vrai check `conventional-comments` (PR 552 de `just-dummies`,
+   * publié par un workflow temporaire comme le ferait le vérificateur ;
+   * `03-conversation-cc1-en-echec.html`) et sur celui de CodeQL (PR 551 ;
+   * `03-conversation-checks-deplies.html`, `03-overview-checks-deplies.html`). Dans les deux vues,
+   * chaque check de la liste est un `li` dont le nom accessible porte le NOM du check, et dont un
+   * `span.titleDescription__…` rend l'état PUIS le titre — `— cc/1 state=failure …`, ligne entière.
+   *
+   * La lecture est LIMITÉE au check `conventional-comments` (§A.8) : n'importe quel autre check
+   * pouvait publier un titre de la forme `cc/1 …`, et le premier rencontré l'emportait (revue
+   * Reefact, PR #143). Le nom n'est pas en tête : GitHub rattache le check publié par le jeton
+   * d'un workflow à la suite d'un AUTRE workflow du dépôt, et le rend
+   * `Contributor agreement / conventional-comments (pull_request_target)` — d'où la recherche de
+   * `/ conventional-comments `, barre et espaces compris, qu'un `conventional-comments-lint` ne
+   * satisfait pas. Les quatre candidats d'avant ne trouvaient rien sur aucune capture, et ne
+   * regardaient pas de quel check venait le titre : retirés.
+   *
+   * LIMITE, mesurée dans Chromium sur la même PR : la liste est REPLIÉE — et le titre absent du
+   * DOM — quand tous les checks sont verts, dans les deux vues ; la Conversation classique la DÉPLIE
+   * d'elle-même quand un check échoue ou tourne encore, l'Overview jamais. Le résumé publié ne se
+   * lit donc qu'en vue classique, et seulement dans ces cas ; ailleurs, l'extension garde son repli
+   * local (décision du propriétaire, 2026-11-09). */
   checkRunTitles: {
     name: 'check-run-titles',
-    candidates: [
-      '[data-testid="check-run-item"]',
-      '.merge-status-item .status-meta',
-      '.merge-status-item',
-      '.branch-action-item .status-meta',
-      // MESURÉ le 2026-11-09 (`03-conversation-checks-deplies.html`, `03-overview-checks-deplies.html`,
-      // PR 551) : les quatre candidats ci-dessus ne trouvent rien sur aucune capture. Dans les DEUX
-      // vues, chaque check de la liste porte un `span.titleDescription__…` qui rend son état PUIS
-      // son titre — « Successful in 5s — No new alerts in code changed by this pull request » pour
-      // CodeQL. `readPublishedResult()` y cherche `cc/1 ` où qu'il soit : l'état en tête ne gêne pas.
-      //
-      // LIMITE, mesurée dans Chromium : la liste des checks est REPLIÉE par défaut quand tous sont
-      // verts, et un titre replié n'est PAS dans le DOM — ni dans l'une ni dans l'autre vue. Qu'elle
-      // se déplie d'elle-même quand un check échoue (ce que suggère le squelette du #113, qui montrait
-      // « Collapse checks ») reste à vérifier sur une vraie ligne `cc/1` en échec ; aucun vérificateur
-      // ne publie encore sur un dépôt mesuré.
-      '[class*="titleDescription__"]',
-    ],
+    candidates: ['li[aria-label*="/ conventional-comments "] [class*="titleDescription__"]'],
   } satisfies SelectorChain,
 
   /** Brouillon — décide de rien côté A, affiché seulement. */

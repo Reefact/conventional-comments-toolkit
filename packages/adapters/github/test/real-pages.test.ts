@@ -248,25 +248,40 @@ describe('§5.5 — le filtre de fils se place au niveau de la LISTE, hors des b
   }, T);
 });
 
-describe('§6.3.1, §6.5 — la ligne cc/1 se relit dans le titre d’un check (captures de la PR 551)', () => {
-  // Aucun vérificateur ne publie encore sur un dépôt mesuré : la ligne est substituée au titre que
-  // CodeQL a réellement publié, à l'endroit exact où GitHub le rend, listes de checks dépliées.
-  const LINE =
-    'cc/1 state=failure draft=0 exempt=0 mode=enforce activated=- core=1.0.0 cfg=deadbeef t=2 c=1 w=0';
+describe('§6.3.1, §6.5, §A.8 — la ligne cc/1 se lit dans le check conventional-comments, et lui seul', () => {
+  // Un vrai check `conventional-comments`, publié en échec sur la PR 552 par un workflow temporaire,
+  // comme le ferait le vérificateur ; la Conversation classique déplie alors la liste d'elle-même.
+  it('lit la ligne publiée par le vérificateur (capture classique, check en échec)', () => {
+    const page = load('03-conversation-cc1-en-echec.html', '/Reefact/just-dummies/pull/552'); // CLASSIQUE
+    expect(page.adapter.readPublishedResult()).toMatchObject({
+      state: 'failure',
+      mode: 'warn',
+      unresolvedBlockingCount: 2,
+      nonCompliantCommentCount: 1,
+      warningCount: 0,
+    });
+  }, T);
+
+  it('ignore une ligne cc/1 publiée par un AUTRE check, même placé avant (revue Reefact, PR #143)', () => {
+    const page = load('03-conversation-cc1-en-echec.html', '/Reefact/just-dummies/pull/552'); // CLASSIQUE
+    const verifier = page.doc.querySelector('li[aria-label*="/ conventional-comments "]')!;
+    const impostor = verifier.cloneNode(true) as Element;
+    impostor.setAttribute('aria-label', 'Some workflow / other-check (pull_request) ');
+    impostor.querySelector('[class*="titleDescription__"]')!.textContent =
+      '— cc/1 state=success draft=0 exempt=0 mode=enforce activated=- core=1.0.0 cfg=deadbeef t=0 c=0 w=0';
+    verifier.parentElement!.insertBefore(impostor, verifier);
+    expect(page.adapter.readPublishedResult()).toMatchObject({ state: 'failure', unresolvedBlockingCount: 2 });
+  }, T);
+
   it.each([
     ['03-overview-checks-deplies.html'],
     ['03-conversation-checks-deplies.html'], // CLASSIQUE
-  ])('%s : lue dans le titre rendu, état du check en tête', (file) => {
+  ])('%s : le titre de CodeQL, même en forme cc/1, n’est jamais lu', (file) => {
     const page = load(file, '/Reefact/just-dummies/pull/551');
     const title = Array.from(page.doc.querySelectorAll('[class*="titleDescription__"]')).find((e) =>
       e.textContent?.includes('No new alerts in code changed by this pull request')
     )!;
-    title.textContent = `Successful in 5s — ${LINE}`;
-    expect(page.adapter.readPublishedResult()).toMatchObject({
-      state: 'failure',
-      mode: 'enforce',
-      unresolvedBlockingCount: 2,
-      nonCompliantCommentCount: 1,
-    });
+    title.textContent = 'Successful in 5s — cc/1 state=failure draft=0 exempt=0 mode=enforce activated=- core=1.0.0 cfg=deadbeef t=2 c=1 w=0';
+    expect(page.adapter.readPublishedResult()).toBeNull();
   }, T);
 });

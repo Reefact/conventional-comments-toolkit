@@ -550,7 +550,14 @@ export function commentBodyText(element: Element): string {
   clone.querySelectorAll(OWN_BADGES).forEach((badge) => badge.remove());
   const text = (s: string) => clone.ownerDocument.createTextNode(s);
   for (const pre of clone.querySelectorAll('pre')) {
-    pre.replaceWith(text(`\n\`\`\`\n${(pre.textContent ?? '').replace(/^\n+|\n+$/g, '')}\n\`\`\`\n`));
+    const code = (pre.textContent ?? '').replace(/^\n+|\n+$/g, '');
+    // Plus long que toute suite d'accents graves du code, et trois au moins : un bloc ne se ferme
+    // que sur une ligne au moins aussi longue que son ouverture (§3.4.1, `splitBody`), si bien
+    // qu'un code qui CONTIENT une ligne ```` ``` ```` — un exemple de syntaxe Markdown — ne ferme
+    // plus le bloc reconstruit avant sa fin (revue Reefact, PR #141).
+    const longest = Math.max(0, ...(code.match(/`+/g) ?? []).map((run) => run.length));
+    const fence = '`'.repeat(Math.max(3, longest + 1));
+    pre.replaceWith(text(`\n${fence}\n${code}\n${fence}\n`));
   }
   // Les citations les plus profondes d'abord : la citation qui les contient relit alors leur
   // forme source, et chaque niveau ajoute son `> `.

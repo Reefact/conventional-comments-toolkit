@@ -21,175 +21,8 @@
 // sur les mêmes pages : mêmes comptes partout.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import type { EditorHandle } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '../src/index.js';
-
-const PAGES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'pages');
-
-interface LoadedPage {
-  adapter: GithubClientAdapter;
-  doc: Document;
-  editors: EditorHandle[];
-}
-
-/** Une page capturée, à l'URL où elle a été prise. `DOMParser` plutôt que le document de
- * l'environnement : un document analysé ne charge ni script ni feuille de style. */
-function load(file: string, path: string): LoadedPage {
-  const doc = new DOMParser().parseFromString(readFileSync(join(PAGES, file), 'utf8'), 'text/html');
-  Object.defineProperty(doc, 'location', { value: new URL(`https://github.com${path}`), configurable: true });
-  const adapter = new GithubClientAdapter({ documentRef: doc });
-  const editors: EditorHandle[] = [];
-  adapter.observeEditors((e) => editors.push(e)).dispose();
-  return { adapter, doc, editors };
-}
-
-/** L'éditeur qui porte ce champ — il DOIT avoir été observé. */
-function editorOf(page: LoadedPage, field: Element | null): EditorHandle {
-  const editor = page.editors.find((e) => e.element === field);
-  if (!editor) throw new Error('champ non observé');
-  return editor;
-}
-
-/** Le libellé des contrôles d'envoi, espaces resserrés. */
-function submitLabels(page: LoadedPage, editor: EditorHandle): string[] {
-  return page.adapter.getSubmitControls(editor).map((c) => (c.element.textContent ?? '').trim().replace(/\s+/g, ' '));
-}
-
-// Analyser une page de 3 Mo prend quelques secondes : une seule fois par fichier.
-const T = 30_000;
-
-describe('§4.1, §9.2.3 — Conversation : nouveau commentaire (capture 01)', () => {
-  let page: LoadedPage;
-  beforeAll(() => {
-    page = load('01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/331');
-  }, T);
-
-  it('observe le champ de nouveau commentaire, en zone conversation', () => {
-    const editor = editorOf(page, page.doc.getElementById('new_comment_field'));
-    expect(editor.context).toMatchObject({ zone: 'conversation', action: 'compose', canCarryBlockingState: false });
-    expect(submitLabels(page, editor)).toEqual(['Comment']);
-  });
-
-  it("n'observe PAS la description de la PR, ouverte en édition sur cette capture (§4.1)", () => {
-    expect(page.doc.getElementById('issue-6074440789-body')).not.toBeNull();
-    expect(page.editors.map((e) => e.element.id)).not.toContain('issue-6074440789-body');
-  });
-
-  it('lit la PR, sa date de création et la personne connectée dans la page', async () => {
-    expect(page.adapter.currentPr()).toMatchObject({
-      platform: 'github',
-      host: 'github.com',
-      scope: ['Reefact', 'just-dummies'],
-      number: 331,
-    });
-    expect(page.adapter.currentPr()?.createdAt).not.toBe('');
-    expect((await page.adapter.getCurrentUser()).login).toBe('Reefact');
-  });
-
-  it("trouve le bouton de fusion d'une PR ouverte, et ne journalise rien (§6.5, §9.4)", () => {
-    // Avant le 2026-10-29, aucun candidat ne trouvait ce bouton Primer React : le §6.5 ne
-    // grisait plus rien sur github.com.
-    const control = page.adapter.getCompletionControl();
-    expect(control?.kind).toBe('complete-pr');
-    expect(control?.element.textContent?.trim()).toBe('Rebase and merge');
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-  });
-
-  it("lit l'état que chaque fil déclare, et ne journalise pas les fils repliés (§9.2.3, §9.4)", async () => {
-    const threads = await page.adapter.getThreads();
-    expect(threads).toHaveLength(13);
-    // Lus `unknown` jusque-là, donc comptés non résolus — dont deux `issue (blocking)` résolus.
-    expect(threads.filter((t) => t.resolution === 'unknown')).toEqual([]);
-    expect(threads.filter((t) => t.resolution === 'unresolved')).toHaveLength(1);
-    const byAnchor = (a: string) => threads.find((t) => t.root.permalink.endsWith(a));
-    // Recoupés avec la vue Files changed de la même PR (capture 05).
-    expect(byAnchor('#discussion_r4398202547')?.resolution).toBe('resolved');
-    expect(byAnchor('#discussion_r4397911246')?.resolution).toBe('unresolved');
-    expect(byAnchor('#discussion_r4398521306')?.root.body).toMatch(/^\s*issue \(blocking\)/);
-    expect(byAnchor('#discussion_r4398521306')?.resolution).toBe('resolved');
-    // Huit fils repliés, sans corps ni auteur dans la page : rien de pourri.
-    expect(threads.filter((t) => t.root.body === '')).toHaveLength(8);
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('comment-body');
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('comment-author');
-  });
-
-  // Les deux sondes ne font taire le journal que lorsqu'elles matchent : si GitHub les renomme,
-  // l'absence redevient une entrée — du bruit, jamais du silence. Ces deux tests altèrent la
-  // page déjà chargée, puis la restaurent, plutôt que d'en charger une copie : chaque chargement
-  // de cette capture coûte ~200 Mo de tas, et deux de plus faisaient déborder le worker en CI.
-  // Un adaptateur neuf sur le même document part d'un journal vide.
-  it('journalise un bouton de fusion devenu introuvable sur une PR ouverte (§9.4)', () => {
-    const button = page.doc.querySelector('[data-testid="mergebox-partial"] button[data-variant="primary"]')!;
-    const [parent, next] = [button.parentNode!, button.nextSibling];
-    button.remove();
-    try {
-      const adapter = new GithubClientAdapter({ documentRef: page.doc });
-      expect(adapter.getCompletionControl()).toBeNull();
-      expect(adapter.log.failures.map((f) => f.chain)).toContain('merge-button');
-    } finally {
-      parent.insertBefore(button, next);
-    }
-  });
-
-  it('journalise un fil sans corps ni auteur qui ne se déclare pas replié (§9.4)', async () => {
-    const deferred = [...page.doc.querySelectorAll('[data-deferred-content-url]')].map(
-      (el) => [el, el.getAttribute('data-deferred-content-url')!] as const
-    );
-    for (const [el] of deferred) el.removeAttribute('data-deferred-content-url');
-    try {
-      const adapter = new GithubClientAdapter({ documentRef: page.doc });
-      await adapter.getThreads();
-      expect(adapter.log.failures.map((f) => f.chain)).toEqual(expect.arrayContaining(['comment-body', 'comment-author']));
-    } finally {
-      for (const [el, url] of deferred) el.setAttribute('data-deferred-content-url', url);
-    }
-  });
-});
-
-describe('§4.1 — Conversation : réponse dans un fil (capture 02)', () => {
-  let page: LoadedPage;
-  beforeAll(() => {
-    page = load('02-conversation-reponse-fil.html', '/Reefact/just-dummies/pull/331');
-  }, T);
-
-  it('classe la réponse ouverte en zone reply, rattachée à son fil', () => {
-    const field = page.doc.querySelector('.js-inline-comment-form-container.open textarea');
-    const editor = editorOf(page, field);
-    expect(editor.context).toMatchObject({
-      zone: 'reply',
-      action: 'compose',
-      threadId: 'discussion_r4397911246',
-      canCarryBlockingState: false,
-    });
-    expect(submitLabels(page, editor)).toEqual(['Comment']);
-  });
-});
-
-describe('§5.5, §6.5 — PR fusionnée, commentaires préfixés (capture 03)', () => {
-  let page: LoadedPage;
-  beforeAll(() => {
-    page = load('03-pr-fusionnee-commentaires-prefixes.html', '/Reefact/just-dummies/pull/294');
-  }, T);
-
-  it('rend les commentaires publiés, préfixes compris, et jamais la description de la PR', () => {
-    const subjects = page.adapter.getRenderedComments().map((c) => c.bodyText.trim().split('\n')[0]);
-    expect(subjects).toContain('chore (blocking): PR title and description need accurate English.');
-    expect(subjects).toContain('praise: The SonarCloud triage is now clearly documented.');
-    const description = page.doc.querySelector('[id^="pullrequest-"].js-comment .comment-body');
-    expect(description).not.toBeNull();
-    expect(page.adapter.getRenderedComments().map((c) => c.element)).not.toContain(description);
-  });
-
-  it("n'expose aucun bouton de fusion sur une PR fusionnée, et ne le journalise pas : c'est la norme (§9.4)", () => {
-    // L'inverse était attendu ici. Une entrée par PR fusionnée visitée enfouissait la seule qui
-    // comptait : le bouton d'une PR ouverte, introuvable depuis que GitHub l'a migré.
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-  });
-});
+import { editorOf, load, submitLabels, T, type LoadedPage } from './helpers/real-pages.js';
 
 describe('§4.1, §5.4 — Files changed : commentaire sur une ligne (capture 04)', () => {
   let page: LoadedPage;
@@ -265,49 +98,6 @@ describe('§4.3 — Files changed : modification d\'une réponse (capture 06)', 
   });
 });
 
-describe('§4.1, §4.3 — Conversation : modification d\'un commentaire général (capture 06)', () => {
-  let page: LoadedPage;
-  beforeAll(() => {
-    page = load('06-conversation-modification-commentaire.html', '/Reefact/just-dummies/pull/292');
-  }, T);
-
-  it('reconnaît une ÉDITION en zone conversation, qui ne porte pas d\'état bloquant', () => {
-    const editor = editorOf(page, page.doc.getElementById('issuecomment-6442405642-body'));
-    expect(editor.context).toMatchObject({
-      zone: 'conversation',
-      action: 'edit',
-      commentId: 'issuecomment-6442405642',
-      threadId: 'issuecomment-6442405642',
-      canCarryBlockingState: false,
-    });
-    expect(submitLabels(page, editor)).toEqual(['Update comment']);
-  });
-
-  it("ne prend pas le champ « Reference in new issue » pour un composeur pourri (§9.4)", () => {
-    // Journal reçu le 2026-10-30 : une entrée `editors` sur une PR où rien n'avait pourri. Sur
-    // cette capture, le seul champ que ni `editors` ni la sonde ne connaissaient était celui du
-    // dialogue qui crée un ticket à partir d'un commentaire — hors de toute zone du §4.1.
-    expect(page.doc.getElementById('convert-to-issue-body-6442405642')).not.toBeNull();
-    expect(page.editors.map((e) => e.element.id)).not.toContain('convert-to-issue-body-6442405642');
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('editors');
-  });
-
-  it('laisse le champ de nouveau commentaire en composition', () => {
-    const editor = editorOf(page, page.doc.getElementById('new_comment_field'));
-    expect(editor.context).toMatchObject({ zone: 'conversation', action: 'compose' });
-  });
-
-  it('lit ses deux fils repliés comme résolus, sans rien journaliser (§9.2.3, §9.4)', async () => {
-    // La forme exacte du journal relevé le 2026-10-29 sur une PR fusionnée de ce dépôt :
-    // `comment-body` et `comment-author` à la même milliseconde, `merge-button` juste avant.
-    const threads = await page.adapter.getThreads();
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(threads.map((t) => t.resolution)).toEqual(['resolved', 'resolved']);
-    const logged = page.adapter.log.failures.map((f) => f.chain);
-    expect(logged.filter((c) => ['merge-button', 'comment-body', 'comment-author'].includes(c))).toEqual([]);
-  });
-});
-
 describe('§4.1, §5.4 — Files changed : panneau de revue (capture 07)', () => {
   let page: LoadedPage;
   beforeAll(() => {
@@ -330,14 +120,21 @@ describe('§6.2.3 — la date de création de la PR, sur chaque capture (#84)', 
   // La première date de la page n'est PAS la création : l'en-tête d'une PR fusionnée porte la
   // date de FUSION, et la même PR #331 se lisait 07:18 ou 09:17 selon la page.
   const CASES: [string, string, string][] = [
-    ['01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/331', '2026-10-28T07:18:01Z'],
-    ['02-conversation-reponse-fil.html', '/Reefact/just-dummies/pull/331', '2026-10-28T07:18:01Z'],
-    ['03-pr-fusionnee-commentaires-prefixes.html', '/Reefact/just-dummies/pull/294', '2026-10-27T13:28:00Z'],
+    ['01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/331', '2026-10-28T07:18:01Z'], // CLASSIQUE
+    ['02-conversation-reponse-fil.html', '/Reefact/just-dummies/pull/331', '2026-10-28T07:18:01Z'], // CLASSIQUE
+    ['03-conversation-pr-fusionnee-commentaires-prefixes.html', '/Reefact/just-dummies/pull/294', '2026-10-27T13:28:00Z'], // CLASSIQUE
+    ['03-conversation-commentaires-prefixes-pr-ouverte.html', '/Reefact/just-dummies/pull/548', '2026-11-09T12:07:12Z'], // CLASSIQUE
     ['04-files-commentaire-ligne.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
+    ['04-files-commentaire-ligne-pr-ouverte.html', '/Reefact/just-dummies/pull/548/changes', '2026-11-09T12:07:12.000Z'],
     ['05-files-reponse-fil-ligne.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
-    ['06-conversation-modification-commentaire.html', '/Reefact/just-dummies/pull/292', '2026-10-27T12:15:37Z'],
+    ['06-conversation-modification-commentaire.html', '/Reefact/just-dummies/pull/292', '2026-10-27T12:15:37Z'], // CLASSIQUE
     ['06-files-modification-commentaire.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
     ['07-review-changes.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
+    // L'Overview ne porte pas la description en `[id^="pullrequest-"]` : la date vient des données
+    // embarquées, qui désignent bien la PR de l'URL (création de 547 : 2026-11-07T20:22:48Z,
+    // lue par l'API publique de GitHub le 2026-11-09 pour recouper).
+    ['03-overview-commentaires-prefixes.html', '/Reefact/just-dummies/pull/548', '2026-11-09T12:07:12.000Z'],
+    ['08-overview-pr-fusionnee.html', '/Reefact/just-dummies/pull/547', '2026-11-07T20:22:48.000Z'],
   ];
 
   it.each(CASES)('%s : la date de la description, ou à défaut celle des données embarquées', (file, path, expected) => {
@@ -385,3 +182,34 @@ describe('§6.2.3 — la date de création de la PR, sur chaque capture (#84)', 
   });
 });
 
+
+describe('§6.5, §9.4 — Files changed : PR ouverte (capture 04, PR 548) — #103', () => {
+  it("n'y cherche pas de bouton de fusion : l'onglet n'en a pas, ce n'est pas une rupture", () => {
+    const page = load('04-files-commentaire-ligne-pr-ouverte.html', '/Reefact/just-dummies/pull/548/changes');
+    expect(page.doc.querySelector('[data-testid="mergebox-partial"], [data-testid="for-you-item-row"]')).toBeNull();
+    expect(page.adapter.getCompletionControl()).toBeNull();
+    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
+  }, T);
+});
+
+describe('§9.4 — hors PR, un champ inconnu ne se journalise pas (#115)', () => {
+  // Le rapport du 2026-10-31 : la page de profil, et son champ masqué « Add a bio » (relevé du
+  // rapport : `textarea[aria-label="Add a bio"]` dans `form[action="/users/Reefact"]`).
+  const PROFILE = '<html><body><form action="/users/Reefact"><textarea aria-label="Add a bio" hidden></textarea></form></body></html>';
+
+  function journalAt(path: string): string[] {
+    const doc = new DOMParser().parseFromString(PROFILE, 'text/html');
+    Object.defineProperty(doc, 'location', { value: new URL(`https://github.com${path}`), configurable: true });
+    const adapter = new GithubClientAdapter({ documentRef: doc });
+    adapter.observeEditors(() => {}).dispose();
+    return adapter.log.failures.map((f) => f.chain);
+  }
+
+  it('sur la page de profil, rien', () => {
+    expect(journalAt('/Reefact')).not.toContain('editors');
+  });
+
+  it('le même champ sur une PR reste journalisé : la sonde y garde tout son sens', () => {
+    expect(journalAt('/Reefact/just-dummies/pull/548')).toContain('editors');
+  });
+});

@@ -36,9 +36,18 @@ import {
   type PlatformAdapter,
   type SubmitControl,
 } from '@cct/adapter-shared';
+import {
+  classicCompletion,
+  classicResolutionFlag,
+  classicThreadNotRendered,
+  inClassicConversationForm,
+  inClassicPrDescription,
+} from './classic.js';
 import { configCredentials } from './descriptor.js';
+import { inOverviewPrDescription, overviewCompletion, overviewContext } from './overview.js';
 import { selectors } from './selectors.js';
 import { ALL_EDITORS, SURFACES, type GithubSurface } from './surfaces.js';
+import { githubView, isPullRequestPath } from './view.js';
 
 /** §5.5 — la forme du corps rendu de GITHUB, MESURÉE à plusieurs reprises sur github.com : une
  * ligne de Markdown ordinaire dans un `<p>`, une fin de ligne simple en `<br>`.
@@ -307,7 +316,11 @@ export class GithubClientAdapter implements PlatformAdapter {
       // Ce que ça coûte, et c'est assumé : un `<textarea>` étranger au composeur (formulaire
       // voisin, champ masqué) vaut une entrée de journal à tort. Une seule, le journal
       // dédupliquant par chaîne — contre une extension muette dans le cas inverse.
-      if (inconnues.length > 0) {
+      //
+      // Seulement sur une PR (#115) : hors PR, aucun champ n'est une zone du §4.1, et ne pas en
+      // reconnaître un n'est pas une rupture. Le rapport du 2026-10-31 journalisait `editors` sur
+      // la page de profil de l'utilisateur, pour le champ masqué « Add a bio ».
+      if (inconnues.length > 0 && isPullRequestPath(this.#doc)) {
         // Le relevé nomme les champs inconnus eux-mêmes : c'est d'eux qu'il faut parler, pas
         // des candidats, qui ont bien trouvé ce qu'ils cherchaient.
         this.#degraded(ALL_EDITORS, this.#doc, { unmatched: inconnues.slice(0, 5).map(printElement) });
@@ -327,7 +340,7 @@ export class GithubClientAdapter implements PlatformAdapter {
         // matche RIEN sur la quasi-totalité des pages — celle des fichiers modifiés n'a
         // pas de description de PR —, et le contraire noierait CA-11 sous des échecs qui
         // sont le cas nominal.
-        if (closestChain(el, selectors.prDescription).element) continue;
+        if (inClassicPrDescription(el) || inOverviewPrDescription(el)) continue;
         // Marquer « vu » APRÈS #toHandle() : un élément balayé avant que currentPr() ne
         // trouve de PR (page pas encore navigée) doit rester réexaminable au prochain
         // balayage, pas définitivement ignoré (§9.2.3).
@@ -426,10 +439,13 @@ export class GithubClientAdapter implements PlatformAdapter {
     }
     // Le repli d'avant, conservé tel quel : le parent direct, quand aucun candidat ne matche.
     if (editor.element.parentElement) containers.push(editor.element.parentElement);
+    // Les pieds d'éditeur de l'Overview mettent leurs boutons de publication là où la chaîne
+    // commune ne les cherche pas — nus, ou enveloppés en première position (`overviewSubmitButtons`).
+    const chain = githubView(this.#doc) === 'overview' ? selectors.overviewSubmitButtons : selectors.submitButtons;
     for (const container of containers) {
       // Jamais de contrôle `complete-pr` ici : seul getCompletionControl() l'expose, et il
       // n'est jamais intercepté (§9.2.3).
-      const controls = queryChainAll(container, selectors.submitButtons);
+      const controls = queryChainAll(container, chain);
       if (controls.length > 0) return controls.map((element) => ({ element, kind: 'submit' as const }));
     }
     return [];
@@ -459,9 +475,9 @@ export class GithubClientAdapter implements PlatformAdapter {
       const anchorOutcome = queryChain(el, selectors.threadAnchor);
       // §9.4 — un fil rendu dont on ne sait lire ni le corps ni l'auteur est une chaîne
       // pourrie, pas un fil vide : sur la vue `…/changes`, les deux étaient muettes. Sauf
-      // quand GitHub n'a pas rendu ce contenu du tout — un fil replié, chargé au dépliage :
-      // il n'y avait rien à trouver (`selectors.deferredThread`).
-      const deferred = matchesChain(el, selectors.deferredThread).element !== null;
+      // quand GitHub n'a pas rendu ce contenu du tout — un fil replié, chargé au dépliage, ou
+      // dont le chargement est en cours (#117) : il n'y avait rien à trouver.
+      const deferred = classicThreadNotRendered(el);
       if (!bodyEl && !deferred) this.#degraded(selectors.commentBody, el);
       if (!authorEl && !deferred) this.#degraded(selectors.commentAuthor, el);
       if (!anchorOutcome.element) this.#degraded(selectors.threadAnchor, el);
@@ -489,8 +505,8 @@ export class GithubClientAdapter implements PlatformAdapter {
    * Conversation), puis les marqueurs rendus dedans ou à côté. `unknown` seulement quand la
    * page ne rend l'état nulle part (§9.2.3). */
   #resolution(thread: Element): ThreadInfo['resolution'] {
-    if (matchesChain(thread, selectors.threadResolvedFlag).element) return 'resolved';
-    if (matchesChain(thread, selectors.threadUnresolvedFlag).element) return 'unresolved';
+    const declared = classicResolutionFlag(thread);
+    if (declared) return declared;
     const marker = queryChain(thread, selectors.resolvedMarker).element ?? this.#resolvedMarkerBeside(thread);
     return marker ? 'resolved' : 'unknown';
   }
@@ -512,17 +528,27 @@ export class GithubClientAdapter implements PlatformAdapter {
   }
 
   getCompletionControl(): SubmitControl | null {
-    const { element } = queryChain(this.#doc, selectors.mergeButton);
+    const view = githubView(this.#doc);
+    // Seul l'onglet Conversation porte un bouton de fusion : MESURÉ sur
+    // `04-files-commentaire-ligne-pr-ouverte.html`, Files changed d'une PR OUVERTE n'en a aucun.
+    // L'y chercher journalisait `merge-button` à chaque visite de cet onglet (#103).
+    if (view === 'other') return null;
+    // Les deux vues rangent le bouton à deux endroits sans rapport ; la chaîne journalisée reste
+    // `merge-button` dans les deux, pour qu'un relevé pris trop tôt sur une Overview encore lue
+    // `classic` soit marqué rattrapé quand le bouton arrive (`view.ts`, #127).
+    const chain = view === 'overview' ? selectors.overviewMergeButton : selectors.mergeButton;
+    const { element, nominalAbsence } = view === 'overview' ? overviewCompletion(this.#doc) : classicCompletion(this.#doc);
     if (!element) {
       // Fusionnée, fermée ou brouillon : GitHub ne rend aucun bouton, et ne rien trouver est
-      // le cas nominal, pas une chaîne pourrie (§9.4, `selectors.prSettledState`).
-      if (!queryChain(this.#doc, selectors.prSettledState).element) this.#degraded(selectors.mergeButton);
+      // le cas nominal, pas une chaîne pourrie (§9.4, `selectors.prSettledState`). De même pour
+      // une PR ouverte que la page dit non fusionnable maintenant (#113, #127).
+      if (!nominalAbsence && !queryChain(this.#doc, selectors.prSettledState).element) this.#degraded(chain);
       return null;
     }
     // Trouvé : si la chaîne a été journalisée plus tôt dans cette visite, elle a été sondée
     // avant que GitHub rende la boîte de fusion, et la ligne doit le dire (§9.4). Sans effet
     // dans le cas nominal (`SelectorLog.recovered`).
-    this.log.recovered(selectors.mergeButton);
+    this.log.recovered(chain);
     return { element, kind: 'complete-pr' };
   }
 
@@ -562,8 +588,8 @@ export class GithubClientAdapter implements PlatformAdapter {
    * est un changement de page comme un autre, et le fait qu'elle ne porte jamais de badge
    * ne la rend pas moins visible. */
   getRenderedComments(): { element: Element; bodyText: string }[] {
-    const published = queryChainAll(this.#doc, selectors.commentBody).filter(
-      (element) => closestChain(element, selectors.prDescription).element === null
+    const published = this.#publishedBodies().filter(
+      (element) => !inClassicPrDescription(element) && !inOverviewPrDescription(element)
     );
     // `Set` : sur les générations mesurées, les deux chaînes désignent des éléments
     // disjoints (voir `previewBody`) — mais un corps décoré deux fois n'est une évidence
@@ -594,6 +620,14 @@ export class GithubClientAdapter implements PlatformAdapter {
     return queryChainAll(this.#doc, selectors.previewBody);
   }
 
+  /** Les corps PUBLIÉS que la page rend. Sur l'Overview, la chaîne commune `comment-body` ne
+   * trouve que les corps des fils de revue et s'arrête là : les commentaires généraux n'avaient
+   * aucun badge (`overviewCommentBody`, capture 03). */
+  #publishedBodies(): Element[] {
+    const chain = githubView(this.#doc) === 'overview' ? selectors.overviewCommentBody : selectors.commentBody;
+    return queryChainAll(this.#doc, chain);
+  }
+
   /** Les corps que la plateforme REND, éléments seuls, sans `bodyText` (§9.2.3) — la sonde des
    * deux signatures de content-internal.ts : `chromeSignatureOf` en compte la longueur,
    * `ownOutputSignatureOf` doit remarquer qu'un corps réécrit par la plateforme (mise à jour
@@ -613,7 +647,7 @@ export class GithubClientAdapter implements PlatformAdapter {
     // aller-retour Write/Preview : une seconde rédaction suivie d'un second aperçu ne change
     // AUCUN compte, seul le digest de texte voit que le corps n'est plus celui que nos badges
     // décrivaient.
-    return [...queryChainAll(this.#doc, selectors.commentBody), ...this.#previewBodies()];
+    return [...this.#publishedBodies(), ...this.#previewBodies()];
   }
 
   /** Élément après lequel insérer le bandeau (§5.5, §9.2.3). Null quand rien n'apparie :
@@ -746,6 +780,13 @@ export class GithubClientAdapter implements PlatformAdapter {
    * renseignés (§9.2.3 : commentId « renseigné pour 'edit' », threadId « pour toute
    * action: 'edit' »). */
   #contextOf(el: Element, pr: PrRef): EditorContext {
+    // L'Overview d'abord, pour ce qu'elle a en propre — composeur général, réponse dans un fil,
+    // édition d'un commentaire général. Le reste (édition d'un commentaire de fil, panneau de
+    // revue) y est rendu comme sur Files changed, et suit le chemin commun ci-dessous.
+    if (githubView(this.#doc) === 'overview') {
+      const own = overviewContext(el, pr);
+      if (own) return own;
+    }
     const action: 'compose' | 'edit' = closestChain(el, selectors.editForm).element ? 'edit' : 'compose';
     // Identifiant du commentaire édité, lu dans le DOM (#issuecomment-…, #discussion_r…).
     const editedComment_ = action === 'edit' ? closestChain(el, selectors.renderedComment).element : null;
@@ -813,7 +854,7 @@ export class GithubClientAdapter implements PlatformAdapter {
     if (closestChain(el, selectors.reviewSummaryForm).element) {
       return { zone: 'review-body', action, pr, ...editIds, canCarryBlockingState: false, inScope: true };
     }
-    if (closestChain(el, selectors.conversationForm).element) {
+    if (inClassicConversationForm(el)) {
       return { zone: 'conversation', action, pr, ...editIds, canCarryBlockingState: false, inScope: true };
     }
     // Commentaire inline sur une ligne de diff, ou racine de fil : porte un état de

@@ -45,7 +45,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { commentBodyText, SelectorLog, type PlatformAdapter, type SubmitControl, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
-import { defaultConfig, fingerprint, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
+import { defaultConfig, fingerprint, splitBody, type PrRef, type PublishedSummary, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver, type ResolvedClientConfig } from '../src/config-resolver.js';
 import { decorateWithHtmlShape, HTML_SHAPE } from './helpers/decorate.js';
 import { applyLabelFilter, clearLabelFilter } from '../src/ui/thread-filter.js';
@@ -1100,6 +1100,15 @@ describe('Codex #4 — le texte d’un badge injecté n’est jamais mêlé au c
     // Le texte cité reste dans le corps relu, sous sa forme SOURCE (`> `) depuis que le §3.4.1 doit
     // pouvoir écarter une citation placée avant le préfixe.
     expect(commentBodyText(el)).toBe('\n> 🐛 issue\nissue: x');
+  });
+
+  it('un code cité qui CONTIENT une clôture ``` ne ferme pas le bloc reconstruit (revue Reefact, PR #141)', () => {
+    // Rendu de ````md … ```` : le code montre lui-même une clôture et une ligne préfixée. Un
+    // délimiteur synthétique de trois accents graves se fermait sur la ligne ``` du code, et
+    // `issue: example` passait pour la ligne de préfixe du commentaire.
+    const el = document.createElement('div');
+    el.innerHTML = '<pre><code>```\nissue: example\n```</code></pre><p>issue: actual</p>';
+    expect(splitBody(commentBodyText(el)).prefixLine).toBe('issue: actual');
   });
 
   it('GithubClientAdapter.getThreads() relit le vrai corps même après un badge posé par decorateComment', async () => {

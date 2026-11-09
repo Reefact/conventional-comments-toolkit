@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { EditorHandle } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '../../src/index.js';
 
-const PAGES = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'pages');
+export const PAGES = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'pages');
 
 export interface LoadedPage {
   adapter: GithubClientAdapter;

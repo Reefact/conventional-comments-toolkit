@@ -551,7 +551,19 @@ export const selectors = {
    * une page hors PR : l'appelant se replie alors sur le haut du document. */
   bannerMount: {
     name: 'banner-mount',
-    candidates: ['[data-testid="pr-header"]', '.gh-header-show', '.gh-header'],
+    candidates: [
+      '[data-testid="pr-header"]',
+      '.gh-header-show',
+      '.gh-header',
+      // MESURÉ le 2026-11-09 : les trois candidats ci-dessus ne trouvent rien sur AUCUNE des 21
+      // captures, et le bandeau tombait au repli — tout en haut du document, au-dessus de l'en-tête
+      // de GitHub, dans les trois vues. L'en-tête de la page de PR est
+      // `header[data-component="SplitPageLayout.Header"]`, un seul par capture, qui porte le titre
+      // (`h1`), l'état et les onglets, et que suit le contenu : le bandeau inséré APRÈS lui est
+      // « en tête de PR, sous le titre » (§5.5). Commun à la Conversation classique, à l'Overview
+      // et à Files changed.
+      'header[data-component="SplitPageLayout.Header"]',
+    ],
   } satisfies SelectorChain,
 
   /** Titres de checks rendus sur la page — c'est là que vit la ligne cc/1 (§6.3.1, §A.8). */

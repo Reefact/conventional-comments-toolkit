@@ -21,6 +21,7 @@
 // sur les mêmes pages : mêmes comptes partout.
 
 import { beforeAll, describe, expect, it } from 'vitest';
+import { splitBody } from '@cct/core';
 import { GithubClientAdapter } from '../src/index.js';
 import { editorOf, load, submitLabels, T, type LoadedPage } from './helpers/real-pages.js';
 
@@ -213,3 +214,19 @@ describe('§9.4 — hors PR, un champ inconnu ne se journalise pas (#115)', () =
     expect(journalAt('/Reefact/just-dummies/pull/548')).toContain('editors');
   });
 });
+
+describe('§3.4.1, §5.5 — un préfixe placé après un bloc de code cité (C3, captures 03 de la PR 548)', () => {
+  // Le §3.4.1 nomme la forme comme courante : citer du code, puis écrire le préfixe dessous. Relu
+  // depuis le corps RENDU, le bloc de code perdait ses délimiteurs, sa première ligne devenait la
+  // ligne de préfixe, et le commentaire n'avait aucun badge — dans les deux vues.
+  it.each([
+    ['03-overview-commentaires-prefixes.html', 'Overview'],
+    ['03-conversation-commentaires-prefixes-pr-ouverte.html', 'classique'], // CLASSIQUE
+  ])('%s (%s) : la ligne de préfixe est celle qui suit le code', (file) => {
+    const page = load(file, '/Reefact/just-dummies/pull/548');
+    const c3 = page.adapter.getRenderedComments().find((c) => c.bodyText.includes('should an empty list return 0'));
+    expect(c3).toBeDefined();
+    expect(splitBody(c3!.bodyText).prefixLine).toBe('question: [cct test] should an empty list return 0?');
+  }, T);
+});
+

@@ -140,6 +140,16 @@ every earlier capture.
 
 ## Found while measuring, not fixed here
 
-On all 21 captures, three chains find nothing: `checkRunTitles` (so the published `cc/1` line is
-never read from the page), `bannerMount` and `draftBadge`. `previewBody` found nothing either; it
-is fixed (`previewViewerWrapper__`, capture 09).
+On all 21 captures, two chains find nothing: `checkRunTitles` (so the published `cc/1` line is
+never read from the page) and `draftBadge`.
+
+Fixed in the same pull request, because the final validation showed them in both views:
+
+- `previewBody` found nothing (`previewViewerWrapper__`, capture 09): previews had no badges.
+- `bannerMount` found nothing, and the banner fell back to the very top of the document, above
+  GitHub's header. The PR page header is `header[data-component="SplitPageLayout.Header"]`, one
+  per capture, holding the title, the state and the tabs; the banner goes right after it.
+- A comment that quotes code BEFORE its prefix line (C3) got no badge: the rendered body was read
+  as plain text, the code block lost its fences, and its first line became the prefix line
+  (§3.4.1). `commentBodyText` (shared) now restores fences around `<pre>` and `> ` before quoted
+  lines.

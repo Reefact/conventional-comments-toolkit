@@ -242,6 +242,36 @@ it: one more `.markdown-content` in every `-rempli` page.
 ## Personal data in the captures
 
 The Microsoft account menu (`.mectrl_root`, `#mectrl_currentAccount_secondary`) is in the DOM of
-every page, closed, and carries the signed-in account's EMAIL ADDRESS. The reduction keeps it
-(text). The display name of the account is also everywhere as comment author and in `aria-label`s.
-To be resolved BEFORE any push — see the pull request.
+every page, closed, and carries the signed-in account's EMAIL ADDRESS. The reducer now drops that
+region for Azure DevOps (`PLATFORM_RULES.azdo.dropSelectors`), and `check:captured-pages` refuses
+any clear email address; the 25 captures were reduced again, none keeps it. The display name of
+the account stays, as comment author and in `aria-label`s (owner's decision, 2026-11-09).
+
+## Live validation (2026-11-09, extension built from this branch)
+
+Checked in the browser, on the test pull requests, without sending anything (the API showed the
+same comment count per thread afterwards):
+- Overview: toolbar and degraded-state notice on the new comment, the reply and the edit of a
+  root; `E-NO-LABEL` and `W-MISSING-DECORATION` under the field; a label button writes into the
+  field and Azure DevOps sees it (its *Comment* button turns enabled, its hidden auto-size twin
+  copies the value — the §B.2 desynchronisation risk does not show on this field).
+- Badges and subject on published comments and on the live preview; thread filter above the
+  activity feed, hiding whole rows; banner counting the blocking threads of the page.
+- Files, Inline and Side-by-side: toolbar on the line comment and on a reply, no filter.
+- NOT validated: blocking a send (the extension is degraded while §B.4 is not measured); the
+  light theme; a cross audit over real, varied pull requests (no such organisation available).
+
+## Changelog watch (skill `plateforme`, §6)
+
+Sources checked on 2026-11-09:
+- sprint release notes on Microsoft Learn, `https://learn.microsoft.com/en-us/azure/devops/release-notes/<year>/sprint-<n>-update`
+  — the latest, sprint 281, is dated 2026-10-27; its **Azure Repos** section is the one to read;
+- the Azure DevOps blog RSS feed, `https://devblogs.microsoft.com/devops/feed/` — answers, six
+  posts between 2026-10-13 and 2026-11-05;
+- the roadmap, `https://learn.microsoft.com/en-us/azure/devops/release-notes/features-timeline`
+  (updated 2026-11-06), Repos rows.
+
+Already worth watching for this adapter: the new Monaco-based Wiki editor (public preview, sprint
+281) — if the pull request comment editor ever moves to it, the field is no longer a `<textarea>`;
+Copilot code reviews in Azure Repos, which post comments into threads; "Pull request commenter
+filtering" (roadmap, 2026 Q4).

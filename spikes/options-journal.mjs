@@ -172,24 +172,37 @@ try {
   ]);
   const saved = join(profile, 'diagnostic.zip');
   await download.saveAs(saved);
-  const read = spawnSync(
-    'python3',
-    [
-      '-c',
-      [
-        'import json, sys, zipfile',
-        'z = zipfile.ZipFile(sys.argv[1])',
-        'print(json.dumps({"bad": z.testzip(), "names": z.namelist(), "lines": len(json.loads(z.read("report.json"))["entries"]), "skeleton": z.read("skeletons/k1.txt").decode("utf-8")}))',
-      ].join('\n'),
-      saved,
-    ],
-    { encoding: 'utf8' }
+  // Python sous le nom que la machine lui donne (#153). Sous Windows, `python3` est souvent un
+  // alias du Microsoft Store qui ne lance rien (mesuré : exit 49), quand `python` et `py` sont
+  // installés. Le premier qui importe `zipfile` sert ; sinon, l'échec nomme la dépendance au lieu
+  // de dire l'archive cassée.
+  const python = [['python3'], ['python'], ['py', '-3']].find(
+    ([cmd, ...pre]) => spawnSync(cmd, [...pre, '-c', 'import zipfile'], { encoding: 'utf8' }).status === 0
   );
-  const archive = read.status === 0 ? JSON.parse(read.stdout) : null;
+  const read = python
+    ? spawnSync(
+        python[0],
+        [
+          ...python.slice(1),
+          '-c',
+          [
+            'import json, sys, zipfile',
+            'z = zipfile.ZipFile(sys.argv[1])',
+            'print(json.dumps({"bad": z.testzip(), "names": z.namelist(), "lines": len(json.loads(z.read("report.json"))["entries"]), "skeleton": z.read("skeletons/k1.txt").decode("utf-8")}))',
+          ].join('\n'),
+          saved,
+        ],
+        { encoding: 'utf8' }
+      )
+    : null;
+  const archive = read?.status === 0 ? JSON.parse(read.stdout) : null;
+  const unread = python
+    ? (read.stderr || `${python.join(' ')} : exit ${read.status}`).trim()
+    : 'archive NON vérifiée : aucun Python avec zipfile (essayés : python3, python, py -3)';
   assert(
     'le bouton télécharge une archive .zip que zipfile ouvre, CRC compris',
     /^cct-diagnostic-.*\.zip$/.test(download.suggestedFilename()) && archive?.bad === null,
-    archive ? `${download.suggestedFilename()} — ${archive.names.join(', ')}` : (read.stderr || 'python3 absent').trim()
+    archive ? `${download.suggestedFilename()} — ${archive.names.join(', ')} (${python.join(' ')})` : unread
   );
   assert(
     'l’archive porte tout le journal, et le squelette compressé par le navigateur en ressort lisible',

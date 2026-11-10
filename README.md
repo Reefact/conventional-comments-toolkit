@@ -210,7 +210,9 @@ theme it draws them from.
 Both read the repository's `.conventional-comments.json` first, so they only use the labels it
 enables. The reviewer ends each of its comments with a `[session:<identifier>]` line, the same for
 the whole review session, and the author copies it into the reply to that comment, so a reader can
-tell parallel review sessions apart. The identifier is a readable name drawn by
+tell parallel review sessions apart. Each agent session draws its own identifier from a random
+source, checks that the pull request does not carry it yet, and never takes one from the pull
+request, from another session or from an earlier conversation. The identifier is a readable name drawn by
 [Slugger](https://github.com/Reefact/slugger), used without asking when it already runs; otherwise
 the reviewer skill offers it once, and records the answer — Slugger, or a GUID — in a committed
 `session-id.md` beside it.

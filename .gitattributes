@@ -1,0 +1,7 @@
+# Fins de ligne : LF partout, quel que soit `core.autocrlf` sur le poste (#140). Sans ce fichier,
+# Git pour Windows réglé en `autocrlf=true` extrait en CRLF, et les tests qui comparent du texte
+# lu sur disque échouent en local alors que la CI (Linux, LF) passe.
+* text=auto eol=lf
+
+# Binaires : jamais convertis.
+*.png binary

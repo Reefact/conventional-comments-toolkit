@@ -231,11 +231,11 @@ it: one more `.markdown-content` in every `-rempli` page.
   adapter (owner's decision, 2026-11-09).
 - A COMPLETED (merged) pull request; a comment by another user (the *Delete* button, the persona);
   an interface in another language than English.
-- Reading the repository config from a content script (§B.4): `getRepoConfig()` answers
-  `unreachable`. Note for §10: the REST API DID accept the browser's session cookies from the
-  page (every test pull request and comment was created that way) — the premise "les API
-  publiques n'acceptent pas l'authentification par cookie de session" does not hold for Azure
-  DevOps from the page. Whether it holds from a content script is not measured.
+- Note for §10: the REST API accepts the browser's session cookies, from the page and from a
+  content script (see "Repository config read") — the premise "les API publiques n'acceptent pas
+  l'authentification par cookie de session" does not hold for Azure DevOps. Not acted on.
+- The creation date of a LONG pull request: it is read in the last activity row, which a long,
+  virtualized feed may not have rendered at load; the extension then never blocks (unknown date).
 - The editor chrome (styles, geometry): neutral answer. Theme TOKENS were measured on 2026-11-09
   in dark theme (`src/platform.css`); the light theme is not measured.
 
@@ -258,8 +258,37 @@ same comment count per thread afterwards):
 - Badges and subject on published comments and on the live preview; thread filter above the
   activity feed, hiding whole rows; banner counting the blocking threads of the page.
 - Files, Inline and Side-by-side: toolbar on the line comment and on a reply, no filter.
-- NOT validated: blocking a send (the extension is degraded while §B.4 is not measured); the
-  light theme; a cross audit over real, varied pull requests (no such organisation available).
+- NOT validated on that day: blocking a send (the extension was degraded, §B.4 not measured —
+  done on 2026-11-10, see "Repository config read"); the light theme; a cross audit over real,
+  varied pull requests (no such organisation available).
+
+## Repository config read (§B.4, 2026-11-10)
+
+A test file `{"version": 1, "mode": "enforce"}` was pushed to `main` of `cct-test`, then an
+`activation.activatedAt` before the test pull requests was added (without it, §6.2.3 keeps every
+pull request out of scope, and nothing blocks — by design).
+
+Measured from a signed-in pull request page, on
+`/{org}/{project}/_apis/git/repositories/{repo}/items?path=/.conventional-comments.json&api-version=7.1`:
+
+| Case | Answer |
+|---|---|
+| file present, `credentials: 'same-origin'` or `'include'` | 200, no redirect, the file's RAW content |
+| file present, `Accept: application/json` | 200, but item METADATA instead of the content |
+| file absent | 404 (`TF401174`), no redirect |
+| `credentials: 'omit'` (no session) | redirected to `*.vssps.visualstudio.com/_signin`, 203, HTML |
+
+The request stays same-origin for an open session: the case `check:content-script-cors` measures
+for a content script without host permission. A 404 is reliable: a signed-out visitor is
+redirected, not served a masking 404 (unlike GitHub).
+
+Then live, with the extension built from the branch: the degraded notice is gone, the diagnostic
+turns from warning to error (`enforce` applies), *Comment* gets `aria-disabled="true"` (Azure
+DevOps styles a disabled button by its `disabled` CLASS, so it still LOOKS enabled), and a click
+on it with a non-compliant comment is stopped — the API showed no new comment. Ctrl+Enter on the
+FOCUSED BUTTON, however, published one: Azure DevOps' buttons act on the key, without a click.
+Fixed by the `submitKeystrokes()` contract (PR #147), validated live afterwards with a probe
+that blocked every publish request; the published test comment was deleted (owner's consent).
 
 ## Changelog watch (skill `plateforme`, §6)
 

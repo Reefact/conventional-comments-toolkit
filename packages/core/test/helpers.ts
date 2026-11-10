@@ -12,7 +12,11 @@ import { defaultConfig } from '../src/config/defaults.js';
 
 export const githubProfile: PlatformProfile = { id: 'github', suggestionInfoString: 'suggestion' };
 
-export const azdoProfile: PlatformProfile = { id: 'azdo', suggestionInfoString: null };
+// Azure DevOps porte le même marqueur de suggestion que GitHub (§B.6, mesuré, et son adaptateur).
+export const azdoProfile: PlatformProfile = { id: 'azdo', suggestionInfoString: 'suggestion' };
+
+// GitLab n'a pas d'étage 0 : son marqueur porte une plage de lignes que core/ ne reconnaît pas (§C.6).
+export const gitlabProfile: PlatformProfile = { id: 'gitlab', suggestionInfoString: null };
 
 // §4.2 — valeur recommandée en annexe A.7, jamais un défaut produit (defaultConfig().toolCommands
 // est vide) : les tests qui exercent l'exemption de commande la posent explicitement via config().

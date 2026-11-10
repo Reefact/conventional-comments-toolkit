@@ -109,7 +109,11 @@ export const corpus: CorpusCase[] = [
   { id: 'suggestion-block-alone', body: '```suggestion\nconst x = 1;\n```', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'suggestion-block-explicit-prefix', body: 'issue (blocking): fuite mémoire\n```suggestion\nconst x = 1;\n```', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'suggestion-block-malformed-attempt', body: 'issue (blocking: x\n```suggestion\nconst x = 1;\n```', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-MALFORMED-PREFIX', 'error']] },
-  { id: 'suggestion-block-azdo-no-stage0', body: '```suggestion\nconst x = 1;\n```\nune phrase', zone: 'thread-root', canCarryBlockingState: true, platform: 'azdo', expected: [['E-NO-LABEL', 'error']] },
+  // Azure DevOps a désormais son étage 0, le même marqueur que GitHub (§B.6, mesuré, et son
+  // adaptateur) : la plateforme SANS étage 0 est GitLab, dont le marqueur porte une plage de
+  // lignes (§C.6).
+  { id: 'suggestion-block-gitlab-no-stage0', body: '```suggestion\nconst x = 1;\n```\nune phrase', zone: 'thread-root', canCarryBlockingState: true, platform: 'gitlab', expected: [['E-NO-LABEL', 'error']] },
+  { id: 'suggestion-block-azdo', body: '```suggestion\nconst x = 1;\n```\nune phrase', zone: 'thread-root', canCarryBlockingState: true, platform: 'azdo', expected: [] },
 
   // ————— Sévérités (§8.2) —————
   { id: 'severity-off', body: 'suggestion: extraire une méthode\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', configDoc: { severities: { 'W-MISSING-DECORATION': 'off' } }, expected: [] },

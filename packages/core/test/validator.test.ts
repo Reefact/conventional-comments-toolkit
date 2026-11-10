@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validate, analyze, isBlocking, isCompliant, malformedMotif } from '../src/validator.js';
-import { codes, codeSev, config, githubProfile, azdoProfile, GITHUB_TOOL_COMMANDS, user, vInput } from './helpers.js';
+import { codes, codeSev, config, githubProfile, azdoProfile, gitlabProfile, GITHUB_TOOL_COMMANDS, user, vInput } from './helpers.js';
 
 const withToolCommands = (c: ReturnType<typeof config>) => {
   c.toolCommands = GITHUB_TOOL_COMMANDS;
@@ -454,8 +454,8 @@ describe('§4.2 / §3.5.1 étage 0 — bloc de suggestion natif', () => {
     expect(codes(a.diagnostics)).toEqual(['E-MALFORMED-PREFIX']);
   });
 
-  it('pas d’étage 0 sur une plateforme sans marqueur établi (§B.6)', () => {
-    const a = analyze(vInput(`${sugg}\nune phrase`, { platform: azdoProfile }), config());
+  it('pas d’étage 0 sur une plateforme sans marqueur établi (§C.6)', () => {
+    const a = analyze(vInput(`${sugg}\nune phrase`, { platform: gitlabProfile }), config());
     expect(codes(a.diagnostics)).toEqual(['E-NO-LABEL']);
   });
 });

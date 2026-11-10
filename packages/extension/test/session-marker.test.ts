@@ -91,6 +91,25 @@ describe('CA-53 — le marqueur reconnu s’affiche en bas du commentaire, à sa
     expect(el.innerHTML).toBe(once);
   });
 
+  it.each([
+    ['espaces après le marqueur', '<p>note: x</p>\n<p>[session:Run-7]   </p>'],
+    ['espaces avant et après, après un saut de ligne', '<p>note: x<br>\n   [session:Run-7] \t </p>'],
+  ])('toute la dernière ligne est remplacée, blancs de bordure compris (revue Reefact, PR #163) : %s', (_name, html) => {
+    const el = body(html);
+    decorate(el);
+    const shown = el.querySelector('.cct-session')!;
+    // Rien de la ligne d'origine ne reste visible autour de la mention : ni avant, ni après.
+    expect(shown.nextSibling).toBeNull();
+    const hidden = el.querySelector('.cct-hidden-session')!;
+    const before = hidden.previousSibling;
+    expect(before === null || before.nodeType !== 3 || !/[ \t]/.test((before as Text).data.split('\n').pop() ?? '')).toBe(true);
+    // Le corps relu est inchangé, et un second passage ne change rien.
+    const once = el.innerHTML;
+    decorate(el);
+    expect(el.innerHTML).toBe(once);
+    expect(commentBodyText(el)).toContain('[session:Run-7]');
+  });
+
   it('un affichage emporté par la plateforme est reposé au passage suivant', () => {
     const el = body('<p>note: x</p>\n<p>[session:a]</p>');
     decorate(el);

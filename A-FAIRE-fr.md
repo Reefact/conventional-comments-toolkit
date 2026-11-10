@@ -14,7 +14,8 @@ spécification** (décision du propriétaire, 2026-11-10) : le produit ne contr�
 complétion d'une PR, il signale les fils bloquants non résolus sans jamais empêcher la fusion.
 
 Ce qui reste est donc surtout fait d'**étapes humaines** : essayer l'extension en vrai, la
-soumettre aux stores, puis mener le pilote `enforce`.
+soumettre aux stores, puis mener le pilote `enforce` — qui attend toutefois une part de
+développement, les indicateurs du §12 (§4 ci-dessous).
 
 ## 1. Ce que fait l'extension, et ce qu'elle ne fait pas
 
@@ -119,13 +120,15 @@ vérifiés partiellement ».
 | # | Tâche | Qui |
 |---|-------|-----|
 | 1 | Essayer l'extension en vrai (§3 ci-dessus) | Vous |
-| 2 | Choisir un dépôt pilote et suivre la trajectoire `assist → enforce` (§7) ; écrire avant la bascule la procédure de retour arrière et la liste des dépôts qui écrivent leur propre `mode` — `docs/operations-fr.md` | Vous |
-| 2b | **Développement** — rendre calculables les indicateurs du §12 : un événement par commentaire envoyé (conforme ou non, avec ou sans avertissement) pour donner un dénominateur aux taux, et le décompte d'un label quelle que soit la façon dont il a été écrit. Puis leur restitution | Moi |
+| 2 | Choisir un dépôt pilote, le laisser en `assist`, et écrire la procédure de retour arrière avec la liste des dépôts qui écrivent leur propre `mode` — `docs/operations-fr.md`. Possible dès maintenant | Vous |
+| 2b | **Développement** — rendre calculables les indicateurs du §12 (phase `P4`) : un événement par commentaire envoyé (conforme ou non, avec ou sans avertissement) pour donner un dénominateur aux taux, et le décompte d'un label quelle que soit la façon dont il a été écrit. Puis leur restitution | Moi |
+| 2c | Passer le pilote en `enforce` (phase `P6`), puis généraliser. **Attend la fin de 2b** : le §14 fait dépendre `P6` de `P4` | Vous |
 | 3 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) : **toute livraison de l'extension y passe** (§10, §14), et c'est le seul chemin qui donne la mise à jour automatique. Les zips de release (`docs/release-fr.md`) servent à l'essai et aux postes sans chaîne de build, ils ne s'y substituent pas | Vous |
 | 4 | Fournir des captures DOM réelles pour le smoke test de sélecteurs (§9.4) | Vous (ou moi, avec un accès) |
 | 5 | Vérifier sur un vrai tenant Azure DevOps ce que le spike n'a pas tranché : type d'éditeur, lisibilité du fichier de config, et **la forme du corps rendu** — quelle balise enveloppe une ligne de Markdown ordinaire, laquelle matérialise une fin de ligne simple (`renderedBodyShape()`, §9.2.3). Replis dégradés déjà en place, documentés dans `spikes/p1-prime/README-fr.md` | Vous (ou moi, avec un accès) |
 
-Une seule ligne est du développement, la 2b : les indicateurs du §12. Les autres sont des
+Une seule ligne est du développement, la 2b : les indicateurs du §12, dont dépend le passage
+du pilote en `enforce` (2c). Les autres sont des
 étapes d'**exploitation** ou de **mesure** sur une vraie plateforme.
 
 ## 5. Où trouver le reste

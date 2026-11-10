@@ -170,7 +170,7 @@ async function measure(undo) {
         session: shown.getBoundingClientRect().top + parseFloat(style.paddingTop) - top,
         height: el.getBoundingClientRect().height,
         normal: 16, // la marge de paragraphe de la feuille ci-dessus
-        italic: style.fontStyle,
+        fontStyle: style.fontStyle,
         display: style.display,
         text: shown.textContent,
       };
@@ -261,7 +261,7 @@ assert(
 );
 assert('sujet et marqueur seuls : un écart de paragraphe sous le sujet', same(short.shortSpaced.gap, 16), `${short.shortSpaced.gap.toFixed(1)} px`);
 for (const [id, m] of Object.entries(after)) {
-  assert(`${id} : la mention est remplacée, en bloc et en italique`, m.text === '\u{1F916} session: some-session-id' && m.display === 'block' && m.italic === 'italic', `${m.text}, ${m.display}, ${m.italic}`);
+  assert(`${id} : la mention est remplacée, en bloc et en romain`, m.text === '\u{1F916} session: some-session-id' && m.display === 'block' && m.fontStyle === 'normal', `${m.text}, ${m.display}, ${m.fontStyle}`);
 }
 
 console.log('\nOù que soit le marqueur (#169) — comparé au même commentaire, marqueur en bas\n');

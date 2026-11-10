@@ -163,6 +163,14 @@ right next to *Edit* and opens an in-page confirmation (not a native dialog). In
 `<textarea>` sits INSIDE the `.repos-discussion-comment` being edited, the body displayed below
 it is the LIVE PREVIEW of the edit (see state 9), and the buttons are *Cancel* / *Update & resolve* / *Update* — both send.
 
+**The pull request description, being edited** (#50): `06-overview-modification-description.html`,
+PR 1, 2026-11-10 — *Edit description* clicked, nothing typed, then *Cancel* (nothing saved). The
+editor opens INSIDE its own card, `.repos-pr-description-card`, under `.repos-pr-details-page`,
+outside any `.repos-discussion-thread`: one `<textarea class="bolt-textfield-input">` and its
+hidden twin, with a formatting toolbar and *Cancel* / *Save*. Measured in the live page too: the
+`editors` chain matches neither textarea. The description is therefore not a zone (§4.1), and the
+adapter's fallback to `conversation` (which carries a blocking state) is never reached for it.
+
 ## Diff modes (Files) — memorized for the account
 
 - **Inline / Side-by-side** (a toggle button next to the file count): side-by-side puts the

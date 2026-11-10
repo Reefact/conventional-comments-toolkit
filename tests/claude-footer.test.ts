@@ -69,12 +69,12 @@ describe('stripClaudeFooterAfterSessionMarker (commentaires)', () => {
     expect(stripClaudeFooterAfterSessionMarker(`${MARKED}\n\n${COMMENT_FOOTER}`)).toBe(MARKED);
   });
 
-  it('rend au marqueur sa place de dernière ligne : le cœur le reconnaît de nouveau', () => {
+  it('rend au marqueur sa place de dernière ligne ; le cœur le reconnaît avec ou sans le pied (#169)', () => {
     const posted = `${MARKED}\n\n${COMMENT_FOOTER}`;
-    expect(extractSessionMarker(posted)).toBeNull();
-    expect(extractSessionMarker(stripClaudeFooterAfterSessionMarker(posted))?.value).toBe(
-      'tedious-debated-branch'
-    );
+    expect(extractSessionMarker(posted)?.value).toBe('tedious-debated-branch');
+    const stripped = stripClaudeFooterAfterSessionMarker(posted);
+    expect(stripped.trimEnd().split('\n').pop()).toBe('[session:tedious-debated-branch]');
+    expect(extractSessionMarker(stripped)?.value).toBe('tedious-debated-branch');
   });
 
   it('garde le pied quand aucun marqueur ne le précède', () => {

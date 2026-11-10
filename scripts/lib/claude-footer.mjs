@@ -9,12 +9,12 @@
 // donc être retiré qu'APRÈS la création, par un chemin où l'outil n'intervient pas.
 //
 // COMMENTAIRES — seulement quand la ligne qui précède le pied est un marqueur de session
-// (§3.6). Deux raisons, qui vont ensemble :
-//   - le pied, posé après tout le texte, fait que le marqueur n'est plus la dernière ligne
-//     non vide : l'extension ne le reconnaît plus, et le §3.6 ne marche sur AUCUN
-//     commentaire d'agent tant que le pied reste ;
-//   - le marqueur dit alors qui a écrit (une session, pas le titulaire du compte). Sans
-//     marqueur, rien ne le dirait plus : le pied reste.
+// (§3.6) : le marqueur dit alors qui a écrit (une session, pas le titulaire du compte), et le
+// pied le répète. Sans marqueur, rien ne le dirait plus : le pied reste.
+//
+// Ce retrait avait une seconde raison, que #169 a levée : le §3.6 n'exige plus le marqueur en
+// DERNIÈRE ligne. Un marqueur suivi du pied est reconnu par l'extension, pied en place ou non ;
+// le retirer ne fait plus que rendre au commentaire la forme que les skills recommandent.
 //
 // Deux formes rencontrées, toutes deux en fin de texte, parfois l'une après l'autre :
 //   - celle qu'écrit la session dans une description :

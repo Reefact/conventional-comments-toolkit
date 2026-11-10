@@ -7,7 +7,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { resolveConfig } from '../src/config/resolve.js';
 import { defaultConfig, ADDED_LABELS } from '../src/config/defaults.js';
-import { fingerprint } from '../src/config/fingerprint.js';
 import { enabledLabels, resolveLabel } from '../src/parser.js';
 import { isBlocking, validate } from '../src/validator.js';
 import type { ConfigRead, EffectiveConfig, Floor, ValidationInput, Zone } from '../src/types.js';
@@ -31,18 +30,6 @@ const codes = (body: string, config: EffectiveConfig, zone?: Zone) =>
   validate(input(body, zone), config).map((d) => d.code);
 
 describe('CA-41 — labels ajoutés désactivés par un dépôt : eux seuls disparaissent', () => {
-  it("l'empreinte par défaut est la valeur LITTÉRALE, et elle a quitté celle d'avant la famille (§9.2.2)", () => {
-    // Le garde du §9.2.2 : un changement de défaut qui n'aurait pas été décidé déplace cette
-    // valeur. Le déplacement depuis `becd76df` EST décidé — avec les défauts, `done:` est un
-    // label ici et un mot inconnu pour un `core/` antérieur —, et le second aussi : `c2245ec0`,
-    // la valeur de 1.0.0-beta.13, a bougé quand `quibble` a été livré désactivé (§3.2).
-    expect(fingerprint(defaultConfig())).toBe('c14b4d01');
-    expect(fingerprint(resolveConfig(null, absent, absent, null, false).config)).toBe('c14b4d01');
-  });
-
-  it('désactivés par un dépôt, les labels ajoutés mesurent `40672114` — leurs entrées restent projetées', () => {
-    expect(fingerprint(repo(OFF).config)).toBe('40672114');
-  });
 
   it('tous actifs par défaut sauf `quibble` ; désactiver les labels ajoutés ne retire qu’eux', () => {
     const cc = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish'];
@@ -57,13 +44,6 @@ describe('CA-41 — labels ajoutés désactivés par un dépôt : eux seuls disp
     expect(codes('done: rebasé sur main', repo(OFF).config)).toEqual(['E-UNKNOWN-LABEL']);
     expect(codes('reviewed: rien à ajouter', repo(OFF).config)).toEqual(['E-UNKNOWN-LABEL']);
     expect(resolveLabel('fixed', repo(OFF).config)).toBeNull(); // un alias d'un label désactivé non plus
-  });
-
-  it('contre-épreuve : aucune entrée de `labels` n’est omise de la projection', () => {
-    // La règle d'omission retirée (§9.2.2) aurait effacé ici une différence qui change les
-    // verdicts : `done:` reconnu d'un côté, inconnu de l'autre.
-    expect(fingerprint(repo({ labels: [{ id: 'done', enabled: false }] }).config)).not.toBe('c14b4d01');
-    expect(fingerprint(repo({ labels: [{ id: 'done', enabled: false }] }).config)).not.toBe('becd76df');
   });
 
   it('les labels ajoutés SONT ceux que le §3.2 déclare — identifiants et alias', () => {
@@ -94,12 +74,11 @@ describe('CA-42 — vocabulaire actif : des labels ordinaires, les mêmes mécan
     expect(codes('reviewed: rien à ajouter', on())).toEqual([]);
   });
 
-  it('le type `reply` ne change aucun verdict, ni l’empreinte', () => {
+  it('le type `reply` ne change aucun verdict', () => {
     const asReply = repo({ labels: [{ id: 'note', kind: 'reply' }] }).config;
     for (const body of ['note: ce module part en refonte', 'Note: x', 'note (blocking): ce module part en refonte']) {
       expect(codes(body, asReply), body).toEqual(codes(body, on()));
     }
-    expect(fingerprint(asReply)).toBe(fingerprint(on()));
   });
 
   it("l'alias est reconnu sans diagnostic — `fixed` vaut `done`", () => {
@@ -217,7 +196,9 @@ describe('CA-45 — le dépôt garde la maîtrise de son vocabulaire', () => {
     for (const labels of [[a, b], [b, a]]) {
       const { config } = repo({ labels });
       expect(resolveLabel('shared', config), JSON.stringify(labels.map((l) => l.id))).toBeNull();
-      expect(fingerprint(config)).toBe(fingerprint(repo({ labels: [a, b] }).config));
+      expect(config.labels.filter((l) => l.enabled).map((l) => [l.id, l.aliases])).toEqual(
+        expect.arrayContaining([['alpha', []], ['beta', []]])
+      );
     }
   });
 
@@ -261,7 +242,7 @@ describe('CA-45 — le dépôt garde la maîtrise de son vocabulaire', () => {
   });
 });
 
-describe('CA-46 — activation en direct, et sans effet possible sur le critère 2', () => {
+describe('CA-46 — activation en direct, et sans effet sur le décompte des fils bloquants avec les drapeaux livrés', () => {
   it('désactivé après usage : `E-UNKNOWN-LABEL` en zone validée, rien dans une réponse non validée', () => {
     const off = repo(OFF).config;
     expect(codes('done: rebasé sur main', off, 'thread-root')).toEqual(['E-UNKNOWN-LABEL']);
@@ -278,6 +259,13 @@ describe('CA-46 — activation en direct, et sans effet possible sur le critère
         expect(isBlocking(input(body), on), body).toBe(false);
       }
     }
+  });
+
+  it('contre-épreuve : la garantie porte sur les valeurs LIVRÉES — un `done` redéclaré bloquant ouvre un fil bloquant', () => {
+    // §8.1.4 : une déclaration explicite l'emporte. Déclaré `alwaysNonBlocking: false` et
+    // `blockingByDefault: true`, `done` est un label bloquant comme un autre (CA-45).
+    const { config } = repo({ labels: [{ id: 'done', alwaysNonBlocking: false, blockingByDefault: true }] });
+    expect(isBlocking(input('done: le correctif est en place'), config)).toBe(true);
   });
 });
 

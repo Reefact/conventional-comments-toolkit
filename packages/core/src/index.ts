@@ -1,6 +1,5 @@
-// @cct/core — bibliothèque partagée par l'extension (composant A) et le compagnon serveur
-// (composant B). Aucune dépendance DOM ni plateforme (§9.1) ; aucune règle de validation
-// n'est dupliquée en dehors de ce paquet.
+// @cct/core — bibliothèque partagée par l'extension et ses adaptateurs. Aucune dépendance DOM
+// ni plateforme (§9.1) ; aucune règle de validation n'est dupliquée en dehors de ce paquet.
 
 export * from './types.js';
 export {
@@ -62,7 +61,7 @@ export {
 } from './validator.js';
 
 // §8 — configuration
-export { defaultConfig, completeStoredConfig, ADDED_LABELS } from './config/defaults.js';
+export { defaultConfig, ADDED_LABELS } from './config/defaults.js';
 export {
   parseConfigDocument,
   filterAllowlistPatterns,
@@ -84,11 +83,9 @@ export {
   MODE_SCALE,
 } from './config/floor.js';
 export { resolveConfig, type ResolvedConfig } from './config/resolve.js';
-export { fingerprint, fingerprintDomain } from './config/fingerprint.js';
-
-// §6 — évaluation et ligne cc/1
-export { evaluate } from './evaluate.js';
-export { encodeSummary, decodeSummary } from './summary.js';
+// Ligne cc/1 d'un vérificateur retiré (§2) : son décodage seul, tant que l'adaptateur GitHub la
+// lit.
+export { decodeSummary } from './summary.js';
 
 // i18n
 export { t, resolveLang, availableLanguages } from './i18n/index.js';

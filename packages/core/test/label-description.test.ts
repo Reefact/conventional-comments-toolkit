@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveConfig } from '../src/config/resolve.js';
 import { defaultConfig } from '../src/config/defaults.js';
-import { fingerprint } from '../src/config/fingerprint.js';
 import type { ConfigRead } from '../src/types.js';
 
 const absent: ConfigRead = { status: 'absent' };
@@ -48,13 +47,7 @@ describe('`labels[].description` (§8.2)', () => {
     expect(r.notices.some((n) => n.message.includes('"description" of label "issue" must be a string'))).toBe(true);
   });
 
-  it('n’entre pas dans l’empreinte : elle ne change aucun verdict (§9.2.2)', () => {
-    const base = fingerprint(resolveConfig(null, absent, found({ labels: [{ id: 'issue' }] })).config);
-    expect(fingerprint(resolveConfig(null, absent, found({ labels: [{ id: 'issue', description: 'Autre chose.' }] })).config)).toBe(base);
-    expect(fingerprint(resolveConfig(null, absent, found({ labels: [{ id: 'issue', description: '' }] })).config)).toBe(base);
-  });
-
-  it('`usage` se lit, se fusionne et reste hors de l’empreinte comme `description`', () => {
+  it('`usage` se lit et se fusionne comme `description`', () => {
     const usageOf = (r: ReturnType<typeof resolveConfig>, id: string) => r.config.labels.find((l) => l.id === id)?.usage;
     const org = found({ labels: [{ id: 'issue', usage: 'Version de l’organisation.' }] });
     expect(usageOf(resolveConfig(null, org, found({ labels: [{ id: 'issue', usage: '' }] })), 'issue')).toBe('');
@@ -63,7 +56,5 @@ describe('`labels[].description` (§8.2)', () => {
     const bad = resolveConfig(null, absent, found({ labels: [{ id: 'issue', usage: 42 }] }));
     expect(usageOf(bad, 'issue')).toBeUndefined();
     expect(bad.notices.some((n) => n.message.includes('"usage" of label "issue" must be a string'))).toBe(true);
-    const base = fingerprint(resolveConfig(null, absent, found({ labels: [{ id: 'issue' }] })).config);
-    expect(fingerprint(resolveConfig(null, absent, found({ labels: [{ id: 'issue', usage: 'Autre.' }] })).config)).toBe(base);
   });
 });

@@ -1,72 +1,60 @@
 // @vitest-environment happy-dom
-// CA-06 — injection du corpus AU NIVEAU DES ADAPTATEURS, en amont de core/ (§11) :
-// côté A en sortie de readValue() (la valeur d'un champ de saisie, LF), côté B en sortie
-// de fetchThreads()/fetchStandaloneComments() (le corps stocké, CRLF). C'est ce qui
-// attrape les divergences de transport — un prétraitement appliqué d'un seul côté, une
-// normalisation oubliée dans un adaptateur — que le test core-à-core ne peut pas voir.
+// CA-06, CA-18 — non-régression du transport (§11, §3.4.1). Le corpus est injecté AU NIVEAU DES
+// ADAPTATEURS, en amont de core/ : chaque cas entre par la sortie de `readValue()`, sous ses
+// deux formes de transport — la valeur d'un champ de saisie (LF), et un corps stocké (CRLF).
+// Les deux formes d'un même cas doivent produire le même verdict, et ce verdict être celui du
+// corpus. C'est ce qui attrape les divergences de transport — un prétraitement appliqué à une
+// forme seulement, une normalisation oubliée dans un adaptateur — que le test core-à-core ne
+// peut pas voir.
+//
+// La forme LF passe par un VRAI `<textarea>` et par l'adaptateur GitHub. La forme CRLF ne le
+// peut pas : un `<textarea>` ramène ses fins de ligne à LF, si bien que le corps stocké n'y
+// survivrait pas. Elle entre donc par le `readValue()` d'une doublure qui rend le corps tel
+// qu'il est stocké — le cas d'un éditeur qui le recevrait sans normaliser. Une rédaction
+// antérieure faisait entrer cette forme par l'adaptateur SERVEUR d'un vérificateur, retiré
+// depuis (§2).
 
 import { describe, expect, it } from 'vitest';
-import {
-  corpus,
-  toStoredForm,
-  type CorpusCase,
-} from '@cct/core/corpus';
+import { corpus, toStoredForm, type CorpusCase } from '@cct/core/corpus';
 import {
   resolveConfig,
   validate,
-  type CommentInfo,
   type ConfigRead,
   type PlatformProfile,
   type PrRef,
-  type ThreadInfo,
   type UserInfo,
   type ValidationInput,
-  type Zone,
 } from '@cct/core';
+import type { EditorHandle } from '@cct/adapter-shared';
 import { GithubClientAdapter } from '@cct/adapter-github';
-import { evaluate } from '@cct/core';
 
 const absent: ConfigRead = { status: 'absent' };
 const githubProfile: PlatformProfile = { id: 'github', suggestionInfoString: 'suggestion' };
 const azdoProfile: PlatformProfile = { id: 'azdo', suggestionInfoString: null };
 
-const PR: PrRef = {
-  platform: 'github',
-  createdAt: '2026-10-01T00:00:00Z',
-  host: 'github.com',
-  scope: ['acme', 'demo'],
-  number: 42,
-};
+const PR: PrRef = { platform: 'github', host: 'github.com', scope: ['acme', 'demo'], number: 42 };
 
 function author(c: CorpusCase): UserInfo {
   const login = c.authorLogin ?? 'reviewer';
-  return { id: `login:${login.toLowerCase()}`, login, isServiceAccount: false };
+  return { id: `login:${login.toLowerCase()}`, login };
 }
 
 function configFor(c: CorpusCase) {
   const repo: ConfigRead = c.configDoc ? { status: 'found', text: JSON.stringify(c.configDoc) } : absent;
-  return resolveConfig(null, absent, repo, null, false).config;
+  return resolveConfig(null, absent, repo).config;
 }
 
-/** Côté A : le corps entre par un vrai <textarea> et ressort par readValue() de
- * l'adaptateur client — le chemin nominal de la saisie. */
-function sideA(c: CorpusCase): [string, string][] {
-  const adapter = new GithubClientAdapter({ documentRef: document });
-  const textarea = document.createElement('textarea');
-  document.body.appendChild(textarea);
-  textarea.value = c.body; // le navigateur normalise déjà les fins de ligne d'un textarea en LF
-  const editor = {
+function editorFor(c: CorpusCase, element: Element): EditorHandle {
+  return {
     id: 'e1',
-    element: textarea,
-    context: {
-      zone: c.zone,
-      action: 'compose' as const,
-      pr: PR,
-      canCarryBlockingState: c.canCarryBlockingState,
-      inScope: true,
-    },
+    element,
+    context: { zone: c.zone, action: 'compose', pr: PR, canCarryBlockingState: c.canCarryBlockingState },
   };
-  const body = adapter.readValue(editor);
+}
+
+/** Le verdict de core/ sur le corps que l'adaptateur a rendu — rien d'autre ne change entre
+ * les deux formes : même zone, même configuration, même auteur. */
+function verdict(c: CorpusCase, body: string): [string, string][] {
   const input: ValidationInput = {
     body,
     platform: c.platform === 'github' ? githubProfile : azdoProfile,
@@ -75,86 +63,37 @@ function sideA(c: CorpusCase): [string, string][] {
     canCarryBlockingState: c.canCarryBlockingState,
     author: author(c),
   };
-  textarea.remove();
   return validate(input, configFor(c)).map((d) => [d.code, d.severity]);
 }
 
-/** Côté B : le corps stocké (CRLF) entre par la sortie de fetchThreads() /
- * fetchStandaloneComments() d'un adaptateur serveur synthétique, puis par evaluate() —
- * le chemin nominal du composant B. */
-async function sideB(c: CorpusCase): Promise<[string, string][]> {
-  const stored = toStoredForm(c.body);
-  const comment: CommentInfo = {
-    id: 'c1',
-    author: author(c),
-    body: stored,
-    createdAt: '2026-10-02T00:00:00Z',
-    permalink: 'https://example.test/c1',
-    isSystemGenerated: false,
-    canCarryBlockingState: c.canCarryBlockingState,
-  };
-
-  // L'adaptateur synthétique rend le triplet figé du corpus par ses méthodes de contrat
-  // (§9.2.4) — jamais une lecture de l'environnement.
-  const fetchThreads = async (): Promise<ThreadInfo[]> => {
-    if (c.zone === 'thread-root') {
-      return [
-        {
-          id: 't1',
-          pr: PR,
-          root: comment,
-          replies: [],
-          resolution: 'unresolved',
-          canCarryBlockingState: c.canCarryBlockingState,
-        },
-      ];
-    }
-    if (c.zone === 'reply') {
-      const root: CommentInfo = {
-        ...comment,
-        id: 'root',
-        body: 'issue: racine du fil\r\n\r\nDétail.',
-        canCarryBlockingState: true,
-      };
-      return [
-        { id: 't1', pr: PR, root, replies: [comment], resolution: 'unresolved', canCarryBlockingState: true },
-      ];
-    }
-    return [];
-  };
-  const fetchStandaloneComments = async (): Promise<{ comment: CommentInfo; zone: Zone }[]> =>
-    c.zone === 'conversation' || c.zone === 'review-body' ? [{ comment, zone: c.zone }] : [];
-
-  const threads = await fetchThreads();
-  const loose = await fetchStandaloneComments();
-  const result = evaluate({
-    pr: PR,
-    platform: c.platform === 'github' ? githubProfile : azdoProfile,
-    threads,
-    loose,
-    config: configFor(c),
-    configNotices: [],
-    ctx: {
-      activatedAt: '2026-09-01T00:00:00Z',
-      isDraft: false,
-      isOverrideMember: () => false,
-      knownBlockingThreadIds: [],
-      firstVerdicts: {},
-    },
-  });
-  return result.formatDiagnostics
-    .filter((d) => d.comment.id === 'c1')
-    .map((d) => [d.code, d.severity]);
+/** Forme LF : la valeur d'un vrai champ de saisie, lue par l'adaptateur GitHub. */
+function fieldForm(c: CorpusCase): [string, string][] {
+  const adapter = new GithubClientAdapter({ documentRef: document });
+  const textarea = document.createElement('textarea');
+  document.body.appendChild(textarea);
+  textarea.value = c.body;
+  const body = adapter.readValue(editorFor(c, textarea));
+  textarea.remove();
+  return verdict(c, body);
 }
 
-describe('CA-06 — parité de verdict, corpus injecté au niveau des adaptateurs', () => {
+/** Forme CRLF : le corps stocké, rendu tel quel par le `readValue()` d'une doublure. */
+function storedForm(c: CorpusCase): [string, string][] {
+  const stored = toStoredForm(c.body);
+  const readValue = (_editor: EditorHandle): string => stored;
+  const body = readValue(editorFor(c, document.createElement('div')));
+  expect(body.includes('\r\n') || !c.body.includes('\n')).toBe(true); // la forme stockée est bien CRLF
+  return verdict(c, body);
+}
+
+describe('CA-06, CA-18 — non-régression du transport, corpus injecté en sortie de readValue()', () => {
   for (const c of corpus) {
-    it(`${c.id} : A (readValue, LF) ≡ B (fetchThreads, CRLF) ≡ attendu — 100 %, aucun écart toléré`, async () => {
-      const a = sideA(c);
-      const b = await sideB(c);
-      expect(a, 'verdict côté A').toEqual(c.expected);
-      expect(b, 'verdict côté B').toEqual(c.expected);
-      expect(a, 'parité A/B').toEqual(b);
+    it(`${c.id} : champ (LF) ≡ corps stocké (CRLF) ≡ attendu — 100 %, aucun écart toléré`, () => {
+      const lf = fieldForm(c);
+      const crlf = storedForm(c);
+      expect(lf, 'verdict de la forme champ (LF)').toEqual(c.expected);
+      expect(crlf, 'verdict de la forme stockée (CRLF)').toEqual(c.expected);
+      expect(lf, 'les deux formes concordent').toEqual(crlf);
     });
   }
 });

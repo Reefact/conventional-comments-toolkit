@@ -74,18 +74,9 @@ export function mergeLevel(base: EffectiveConfig, values: Record<string, unknown
         out[key] = merged;
         break;
       }
-      case 'resolverOverrideGroup': {
-        // Intersection d'habilitation : être membre de chacun des groupes cités (§8.1.4).
-        // La liste effective accumule les groupes déclarés à chaque niveau.
-        const merged = [...out.resolverOverrideGroup];
-        for (const v of value as string[]) if (!merged.includes(v)) merged.push(v);
-        out.resolverOverrideGroup = merged;
-        break;
-      }
       case 'scope':
       case 'rules':
-      case 'telemetry':
-      case 'activation': {
+      case 'telemetry': {
         // Remplacement clé par clé à l'intérieur de l'objet.
         Object.assign(out[key] as Record<string, unknown>, value as Record<string, unknown>);
         break;

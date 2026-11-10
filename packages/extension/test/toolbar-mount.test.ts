@@ -114,11 +114,10 @@ function attachOn(
     writeValue: (_e, text, caret) => writeToTextField(champ, text, caret),
   };
   const config = defaultConfig();
-  config.activation.activatedAt = '2026-09-01T00:00:00Z';
   new EditorController({
     adapter: adapter as PlatformAdapter,
     editor,
-    resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
+    resolved: { config, notices: [], degraded: false, degradedReason: null },
     published: null,
     lang: 'fr',
     currentUserLogin: 'alice',

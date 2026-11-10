@@ -1944,7 +1944,7 @@ describe('Codex #38 — sondage périodique de la configuration effective sur un
     adapter.getRepoConfig = async () => (repoUnreachable ? { status: 'unreachable' } : { status: 'found', text: '{}' });
     let resolverNow2 = 0;
     const resolver2 = new ClientConfigResolver(
-      async () => ({ minimumMode: 'enforce', activation: { activatedAt: '2025-01-01T00:00:00Z' } }),
+      async () => ({ minimumMode: 'enforce' }),
       () => resolverNow2
     );
     const POLL_MS2 = 30;

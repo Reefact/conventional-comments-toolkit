@@ -1,13 +1,14 @@
 // Bornes d'entreprise (§8.1.1). « Plancher » signifie : le niveau inférieur ne peut pas
 // assouplir — l'opération exacte est normative clé par clé, elle ne se déduit pas d'une
-// règle générale (l'erreur type : max() sur activatedAt produit l'inverse du but).
+// règle générale (l'erreur type : max() sur configCacheTtlSeconds, borné en MAXIMUM, produit
+// l'inverse du but).
 
 import type { EffectiveConfig, Floor, Mode, Notice, Severity } from '../types.js';
 import { SUPPORTED_FLOOR_VERSION } from '../version.js';
 import { defaultConfig } from './defaults.js';
-import { filterAllowlistPatterns, filterToolCommands, MODES, SEVERITIES } from './schema.js';
+import { DEPRECATED_MODE, deprecatedModeNotice, filterAllowlistPatterns, filterToolCommands, MODES, SEVERITIES } from './schema.js';
 
-export const MODE_SCALE: Record<Mode, number> = { off: 0, assist: 1, warn: 2, enforce: 3 };
+export const MODE_SCALE: Record<Mode, number> = { off: 0, assist: 1, enforce: 2 };
 const SEVERITY_SCALE: Record<Severity, number> = { off: 0, warn: 1, error: 2 };
 
 export function maxMode(a: Mode, b: Mode): Mode {
@@ -92,11 +93,15 @@ function asClosed(value: unknown, ref: string, notices: Notice[]): boolean {
 
 /** Les clés que le §8.1.1 définit. Une clé hors liste est ignorée par tout le reste du
  * code ; sans avertissement, `{"minimumMood": "enforce"}` laisserait l'administration
- * croire son plancher posé alors qu'il ne l'est pas. */
+ * croire son plancher posé alors qu'il ne l'est pas.
+ *
+ * `formatSeverity`, `activation` et `resolverOverrideGroup` en sont sortis avec le
+ * vérificateur (§2) : un plancher qui les porte encore les voit ignorées et signalées
+ * (`config-warning`), comme toute clé inconnue — la même règle que le §8.2 pose pour les clés
+ * retirées d'un fichier de configuration, sans repli. */
 const FLOOR_KEYS = new Set([
-  'floorVersion', 'configUrl', 'minimumMode', 'formatSeverity', 'severities', 'labels',
-  'rules', 'activation', 'exemptUsers', 'allowlistPatterns', 'toolCommands',
-  'resolverOverrideGroup', 'configCacheTtlSeconds',
+  'floorVersion', 'configUrl', 'minimumMode', 'severities', 'labels',
+  'rules', 'exemptUsers', 'allowlistPatterns', 'toolCommands', 'configCacheTtlSeconds',
 ]);
 
 /** Entier positif ou nul — la même exigence que `parseConfigDocument()` pose au document
@@ -170,9 +175,9 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   for (const key of FLOOR_LIST_KEYS) {
     const rule = out[key] as { minimum?: unknown; closed?: unknown } | undefined | null;
     if (rule === undefined) continue;
-    // Les sous-clés inconnues d'une règle de liste, au même titre que celles de `rules`
-    // et d'`activation` : `{"minimum": [], "closd": true}` lisait `closed` absent et
-    // rendait la liste OUVERTE, alors que l'administration la voulait fermée.
+    // Les sous-clés inconnues d'une règle de liste, au même titre que celles de `rules` :
+    // `{"minimum": [], "closd": true}` lisait `closed` absent et rendait la liste OUVERTE,
+    // alors que l'administration la voulait fermée.
     if (rule !== null && typeof rule === 'object') {
       for (const k of Object.keys(rule)) {
         if (k !== 'minimum' && k !== 'closed') {
@@ -195,15 +200,11 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
     out[key] = { minimum: kept, closed: asClosed(rule?.closed, `${key}.closed`, notices) };
   }
 
-  if (out.resolverOverrideGroup !== undefined) {
-    out.resolverOverrideGroup = asStringArray(out.resolverOverrideGroup, 'resolverOverrideGroup', notices);
-  }
   if (out.labels !== undefined) {
     const obj = asObject(out.labels, 'labels', notices);
     if (obj === undefined) delete out.labels;
     else {
-      // Les sous-clés inconnues de `labels`, comme celles de `rules`, d'`activation` et
-      // des règles de liste. `{"minimum": ["issue"], "minmum": ["todo"]}` protégeait
+      // Les sous-clés inconnues de `labels`, comme celles de `rules` et des règles de liste. `{"minimum": ["issue"], "minmum": ["todo"]}` protégeait
       // `issue` seul, sans un mot sur `todo` : un niveau inférieur pouvait le désactiver
       // alors que l'administration croyait l'avoir planché.
       for (const k of Object.keys(obj)) {
@@ -218,8 +219,7 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   // Une valeur fautive est ÉCARTÉE : le plancher ne contraint alors tout simplement pas
   // cette clé-là, et l'avertissement est la seule sauvegarde — il n'existe aucune valeur
   // sûre à inventer à la place. Poser `enforce` sur une coquille de `minimumMode`
-  // bloquerait les merges de toute une organisation ; poser une date sur une coquille
-  // d'`activatedAt` ferait entrer un historique arbitraire dans le périmètre. Écarter est
+  // bloquerait les envois de toute une organisation. Écarter est
   // le seul geste qui ne décide rien à la place de qui a écrit la politique.
   //
   // C'est la nuance que la règle des listes ci-dessus n'a pas : y retirer une entrée
@@ -237,14 +237,16 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
     drop('configUrl');
   }
   if (out.minimumMode !== undefined) {
-    const v = asOneOf(out.minimumMode, MODES, 'minimumMode', notices);
-    if (v === undefined) drop('minimumMode');
-    else out.minimumMode = v as Mode;
-  }
-  if (out.formatSeverity !== undefined) {
-    const v = asOneOf(out.formatSeverity, ['warn', 'error'], 'formatSeverity', notices);
-    if (v === undefined) drop('formatSeverity');
-    else out.formatSeverity = v as 'warn' | 'error';
+    // `warn` n'est plus un mode : lu comme `assist`, et signalé (§7). Le plancher est une
+    // borne, et `warn` se rangeait déjà avec `assist` sur son échelle (§8.1.1).
+    if ((out.minimumMode as string) === DEPRECATED_MODE) {
+      out.minimumMode = 'assist';
+      notices.push(deprecatedModeNotice('minimumMode'));
+    } else {
+      const v = asOneOf(out.minimumMode, MODES, 'minimumMode', notices);
+      if (v === undefined) drop('minimumMode');
+      else out.minimumMode = v as Mode;
+    }
   }
   if (out.severities !== undefined) {
     const obj = asObject(out.severities, 'severities', notices);
@@ -272,26 +274,6 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
         if (n !== undefined) rules.minDecisionSubjectLength = n;
       }
       out.rules = rules;
-    }
-  }
-  if (out.activation !== undefined) {
-    const obj = asObject(out.activation, 'activation', notices);
-    if (obj === undefined) drop('activation');
-    else {
-      const activation: { activatedAt?: string } = {};
-      for (const [k, v] of Object.entries(obj)) {
-        if (k !== 'activatedAt') {
-          notices.push(floorWarning(`unknown floor key "activation.${k}" ignored`, `activation.${k}`));
-          continue;
-        }
-        // La date NON VÉRIFIÉE était le pire défaut de cette famille : `Date.parse()`
-        // rend NaN, la comparaison de périmètre du §6.2.3 est alors fausse pour TOUTE
-        // PR, et `evaluate()` publie `success` partout — l'enforcement d'une organisation
-        // entière annulé par une coquille, sans que rien ne le signale.
-        if (typeof v === 'string' && !Number.isNaN(Date.parse(v))) activation.activatedAt = v;
-        else notices.push(floorWarning('floor key ignored: must be an ISO 8601 date', 'activation.activatedAt'));
-      }
-      out.activation = activation;
     }
   }
   if (out.configCacheTtlSeconds !== undefined
@@ -334,17 +316,8 @@ export interface FloorApplication {
  *
  * `written` — les clés effectivement écrites par un niveau inférieur (org/repo), pour
  * n'émettre `floor-override` que lorsqu'une valeur écrite est ignorée.
- * `skipActivation` — `resolveConfig()` calcule lui-même `min(plancher, niveau inférieur)`
- * sur `activation.activatedAt` (§8.1.1) avant d'appeler cette fonction, qui ne doit donc
- * pas le refaire. Le drapeau justifiait autrefois l'épinglage de cette clé ; l'épinglage a
- * disparu avec la mémoire, le drapeau reste parce que le calcul vit ailleurs.
  */
-export function applyFloor(
-  config: EffectiveConfig,
-  floor: Floor,
-  written: Set<string>,
-  opts: { skipActivation?: boolean } = {}
-): FloorApplication {
+export function applyFloor(config: EffectiveConfig, floor: Floor, written: Set<string>): FloorApplication {
   const out = structuredClone(config);
   const notices: Notice[] = [];
   const overridden = (key: string) => {
@@ -361,12 +334,6 @@ export function applyFloor(
   if (floor.minimumMode !== undefined && MODE_SCALE[out.mode] < MODE_SCALE[floor.minimumMode]) {
     out.mode = floor.minimumMode;
     overridden('mode');
-  }
-
-  // formatSeverity — minimum sur sa propre échelle (error > warn).
-  if (floor.formatSeverity === 'error' && out.formatSeverity === 'warn') {
-    out.formatSeverity = 'error';
-    overridden('formatSeverity');
   }
 
   // severities — ensemble de codes dont la sévérité ne peut pas être abaissée (§8.1.1).
@@ -429,17 +396,6 @@ export function applyFloor(
     overridden('rules.minDecisionSubjectLength');
   }
 
-  // activation.activatedAt — min(plancher, niveau inférieur) : une date plus ancienne
-  // élargit le périmètre, donc durcit. Seule exception à la règle des bornes en direct :
-  // en présence d'une configuration épinglée, ce durcissement est épinglé (§8.1.1).
-  if (!opts.skipActivation && floor.activation?.activatedAt !== undefined) {
-    const f = floor.activation.activatedAt;
-    const current = out.activation.activatedAt;
-    if (current === null || Date.parse(f) < Date.parse(current)) {
-      out.activation.activatedAt = f;
-    }
-  }
-
   // exemptUsers / allowlistPatterns / toolCommands — minimum + closed (§8.1.1).
   for (const key of FLOOR_LIST_KEYS) {
     const rule = floor[key];
@@ -450,15 +406,6 @@ export function applyFloor(
       out[key] = [...rule.minimum];
     } else {
       for (const v of rule.minimum) if (!out[key].includes(v)) out[key].push(v);
-    }
-  }
-
-  // resolverOverrideGroup — le groupe du plancher ne peut pas être remplacé ; un niveau
-  // inférieur restreint en ajoutant : l'habilitation effective est l'intersection —
-  // être membre de chacun des groupes cités (§8.1.1).
-  if (floor.resolverOverrideGroup) {
-    for (const g of floor.resolverOverrideGroup) {
-      if (!out.resolverOverrideGroup.includes(g)) out.resolverOverrideGroup.push(g);
     }
   }
 

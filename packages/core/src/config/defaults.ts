@@ -6,10 +6,9 @@
 // aucune des deux clés — le rendu que `badges.ts`/`toolbar.ts` savent produire à partir
 // d'elles (bordure du badge, bouton actif de la barre d'outils, §5.1/§5.5) restait donc
 // invisible sur tout dépôt sans configuration `.conventional-comments.json` propre, y
-// compris le mockup de référence qu'elles sont censées reprendre. Les deux clés sont déjà
-// exclues de `fingerprint()` (§9.2.2) et de la liste plancher-able (§8.1.3) : purement
-// cosmétiques, elles ne peuvent donc jamais faire diverger un verdict ni être verrouillées
-// par un plancher — les fournir ici est sans risque pour ces deux garanties.
+// compris le mockup de référence qu'elles sont censées reprendre. Les deux clés sont hors de la
+// liste plancher-able (§8.1.1) : purement cosmétiques, elles ne changent aucun verdict et ne
+// peuvent être verrouillées par un plancher — les fournir ici est sans risque.
 //
 // La couleur ne teinte jamais un FOND au repos (`styles.css` : `.cct-badge` et
 // `.cct-label-button` à l'état non pressé n'appliquent `--cct-label-color` qu'à
@@ -128,13 +127,9 @@ export function defaultConfig(): EffectiveConfig {
     severities: {},
     scope: { validateReplies: false, validateReviewSummary: true },
     rules: { minSubjectLength: 5, maxSubjectLength: 120, minDecisionSubjectLength: 20 },
-    formatSeverity: 'warn',
     exemptUsers: [],
     allowlistPatterns: [],
     toolCommands: [], // vide par défaut — recommandation en annexe, jamais un défaut produit (§4.2)
-    resolverOverrideGroup: [], // repli terminal — n'habilite personne (§8.2)
-    overrideLabel: 'cc-override',
-    activation: { activatedAt: null },
     configUrl: null,
     coreMinVersion: '1.0.0',
     configCacheTtlSeconds: 3600,
@@ -169,31 +164,7 @@ export function defaultConfig(): EffectiveConfig {
         '?qui': 'quibble: ',
       },
     },
-    // La page des labels du site de l'outil, et non conventionalcomments.org : celle-ci ne
-    // documente aucun des labels ajoutés, actifs par défaut (§8.2, `docUrl`).
-    docUrl: 'https://conventionalcomments.io/docs/labels/',
     language: null,
     telemetry: { enabled: false, endpoint: null },
   };
-}
-
-/**
- * Complète un document `EffectiveConfig` **relu du stockage** (§6.4) par les valeurs par
- * défaut du produit. Deux documents sont persistés — la configuration épinglée d'une PR et
- * la dernière configuration effective connue d'un dépôt —, tous deux écrits par la version
- * de `core/` qui tournait alors et relus par `JSON.parse` sans normalisation, sur les deux
- * backends. Une clé ajoutée au §8.2 depuis l'écriture y est donc ABSENTE, et le premier
- * consommateur qui la lit lève : `fingerprint()` sur un `.map()`, le mélange du §8.1.3 sur
- * une union de listes.
- *
- * À appeler à la **frontière de désérialisation**, jamais au cas par cas chez les
- * consommateurs : c'est ce qui rend le correctif vrai pour toute clé future, et pour tout
- * consommateur — présent ou à venir — d'un document persisté.
- *
- * Compléter est le comportement juste, et pas seulement le comportement sûr : une clé qui
- * n'existait pas au moment de l'écriture n'a jamais pu être configurée sur ce dépôt ni sur
- * cette PR, et sa valeur par défaut est exactement ce sous quoi ils ont été jugés jusque-là.
- */
-export function completeStoredConfig(stored: EffectiveConfig): EffectiveConfig {
-  return { ...defaultConfig(), ...stored };
 }

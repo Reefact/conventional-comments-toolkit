@@ -38,11 +38,10 @@ export function recordingLog() {
 export function controllerFor(adapter: PlatformAdapter, editor: EditorHandle, log: SelectorLog): EditorController {
   const config = defaultConfig();
   config.mode = 'enforce';
-  config.activation.activatedAt = '2026-09-01T00:00:00Z';
   return new EditorController({
     adapter,
     editor,
-    resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
+    resolved: { config, notices: [], degraded: false, degradedReason: null },
     published: null,
     lang: 'fr',
     currentUserLogin: 'alice',

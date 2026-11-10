@@ -8,5 +8,5 @@ export const SUPPORTED_CONFIG_VERSION = 1;
 // Version de plancher supportée (§8.1.1, `floorVersion`).
 export const SUPPORTED_FLOOR_VERSION = 1;
 
-// Préfixe de version de la ligne machine (§6.3.1).
+// Préfixe de version de la ligne machine d'un vérificateur retiré (§2), que `decodeSummary()` lit encore.
 export const SUMMARY_PREFIX = 'cc/1';

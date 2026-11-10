@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveConfig } from '../src/config/resolve.js';
 import { defaultConfig } from '../src/config/defaults.js';
 import { hasNestedQuantifier } from '../src/config/schema.js';
-import { fingerprint, fingerprintDomain } from '../src/config/fingerprint.js';
-import { vetFloor, vettedConfigUrl } from '../src/config/floor.js';
+import { MODE_SCALE, vetFloor, vettedConfigUrl } from '../src/config/floor.js';
 import type { ConfigRead, Floor } from '../src/types.js';
 
 const absent: ConfigRead = { status: 'absent' };
@@ -38,13 +37,13 @@ describe('§8.2 — valeurs par défaut du produit', () => {
       'thought',
     ]);
     expect(c.mode).toBe('assist');
-    expect(c.formatSeverity).toBe('warn');
     expect(c.severities).toEqual({});
     expect(c.decorations.allowFree).toBe(true);
     expect(c.scope).toEqual({ validateReplies: false, validateReviewSummary: true });
-    expect(c.resolverOverrideGroup).toEqual([]);
-    // La page des labels de l'outil, qui documente aussi les labels ajoutés (§8.2, `docUrl`).
-    expect(c.docUrl).toBe('https://conventionalcomments.io/docs/labels/');
+    // Les clés du vérificateur retiré (§8.2, « Clés retirées ») n'existent plus.
+    for (const key of ['formatSeverity', 'overrideLabel', 'resolverOverrideGroup', 'activation', 'docUrl']) {
+      expect(key in c, key).toBe(false);
+    }
   });
 
   it('abréviations : uniques au moment du Tab, ?que/?qui séparés (§5.2)', () => {
@@ -154,18 +153,10 @@ describe('§8.1.2 / §8.1.4 — précédence et fusion', () => {
     expect(config.severities).toEqual({ 'W-CASE': 'error', 'W-NO-DISCUSSION': 'off' });
     expect(config.exemptUsers).toEqual(['bot-a', 'bot-b']);
   });
-
-  it('resolverOverrideGroup : intersection d’habilitation — les groupes déclarés s’accumulent', () => {
-    const { config } = resolveConfig(
-      { minimumMode: 'off', resolverOverrideGroup: ['org/leads'] },
-      absent,
-      found({ resolverOverrideGroup: ['org/security'] }));
-    expect(config.resolverOverrideGroup.sort()).toEqual(['org/leads', 'org/security']);
-  });
 });
 
 describe('§8.1.1 — plancher', () => {
-  const floor: Floor = { floorVersion: 1, minimumMode: 'enforce', formatSeverity: 'error' };
+  const floor: Floor = { floorVersion: 1, minimumMode: 'enforce' };
 
   it('CA-14/CA-24 : un mode de dépôt sous le plancher est ignoré, et le fait signalé', () => {
     const { config, notices } = resolveConfig(floor, absent, found({ mode: 'off' }));
@@ -174,13 +165,8 @@ describe('§8.1.1 — plancher', () => {
   });
 
   it('durcir au-delà du plancher est permis', () => {
-    const { config } = resolveConfig({ minimumMode: 'warn' }, absent, found({ mode: 'enforce' }));
+    const { config } = resolveConfig({ minimumMode: 'assist' }, absent, found({ mode: 'enforce' }));
     expect(config.mode).toBe('enforce');
-  });
-
-  it('formatSeverity : minimum sur sa propre échelle', () => {
-    const { config } = resolveConfig(floor, absent, found({ formatSeverity: 'warn' }));
-    expect(config.formatSeverity).toBe('error');
   });
 
   it('severities du plancher non abaissables', () => {
@@ -200,22 +186,6 @@ describe('§8.1.1 — plancher', () => {
     expect(config.labels.find((l) => l.id === 'todo')!.blockingByDefault).toBe(true);
     expect(config.labels.find((l) => l.id === 'chore')!.enabled).toBe(false); // hors minimum : libre
     expect(notices.filter((n) => n.kind === 'floor-override').length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('activation.activatedAt : min(plancher, niveau inférieur) — jamais max (§8.1.1)', () => {
-    const { config } = resolveConfig(
-      { minimumMode: 'off', activation: { activatedAt: '2026-06-01T00:00:00Z' } },
-      absent,
-      found({ activation: { activatedAt: '2026-09-01T00:00:00Z' } }));
-    expect(config.activation.activatedAt).toBe('2026-06-01T00:00:00Z');
-  });
-
-  it('repousser la bascule dans le futur est l’assouplissement à interdire', () => {
-    const { config } = resolveConfig(
-      { minimumMode: 'off', activation: { activatedAt: '2026-06-01T00:00:00Z' } },
-      absent,
-      found({ activation: { activatedAt: '2099-01-01T00:00:00Z' } }));
-    expect(config.activation.activatedAt).toBe('2026-06-01T00:00:00Z');
   });
 
   it('exemptUsers : minimum irrétirable ; closed interdit tout ajout (§8.1.1)', () => {
@@ -258,9 +228,9 @@ describe('§8.1.5 — configuration absente, illisible ou invalide', () => {
   it('JSON invalide : repli sur le dernier niveau valide + invalid-config avec la ligne fautive', () => {
     const { config, notices } = resolveConfig(
       null,
-      found({ mode: 'warn' }),
-      foundText('{\n  "mode": "warn",\n  oops\n}'));
-    expect(config.mode).toBe('warn'); // organisation, puis défauts
+      found({ mode: 'enforce' }),
+      foundText('{\n  "mode": "off",\n  oops\n}'));
+    expect(config.mode).toBe('enforce'); // organisation, puis défauts
     const notice = notices.find((n) => n.kind === 'invalid-config');
     expect(notice).toBeDefined();
     expect(notice!.message).toMatch(/line \d+/);
@@ -287,28 +257,15 @@ describe('§8.1.5 — configuration absente, illisible ou invalide', () => {
     expect(notices).toEqual([]);
   });
 
-  it('CA-29 : un fichier absent ne produit AUCUN signal ici, et laisse l’activation non datée', () => {
-    // §8.1.5 : le même repli d'abord. `resolveConfig` ne signale rien — ni incident, ni
-    // désactivation —, et c'est la configuration résolue qui tranche ensuite : aucun niveau
-    // ne datant l'activation, c'est le vérificateur qui arme `activation-undated` (§6.2.2).
-    //
-    // Une rédaction antérieure émettait ici `config-vanished` dès lors que le dépôt avait
-    // « déjà été évalué ». C'était une mémoire par dépôt, et le nom affirmait une
-    // DISPARITION — une transition entre deux états, que ce code ne peut pas observer.
-    const { notices, config } = resolveConfig(null, absent, absent);
-    expect(notices).toEqual([]);
-    expect(config.activation.activatedAt).toBeNull();
-  });
-
   it('version de schéma supérieure : repli assist, ou plancher si plus strict, signalé', () => {
     const noFloor = resolveConfig(null, absent, found({ version: 99, mode: 'enforce' }));
     expect(noFloor.config.mode).toBe('assist');
     expect(noFloor.notices.some((n) => n.kind === 'unsupported-version')).toBe(true);
     const withFloor = resolveConfig(
-      { minimumMode: 'warn' },
+      { minimumMode: 'enforce' },
       absent,
-      found({ version: 99, mode: 'enforce' }));
-    expect(withFloor.config.mode).toBe('warn'); // le plancher en vigueur, plus strict
+      found({ version: 99, mode: 'off' }));
+    expect(withFloor.config.mode).toBe('enforce'); // le plancher en vigueur, plus strict
   });
 
   it('coreMinVersion non satisfaite : même repli, mot pour mot', () => {
@@ -321,8 +278,8 @@ describe('§8.1.5 — configuration absente, illisible ou invalide', () => {
     const { config } = resolveConfig(
       null,
       { status: 'unreachable', reason: 'network' },
-      found({ mode: 'warn' }));
-    expect(config.mode).toBe('warn');
+      found({ mode: 'enforce' }));
+    expect(config.mode).toBe('enforce');
   });
 
   it('configUrl posée dans le fichier de dépôt : ignorée et signalée (§8.1.2)', () => {
@@ -353,96 +310,6 @@ describe('§8.2 — bornes statiques des allowlistPatterns', () => {
       found({ allowlistPatterns: ['^LGTM$', 'a'.repeat(300), '^(a+)+$', '[invalid'] }));
     expect(config.allowlistPatterns).toEqual(['^LGTM$']);
     expect(notices.filter((n) => n.kind === 'config-warning')).toHaveLength(3);
-  });
-});
-
-describe('§9.2.2 — empreinte de configuration', () => {
-  it('déterministe et bornée (8 hexadécimaux)', () => {
-    const a = fingerprint(defaultConfig());
-    const b = fingerprint(defaultConfig());
-    expect(a).toBe(b);
-    expect(a).toMatch(/^[0-9a-f]{8}$/);
-  });
-
-  it('les clés qui gouvernent le verdict font diverger l’empreinte', () => {
-    const base = fingerprint(defaultConfig());
-    const c = defaultConfig();
-    c.mode = 'enforce';
-    expect(fingerprint(c)).not.toBe(base);
-  });
-
-  it('les clés exclues du domaine ne la font jamais diverger (§9.2.2)', () => {
-    const base = fingerprint(defaultConfig());
-    const c = defaultConfig();
-    c.language = 'fr';
-    c.badgeStyle = 'flat';
-    c.docUrl = 'https://autre.example/';
-    c.overrideLabel = 'autre-etiquette';
-    c.resolverOverrideGroup = ['org/leads'];
-    c.configCacheTtlSeconds = 60;
-    c.coreMinVersion = '1.2.0';
-    c.telemetry.enabled = true;
-    c.labels[0]!.color = '#ff0000';
-    c.labels[0]!.icon = '🔥';
-    c.shortcuts.abbreviations['?x'] = 'issue: ';
-    expect(fingerprint(c)).toBe(base);
-  });
-
-  it('l’ordre des listes non significatives n’influe pas', () => {
-    const a = defaultConfig();
-    a.exemptUsers = ['b', 'a'];
-    const b = defaultConfig();
-    b.exemptUsers = ['a', 'b'];
-    expect(fingerprint(a)).toBe(fingerprint(b));
-  });
-
-  it('CA-40 : la casse d’une entrée toolCommands ne fait pas diverger l’empreinte', () => {
-    const a = defaultConfig();
-    a.toolCommands = ['@Codex'];
-    const b = defaultConfig();
-    b.toolCommands = ['@codex'];
-    expect(fingerprint(a)).toBe(fingerprint(b));
-  });
-
-  it('CA-40 : une liste toolCommands vide ne fait PAS diverger l’empreinte (§8.1.3 r.5)', () => {
-    // Compatibilité de l'ajout de la clé. L'entrée de fingerprint() est sérialisée en JSON :
-    // un membre présent avec `[]` ne produit pas le même texte qu'un membre absent. Sans
-    // l'omission, la mise à jour de `core/` changerait à elle seule l'empreinte de TOUT
-    // dépôt — y compris ceux qui ne configurent rien —, et la règle 2 désarmerait le
-    // blocage d'envoi partout pendant la fenêtre de décalage que la règle 5 dit normale.
-    const c = defaultConfig();
-    expect(c.toolCommands).toEqual([]);
-    // Le membre est ABSENT de la projection — c'est le mécanisme, et c'est ce qui rend le
-    // texte JSON identique à celui que produisait la version antérieure de `core/`.
-    expect('toolCommands' in fingerprintDomain(c)).toBe(false);
-    // Contre-épreuve : dès qu'une entrée existe, le membre apparaît et l'empreinte diverge
-    // — c'est tout l'intérêt de faire entrer la clé dans le domaine.
-    const avec = defaultConfig();
-    avec.toolCommands = ['@codex'];
-    expect('toolCommands' in fingerprintDomain(avec)).toBe(true);
-    expect(fingerprint(avec)).not.toBe(fingerprint(c));
-  });
-
-  it('exemptUsers : un doublon de casse ne fabrique pas de désaccord non plus (§4.2)', () => {
-    // `exemptUsers` est l'AUTRE membre du domaine dont la comparaison est insensible à la
-    // casse : il court exactement le même risque, et le corrige de la même façon.
-    const server = defaultConfig();
-    server.exemptUsers = ['Dependabot[bot]', 'dependabot[bot]'];
-    const extension = defaultConfig();
-    extension.exemptUsers = ['dependabot[bot]'];
-    expect(fingerprint(server)).toBe(fingerprint(extension));
-  });
-
-  it('CA-40 : un doublon de casse ne fabrique pas de désaccord (§8.1.3, règle 2)', () => {
-    // Ce que l’union du §8.1.4 produit après une correction de casse sur une PR épinglée :
-    // le serveur porte les deux orthographes, l’extension une seule. Les deux exemptent
-    // exactement les mêmes commentaires — l’empreinte doit le refléter, sans quoi la
-    // règle 2 désarmerait le blocage d’envoi en permanence.
-    const server = defaultConfig();
-    server.toolCommands = ['@Codex', '@codex'];
-    const extension = defaultConfig();
-    extension.toolCommands = ['@codex'];
-    expect(fingerprint(server)).toBe(fingerprint(extension));
   });
 });
 
@@ -490,13 +357,6 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     expect(notices.some((n) => n.ref === 'allowlistPatterns.minimum')).toBe(true);
   });
 
-  it('un resolverOverrideGroup qui n’est pas un tableau ne fait plus lever', () => {
-    const floor = { resolverOverrideGroup: 'org/team' } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, absent);
-    expect(config.resolverOverrideGroup).toEqual([]);
-    expect(notices.some((n) => n.ref === 'resolverOverrideGroup')).toBe(true);
-  });
-
   it('un labels.minimum qui n’est pas un tableau ne fait plus lever', () => {
     const floor = { labels: { minimum: 'issue' } } as unknown as Floor;
     const { config, notices } = resolveConfig(floor, absent, found({ labels: [{ id: 'issue', enabled: false }] }));
@@ -525,35 +385,10 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
   it('une entrée non textuelle DANS le tableau est écartée et signalée', () => {
     // Le contrat annoncé est « écartée ET signalée ». Ne signaler que le tableau absent
     // laissait une politique à moitié appliquée en silence.
-    const floor = { resolverOverrideGroup: ['org/securite', 42] } as unknown as Floor;
+    const floor = { exemptUsers: { minimum: ['ci[bot]', 42] } } as unknown as Floor;
     const { config, notices } = resolveConfig(floor, absent, absent);
-    expect(config.resolverOverrideGroup).toEqual(['org/securite']);
-    expect(notices.some((n) => n.ref === 'resolverOverrideGroup' && n.message.includes('non-string'))).toBe(true);
-  });
-
-  it('P1 — une date d’activation invalide est écartée, pas installée', () => {
-    // Le pire défaut de cette famille : `Date.parse("pas-une-date")` rend NaN, la
-    // comparaison de périmètre du §6.2.3 devient fausse pour TOUTE PR, et `evaluate()`
-    // publie `success` partout. Une coquille de plancher annulait l'enforcement d'une
-    // organisation entière, sans que rien ne le signale.
-    const floor = { activation: { activatedAt: 'pas-une-date' } } as unknown as Floor;
-    const { config, notices } = resolveConfig(floor, absent, absent);
-    expect(config.activation.activatedAt).toBeNull(); // écartée : le défaut du produit
-    expect(notices.some((n) => n.ref === 'activation.activatedAt')).toBe(true);
-
-    // Et surtout : la date du dépôt survit au lieu d'être écrasée par la coquille. Sans
-    // l'écart, `min(plancher, dépôt)` installait `NaN` et le périmètre du §6.2.3
-    // devenait faux pour toute PR.
-    const avecDepot = resolveConfig(floor, absent, found({ activation: { activatedAt: '2026-01-01T00:00:00Z' } }));
-    expect(avecDepot.config.activation.activatedAt).toBe('2026-01-01T00:00:00Z');
-    expect(Number.isNaN(Date.parse(avecDepot.config.activation.activatedAt!))).toBe(false);
-  });
-
-  it('une date d’activation valide passe intacte', () => {
-    const floor: Floor = { activation: { activatedAt: '2026-09-01T00:00:00Z' } };
-    const { config, notices } = resolveConfig(floor, absent, absent);
-    expect(config.activation.activatedAt).toBe('2026-09-01T00:00:00Z');
-    expect(notices.some((n) => n.ref === 'activation.activatedAt')).toBe(false);
+    expect(config.exemptUsers).toEqual(['ci[bot]']);
+    expect(notices.some((n) => n.ref === 'exemptUsers.minimum' && n.message.includes('non-string'))).toBe(true);
   });
 
   it('une clé de plancher inconnue est écartée et signalée', () => {
@@ -651,7 +486,6 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
       allowlistPatterns: { minimum: ['^ok$'] },
       toolCommands: { minimum: ['/*'] },
       labels: { minimum: ['issue'] },
-      resolverOverrideGroup: ['org/champions'],
     };
     const { config, notices } = resolveConfig(floor, absent, found({ labels: [{ id: 'issue', enabled: false }] }));
     expect(config.mode).toBe('enforce');
@@ -659,7 +493,72 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     expect(config.allowlistPatterns).toEqual(['^ok$']);
     expect(config.toolCommands).toEqual(['/*']);
     expect(config.labels.find((l) => l.id === 'issue')!.enabled).toBe(true);
-    expect(config.resolverOverrideGroup).toEqual(['org/champions']);
     expect(notices.some((n) => n.kind === 'config-warning')).toBe(false);
   });
+});
+
+describe('§7 — `warn` est lu comme `assist`, et le fait signalé', () => {
+  it('dans un fichier de configuration : mode assist, avis « valeur obsolète », aucun repli', () => {
+    const { config, notices } = resolveConfig(null, absent, found({ mode: 'warn', labels: [{ id: 'kudos' }] }));
+    expect(config.mode).toBe('assist');
+    // Pas de repli du §8.1.5 : le reste du document s'applique.
+    expect(config.labels.some((l) => l.id === 'kudos')).toBe(true);
+    expect(notices.filter((n) => n.ref === 'mode').map((n) => n.kind)).toEqual(['config-warning']);
+    expect(notices.find((n) => n.ref === 'mode')!.message).toMatch(/obsolete value "warn".*"assist"/);
+    expect(notices.some((n) => n.kind === 'invalid-config')).toBe(false);
+  });
+
+  it('dans un document d’organisation : de même', () => {
+    const { config, notices } = resolveConfig(null, found({ mode: 'warn' }), absent);
+    expect(config.mode).toBe('assist');
+    expect(notices.some((n) => n.kind === 'config-warning' && n.ref === 'mode')).toBe(true);
+  });
+
+  it('dans le plancher (`minimumMode`) : borne assist, avis, et un dépôt en off est relevé', () => {
+    const vetted = vetFloor({ minimumMode: 'warn' } as unknown as Floor);
+    expect(vetted.floor.minimumMode).toBe('assist');
+    expect(vetted.notices.map((n) => [n.kind, n.ref])).toEqual([['config-warning', 'minimumMode']]);
+    const { config } = resolveConfig({ minimumMode: 'warn' } as unknown as Floor, absent, found({ mode: 'off' }));
+    expect(config.mode).toBe('assist');
+  });
+
+  it('l’échelle n’a plus que trois crans : off < assist < enforce (§8.1.1)', () => {
+    expect(Object.keys(MODE_SCALE)).toEqual(['off', 'assist', 'enforce']);
+    // Sous un plancher assist, enforce reste permis ; off est relevé.
+    expect(resolveConfig({ minimumMode: 'assist' }, absent, found({ mode: 'enforce' })).config.mode).toBe('enforce');
+  });
+});
+
+describe('§8.2 « Clés retirées » — une clé du vérificateur est une clé inconnue, signalée, sans repli', () => {
+  const RETIRED: Record<string, unknown> = {
+    formatSeverity: 'error',
+    overrideLabel: 'cc-override',
+    resolverOverrideGroup: ['acme/tech-leads'],
+    activation: { activatedAt: '2026-09-01T00:00:00Z' },
+    docUrl: 'https://conventionalcomments.org/',
+  };
+
+  it.each(Object.entries(RETIRED))('`%s` dans un fichier de dépôt : ignorée, config-warning, le reste s’applique', (key, value) => {
+    const { config, notices } = resolveConfig(null, absent, found({ mode: 'enforce', [key]: value }));
+    expect(config.mode).toBe('enforce'); // aucun repli : la contrainte ne disparaît pas
+    expect(notices.filter((n) => n.ref === key).map((n) => n.kind)).toEqual(['config-warning']);
+    expect(notices.some((n) => n.kind === 'invalid-config')).toBe(false);
+    expect(key in config).toBe(false); // elle ne parvient pas à la configuration effective
+  });
+
+  it.each(Object.entries(RETIRED))('`%s` dans un document d’organisation : de même', (key, value) => {
+    const { config, notices } = resolveConfig(null, found({ mode: 'enforce', [key]: value }), absent);
+    expect(config.mode).toBe('enforce');
+    expect(notices.filter((n) => n.ref === key).map((n) => n.kind)).toEqual(['config-warning']);
+  });
+
+  it.each(['formatSeverity', 'activation', 'resolverOverrideGroup'])(
+    '`%s` dans le plancher : clé de plancher inconnue, écartée et signalée, le reste du plancher s’applique',
+    (key) => {
+      const floor = { minimumMode: 'enforce', [key]: RETIRED[key] } as unknown as Floor;
+      const { config, notices } = resolveConfig(floor, absent, absent);
+      expect(config.mode).toBe('enforce');
+      expect(notices.filter((n) => n.ref === key).map((n) => n.kind)).toEqual(['config-warning']);
+    }
+  );
 });

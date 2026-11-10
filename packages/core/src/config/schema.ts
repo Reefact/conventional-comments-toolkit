@@ -16,10 +16,28 @@ export interface ParsedDocument {
   unsupported: boolean;
 }
 
-export const MODES = ['off', 'assist', 'warn', 'enforce'];
+export const MODES = ['off', 'assist', 'enforce'];
+/** `warn` n'est plus un mode : il est lu comme `assist`, et le fait signalé (§7). Le refuser
+ * comme valeur hors domaine ferait retomber dans le repli du §8.1.5 toute configuration
+ * existante qui l'emploie. */
+export const DEPRECATED_MODE = 'warn';
+
+/** L'avis qui accompagne la lecture de `"warn"` (§7) — le même pour un document de
+ * configuration et pour le plancher, d'où son partage. */
+export function deprecatedModeNotice(ref: string): Notice {
+  return {
+    kind: 'config-warning',
+    message: `obsolete value "warn" for "${ref}": read as "assist" — replace it with "assist" (§7)`,
+    ref,
+  };
+}
 export const SEVERITIES = ['off', 'warn', 'error'];
 const FORCES = ['blocking', 'non-blocking', null];
 
+// Les clés retirées avec le vérificateur — `formatSeverity`, `overrideLabel`,
+// `resolverOverrideGroup`, `activation`, `docUrl` — n'y figurent plus : une configuration qui
+// les porte encore reste lisible, chacune y étant une clé inconnue, ignorée et signalée
+// (`config-warning`), sans repli (§8.2, « Clés retirées » ; §8.1.5).
 const KNOWN_KEYS = new Set([
   '$schema',
   'version',
@@ -29,20 +47,15 @@ const KNOWN_KEYS = new Set([
   'severities',
   'scope',
   'rules',
-  'formatSeverity',
   'exemptUsers',
   'allowlistPatterns',
   'toolCommands',
-  'resolverOverrideGroup',
-  'overrideLabel',
-  'activation',
   'configUrl',
   'coreMinVersion',
   'configCacheTtlSeconds',
   'badgeStyle',
   'sessionIcon',
   'shortcuts',
-  'docUrl',
   'language',
   'telemetry',
 ]);
@@ -114,11 +127,10 @@ export function parseConfigDocument(
         }
         break;
       case 'mode':
-        if (typeof value !== 'string' || !MODES.includes(value)) bad(key, `must be one of ${MODES.join(', ')}`);
-        else out[key] = value;
-        break;
-      case 'formatSeverity':
-        if (value !== 'warn' && value !== 'error') bad(key, 'must be "warn" or "error"');
+        if (value === DEPRECATED_MODE) {
+          out[key] = 'assist';
+          notices.push(deprecatedModeNotice(key));
+        } else if (typeof value !== 'string' || !MODES.includes(value)) bad(key, `must be one of ${MODES.join(', ')}`);
         else out[key] = value;
         break;
       case 'labels': {
@@ -273,38 +285,10 @@ export function parseConfigDocument(
         out[key] = filterToolCommands(value as string[], notices);
         break;
       }
-      case 'resolverOverrideGroup': {
-        // « Groupe ou liste de groupes » (§8.2) — normalisé en liste.
-        if (typeof value === 'string') out[key] = [value];
-        else if (Array.isArray(value) && value.every((v) => typeof v === 'string')) out[key] = value;
-        else bad(key, 'must be a string or an array of strings');
-        break;
-      }
-      case 'overrideLabel':
       case 'badgeStyle':
-      case 'sessionIcon':
-      case 'docUrl': {
+      case 'sessionIcon': {
         if (typeof value !== 'string' || value === '') bad(key, 'must be a non-empty string');
         else out[key] = value;
-        break;
-      }
-      case 'activation': {
-        if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-          bad(key, 'must be an object');
-          break;
-        }
-        const a = value as Record<string, unknown>;
-        const activation: Record<string, unknown> = {};
-        if ('activatedAt' in a) {
-          const v = a['activatedAt'];
-          if (v === null) activation['activatedAt'] = null;
-          else if (typeof v === 'string' && !Number.isNaN(Date.parse(v))) activation['activatedAt'] = v;
-          else bad(key, '"activatedAt" must be an ISO 8601 date or null');
-        }
-        for (const k of Object.keys(a)) {
-          if (k !== 'activatedAt') notices.push(warning(`unknown key "activation.${k}" ignored`, `activation.${k}`));
-        }
-        out[key] = activation;
         break;
       }
       case 'configUrl': {

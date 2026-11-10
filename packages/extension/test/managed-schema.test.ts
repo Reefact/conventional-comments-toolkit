@@ -1,9 +1,6 @@
-// §8.1.1 — les deux canaux de plancher portent le MÊME document. Le canal du composant B
-// est un fichier JSON libre (`CCT_FLOOR_FILE`) ; celui du composant A est une politique de
-// navigateur, contrainte par `managed-schema.json`. Une clé absente de ce schéma n'est donc
-// pas transportable côté extension, alors qu'elle l'est côté serveur : les deux
-// configurations effectives divergent, leurs empreintes aussi, et la règle 2 du §8.1.3
-// désarme le blocage d'envoi — en permanence, et sans que rien ne le signale.
+// §8.1.1 — le plancher a un seul canal : la politique de navigateur, contrainte par
+// `managed-schema.json`. Une clé absente de ce schéma n'est pas transportable : le plancher
+// arriverait amputé, sans que rien ne le signale.
 //
 // Ce garde a un intérêt propre, que la relecture ne remplace pas : le schéma avait dérivé
 // silencieusement de sept clés. Il est construit pour ÉCHOUER À LA COMPILATION quand une
@@ -13,25 +10,28 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { Floor } from '@cct/core';
+import { vetFloor, type Floor } from '@cct/core';
 
 /** Toutes les clés de `Floor`, sans exception : `Required<>` interdit d'en omettre une.
  * Les valeurs n'ont aucune importance — seules les clés sont comparées. */
 const everyFloorKey: Required<Floor> = {
   floorVersion: 1,
   configUrl: null,
-  minimumMode: 'warn',
-  formatSeverity: 'warn',
+  minimumMode: 'assist',
   severities: { 'E-NO-LABEL': 'error' },
   labels: { minimum: ['issue'] },
   rules: { minDecisionSubjectLength: 20 },
-  activation: { activatedAt: '2026-09-01T00:00:00Z' },
   exemptUsers: { minimum: [], closed: false },
   allowlistPatterns: { minimum: [], closed: false },
   toolCommands: { minimum: [], closed: false },
-  resolverOverrideGroup: [],
   configCacheTtlSeconds: 3600,
 };
+
+/** Les clés retirées du plancher avec le vérificateur (§2), et LEUR SEULE raison d'être encore
+ * déclarées : qu'un plancher qui les porte arrive jusqu'à l'extension, qui les ignore et le
+ * signale. Les retirer du schéma supposerait de savoir ce que Chrome fait d'une clé imbriquée
+ * non déclarée — l'écarter, ou rejeter tout le plancher —, ce qui n'a pas été mesuré. */
+const RETIRED_FLOOR_KEYS = ['activation', 'formatSeverity', 'resolverOverrideGroup'];
 
 const schema = JSON.parse(
   readFileSync(fileURLToPath(new URL('../src/managed-schema.json', import.meta.url)), 'utf8')
@@ -44,13 +44,25 @@ describe('§8.1.1 — le schéma de politique managée porte tout le document de
     expect(missing).toEqual([]);
   });
 
-  it('le schéma ne déclare aucune clé de plancher inconnue de Floor', () => {
+  it('le schéma ne déclare, hors de Floor, que les clés retirées — et chacune est signalée à la lecture', () => {
     // Le sens inverse compte autant : une clé déclarée mais inexistante côté `core/` se
-    // laisserait configurer par une politique d'entreprise sans effet, et sans avertir.
+    // laisserait configurer par une politique d'entreprise sans effet. Les seules admises sont
+    // les clés retirées, et seulement parce que leur lecture AVERTIT (§8.2, « Clés retirées »).
     const extra = Object.keys(schema.properties.floor.properties).filter(
       (k) => !Object.keys(everyFloorKey).includes(k)
     );
-    expect(extra).toEqual([]);
+    expect(extra.sort()).toEqual([...RETIRED_FLOOR_KEYS].sort());
+    for (const key of RETIRED_FLOOR_KEYS) {
+      const { notices } = vetFloor({ [key]: 'x' } as unknown as Floor);
+      expect(notices.map((n) => [n.kind, n.ref])).toEqual([['config-warning', key]]);
+    }
+  });
+
+  it('`warn` reste dans l’énumération de `minimumMode` : il est lu comme `assist` (§7)', () => {
+    // Le retirer du schéma pourrait faire rejeter par Chrome un plancher qui l'écrit encore —
+    // ce qui n'a pas été mesuré —, au lieu de le laisser lire comme `assist` et signaler.
+    const minimumMode = schema.properties.floor.properties['minimumMode'] as { enum: string[] };
+    expect(minimumMode.enum).toContain('warn');
   });
 });
 

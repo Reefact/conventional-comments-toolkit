@@ -20,7 +20,7 @@ describe('§5.4 — les deux conditions du blocage d’envoi', () => {
   it('CA-01 : mode enforce, configuration lue, commentaire en erreur → blocage, sans aucune date d’activation', () => {
     const input = base();
     // La configuration par défaut ne date rien : le blocage n'en dépend plus (§5.4 amendé).
-    expect(input.config.activation.activatedAt).toBeNull();
+    expect('activation' in input.config).toBe(false);
     const d = decideGuard(input);
     expect(d.block).toBe(true);
     expect(d.reason).toBe('blocked');

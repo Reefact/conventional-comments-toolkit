@@ -58,13 +58,12 @@ function setup(tweak: (config: ReturnType<typeof defaultConfig>) => void = () =>
   };
   const config = defaultConfig();
   config.mode = 'enforce';
-  config.activation.activatedAt = '2026-09-01T00:00:00Z';
   tweak(config);
 
   const controller = new EditorController({
     adapter: adapter as PlatformAdapter,
     editor,
-    resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
+    resolved: { config, notices: [], degraded: false, degradedReason: null },
     published: null,
     lang: 'fr',
     currentUserLogin: 'alice',

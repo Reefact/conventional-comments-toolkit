@@ -484,3 +484,15 @@ describe('§3.5.2 — sévérités, conformité', () => {
     expect(isCompliant(validate(vInput('issue:'), config()))).toBe(false);
   });
 });
+
+describe('CA-36 — le verdict se lit de l’état courant (§6.1)', () => {
+  it('une racine éditée de `issue:` en `note:` n’est plus bloquante, et rien n’est signalé', () => {
+    const before = vInput('issue: le retry ne borne pas le backoff\n\nIl faut un plafond.');
+    const after = vInput('note: le retry ne borne pas le backoff\n\nIl faut un plafond.');
+    expect(isBlocking(before, config())).toBe(true);
+    expect(isBlocking(after, config())).toBe(false);
+    // Aucune trace de l'état antérieur : `isBlocking()` ne prend que le corps courant, et la
+    // validation du corps édité ne produit aucun diagnostic propre à l'édition.
+    expect(codes(validate(after, config()))).toEqual([]);
+  });
+});

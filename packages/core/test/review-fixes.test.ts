@@ -2,38 +2,13 @@
 // Chaque test cite la règle de la spécification qu'il verrouille.
 
 import { describe, expect, it } from 'vitest';
-import { evaluate } from '../src/evaluate.js';
 import { resolveConfig } from '../src/config/resolve.js';
 import { hasNestedQuantifier } from '../src/config/schema.js';
-import { fingerprint } from '../src/config/fingerprint.js';
 import { defaultConfig } from '../src/config/defaults.js';
 import type { ConfigRead } from '../src/types.js';
-import { comment, config, ctx, evalInput, thread, user } from './helpers.js';
 
 const absent: ConfigRead = { status: 'absent' };
 const found = (o: object): ConfigRead => ({ status: 'found', text: JSON.stringify(o) });
-
-describe('écart 1 — §6.3.2 : une exemption admise fait passer le statut au vert, critère 1 compris', () => {
-  it('enforce + formatSeverity error + commentaire non conforme d’un tiers + exemption → success', () => {
-    const lead = user('lead');
-    const r = evaluate(
-      evalInput({
-        config: config((c) => {
-          c.mode = 'enforce';
-          c.formatSeverity = 'error';
-        }),
-        threads: [thread(comment('pas de label ici'))], // non conforme, inéditable par l'auteur de la PR (§4.2)
-        ctx: ctx({
-          exemption: { by: lead, at: '2026-10-05T00:00:00Z', labelPresent: true },
-          isOverrideMember: (u) => u.id === lead.id,
-        }),
-      })
-    );
-    expect(r.state).toBe('success'); // « le statut passe au vert » (§6.3.2)
-    expect(r.counts.nonCompliantComments).toBe(1); // compteurs non nuls, affichés (§6.5)
-    expect(r.exemption?.by.login).toBe('lead');
-  });
-});
 
 describe('écart 2 — §8.1.1 : le plancher `severities` est un minimum, jamais une valeur imposée', () => {
   it('un plancher warn sur un code E- (défaut error) n’abaisse pas la sévérité effective', () => {
@@ -103,52 +78,6 @@ describe('écart 6 — §8.1.5 : clé inconnue imbriquée ignorée AVEC avertiss
   });
 });
 
-describe('écart 7 — §8.1.3 : `resolverOverrideGroup` suit le document, dans les deux sens', () => {
-  // Ces trois tests affirmaient l'inverse : une restriction était ÉPINGLÉE, et la PR
-  // ouverte gardait son habilitation. L'épinglage a disparu avec la mémoire qu'il exigeait
-  // (§6.4), et le §8.1.3 règle 1 s'applique ici comme partout.
-  it('ajouter un groupe prend effet immédiatement', () => {
-    const { config } = resolveConfig(null, absent, found({ resolverOverrideGroup: ['org/leads', 'org/security'] }));
-    expect(config.resolverOverrideGroup).toEqual(['org/leads', 'org/security']);
-  });
-
-  it('en retirer un aussi', () => {
-    const { config } = resolveConfig(null, absent, found({ resolverOverrideGroup: ['org/leads'] }));
-    expect(config.resolverOverrideGroup).toEqual(['org/leads']);
-  });
-
-  it('retirer la déclaration ramène au repli terminal : la liste vide, qui n’habilite personne', () => {
-    // §8.2 — « repli terminal », et non participant à l'intersection du §8.1.1. Le coût est
-    // réel et assumé : sans groupe habilité, les deux soupapes du §6.3 sont inertes en même
-    // temps — ni `decision`, ni exemption de PR.
-    const { config } = resolveConfig(null, absent, found({}));
-    expect(config.resolverOverrideGroup).toEqual([]);
-  });
-
-  it('le groupe du plancher ne peut pas être remplacé : il s’AJOUTE à la liste (§8.1.1)', () => {
-    // Piège de lecture, et il a coûté une assertion fausse ici : le §8.1.1 dit que
-    // « l'habilitation effective est l'INTERSECTION de toutes les listes en présence », mais
-    // l'intersection porte sur l'APPARTENANCE, pas sur la liste. Il faut être membre de
-    // CHACUN des groupes cités, donc allonger la liste RESTREINT. L'union des listes produit
-    // l'intersection des habilitations — et c'est bien ce que `applyFloor` fait.
-    const { config } = resolveConfig(
-      { minimumMode: 'off', resolverOverrideGroup: ['org/leads', 'org/security'] },
-      absent,
-      found({ resolverOverrideGroup: ['org/security', 'org/newteam'] })
-    );
-    expect(config.resolverOverrideGroup.sort()).toEqual(['org/leads', 'org/newteam', 'org/security']);
-  });
-});
-
-describe('écart 8 — §9.2.2 : l’empreinte ne diverge pas sur une valeur égale au défaut', () => {
-  it('une surcharge explicitement égale au défaut ne change pas l’empreinte', () => {
-    const a = defaultConfig();
-    const b = defaultConfig();
-    b.severities = { 'W-CASE': 'warn' }; // égal au tableau §3.5.2
-    expect(fingerprint(a)).toBe(fingerprint(b));
-  });
-});
-
 describe('écart 9 — §8.1.3 : `labels[].icon` et `labels[].color` suivent le document', () => {
   it('les deux sont en direct — il n’y a plus de clause de fermeture à épingler', () => {
     const { config } = resolveConfig(
@@ -189,30 +118,6 @@ describe('écart 3 — §8.1.1 : labels.minimum contraint la valeur effective, p
       expect(l.enabled).toBe(true);
       expect(l.blockingByDefault).toBe(true);
     }
-  });
-});
-
-describe('écart 10 — §6.2.4 : un verdict imposé « failure » est rabattu en neutre sur un brouillon', () => {
-  it('configuration invalide sous enforce + PR en brouillon → neutral, jamais failure', () => {
-    const r = evaluate(
-      evalInput({
-        config: config((c) => (c.mode = 'enforce')),
-        configNotices: [{ kind: 'invalid-config', message: 'line 3' }],
-        forceState: { state: 'failure', because: 'invalid-config' },
-        ctx: ctx({ isDraft: true }),
-      })
-    );
-    expect(r.state).toBe('neutral'); // « toujours informatif, jamais en échec » (§6.2.4)
-    expect(r.notices.some((n) => n.kind === 'invalid-config')).toBe(true);
-    // Hors brouillon, l'échec imposé s'applique tel quel.
-    const nonDraft = evaluate(
-      evalInput({
-        config: config((c) => (c.mode = 'enforce')),
-        configNotices: [{ kind: 'invalid-config', message: 'line 3' }],
-        forceState: { state: 'failure', because: 'invalid-config' },
-      })
-    );
-    expect(nonDraft.state).toBe('failure');
   });
 });
 

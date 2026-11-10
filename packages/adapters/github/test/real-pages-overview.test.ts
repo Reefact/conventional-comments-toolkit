@@ -190,6 +190,30 @@ describe('§6.5, §9.4 — Overview : PR fusionnée (capture 08)', () => {
   }, T);
 });
 
+describe('§6.5, §9.4 — Overview : un check NON requis en échec, la PR reste fusionnable (PR 552) — #103', () => {
+  // Capturée le 2026-11-10, PR 552 rouverte le temps de la capture, sa CI terminée, seul le check
+  // `conventional-comments` en échec. La vue classique rend alors le bouton en `default` (capture
+  // 03-conversation-cc1-en-echec) ; l'Overview, MESURÉ, garde la rangée « ready-to-merge » et un
+  // bouton `primary` — ce test fige qu'elle n'a pas le défaut de la vue classique.
+  const page = () => load('03-overview-cc1-en-echec.html', '/Reefact/just-dummies/pull/552');
+
+  it('la capture montre bien ce cas : Overview, PR ouverte, une seule rangée « ready-to-merge »', () => {
+    const p = page();
+    expect(githubView(p.doc)).toBe('overview');
+    expect(p.doc.querySelector('[class*="prc-PageHeader-PageHeader"] [data-component="StateLabel"]')?.getAttribute('data-status')).toBe('pullOpened');
+    const rows = [...p.doc.querySelectorAll('[data-testid="for-you-item-row"]')].map((r) => r.getAttribute('data-item-id'));
+    expect(rows).toEqual(['ready-to-merge']);
+  }, T);
+
+  it('trouve « Rebase and merge », et ne journalise rien', () => {
+    const p = page();
+    const control = p.adapter.getCompletionControl();
+    expect(control?.kind).toBe('complete-pr');
+    expect(control?.element.textContent?.trim()).toBe('Rebase and merge');
+    expect(p.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
+  }, T);
+});
+
 describe('§5.5 — Overview : aperçu d’une modification (capture 09)', () => {
   it("rend l'aperçu pour les badges, comme un commentaire publié", () => {
     const page = load('09-overview-apercu.html', PR548);

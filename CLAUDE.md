@@ -21,6 +21,11 @@
     lit quiconque le clone.
   - **Contenu des pull requests : anglais** — titre, corps, commentaires et réponses de
     revue. Le fil d'une PR est ce qu'un contributeur lit en premier.
+    **Le corps d'une PR ne porte NI le pied « 🤖 Generated with Claude Code » NI le lien
+    `https://claude.ai/code/session_…`** (décision du propriétaire, 2026-11-10) : cette règle
+    du dépôt prime la consigne d'attribution de la session. Elle ne suffit pas — l'outil de
+    création de PR pose son propre pied (mesuré sur #167) —, c'est le workflow
+    `strip-claude-footer.yml` qui l'enlève ensuite ; ne pas l'écrire lui épargne du travail.
   - **Documents du dépôt : anglais, et français EN PLUS quand c'est possible**, la paire
     portant les suffixes `-en.md` / `-fr.md` (`docs/extension-setup-en.md` et son jumeau).
     Qu'un document n'existe que dans une langue n'est pas une faute : le doublement est un

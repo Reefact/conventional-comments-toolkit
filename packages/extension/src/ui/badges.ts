@@ -691,11 +691,18 @@ function sessionLine(body: Element, marker: SessionMarker, shape: RenderedBodySh
     if (!atLineStart) return null;
   }
   if (node.data.slice(lineStart, end).trim() !== marker.raw) return null;
-  // La plage rendue est la LIGNE ENTIÈRE, blancs de bordure compris — de son début à la fin du
-  // nœud, où ne restent que des blancs par construction (`end`). Ne prendre que le marqueur
-  // laissait ses espaces de fin dans un nœud de texte visible après la mention (revue Reefact,
-  // PR #163) : la ligne n'était pas remplacée, seulement entamée.
-  return { node, start: lineStart };
+  // La plage rendue est la LIGNE ENTIÈRE, blancs de bordure compris — jusqu'à la fin du nœud, où
+  // ne restent que des blancs par construction (`end`). Ne prendre que le marqueur laissait ses
+  // espaces de fin visibles après la mention (revue Reefact, PR #163).
+  //
+  // Et elle commence juste après le dernier caractère ÉCRIT qui la précède dans ce nœud : les
+  // fins de ligne et les lignes blanches entre le texte et le marqueur partent avec lui. Un
+  // rendu Markdown ne les met pas dans un même nœud — une ligne blanche y devient une frontière
+  // de paragraphe, une fin de ligne simple un saut déclaré (`renderedBodyShape()`) —, et en HTML
+  // ordinaire elles se replient de toute façon. Mais une plateforme qui préserverait les blancs
+  // les afficherait, et la mention ne serait plus à un seul écart du texte (revue Reefact,
+  // PR #163). Les masquer ne coûte rien : la mention est un bloc, l'écart est le sien.
+  return { node, start: node.data.slice(0, lineStart).trimEnd().length };
 }
 
 /** Variable portée par l'espaceur du sujet : sa hauteur, deux tiers d'écart de paragraphe. */

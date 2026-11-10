@@ -52,7 +52,9 @@ describe('CA-53 — le marqueur reconnu s’affiche en bas du commentaire, à sa
     const el = body('<p>note: Some title<br>\n[session:Run-7]</p>');
     decorate(el);
     expect(shown(el)).toBe('\u{1F916} session: run-7');
-    expect(visible(el)).toBe('Some title \u{1F916} session: run-7');
+    // Deux blocs : le sujet, puis la mention — la fin de ligne qui les séparait est masquée avec
+    // le marqueur, la mention étant un bloc qui porte son propre écart.
+    expect(visible(el)).toBe('Some title\u{1F916} session: run-7');
     // Le sujet mis en avant s’arrête au saut de ligne : la métadonnée n’y entre pas.
     expect(el.querySelector('.cct-subject')?.textContent).toBe('Some title');
   });
@@ -109,6 +111,28 @@ describe('CA-53 — le marqueur reconnu s’affiche en bas du commentaire, à sa
     expect(el.innerHTML).toBe(once);
     expect(commentBodyText(el)).toContain('[session:Run-7]');
   });
+
+  it.each([
+    ['une ligne blanche', 'Detail.\n\n[session:run]'],
+    ['plusieurs lignes blanches faites d’espaces', 'Detail.\n   \n\t\n\n[session:run]  \n'],
+    ['une seule fin de ligne', 'Detail.\n[session:run]'],
+  ])(
+    'un corps rendu d’un seul nœud de texte : les blancs qui précèdent le marqueur sont masqués avec lui, aucune ligne blanche ne reste (revue Reefact, PR #163) — %s',
+    (_name, text) => {
+      const el = document.createElement('div');
+      el.textContent = text;
+      document.body.appendChild(el);
+      decorate(el);
+      const hidden = el.querySelector('.cct-hidden-session')!;
+      // Ce qui reste visible avant la mention s'arrête au dernier caractère écrit.
+      expect((hidden.previousSibling as Text).data).toBe('Detail.');
+      expect(hidden.textContent!.trim()).toBe('[session:run]');
+      const once = el.innerHTML;
+      decorate(el);
+      expect(el.innerHTML).toBe(once);
+      expect(commentBodyText(el)).toBe(text);
+    }
+  );
 
   it('un affichage emporté par la plateforme est reposé au passage suivant', () => {
     const el = body('<p>note: x</p>\n<p>[session:a]</p>');

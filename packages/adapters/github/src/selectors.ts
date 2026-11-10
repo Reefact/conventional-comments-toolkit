@@ -1046,6 +1046,24 @@ export const selectors = {
     candidates: ['[data-testid="for-you-item-row"][data-item-id="pending-checks"]'],
   } satisfies SelectorChain,
 
+  /** Sonde « la rangée n'est pas encore rendue » de l'Overview : son absence de bouton n'est pas
+   * une rupture, la page n'a encore rien dit de la mergeabilité (#158).
+   *
+   * MESURÉ sur les deux squelettes de l'archive de #158 (PR 155, `msSinceVisit` 0 et 1) : la
+   * rangée existe, SANS `data-item-id`, et ne contient que des emplacements de chargement Primer —
+   * `SkeletonAvatar` à la place de l'icône, `SkeletonBox` à la place du bouton. Les 15 captures
+   * Overview, toutes chargées, portent un `data-item-id` et aucun `SkeletonBox`. Sans cette
+   * sonde, la chaîne était journalisée à la première milliseconde ; quand la rangée devenait
+   * ensuite `pending-checks`, rien ne rattrapait la ligne, qui restait présentée comme une rupture.
+   *
+   * L'emplacement de chargement est exigé, pas seulement l'absence de `data-item-id` : une rangée
+   * qui perdrait cet attribut pour de bon, sans squelette, reste journalisée — du bruit, jamais du
+   * silence. Non mesuré : une page qui resterait indéfiniment dans cet état. */
+  overviewLoadingRow: {
+    name: 'overview-loading-row',
+    candidates: ['[data-testid="for-you-item-row"]:not([data-item-id]) [data-component="SkeletonBox"]'],
+  } satisfies SelectorChain,
+
   /** Élément après lequel insérer le bandeau du §5.5 sur l'Overview.
    *
    * Le candidat commun de `bannerMount`, l'en-tête de page, y est la bonne place VERTICALE mais

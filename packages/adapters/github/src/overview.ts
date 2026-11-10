@@ -82,8 +82,12 @@ export function inOverviewPrDescription(el: Element): boolean {
 }
 
 /** Le bouton de fusion de la rangée « action recommandée », et si son absence est NOMINALE : la
- * rangée dit que la PR ne peut pas être fusionnée maintenant (`overviewNotMergeable`, #127). */
+ * rangée dit que la PR ne peut pas être fusionnée maintenant (`overviewNotMergeable`, #127), ou
+ * n'est pas encore rendue (`overviewLoadingRow`, #158). */
 export function overviewCompletion(doc: Document): { element: Element | null; nominalAbsence: boolean } {
   const element = queryChain(doc, selectors.overviewMergeButton).element;
-  return { element, nominalAbsence: queryChain(doc, selectors.overviewNotMergeable).element !== null };
+  const nominalAbsence =
+    queryChain(doc, selectors.overviewNotMergeable).element !== null ||
+    queryChain(doc, selectors.overviewLoadingRow).element !== null;
+  return { element, nominalAbsence };
 }

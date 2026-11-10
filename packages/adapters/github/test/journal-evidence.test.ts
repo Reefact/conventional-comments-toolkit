@@ -124,3 +124,63 @@ describe('§9.4 — `merge-button` : le relevé dit ce que la boîte de fusion c
     expect(page.recovered).toEqual([]);
   }, T);
 });
+
+describe('§9.4 — `merge-button` : Overview sondée avant que la rangée de fusion soit rendue (#158)', () => {
+  // La rangée telle que la montrent les deux squelettes de l'archive de #158 (PR 155,
+  // `msSinceVisit` 0 et 1, lignes 415–422) : même `li`, SANS `data-item-id`, avec des emplacements
+  // de chargement Primer à la place de l'icône et du bouton. Reconstituée sur la rangée réelle
+  // d'une capture, puis restaurée telle quelle : la page passe de l'état chargement à l'état
+  // chargé, comme le fait GitHub — c'est la course que le correctif vise.
+  function placeholder(doc: Document, withSkeleton = true): () => void {
+    const row = doc.querySelector('[data-testid="for-you-item-row"]')!;
+    const [itemId, content] = [row.getAttribute('data-item-id')!, [...row.childNodes]];
+    row.removeAttribute('data-item-id');
+    row.replaceChildren();
+    if (withSkeleton) {
+      row.innerHTML =
+        '<div class="Row__lRJeTL"><div data-testid="for-you-item-visual">' +
+        '<div data-component="SkeletonAvatar"></div></div>' +
+        '<div data-testid="for-you-item-title"></div>' +
+        '<div class="Actions__voRwBb"><div><div data-component="SkeletonBox"></div></div></div></div>';
+    }
+    return () => {
+      row.setAttribute('data-item-id', itemId);
+      row.replaceChildren(...content);
+    };
+  }
+
+  it('checks en cours (capture 01, le 1er relevé de #158) : rien de journalisé, ni pendant ni après', () => {
+    let restore = () => {};
+    const page = load('01-overview-nouveau-commentaire.html', '/Reefact/just-dummies/pull/548', (doc) => {
+      restore = placeholder(doc);
+    });
+    expect(page.adapter.getCompletionControl()).toBeNull();
+    expect(page.lines).toEqual([]);
+
+    restore(); // GitHub rend la rangée : `pending-checks`, aucun bouton, absence nominale.
+    expect(page.adapter.getCompletionControl()).toBeNull();
+    expect(page.lines).toEqual([]);
+  }, T);
+
+  it('fusion possible (capture 03, le 2e relevé de #158) : rien de journalisé, puis le bouton', () => {
+    let restore = () => {};
+    const page = load('03-overview-commentaires-prefixes.html', '/Reefact/just-dummies/pull/548', (doc) => {
+      restore = placeholder(doc);
+    });
+    expect(page.adapter.getCompletionControl()).toBeNull();
+    expect(page.lines).toEqual([]);
+
+    restore();
+    expect(page.adapter.getCompletionControl()?.element.textContent?.trim()).toBe('Rebase and merge');
+    expect(page.lines).toEqual([]);
+    expect(page.recovered).toEqual([]);
+  }, T);
+
+  it('une rangée sans `data-item-id` NI emplacement de chargement reste journalisée — du bruit, jamais du silence', () => {
+    const page = load('03-overview-commentaires-prefixes.html', '/Reefact/just-dummies/pull/548', (doc) => {
+      placeholder(doc, false);
+    });
+    expect(page.adapter.getCompletionControl()).toBeNull();
+    expect(page.lines.map((l) => l.chain)).toEqual(['merge-button']);
+  }, T);
+});

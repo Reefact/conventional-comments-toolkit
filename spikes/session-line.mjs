@@ -1,13 +1,12 @@
-// Marqueur de session affiché (§3.6, §5.5) — écart MESURÉ dans un vrai Chromium.
+// En-tête et marqueur de session (§3.6, §5.5) — rendu MESURÉ dans un vrai Chromium.
 //
-// Ce que happy-dom ne sait pas dire : à quelle distance du texte qui la précède la mention
-// `🤖 session: …` est peinte. La demande (Reefact, #163) est géométrique : le DOUBLE de l'écart
-// normal entre deux paragraphes, que le marqueur soit écrit dans son propre paragraphe ou juste
-// après un saut de ligne, et quel que soit le nombre de lignes blanches autour — le rendu
-// Markdown les replie, le corps rendu n'en garde aucune trace.
+// Ce que happy-dom ne sait pas dire : où les lignes sont peintes. La demande (Reefact, #163) est
+// géométrique : un commentaire écrit avec des lignes blanches entre préfixe, corps et marqueur,
+// et le même écrit d'un bloc, se rendent À L'IDENTIQUE — sujet, corps et mention aux mêmes
+// positions —, chaque séparation valant un écart de paragraphe.
 //
-// Contrôle DIFFÉRENTIEL : la même mesure sans la variable d'écart posée par `sessionGap()` doit
-// donner autre chose que le double — sinon elle ne prouverait rien.
+// Contrôle DIFFÉRENTIEL : sans les variables d'écart posées par badges.ts, les deux écritures
+// doivent différer — sinon la comparaison ne prouverait rien.
 //
 // Le style de plateforme (marge de paragraphe de 16 px, dernière marge nulle) est une
 // APPROXIMATION de github.com ; les assertions portent sur des rapports à l'écart normal MESURÉ
@@ -54,19 +53,23 @@ const bundled = await build({
 });
 const css = readFileSync(resolve(root, 'packages/extension/src/styles.css'), 'utf8');
 
-// Le HTML qu'un rendu Markdown produit : les lignes blanches, même faites d'espaces, ne laissent
-// aucun nœud — c'est pourquoi un seul cas « paragraphe à part » couvre « une » comme « dix » lignes
-// blanches avant le marqueur.
-const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin vel justo a quam scelerisque fringilla.';
+// Les deux écritures de la demande (Reefact, #163), telles qu'un rendu Markdown les produit :
+// - « aérée » : lignes blanches (espaces compris) autour de chaque bloc — le rendu n'en garde
+//   aucune trace, chaque bloc devient un paragraphe ;
+// - « serrée » : tout d'un bloc, chaque fin de ligne simple devient un `<br>`.
+// Elles doivent se rendre à l'identique, en-tête comme pied.
+const LOREM =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin vel justo a quam scelerisque fringilla. Nam congue mattis egestas. Sed eu porta enim. In luctus justo lobortis imperdiet laoreet.';
 const CASES = {
-  own: `<p dir="auto">reviewed: blah-blah-blah</p>\n<p dir="auto" class="before">${LOREM}</p>\n<p dir="auto">[session:some-session-id]</p>`,
-  br: `<p dir="auto">reviewed: blah-blah-blah</p>\n<p dir="auto" class="before">${LOREM}<br>\n[session:some-session-id]</p>`,
+  spaced: `<p dir="auto">reviewed: blah-blah-blah</p>\n<p dir="auto">${LOREM}</p>\n<p dir="auto">[session:some-session-id]</p>`,
+  tight: `<p dir="auto">reviewed: blah-blah-blah<br>\n${LOREM}<br>\n[session:some-session-id]</p>`,
 };
 
 const browser = await chromium.launch({ executablePath: EXECUTABLE });
 const page = await browser.newPage();
 await page.setContent(`<!doctype html><html><head><style>
   body { font: 14px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; margin: 0; width: 600px; }
+  .markdown-body { padding: 8px; }
   .markdown-body p { margin: 0 0 16px; }
   .markdown-body > *:last-child { margin-bottom: 0; }
   ${css}
@@ -75,53 +78,82 @@ await page.setContent(`<!doctype html><html><head><style>
   <script>${bundled.outputFiles[0].text}</script>
 </body></html>`);
 
-const measured = await page.evaluate(() => {
-  const out = {};
-  for (const el of document.querySelectorAll('.markdown-body')) {
-    cct.decorateComment(el, cct.commentBodyText(el), cct.defaultConfig(), { id: 'github', suggestionInfoString: 'suggestion' }, 'en', cct.GITHUB_BODY_SHAPE);
-    const shown = el.querySelector('.cct-session');
-    const before = el.querySelector('.before');
-    const [first, second] = el.querySelectorAll('p');
-    // Bas du texte qui précède : la boîte du paragraphe quand la mention ouvre le sien, sinon la
-    // boîte de ligne du texte (même paragraphe, après un saut de ligne).
-    const text = document.createRange();
-    text.selectNodeContents(before.firstChild);
-    // La DERNIÈRE ligne peinte : le texte peut se replier sur plusieurs lignes.
-    const rects = [...text.getClientRects()];
-    const glyphs = rects[rects.length - 1];
-    const lineHeight = parseFloat(getComputedStyle(before).lineHeight);
-    const inSame = before.contains(shown);
-    const textBottom = inSame ? glyphs.bottom + (lineHeight - glyphs.height) / 2 : before.getBoundingClientRect().bottom;
-    const gap = () => shown.getBoundingClientRect().top + parseFloat(getComputedStyle(shown).paddingTop) - textBottom;
-    const style = getComputedStyle(shown);
-    const withGap = gap();
-    // Contre-épreuve : sans la variable posée par sessionGap(), l'écart retombe sur le défaut CSS.
-    const saved = shown.style.getPropertyValue('--cct-session-gap');
-    shown.style.removeProperty('--cct-session-gap');
-    shown.style.setProperty('padding-top', '0px');
-    const withoutGap = gap();
-    shown.style.removeProperty('padding-top');
-    shown.style.setProperty('--cct-session-gap', saved);
-    out[el.id] = {
-      normal: second.getBoundingClientRect().top - first.getBoundingClientRect().bottom,
-      withGap,
-      withoutGap,
-      italic: style.fontStyle,
-      display: style.display,
-      text: shown.textContent,
-    };
-  }
-  return out;
-});
+/** Positions, relatives au haut du corps, de ce que le lecteur voit : la ligne de l'en-tête, la
+ * première et la dernière ligne du texte, la mention. Mesure DIFFÉRENTIELLE : avec `undo`, les
+ * deux variables d'écart sont retirées — l'état d'avant la demande, dont les deux écritures
+ * doivent alors différer, sans quoi la comparaison ne prouverait rien. */
+async function measure(undo) {
+  return page.evaluate((undo) => {
+    const out = {};
+    for (const el of document.querySelectorAll('.markdown-body')) {
+      if (!el.querySelector('.cct-session')) {
+        cct.decorateComment(el, cct.commentBodyText(el), cct.defaultConfig(), { id: 'github', suggestionInfoString: 'suggestion' }, 'en', cct.GITHUB_BODY_SHAPE);
+      }
+      const shown = el.querySelector('.cct-session');
+      const spacer = el.querySelector('.cct-subject-break');
+      for (const [node, name] of [[shown, '--cct-session-gap'], [spacer, '--cct-paragraph-gap']]) {
+        if (!node) continue;
+        if (undo) {
+          node.dataset.saved = node.style.getPropertyValue(name);
+          node.style.removeProperty(name);
+        } else if (node.dataset.saved !== undefined) {
+          node.style.setProperty(name, node.dataset.saved);
+        }
+      }
+      const top = el.getBoundingClientRect().top;
+      const lorem = [...el.querySelectorAll('p')].flatMap((p) => [...p.childNodes]).find((n) => n.nodeType === 3 && n.data.includes('Lorem'));
+      const range = document.createRange();
+      range.selectNodeContents(lorem);
+      const lines = [...range.getClientRects()];
+      const subject = document.createRange();
+      subject.selectNodeContents(el.querySelector('.cct-subject'));
+      const style = getComputedStyle(shown);
+      const blocks = [...el.querySelectorAll(':scope > p')].map((p) => p.getBoundingClientRect());
+      out[el.id] = {
+        headerGap: blocks.length === 3 ? blocks[1].top - blocks[0].bottom : NaN,
+        footerGap: blocks.length === 3 ? shown.getBoundingClientRect().top + parseFloat(style.paddingTop) - blocks[1].bottom : NaN,
+        subject: subject.getClientRects()[0].top - top,
+        first: lines[0].top - top,
+        last: lines[lines.length - 1].top - top,
+        session: shown.getBoundingClientRect().top + parseFloat(style.paddingTop) - top,
+        height: el.getBoundingClientRect().height,
+        normal: parseFloat(getComputedStyle(el.querySelector('p')).marginBottom) || 16,
+        italic: style.fontStyle,
+        display: style.display,
+        text: shown.textContent,
+      };
+    }
+    return out;
+  }, undo);
+}
+
+const after = await measure(false);
+const before = await measure(true);
 await browser.close();
 
-console.log('Marqueur de session affiché — mesuré dans un vrai Chromium\n');
-for (const [id, m] of Object.entries(measured)) {
-  const label = id === 'own' ? 'paragraphe à part' : 'après un saut de ligne';
-  assert(`${label} : la mention est remplacée`, m.text === '\u{1F916} session: some-session-id', m.text);
-  assert(`${label} : écart au-dessus = 2 × l’écart normal (± 1 px)`, Math.abs(m.withGap - 2 * m.normal) <= 1, `${m.withGap.toFixed(1)} px pour un écart normal de ${m.normal} px`);
-  assert(`${label} : contre-épreuve, sans la variable l’écart n’est pas le double`, Math.abs(m.withoutGap - 2 * m.normal) > 1, `${m.withoutGap.toFixed(1)} px`);
-  assert(`${label} : bloc, en italique`, m.display === 'block' && m.italic === 'italic', `${m.display}, ${m.italic}`);
+console.log('Marqueur de session et en-tête — mesurés dans un vrai Chromium\n');
+const { spaced, tight } = after;
+const same = (a, b) => Math.abs(a - b) <= 1;
+for (const [k, label] of [
+  ['subject', 'ligne de l’en-tête'],
+  ['first', 'première ligne du texte'],
+  ['last', 'dernière ligne du texte'],
+  ['session', 'mention de session'],
+  ['height', 'hauteur du commentaire'],
+]) {
+  assert(`même position, écriture aérée ou serrée : ${label}`, same(spaced[k], tight[k]), `${spaced[k].toFixed(1)} / ${tight[k].toFixed(1)} px`);
+}
+// Les écarts eux-mêmes, entre BOÎTES de blocs sur l'écriture aérée — de ligne à ligne, la
+// hauteur d'une ligne entrerait dans la mesure, et celle de l'en-tête dépend des badges.
+assert('en-tête → texte : un écart de paragraphe', same(spaced.headerGap, spaced.normal), `${spaced.headerGap.toFixed(1)} px pour ${spaced.normal}`);
+assert('texte → mention : un écart de paragraphe', same(spaced.footerGap, spaced.normal), `${spaced.footerGap.toFixed(1)} px pour ${spaced.normal}`);
+assert(
+  'contre-épreuve : sans les variables d’écart, les deux écritures diffèrent',
+  !same(before.spaced.session, before.tight.session) || !same(before.spaced.first, before.tight.first),
+  `mention ${before.spaced.session.toFixed(1)} / ${before.tight.session.toFixed(1)} px`
+);
+for (const [id, m] of Object.entries(after)) {
+  assert(`${id} : la mention est remplacée, en bloc et en italique`, m.text === '\u{1F916} session: some-session-id' && m.display === 'block' && m.italic === 'italic', `${m.text}, ${m.display}, ${m.italic}`);
 }
 
 const failed = results.filter((r) => !r.ok).length;

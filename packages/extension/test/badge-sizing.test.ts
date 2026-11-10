@@ -77,6 +77,9 @@ describe('taille des badges (§5.5) — le label reste plus marquant que ses dé
     // dont aucune n’est décorative.
     const body = ruleBody('.cct-subject-break');
     expect(body).toMatch(/display\s*:\s*block/);
-    expect(declaredNumber(body, 'height')).toBeGreaterThan(0);
+    // La hauteur est l'écart de paragraphe que badges.ts lit sur la page (`paragraphGap`) et pose
+    // dans la variable ; le repli, faute de variable, reste une hauteur positive. La géométrie
+    // elle-même — même rendu avec ou sans ligne blanche — est mesurée par check:session-line.
+    expect(body).toMatch(/height\s*:\s*var\(--cct-paragraph-gap,\s*1em\)/);
   });
 });

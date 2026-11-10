@@ -104,10 +104,10 @@ jobs:
       - name: Ligne du sujet — badges et sujet sur une seule ligne (§5.5)
         run: npm run check:subject-line
 
-      # Même famille : l'écart au-dessus du marqueur de session affiché est une affirmation de
-      # mise en page — le double de l'écart normal entre paragraphes, que le marqueur ouvre son
-      # paragraphe ou suive un saut de ligne. Différentiel : sans la variable, l'écart change.
-      - name: Marqueur de session — écart et style mesurés (§3.6, §5.5)
+      # Même famille : un commentaire écrit avec des lignes blanches et le même écrit d'un bloc
+      # doivent se rendre à l'identique, en-tête (sujet) comme pied (marqueur de session) — une
+      # affirmation de mise en page. Différentiel : sans les variables d'écart, ils diffèrent.
+      - name: En-tête et marqueur de session — même rendu, aéré ou serré (§3.6, §5.5)
         run: npm run check:session-line
 
       # Même famille : où un trait est PEINT et ce qui le rogne ne se déduit pas d'un arbre

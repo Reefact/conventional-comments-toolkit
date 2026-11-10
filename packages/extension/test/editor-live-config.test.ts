@@ -91,6 +91,9 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
       renderedBodyShape() {
         return HTML_SHAPE;
       }
+      submitKeystrokes() {
+        return { field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] };
+      }
       getSubmitControls() {
         return [{ element: submit, kind: 'submit' }];
       }

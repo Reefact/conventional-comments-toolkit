@@ -39,6 +39,35 @@ export interface SubmitControl {
   kind: 'submit' | 'submit-and-resolve' | 'complete-pr';
 }
 
+/** Une combinaison de touches qui PUBLIE (§4.3, §5.4). `key` est la valeur de
+ * `KeyboardEvent.key` (`'Enter'`, `' '` pour Espace) ; `modifiers` dit si Ctrl ou ⌘ est requis
+ * (`'ctrl-or-meta'`) ou si la touche publie quels que soient les modificateurs (`'any'`). */
+export interface SubmitKeystroke {
+  key: string;
+  modifiers: 'ctrl-or-meta' | 'any';
+}
+
+/** §4.3, §5.4 — les touches qui publient sur CETTE plateforme, déclarées par son adaptateur.
+ *
+ * Le code partagé n'en connaît AUCUNE : il arrête ce que l'adaptateur déclare, et rien d'autre.
+ * Un raccourci n'est pas le même d'une plateforme à l'autre — MESURÉ le 2026-11-10 : le bouton
+ * *Comment* d'Azure DevOps publie sur Entrée, Ctrl+Entrée et Espace, sans émettre de `click`,
+ * quand un bouton natif émet un `click` que le garde du clic arrête déjà. Un raccourci écrit dans
+ * le garde partagé s'appliquerait à toutes les plateformes ; déclaré ici, il ne touche que la
+ * sienne (décision du propriétaire, 2026-11-10).
+ *   - `field` : depuis la zone de saisie (le Ctrl+Entrée de GitHub, de GitLab) ;
+ *   - `control` : quand un contrôle d'envoi (`getSubmitControls()`) a le focus, pour un bouton qui
+ *     agit sur la touche elle-même. Vide pour un bouton natif : son `click` suffit. */
+export interface SubmitKeystrokes {
+  field: readonly SubmitKeystroke[];
+  control: readonly SubmitKeystroke[];
+}
+
+/** L'événement est-il l'une des combinaisons déclarées ? Aucune touche n'est écrite ici. */
+export function matchesSubmitKeystroke(e: KeyboardEvent, keystrokes: readonly SubmitKeystroke[]): boolean {
+  return keystrokes.some((k) => e.key === k.key && (k.modifiers === 'any' || e.ctrlKey || e.metaKey));
+}
+
 /** Ce que seule la PLATEFORME sait du châssis qui entoure une zone de saisie — la boîte de
  * commentaire, ses onglets, son en-tête — et dont l'extension a besoin pour s'y loger sans
  * décaler quoi que ce soit (§5.1, §5.3).
@@ -260,6 +289,10 @@ export interface PlatformAdapter {
   getOrgConfig(url: string | null): Promise<ConfigRead>;
   observeEditors(cb: (editor: EditorHandle) => void): Disposable;
   getSubmitControls(editor: EditorHandle): SubmitControl[];
+  /** §4.3, §5.4 — les touches qui publient depuis cet éditeur ou ses contrôles d'envoi
+   * (`SubmitKeystrokes`). Obligatoire pour la même raison que `getEditorChrome` : une plateforme
+   * nouvelle doit se voir poser la question, et le garde partagé n'a aucune réponse par défaut. */
+  submitKeystrokes(editor: EditorHandle): SubmitKeystrokes;
   /** §5.1, §5.3, §9.4 — le châssis de CET éditeur. Obligatoire, et c'est délibéré : une
    * méthode optionnelle laisserait une plateforme nouvelle compiler sans jamais répondre, et
    * son extension se logerait alors au jugé sur un DOM que personne n'a regardé. Le compilateur

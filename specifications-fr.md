@@ -1603,6 +1603,12 @@ interface PlatformAdapter {
                                        // composeur. Obligatoire : une méthode optionnelle laisserait une
                                        // plateforme nouvelle compiler sans jamais répondre
   getSubmitControls(editor: EditorHandle): SubmitControl[];  // §4.3 — tous les points de sortie, §5.4 — interception
+  submitKeystrokes(editor: EditorHandle): SubmitKeystrokes;  // §4.3, §5.4 — les touches qui PUBLIENT sur cette
+                                       // plateforme : depuis le champ (`field`) et sur un contrôle d'envoi qui a
+                                       // le focus (`control`). Le composant A n'en connaît aucune : il arrête ce
+                                       // que l'adaptateur déclare, si bien qu'un raccourci propre à une
+                                       // plateforme ne touche jamais les autres (décision du propriétaire,
+                                       // 2026-11-10). Obligatoire, pour la même raison que `getEditorChrome()`
   readValue(editor: EditorHandle): string;
   writeValue(editor: EditorHandle, text: string, caret?: number): void;  // §5.1, §5.2 — insertion de préfixe ;
                                                                           // stratégie d'écriture imposée par le §9.3
@@ -2092,6 +2098,7 @@ S'il s'avère que la plateforme ne l'expose pas, le cas prévu au §6.1 pour les
 ### B.6 Actions couvertes spécifiques
 
 - Boutons « Comment » **et** « Comment & resolve » — les deux doivent passer par la validation.
+- **Le clavier sur ces boutons publie, sans clic.** Mesuré le 2026-11-10 : Entrée, Ctrl+Entrée et Espace sur un bouton d'envoi qui a le focus partent en publication sans émettre d'événement `click` — le bouton agit sur la touche elle-même. L'adaptateur Azure DevOps les déclare donc sur ses contrôles d'envoi (`submitKeystrokes().control`, §9.2.3), en plus de Ctrl/⌘+Entrée depuis le champ.
 - **Le commentaire général peut porter un état bloquant** (§4.1, `canCarryBlockingState`) — à l'inverse de GitHub, comme sur GitLab (§C.6). Sur Azure DevOps, tout commentaire général de PR est un **fil**, avec un état (*Active*, *Pending*, *Resolved*…) et un bouton *Resolve*, comme un fil de ligne de diff (mesuré sur les captures du 2026-11-09, `packages/adapters/azdo/CAPTURES.md`) : le motif du §4.1 — « aucun état de résolution » — ne s'y vérifie pas. Décision du propriétaire, 2026-11-10 : la zone de conversation d'Azure DevOps est traitée comme pouvant bloquer, `W-NOT-BLOCKABLE` ne s'y affiche pas, et un label bloquant y compte dans le critère 2 du §6.2. Contrairement à GitLab, aucune variante « note simple » non résoluble n'a été observée.
 - **Pas d'équivalent de revue soumise en lot** : Azure DevOps ne propose pas de corps de revue global comparable à celui de GitHub. La clé `scope.validateReviewSummary` (§8.2) est donc **sans objet** sur cette plateforme et y est ignorée.
 - **Aucune commande native, ni slash ni mention.** Les *comment triggers* du type `/azp run` sont une fonctionnalité d'Azure Pipelines réservée aux dépôts **GitHub** ; Azure Repos passe par les policies de branche. Aucun écosystème de robots pilotés au commentaire ne s'y est établi non plus : la revue de code assistée que la plateforme propose se déclenche par son interface, pas par une interpellation dans un fil. `toolCommands` (§4.2, §8.2) y vaut donc **`[]`** par défaut, exactement comme sur GitHub — l'exemption n'a ici aucune illustration native à recommander en exemple. Une organisation qui installe malgré tout un outil tiers piloté au commentaire dispose du **même mécanisme** que sur GitHub, sans repli particulier à écrire : elle ajoute son sentinel `/*` ou son handle exact à `toolCommands` dans son `.conventional-comments.json`, la configuration étant la même clé sur les deux plateformes (§4.2).

@@ -37,6 +37,7 @@ import {
   type PlatformAdapter,
   type RenderedBodyShape,
   type SubmitControl,
+  type SubmitKeystrokes,
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
 
@@ -134,6 +135,14 @@ export class GitlabClientAdapter implements PlatformAdapter {
   /** §5.5 — la forme MESURÉE du corps rendu de GitLab, `GITLAB_BODY_SHAPE` ci-dessous. */
   renderedBodyShape(): RenderedBodyShape {
     return GITLAB_BODY_SHAPE;
+  }
+
+  /** §4.3, §5.4 — Ctrl/⌘+Entrée publie depuis le champ ; c'est la règle que le garde partagé
+   * appliquait à toutes les plateformes avant que chacune ne déclare la sienne (2026-11-10). Les
+   * boutons d'envoi de GitLab ne sont pas mesurés au clavier : aucune touche déclarée sur eux, leur
+   * `click` reste arrêté par le garde du clic. Comportement inchangé. */
+  submitKeystrokes(_editor: EditorHandle): SubmitKeystrokes {
+    return { field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }], control: [] };
   }
 
   /** Les boutons d'envoi du FORMULAIRE de l'éditeur — y compris « … and close merge request »,

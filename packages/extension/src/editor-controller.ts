@@ -15,7 +15,7 @@ import {
   type ValidationInput,
 } from '@cct/core';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
-import { computePrefixInsertion, shiftSelection } from '@cct/adapter-shared';
+import { computePrefixInsertion, matchesSubmitKeystroke, shiftSelection } from '@cct/adapter-shared';
 import { decideGuard, feedbackState, type GuardDecision } from './guard.js';
 import { framedAncestor, ringIsClipped, stackingMountFor, usableMount } from './ui/stacking.js';
 import { buildToolbar, type PosedPrefix, type Toolbar } from './ui/toolbar.js';
@@ -370,7 +370,10 @@ export class EditorController {
           return;
         }
       }
-      if (ke.key === 'Enter' && (ke.ctrlKey || ke.metaKey)) {
+      // Les touches qui publient DEPUIS LE CHAMP sont celles que la plateforme déclare
+      // (`submitKeystrokes().field`) : aucune n'est écrite ici (décision du propriétaire,
+      // 2026-11-10).
+      if (matchesSubmitKeystroke(ke, this.deps.adapter.submitKeystrokes(this.deps.editor).field)) {
         if (this.#shouldBlockNow()) {
           ke.preventDefault();
           ke.stopPropagation();
@@ -584,22 +587,49 @@ export class EditorController {
    * paraissait posé, et ne l'était pas.
    *
    * La capture au niveau du document passe avant tout gestionnaire de la page : ceux de React
-   * écoutent sur leur racine, plus bas dans l'arbre, et un `stopPropagation` ici les prive du clic. */
+   * écoutent sur leur racine, plus bas dans l'arbre, et un `stopPropagation` ici les prive du clic.
+   *
+   * LE CLAVIER SUR LE BOUTON, de la même façon — mais seulement les touches que la plateforme
+   * DÉCLARE (`submitKeystrokes().control`). MESURÉ le 2026-11-10 sur Azure DevOps : Entrée,
+   * Ctrl+Entrée et Espace sur le bouton *Comment* qui a le focus publient sur la touche, sans
+   * aucun `click` — un commentaire non conforme est parti sous `enforce`. Un bouton natif émet un
+   * `click`, que l'écouteur ci-dessus arrête : sa plateforme ne déclare rien, et rien ne change
+   * pour elle. Les deux phases, `keydown` et `keyup`, parce qu'un bouton peut agir sur l'une ou
+   * l'autre ; l'annonce n'est faite qu'à l'appui. */
   #guardSubmitControls(): void {
     const doc = this.deps.editor.element.ownerDocument;
-    const onClick = (e: Event) => {
-      const target = e.target;
-      if (!(target instanceof Node)) return;
+    const targetsSubmitControl = (target: EventTarget | null): boolean => {
+      if (!(target instanceof Node)) return false;
       const controls: SubmitControl[] = this.deps.adapter.getSubmitControls(this.deps.editor);
-      if (!controls.some((c) => c.element === target || c.element.contains(target))) return;
+      return controls.some((c) => c.element === target || c.element.contains(target));
+    };
+    const onClick = (e: Event) => {
+      if (!targetsSubmitControl(e.target)) return;
       if (this.#shouldBlockNow()) {
         e.preventDefault();
         e.stopPropagation();
         this.#announceBlock();
       }
     };
+    const onControlKey = (e: Event) => {
+      const ke = e as KeyboardEvent;
+      if (!matchesSubmitKeystroke(ke, this.deps.adapter.submitKeystrokes(this.deps.editor).control)) return;
+      if (!targetsSubmitControl(ke.target)) return;
+      if (this.#shouldBlockNow()) {
+        ke.preventDefault();
+        ke.stopPropagation();
+        if (ke.type === 'keydown') this.#announceBlock();
+      }
+    };
     const guardedClick = guarded('editor', onClick);
+    const guardedKey = guarded('editor', onControlKey);
     doc.addEventListener('click', guardedClick, true);
-    this.#disposers.push(() => doc.removeEventListener('click', guardedClick, true));
+    doc.addEventListener('keydown', guardedKey, true);
+    doc.addEventListener('keyup', guardedKey, true);
+    this.#disposers.push(() => {
+      doc.removeEventListener('click', guardedClick, true);
+      doc.removeEventListener('keydown', guardedKey, true);
+      doc.removeEventListener('keyup', guardedKey, true);
+    });
   }
 }

@@ -35,6 +35,7 @@ import {
   type EditorHandle,
   type PlatformAdapter,
   type SubmitControl,
+  type SubmitKeystrokes,
 } from '@cct/adapter-shared';
 import {
   classicCompletion,
@@ -423,6 +424,15 @@ export class GithubClientAdapter implements PlatformAdapter {
   /** §5.5 — la forme mesurée de GitHub, `GITHUB_BODY_SHAPE` ci-dessus. */
   renderedBodyShape(): RenderedBodyShape {
     return GITHUB_BODY_SHAPE;
+  }
+
+  /** §4.3, §5.4 — Ctrl/⌘+Entrée publie depuis le champ ; c'est la règle que le garde partagé
+   * appliquait à toutes les plateformes avant que chacune ne déclare la sienne (2026-11-10).
+   * Aucune touche déclarée sur les boutons d'envoi : ce sont des `<button>`, qui émettent un
+   * `click` au clavier selon le comportement standard du navigateur — que le garde du clic arrête.
+   * Non mesuré au clavier sur github.com. Comportement inchangé. */
+  submitKeystrokes(_editor: EditorHandle): SubmitKeystrokes {
+    return { field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }], control: [] };
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {

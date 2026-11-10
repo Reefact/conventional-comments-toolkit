@@ -136,6 +136,7 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
           matches: () => true,
           platformProfile: () => ({ id: 'github', suggestionInfoString: null }),
           getSubmitControls: () => [],
+          submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
           readValue: () => '',
           writeValue: () => {},
           async getThreads() {

@@ -257,6 +257,7 @@ describe('§9.4 — un champ de commentaire qui plante est relevé « pendant la
       platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
       getEditorChrome: () => ({ ...NEUTRAL_EDITOR_CHROME, framedContainer: host }),
       getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+      submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
       readValue: () => {
         if (broken) throw new Error('field unreadable');
         return textarea.value;

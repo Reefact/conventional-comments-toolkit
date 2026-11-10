@@ -37,6 +37,7 @@ import {
   type PlatformAdapter,
   type RenderedBodyShape,
   type SubmitControl,
+  type SubmitKeystrokes,
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
 
@@ -156,6 +157,22 @@ export class AzdoClientAdapter implements PlatformAdapter {
 
   renderedBodyShape(): RenderedBodyShape {
     return AZDO_BODY_SHAPE;
+  }
+
+  /** §4.3, §5.4 — les touches qui publient sur Azure DevOps.
+   *   - Champ : Ctrl/⌘+Entrée, la règle que le garde partagé appliquait avant que chaque plateforme
+   *     ne déclare la sienne — pas mesurée à part sur Azure DevOps (le garde l'arrêtait déjà).
+   *   - Bouton d'envoi qui a le focus : Entrée, Ctrl+Entrée et Espace. MESURÉ le 2026-11-10, une
+   *     sonde bloquant toute requête de publication : chacune part en requête SANS émettre de
+   *     `click` — le bouton agit sur la touche elle-même, et le garde du clic n'en voyait rien. */
+  submitKeystrokes(_editor: EditorHandle): SubmitKeystrokes {
+    return {
+      field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }],
+      control: [
+        { key: 'Enter', modifiers: 'any' },
+        { key: ' ', modifiers: 'any' },
+      ],
+    };
   }
 
   /** Les boutons d'envoi de l'éditeur : tous ceux de sa rangée sauf le premier, *Cancel*

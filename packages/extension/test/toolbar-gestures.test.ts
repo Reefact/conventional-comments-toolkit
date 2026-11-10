@@ -51,6 +51,7 @@ function setup(tweak: (config: ReturnType<typeof defaultConfig>) => void = () =>
     getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
       renderedBodyShape: () => HTML_SHAPE,
     getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+    submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
     readValue: () => textarea.value,
     writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),
   };

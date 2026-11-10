@@ -114,8 +114,10 @@ function hasExtensionRelay(): boolean {
  * Une URL illisible n'est pas déclarée de même origine : elle part au relais, qui la
  * confrontera au plancher et la refusera. Mieux vaut un refus explicite qu'un privilège
  * accordé par erreur de parsage. */
-export function relayableFrom(page: URL): (url: string) => Promise<ConfigRead> | null {
-  return (url) => {
+export function relayableFrom(
+  page: URL
+): (url: string, opts?: { bypassCache: boolean }) => Promise<ConfigRead> | null {
+  return (url, opts) => {
     let target: URL | null = null;
     try {
       target = new URL(url);
@@ -125,7 +127,7 @@ export function relayableFrom(page: URL): (url: string) => Promise<ConfigRead> |
     // `origin` et non `hostname` : un port ou un schéma différents font une origine
     // différente pour la politique du navigateur, donc une lecture que la page ne peut pas
     // faire — c'est le critère qui décide, pas la ressemblance des noms d'hôte.
-    return target?.origin === page.origin ? null : relayOrgConfigRead(url);
+    return target?.origin === page.origin ? null : relayOrgConfigRead(url, opts?.bypassCache === true);
   };
 }
 
@@ -142,7 +144,7 @@ export function relayableFrom(page: URL): (url: string) => Promise<ConfigRead> |
  * Seul le document d'ORGANISATION passe par ici. Le fichier de dépôt vit sur l'origine de
  * la page affichée : le lire directement est correct, et le relayer exigerait au contraire
  * une permission d'hôte sur github.com que le manifeste ne déclare plus (PR #28). */
-export function relayOrgConfigRead(url: string): Promise<ConfigRead> {
+export function relayOrgConfigRead(url: string, bypassCache = false): Promise<ConfigRead> {
   return new Promise((resolve) => {
     let settled = false;
     const settle = (value: unknown, reason: string): void => {
@@ -153,7 +155,10 @@ export function relayOrgConfigRead(url: string): Promise<ConfigRead> {
     try {
       const runtime = chrome?.runtime;
       if (!runtime?.sendMessage) return settle(undefined, 'no extension relay');
-      const returned = runtime.sendMessage({ kind: 'cct-fetch-config', url }, (response) => {
+      // `bypassCache` (§8.1.3, règle 3) voyage avec le message : c'est le worker qui émet la
+      // requête, c'est donc lui qui doit écarter le cache HTTP du navigateur.
+      const message = { kind: 'cct-fetch-config', url, ...(bypassCache ? { bypassCache: true } : {}) };
+      const returned = runtime.sendMessage(message, (response) => {
         // Lire `lastError` est ce qui l'ACQUITTE : sans cette lecture, un worker endormi
         // ou une réponse perdue laisse un « Unchecked runtime.lastError » en console. Sa
         // valeur ne change rien ici — pas de réponse exploitable vaut `unreachable`.
@@ -1085,8 +1090,7 @@ export const CONFIG_POLL_MIN_INTERVAL_MS = 5000;
 
 /** Le CONTENU que la plateforme rend et que `renderPrChrome` peut afficher pour la PR
  * courante : l'identité des fils rendus (pas seulement leur nombre — React peut remplacer un
- * fil par un autre sans changer le compte), leur état de résolution quand l'adaptateur le
- * donne, et le nombre de corps de commentaire. Sans ces
+ * fil par un autre sans changer le compte), leur état de résolution, et le nombre de corps de commentaire. Sans ces
  * signaux, un premier rendu fait avant que les fils et les commentaires soient chargés
  * suffirait à figer `showedSomething`, et ce qui arrive ensuite ne recevrait jamais ses badges.
  *
@@ -1101,11 +1105,11 @@ export const CONFIG_POLL_MIN_INTERVAL_MS = 5000;
  * Elle portait aussi le résumé publié par un vérificateur et la présence du bouton de fusion,
  * tous deux retirés avec ce vérificateur (§2). */
 export function contentSignatureOf(adapter: PlatformAdapter): string {
-  // L'état de résolution avec l'identifiant (`id=état`), quand l'adaptateur le donne : résoudre
-  // ou rouvrir un fil change le décompte du bandeau, et la page peut le rendre hors du
-  // conteneur du fil, là où ni son identifiant ni son texte ne bougent.
+  // L'état de résolution avec l'identifiant (`id=état`) : résoudre ou rouvrir un fil change le
+  // décompte du bandeau, et la page peut le rendre hors du conteneur du fil, là où ni son
+  // identifiant ni son texte ne bougent.
   const threadIds = adapter.getRenderedThreadElements()
-    .map((t) => (t.resolution === undefined ? t.id : `${t.id}=${t.resolution}`))
+    .map((t) => `${t.id}=${t.resolution}`)
     .join(',');
   // Le nombre de corps que la PLATEFORME rend — **jamais** le nombre de ceux que nous
   // décorons, et les deux ont cessé de coïncider le jour où la description de la PR est

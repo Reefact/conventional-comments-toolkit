@@ -18,6 +18,19 @@ import type {
 
 // ————— Contrat client (§9.2.3) —————
 
+/** Ce que `bypassCache` (§8.1.3, règle 3) ajoute à la requête d'une lecture de configuration :
+ * `cache: 'reload'`, qui fait partir la requête vers le réseau sans consulter le cache HTTP du
+ * navigateur, et range la réponse fraîche dans ce cache pour les lectures ordinaires suivantes.
+ * Sans `bypassCache`, rien : le comportement ordinaire n'est pas touché.
+ *
+ * MESURÉ dans Chromium (`npm run check:config-cache-bypass`), sur une réponse
+ * `Cache-Control: max-age=300`, depuis un script de contenu ET depuis le service worker : la
+ * lecture ordinaire est servie par le cache, `reload` atteint le serveur. Non mesuré : la
+ * cible d'une redirection (la route `raw` de github.com), et Firefox. */
+export function bypassCacheInit(opts?: { bypassCache: boolean }): RequestInit {
+  return opts?.bypassCache === true ? { cache: 'reload' } : {};
+}
+
 export interface EditorContext {
   zone: Zone;
   action: 'compose' | 'edit';
@@ -260,7 +273,7 @@ export interface ClientAdapterOptions {
    * Codex, PR #30). La décision est donc prise par URL, pas une fois pour toutes.
    *
    * Absent — usage hors extension, tests — l'adaptateur lit directement. */
-  readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
+  readOrgConfig?: (url: string, opts?: { bypassCache: boolean }) => Promise<ConfigRead> | null;
   /** Le document à observer : celui de la page par défaut, un document détaché en test. */
   documentRef?: Document;
   /** Journal des dégradations de sélecteurs (§9.4), partagé avec le code qui l'exploite ; un
@@ -291,11 +304,11 @@ export interface PlatformAdapter {
   currentPr(): PrRef | null;
   platformProfile(): PlatformProfile;
   /** §8.1.2 niveaux 1 et 2. `bypassCache` est ce qu'exige le §8.1.3 (règle 3) avant de
-   * bloquer un envoi : la lecture ne doit s'appuyer sur aucun cache. OPTIONNEL le temps que
-   * chaque adaptateur l'honore, dans la PR de sa plateforme. Aucun des trois adaptateurs
-   * livrés ne garde de cache à lui (lu dans leur code, ainsi que le relais du service
-   * worker) ; ce que l'option n'écarte pas encore, c'est une réponse servie par le cache HTTP
-   * du navigateur — que personne n'a mesuré. */
+   * bloquer un envoi : la lecture ne doit s'appuyer sur aucun cache. OPTIONNEL : une
+   * plateforme nouvelle l'ignore sans cesser de compiler — mais les trois adaptateurs livrés,
+   * et le relais du service worker, l'honorent : aucun ne garde de cache à lui, et la requête
+   * part avec `bypassCacheInit()`, qui écarte aussi le cache HTTP du navigateur (MESURÉ, voir
+   * cette fonction). */
   getRepoConfig(pr: PrRef, opts?: { bypassCache: boolean }): Promise<ConfigRead>;
   getOrgConfig(url: string | null, opts?: { bypassCache: boolean }): Promise<ConfigRead>;
   observeEditors(cb: (editor: EditorHandle) => void): Disposable;
@@ -367,9 +380,9 @@ export interface PlatformAdapter {
    * `getThreads()` ne peut pas servir à cette sonde : elle est asynchrone, et elle lit le corps
    * de chaque fil — un clone de sous-arbre par fil, à chaque mutation de la page.
    *
-   * OPTIONNEL, et seulement le temps que chaque adaptateur le renseigne dans la PR de sa
-   * plateforme : absent, la signature ne voit pas les changements d'état, comme avant. */
-  getRenderedThreadElements(): { id: string; element: Element; resolution?: ResolutionState }[];
+   * OBLIGATOIRE, comme le reste du contrat : une plateforme qui ne le donnerait pas compilerait,
+   * et son bandeau ne suivrait plus les résolutions — sans que rien ne le dise. */
+  getRenderedThreadElements(): { id: string; element: Element; resolution: ResolutionState }[];
   /** §5.5 — les corps de commentaire à DÉCORER (badges, masquage du préfixe), avec leur texte
    * tel que `commentBodyText()` le lit — nos propres badges exclus, sans quoi un second rendu
    * lirait le premier. */

@@ -20,6 +20,7 @@ import type {
   UserInfo,
 } from '@cct/core';
 import {
+  bypassCacheInit,
   adapterFetch,
   closestChain,
   commentBodyText,
@@ -62,7 +63,7 @@ const MR_PATH = /^\/(.+)\/([^/]+)\/-\/merge_requests\/(\d+)(\/diffs)?\/?$/;
 export class GitlabClientAdapter implements PlatformAdapter {
   #fetch: typeof fetch;
   #doc: Document;
-  #readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
+  #readOrgConfig?: (url: string, opts?: { bypassCache: boolean }) => Promise<ConfigRead> | null;
   readonly log: SelectorLog;
   #guardEntry: EntryGuard;
   #editorSeq = 0;
@@ -84,19 +85,20 @@ export class GitlabClientAdapter implements PlatformAdapter {
   /** §C.4 — non mesurée. Une route de fichier brut existe peut-être ; ce qu'elle fait depuis un
    * script de contenu (redirection, CORS, cookies) n'a pas été mesuré, et le dépôt a appris ce
    * que coûte une lecture supposée (`check:content-script-cors`). D'ici là : `unreachable`, donc
-   * état dégradé — l'extension assiste sans bloquer (§5.4). */
+   * état dégradé — l'extension assiste sans bloquer (§5.4). Aucune requête ne part, si bien que
+   * `bypassCache` n'a rien à contourner ici. */
   async getRepoConfig(_pr: PrRef): Promise<ConfigRead> {
     return { status: 'unreachable', reason: 'GitLab repository config read not measured yet (spec §C.4)' };
   }
 
-  async getOrgConfig(url: string | null): Promise<ConfigRead> {
+  async getOrgConfig(url: string | null, opts?: { bypassCache: boolean }): Promise<ConfigRead> {
     if (url === null) return { status: 'absent' };
     // `null` : l'appelant décline pour CETTE url (même origine que la page) — la lecture
     // directe ci-dessous est alors la bonne.
-    const relayed = this.#readOrgConfig?.(url);
+    const relayed = this.#readOrgConfig?.(url, opts);
     if (relayed) return relayed;
     try {
-      const res = await this.#fetch(url, { credentials: 'include' });
+      const res = await this.#fetch(url, { credentials: 'include', ...bypassCacheInit(opts) });
       if (res.status === 404) return { status: 'absent' };
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
       return { status: 'found', text: await res.text() };
@@ -311,10 +313,16 @@ export class GitlabClientAdapter implements PlatformAdapter {
    * la page, son label est inconnaissable, et le filtre du §5.5 le masquerait quel que soit le
    * label choisi — un `issue:` résolu disparaissait sous le filtre `issue`. Hors de cette liste,
    * le filtre n'y touche pas : il reste visible. Les identifiants restent ceux de `getThreads()`,
-   * l'indice compris. */
-  getRenderedThreadElements(): { id: string; element: Element }[] {
+   * l'indice compris. L'état de résolution est celui de `getThreads()` (`#resolution()`, deux
+   * attributs du fil), lu sans cloner aucun corps : cette liste est relue à chaque mutation par
+   * la signature de reprise du code partagé. */
+  getRenderedThreadElements(): { id: string; element: Element; resolution: ThreadInfo['resolution'] }[] {
     return queryChainAll(this.#doc, selectors.thread)
-      .map((element, i) => ({ id: this.#threadId(element) ?? `dom-thread-${i}`, element }))
+      .map((element, i) => ({
+        id: this.#threadId(element) ?? `dom-thread-${i}`,
+        element,
+        resolution: this.#resolution(element),
+      }))
       .filter(({ element }) => queryChain(element, selectors.noteContainer).element !== null);
   }
 

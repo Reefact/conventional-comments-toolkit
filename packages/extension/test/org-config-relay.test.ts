@@ -174,6 +174,17 @@ describe('B — le client du relais, dans le contexte d’un SCRIPT DE CONTENU',
     expect(sent).toEqual([{ kind: 'cct-fetch-config', url: ORG_URL }]);
   });
 
+  it('§8.1.3 règle 3, CA-27 : une relecture qui contourne le cache le dit au worker, et lui seul émet la requête', async () => {
+    const { sent } = installCallbackRelay({ status: 'found', text: '{}' });
+    const { relayOrgConfigRead, relayableFrom } = await import('../src/content-internal.js');
+    await relayOrgConfigRead(ORG_URL, true);
+    await relayableFrom(new URL('https://github.com/acme/demo/pull/1'))(ORG_URL, { bypassCache: true });
+    expect(sent).toEqual([
+      { kind: 'cct-fetch-config', url: ORG_URL, bypassCache: true },
+      { kind: 'cct-fetch-config', url: ORG_URL, bypassCache: true },
+    ]);
+  });
+
   it('accepte aussi la forme PROMESSE — les deux coexistent selon le navigateur', async () => {
     const sent: unknown[] = [];
     (globalThis as { chrome?: unknown }).chrome = {
@@ -524,6 +535,24 @@ describe('D — le gestionnaire du SERVICE WORKER, seul contexte qui a le droit 
       expect(kept).toBe(true);
     });
   }
+
+  it('§8.1.3 règle 3, CA-27 : `bypassCache` fait partir la requête en `cache: reload` — et rien ne change sans lui', async () => {
+    const inits: (RequestInit | undefined)[] = [];
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      inits.push(init);
+      return new Response('{}', { status: 200 });
+    });
+    const sw = installServiceWorkerChrome({ floor: { configUrl: ORG_URL } });
+    await import('../src/background.js');
+    await ask(sw.listener(), ORG_URL);
+    await new Promise((resolve) => {
+      const kept = sw.listener()({ kind: 'cct-fetch-config', url: ORG_URL, bypassCache: true }, {}, resolve);
+      expect(kept).toBe(true);
+    });
+    expect(inits[0]?.cache).toBeUndefined();
+    expect(inits[1]?.cache).toBe('reload');
+    expect(inits[1]?.credentials).toBe(inits[0]?.credentials); // seul le cache change
+  });
 
   it('lit le configUrl du plancher et rend son contenu', async () => {
     const calls: string[] = [];

@@ -630,9 +630,10 @@ describe('§8.1.3 règle 3 — relire la configuration avant de bloquer un envoi
   async function attachWith(
     resolved: ResolvedClientConfig,
     rereadConfig: () => Promise<ResolvedClientConfig>,
-    body: string
+    body: string,
+    keystrokes?: SubmitKeystrokes
   ) {
-    const s = setup('enforce', { resolved, rereadConfig });
+    const s = setup('enforce', { resolved, rereadConfig, ...(keystrokes ? { keystrokes } : {}) });
     s.controller.attach();
     writeToTextField(s.textarea, body);
     await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
@@ -719,6 +720,81 @@ describe('§8.1.3 règle 3 — relire la configuration avant de bloquer un envoi
     expect(host.querySelector('.cct-released')).not.toBeNull();
     // Et le cache a été réécrit : la résolution ordinaire suivante voit déjà le label.
     expect((await org.resolve()).config.labels.some((l) => l.id === 'kudos')).toBe(true);
+    controller.dispose();
+  });
+
+  /** Une relecture que le test fait aboutir QUAND il le veut — entre l'appui et le relâchement. */
+  function deferredReread() {
+    let release: ((r: ResolvedClientConfig) => void) | null = null;
+    const enforce = defaultConfig();
+    enforce.mode = 'enforce';
+    const cached: ResolvedClientConfig = { config: enforce, notices: [], degraded: false, degradedReason: null };
+    const assist = defaultConfig();
+    assist.mode = 'assist';
+    return {
+      cached,
+      reread: () =>
+        new Promise<ResolvedClientConfig>((resolve) => {
+          release = resolve;
+        }),
+      releaseAssist: async () => {
+        release!({ config: assist, notices: [], degraded: false, degradedReason: null });
+        await flushReread();
+      },
+    };
+  }
+
+  const key = (type: string, init: KeyboardEventInit) =>
+    new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init });
+
+  it('CA-27, au clavier sur le bouton : la relecture qui libère entre l’appui et le relâchement ne laisse passer ni le relâchement ni son clic — seul un nouveau geste passe', async () => {
+    const r = deferredReread();
+    const keystrokes: SubmitKeystrokes = {
+      field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }],
+      control: [{ key: ' ', modifiers: 'any' }],
+    };
+    const { controller, submit } = await attachWith(r.cached, r.reread, 'pas de label ici', keystrokes);
+
+    const down = key('keydown', { key: ' ' });
+    submit.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true); // geste retenu, relecture lancée
+    await r.releaseAssist(); // la relecture aboutit AVANT le relâchement
+    expect(submit.hasAttribute('aria-disabled')).toBe(false); // le contrôle est libéré…
+
+    // …mais le relâchement et le clic du PREMIER geste restent retenus.
+    const up = key('keyup', { key: ' ' });
+    submit.dispatchEvent(up);
+    expect(up.defaultPrevented).toBe(true);
+    expect(click(submit).prevented).toBe(true);
+
+    // Un NOUVEAU geste passe, de bout en bout.
+    const down2 = key('keydown', { key: ' ' });
+    submit.dispatchEvent(down2);
+    expect(down2.defaultPrevented).toBe(false);
+    const up2 = key('keyup', { key: ' ' });
+    submit.dispatchEvent(up2);
+    expect(up2.defaultPrevented).toBe(false);
+    expect(click(submit).prevented).toBe(false);
+    controller.dispose();
+  });
+
+  it('CA-27, au clavier depuis le champ : le relâchement d’Entrée du premier geste reste retenu, même Ctrl déjà relâché', async () => {
+    const r = deferredReread();
+    const { controller, textarea } = await attachWith(r.cached, r.reread, 'pas de label ici');
+
+    const down = key('keydown', { key: 'Enter', ctrlKey: true });
+    textarea.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+    await r.releaseAssist();
+
+    // Ctrl relâché d'abord : le `keyup` d'Entrée ne porte plus `ctrlKey`, il reste du même geste.
+    const up = key('keyup', { key: 'Enter' });
+    textarea.dispatchEvent(up);
+    expect(up.defaultPrevented).toBe(true);
+
+    const down2 = key('keydown', { key: 'Enter', ctrlKey: true });
+    textarea.dispatchEvent(down2);
+    expect(down2.defaultPrevented).toBe(false);
     controller.dispose();
   });
 

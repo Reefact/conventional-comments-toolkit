@@ -94,6 +94,12 @@ jobs:
       - name: CORS du relais — ce qu'un service worker a le droit de lire
         run: npm run check:relay-cors
 
+      # Relire la configuration « sans cache » avant de bloquer un envoi (§8.1.3, règle 3) ne
+      # vaut que si le cache HTTP du navigateur est écarté lui aussi : `cache: 'reload'`, mesuré
+      # depuis un script de contenu et depuis le service worker du relais.
+      - name: Relecture de configuration — le cache HTTP du navigateur est contourné
+        run: npm run check:config-cache-bypass
+
       - name: Transport de la télémétrie — POST no-cors vers une autre origine (§10)
         run: npm run check:beacon
 

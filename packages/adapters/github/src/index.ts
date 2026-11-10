@@ -14,6 +14,7 @@ import {
   type UserInfo,
 } from '@cct/core';
 import {
+  bypassCacheInit,
   adapterFetch,
   closestChain,
   commentBodyText,
@@ -74,7 +75,7 @@ interface EmbeddedPr {
 export class GithubClientAdapter implements PlatformAdapter {
   #fetch: typeof fetch;
   #doc: Document;
-  #readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
+  #readOrgConfig?: (url: string, opts?: { bypassCache: boolean }) => Promise<ConfigRead> | null;
   readonly log: SelectorLog;
   #guardEntry: EntryGuard;
   #editorSeq = 0;
@@ -151,11 +152,11 @@ export class GithubClientAdapter implements PlatformAdapter {
    * que sur la conjonction de DEUX signaux : aucune session dans la page, ET un dépôt dit
    * privé. Dans ces cas l'extension DIT qu'elle n'a pas pu lire, au lieu de prétendre qu'il
    * n'y a pas de fichier. */
-  async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
+  async getRepoConfig(pr: PrRef, opts?: { bypassCache: boolean }): Promise<ConfigRead> {
     const url = `https://${pr.host}/${pr.scope.join('/')}/raw/HEAD/.conventional-comments.json`;
     const credentials = configCredentials(url);
     try {
-      const res = await this.#fetch(url, { credentials });
+      const res = await this.#fetch(url, { credentials, ...bypassCacheInit(opts) });
       if (res.status === 404) {
         // Un 404 ne dit pas toujours « pas de fichier ». `same-origin` authentifie le premier
         // saut, ce qui rend ce 404 fiable POUR UNE SESSION OUVERTE — mais pas pour un visiteur
@@ -239,7 +240,7 @@ export class GithubClientAdapter implements PlatformAdapter {
     return null;
   }
 
-  async getOrgConfig(url: string | null): Promise<ConfigRead> {
+  async getOrgConfig(url: string | null, opts?: { bypassCache: boolean }): Promise<ConfigRead> {
     if (url === null) return { status: 'absent' };
     // `null` : l'appelant décline pour CETTE url (même origine que la page) — la lecture
     // directe ci-dessous est alors la bonne, et la seule qui aboutisse. Elle passe par
@@ -247,11 +248,11 @@ export class GithubClientAdapter implements PlatformAdapter {
     // `https://github.com/<org>/<dépôt>/raw/...` est de même origine que la page, donc décliné
     // par le relais, et prenait exactement le mur de la redirection que ce dépôt vient de
     // documenter (revue Codex, PR #36, P2).
-    const relayed = this.#readOrgConfig?.(url);
+    const relayed = this.#readOrgConfig?.(url, opts);
     if (relayed) return relayed;
     const credentials = configCredentials(url);
     try {
-      const res = await this.#fetch(url, { credentials });
+      const res = await this.#fetch(url, { credentials, ...bypassCacheInit(opts) });
       if (res.status === 404) {
         // Même ambiguïté que pour le dépôt — sans le moyen de la lever. Le `configUrl` désigne
         // un AUTRE dépôt que celui affiché, dont la page ne dit pas la visibilité : sans
@@ -652,7 +653,7 @@ export class GithubClientAdapter implements PlatformAdapter {
     // L'aperçu y entre, et c'est CE compte qui réveille le rendu quand on passe sur l'onglet
     // « Preview » : un aperçu qui apparaît ne change ni le résumé publié, ni les identifiants
     // de fils, ni le nombre de corps publiés. Sans lui ici, la signature de reprise
-    // (content-internal.ts, chromeSignatureOf) resterait identique, `run()` ressortirait
+    // (content-internal.ts, contentSignatureOf) resterait identique, `run()` ressortirait
     // avant de rendre, et l'aperçu n'aurait jamais ses badges — le correctif de la chaîne
     // `preview-body` serait resté sans effet. Et il est re-rendu par React à chaque
     // aller-retour Write/Preview : une seconde rédaction suivie d'un second aperçu ne change
@@ -685,11 +686,16 @@ export class GithubClientAdapter implements PlatformAdapter {
   }
 
   /** Conteneurs de fils rendus, pour le filtre local du §5.5 (§9.2.3) — même dérivation
-   * d'identifiant que getThreads(). */
-  getRenderedThreadElements(): { id: string; element: Element }[] {
+   * d'identifiant que getThreads(), et le même état de résolution (`#resolution()`, qui suit la
+   * séparation des vues : `overview.ts`, `classic.ts`, puis le marqueur dans le fil ou À CÔTÉ
+   * de lui sur la vue `…/changes`). Lu de façon synchrone et sans cloner aucun corps : cette
+   * liste est relue à chaque mutation de la page par la signature de reprise du code partagé,
+   * pour qui résoudre un fil sur `…/changes` ne change ni son identifiant ni son texte. */
+  getRenderedThreadElements(): { id: string; element: Element; resolution: ThreadInfo['resolution'] }[] {
     return queryChainAll(this.#doc, selectors.renderedThreads).map((el, i) => ({
       id: el.id || el.getAttribute('data-thread-id') || `dom-thread-${i}`,
       element: el,
+      resolution: this.#resolution(el),
     }));
   }
 

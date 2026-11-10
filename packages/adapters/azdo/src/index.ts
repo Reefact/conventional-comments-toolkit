@@ -19,6 +19,7 @@ import type {
   UserInfo,
 } from '@cct/core';
 import {
+  bypassCacheInit,
   adapterFetch,
   closestChain,
   commentBodyText,
@@ -75,7 +76,7 @@ const PR_PATH = /^\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)\/?$/;
 export class AzdoClientAdapter implements PlatformAdapter {
   #fetch: typeof fetch;
   #doc: Document;
-  #readOrgConfig?: (url: string) => Promise<ConfigRead> | null;
+  #readOrgConfig?: (url: string, opts?: { bypassCache: boolean }) => Promise<ConfigRead> | null;
   readonly log: SelectorLog;
   #guardEntry: EntryGuard;
   #editorSeq = 0;
@@ -113,13 +114,13 @@ export class AzdoClientAdapter implements PlatformAdapter {
    * de dev.azure.com si la plateforme redirige vers la connexion.
    * Un 404 est fiable : la plateforme ne masque pas un dépôt privé derrière un 404 pour un
    * visiteur sans session, elle le REDIRIGE — contrairement à GitHub (son adaptateur). */
-  async getRepoConfig(pr: PrRef): Promise<ConfigRead> {
+  async getRepoConfig(pr: PrRef, opts?: { bypassCache: boolean }): Promise<ConfigRead> {
     const [org, project, repo] = pr.scope.map((s) => encodeURIComponent(s));
     const url =
       `https://${pr.host}/${org}/${project}/_apis/git/repositories/${repo}/items` +
       `?path=${encodeURIComponent('/.conventional-comments.json')}&api-version=7.1`;
     try {
-      const res = await this.#fetch(url, { credentials: 'same-origin' });
+      const res = await this.#fetch(url, { credentials: 'same-origin', ...bypassCacheInit(opts) });
       if (res.status === 404) return { status: 'absent' };
       // Session expirée : la plateforme redirige vers la connexion, qui répond 203 et du HTML
       // (mesuré). Ni `found` ni `absent` — on ne sait rien du fichier.
@@ -134,14 +135,14 @@ export class AzdoClientAdapter implements PlatformAdapter {
     }
   }
 
-  async getOrgConfig(url: string | null): Promise<ConfigRead> {
+  async getOrgConfig(url: string | null, opts?: { bypassCache: boolean }): Promise<ConfigRead> {
     if (url === null) return { status: 'absent' };
     // `null` : l'appelant décline pour CETTE url (même origine que la page) — la lecture
     // directe ci-dessous est alors la bonne.
-    const relayed = this.#readOrgConfig?.(url);
+    const relayed = this.#readOrgConfig?.(url, opts);
     if (relayed) return relayed;
     try {
-      const res = await this.#fetch(url, { credentials: 'include' });
+      const res = await this.#fetch(url, { credentials: 'include', ...bypassCacheInit(opts) });
       if (res.status === 404) return { status: 'absent' };
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
       return { status: 'found', text: await res.text() };
@@ -356,10 +357,14 @@ export class AzdoClientAdapter implements PlatformAdapter {
   /** Ce que le filtre MASQUE : dans l'Overview, la ligne du fil d'activité qui porte le fil —
    * carte et frise comprises —, ailleurs le fil lui-même (selectors.ts, `timelineRow`). Les
    * identifiants restent ceux de `getThreads()`. */
-  getRenderedThreadElements(): { id: string; element: Element }[] {
+  /** L'état de résolution est celui de `getThreads()` (`#resolution()`, lu sur le fil lui-même
+   * et non sur la rangée rendue) : deux textes d'interface, lus sans cloner aucun corps — cette
+   * liste est relue à chaque mutation par la signature de reprise du code partagé. */
+  getRenderedThreadElements(): { id: string; element: Element; resolution: ThreadInfo['resolution'] }[] {
     return this.#publishedThreads().map(({ id, element }) => ({
       id,
       element: closestChain(element, selectors.timelineRow).element ?? element,
+      resolution: this.#resolution(element),
     }));
   }
 

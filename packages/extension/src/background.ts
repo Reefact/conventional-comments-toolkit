@@ -48,6 +48,8 @@ interface FetchConfigRequest {
    * worker dérive lui-même du canal de plancher, jamais fetchée sur parole — voir le
    * gestionnaire ci-dessous. */
   url: string;
+  /** Relecture qui doit écarter tout cache, celui du navigateur compris (§8.1.3, règle 3). */
+  bypassCache?: boolean;
 }
 
 interface RegisteredContentScript {
@@ -179,7 +181,10 @@ chrome?.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       // `Location` est `null`, impossible à suivre soi-même (revue Codex, PR #36, round 5).
       // La règle vient des FICHES de plateforme (`configCredentialsFor`, platforms.ts).
       const credentials = configCredentialsFor(vetted);
-      const res = await fetch(vetted, { credentials });
+      // `cache: 'reload'` sur une relecture : la requête part vers le réseau sans consulter le
+      // cache HTTP du navigateur — MESURÉ dans ce contexte (`npm run check:config-cache-bypass`),
+      // comme `bypassCacheInit()` côté adaptateurs, dont ce worker n'importe pas le paquet.
+      const res = await fetch(vetted, { credentials, ...(req.bypassCache === true ? { cache: 'reload' as const } : {}) });
       if (res.status === 404) {
         // Conséquence : sur un dépôt PRIVÉ, ce 404 est le masque de GitHub, pas un fichier
         // manquant — et le rendre `absent` ferait appliquer les niveaux inférieurs en

@@ -443,3 +443,19 @@ describe('§5.5 — Aperçu (capture 09)', () => {
     ]);
   }, T);
 });
+
+describe('§5.5 — getRenderedThreadElements() expose l’état de résolution de getThreads() (03-overview-fil-resolu)', () => {
+  // La signature de reprise du code partagé compare cet état à chaque mutation : il doit être
+  // celui de `getThreads()`. Le fil résolu replié n'est pas rendu (aucune note, §C.5) : il sort
+  // de la liste, ce que la signature voit déjà par son identifiant ; ceux qui restent portent
+  // leur état, `data-discussion-resolved` compris.
+  it('chaque fil rendu porte l’état que getThreads() lui donne', async () => {
+    const page = load('03-overview-fil-resolu.html', MR1);
+    const byId = new Map((await page.adapter.getThreads()).map((t) => [t.id, t.resolution]));
+    const rendered = page.adapter.getRenderedThreadElements();
+    expect(rendered.length).toBeGreaterThan(0);
+    for (const t of rendered) expect([t.id, t.resolution]).toEqual([t.id, byId.get(t.id)]);
+    expect(rendered.every((t) => t.resolution === 'unresolved')).toBe(true);
+    expect(rendered.some((t) => t.id === 'note_4188016850')).toBe(false); // le fil résolu, replié
+  }, T);
+});

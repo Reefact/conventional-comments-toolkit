@@ -159,6 +159,16 @@ export class EditorController {
    * éditeur. Tant qu'elle court, tout envoi que la configuration en main bloquerait reste
    * retenu, sans en lancer une seconde. */
   #reread: Promise<void> | null = null;
+  /** Les touches d'un geste d'envoi RETENU, de son `keydown` à son `keyup` (`KeyboardEvent.key`).
+   * Un geste retenu l'est tout entier : si la relecture libère le contrôle entre l'appui et le
+   * relâchement, le relâchement — et le clic qu'il ferait naître — appartiennent encore au
+   * PREMIER geste, que le second geste exigé (§8.1.3, règle 3, CA-27) ne remplace pas. Seul un
+   * nouvel appui passe. */
+  #heldKeys = new Set<string>();
+  /** Le geste clavier retenu vient de se terminer (`keyup` retenu) : le clic que le navigateur
+   * synthétiserait à ce relâchement lui appartient encore. Levé par le prochain appui de touche
+   * ou de pointeur — un geste NOUVEAU —, ou par ce clic lui-même. */
+  #swallowGestureClick = false;
   #disposed = false;
   #lastAnalysis: CommentAnalysis | null = null;
   /** La barre, pour la réaligner sur le texte à chaque validation (§5.1). */
@@ -371,16 +381,22 @@ export class EditorController {
       // (`submitKeystrokes().field`) : aucune n'est écrite ici (décision du propriétaire,
       // 2026-11-10).
       if (matchesSubmitKeystroke(ke, this.deps.adapter.submitKeystrokes(this.deps.editor).field)) {
-        if (this.#shouldBlockNow()) {
-          ke.preventDefault();
-          ke.stopPropagation();
-          this.#holdAndReread();
-        }
+        this.#onSubmitKeydown(ke);
       }
     };
     const guardedKeydown = guarded('editor', onKeydown);
     this.deps.editor.element.addEventListener('keydown', guardedKeydown, true);
     this.#disposers.push(() => this.deps.editor.element.removeEventListener('keydown', guardedKeydown, true));
+    // Le relâchement d'un geste retenu depuis le champ. Comparé par TOUCHE seulement, jamais par
+    // la combinaison déclarée : Ctrl peut être relâché avant Entrée, et le `keyup` d'Entrée ne
+    // porte alors plus `ctrlKey` — mesuré dans Chromium : `keydown Control → keydown Enter →
+    // keyup Enter → keyup Control`, ordre qui dépend de la personne.
+    const onKeyup = (e: Event) => {
+      this.#releaseHeldKey(e as KeyboardEvent);
+    };
+    const guardedKeyup = guarded('editor', onKeyup);
+    this.deps.editor.element.addEventListener('keyup', guardedKeyup, true);
+    this.#disposers.push(() => this.deps.editor.element.removeEventListener('keyup', guardedKeyup, true));
 
     this.refresh();
   }
@@ -570,6 +586,45 @@ export class EditorController {
     this.#feedback?.announceBlocked(this.#lastAnalysis?.diagnostics ?? []);
   }
 
+  /** L'appui d'une touche d'envoi déclarée (champ ou contrôle d'envoi). Un appui répété
+   * (`repeat`, touche maintenue) d'un geste retenu reste retenu ; tout autre appui est un geste
+   * NOUVEAU, jugé sur la configuration en main — retenu, et la relecture lancée, s'il serait
+   * bloqué. */
+  #onSubmitKeydown(ke: KeyboardEvent): void {
+    if (ke.repeat && this.#heldKeys.has(ke.key)) {
+      ke.preventDefault();
+      ke.stopPropagation();
+      return;
+    }
+    this.#heldKeys.delete(ke.key);
+    if (this.#shouldBlockNow()) {
+      ke.preventDefault();
+      ke.stopPropagation();
+      this.#heldKeys.add(ke.key);
+      this.#holdAndReread();
+    }
+  }
+
+  /** Le relâchement d'une touche dont l'appui a été retenu : retenu lui aussi, quel que soit ce
+   * que la relecture a décidé entre-temps, et le geste se termine là. Rend `true` s'il l'a
+   * retenu.
+   *
+   * Retenir le `keyup` retient aussi le clic que le navigateur aurait synthétisé au
+   * relâchement — MESURÉ dans Chromium sur un `<button>` : Espace donne `keydown → keypress →
+   * keyup → click`, et le clic disparaît quand le `keyup` OU le `keydown` est empêché ; Entrée
+   * donne `keydown → keypress → click → keyup`, et le clic disparaît quand le `keydown` est
+   * empêché. Le clic qui arriverait malgré tout pendant un geste retenu est arrêté par
+   * `#guardSubmitControls()`. Les autres navigateurs, et les boutons qui ne sont pas des
+   * `<button>` natifs, n'ont pas été mesurés. */
+  #releaseHeldKey(ke: KeyboardEvent): boolean {
+    if (!this.#heldKeys.has(ke.key)) return false;
+    this.#heldKeys.delete(ke.key);
+    this.#swallowGestureClick = true;
+    ke.preventDefault();
+    ke.stopPropagation();
+    return true;
+  }
+
   /** Un envoi que la configuration EN MAIN bloquerait vient d'être retenu (l'appelant a déjà
    * intercepté l'événement). Avant de prononcer le blocage, la configuration est relue en
    * contournant le cache, puis le texte revalidé dessus (§8.1.3, règle 3) : un `mode`
@@ -634,6 +689,14 @@ export class EditorController {
     };
     const onClick = (e: Event) => {
       if (!targetsSubmitControl(e.target)) return;
+      // Un clic pendant un geste clavier retenu, ou né de son relâchement, lui appartient :
+      // retenu, sans nouvelle relecture.
+      if (this.#heldKeys.size > 0 || this.#swallowGestureClick) {
+        this.#swallowGestureClick = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       if (this.#shouldBlockNow()) {
         e.preventDefault();
         e.stopPropagation();
@@ -642,23 +705,41 @@ export class EditorController {
     };
     const onControlKey = (e: Event) => {
       const ke = e as KeyboardEvent;
-      if (!matchesSubmitKeystroke(ke, this.deps.adapter.submitKeystrokes(this.deps.editor).control)) return;
+      // Tout appui de touche, où qu'il vise, ouvre un geste nouveau : le clic d'un geste passé
+      // ne peut plus arriver après lui.
+      if (ke.type === 'keydown' && !ke.repeat) this.#swallowGestureClick = false;
       if (!targetsSubmitControl(ke.target)) return;
+      // Le relâchement d'un geste retenu, d'abord : il l'est quelle que soit la combinaison
+      // portée par ce `keyup` (un modificateur a pu être relâché avant).
+      if (ke.type === 'keyup' && this.#releaseHeldKey(ke)) return;
+      if (!matchesSubmitKeystroke(ke, this.deps.adapter.submitKeystrokes(this.deps.editor).control)) return;
+      if (ke.type === 'keydown') {
+        this.#onSubmitKeydown(ke);
+        return;
+      }
       if (this.#shouldBlockNow()) {
         ke.preventDefault();
         ke.stopPropagation();
-        if (ke.type === 'keydown') this.#holdAndReread();
       }
+    };
+    // Un appui de pointeur est un geste nouveau : un clic à la souris le suit, jamais un clic
+    // synthétisé au relâchement d'une touche.
+    const onPointerDown = () => {
+      this.#swallowGestureClick = false;
     };
     const guardedClick = guarded('editor', onClick);
     const guardedKey = guarded('editor', onControlKey);
     doc.addEventListener('click', guardedClick, true);
     doc.addEventListener('keydown', guardedKey, true);
     doc.addEventListener('keyup', guardedKey, true);
+    doc.addEventListener('pointerdown', onPointerDown, true);
+    doc.addEventListener('mousedown', onPointerDown, true);
     this.#disposers.push(() => {
       doc.removeEventListener('click', guardedClick, true);
       doc.removeEventListener('keydown', guardedKey, true);
       doc.removeEventListener('keyup', guardedKey, true);
+      doc.removeEventListener('pointerdown', onPointerDown, true);
+      doc.removeEventListener('mousedown', onPointerDown, true);
     });
   }
 }

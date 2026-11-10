@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { encodeSummary, decodeSummary } from '../src/summary.js';
-import { evaluate } from '../src/evaluate.js';
-import { config, evalInput } from './helpers.js';
+import { decodeSummary } from '../src/summary.js';
+
+// Seul le DÉCODAGE reste : l'adaptateur GitHub lit encore la ligne cc/1 qu'un vérificateur
+// publiait. Le vérificateur est retiré (§2), l'encodage avec lui ; le décodeur partira quand
+// l'adaptateur aura cessé de lire cette ligne.
 
 const sample =
   'cc/1 state=failure draft=0 exempt=0 mode=enforce activated=2026-09-01T00:00:00Z core=1.4.0 cfg=9f3a1c7e t=3 c=7 w=12';
 
-describe('§6.3.1 — ligne cc/1', () => {
+describe('ligne cc/1 — décodage, tant que l’adaptateur GitHub la lit', () => {
   it('décode l’exemple normatif de la spécification', () => {
     const s = decodeSummary(sample);
     expect(s).toEqual({
@@ -21,34 +23,6 @@ describe('§6.3.1 — ligne cc/1', () => {
       nonCompliantCommentCount: 7,
       warningCount: 12,
     });
-  });
-
-  it('aller-retour : encode puis décode restitue le même résumé', () => {
-    const result = evaluate(evalInput({ config: config((c) => (c.mode = 'warn')) }));
-    const line = encodeSummary(result);
-    expect(line.startsWith('cc/1 state=')).toBe(true);
-    expect(line.length).toBeLessThanOrEqual(140);
-    const s = decodeSummary(line)!;
-    expect(s.state).toBe(result.state);
-    expect(s.mode).toBe('warn');
-    expect(s.configFingerprint).toBe(result.configFingerprint);
-    expect(s.activatedAt).toBe(result.activatedAt);
-  });
-
-  it('ordre normatif à l’écriture : state, draft, exempt, mode, activated, core, cfg, t, c, w', () => {
-    const result = evaluate(evalInput({ config: config() }));
-    const keys = encodeSummary(result)
-      .split(' ')
-      .slice(1)
-      .map((kv) => kv.split('=')[0]);
-    expect(keys).toEqual(['state', 'draft', 'exempt', 'mode', 'activated', 'core', 'cfg', 't', 'c', 'w']);
-  });
-
-  it('activated=- lorsque la date est nulle', () => {
-    const result = evaluate(evalInput({ config: config(), ctx: { activatedAt: null, isDraft: false, isOverrideMember: () => false, knownBlockingThreadIds: [], firstVerdicts: {} } }));
-    const line = encodeSummary(result);
-    expect(line).toContain('activated=-');
-    expect(decodeSummary(line)!.activatedAt).toBeNull();
   });
 
   it('espaces multiples tolérées ; ordre non contraignant à la lecture', () => {

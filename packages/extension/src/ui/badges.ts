@@ -11,8 +11,7 @@
 // Rafraîchi sur changement de config, sans churn DOM sur un rendu inchangé : content-
 // internal.ts appelle decorateComment() sur CHAQUE commentaire à CHAQUE passage de rendu
 // (mutation observée), donc à chaque frappe ailleurs sur la page. Un signal comparable —
-// pas fingerprint() de @cct/core, qui exclut délibérément badgeStyle/labels[].color de son
-// domaine (§9.2.2 : seules les clés qui gouvernent le VERDICT, cosmétiques exclues) — est
+// qui couvre aussi ce qui ne change aucun verdict, `badgeStyle`, `labels[].color` — est
 // calculé à partir de ce que analyze() vient de résoudre, et comparé à ce que le badge déjà
 // posé porte : égal → aucune écriture DOM ; différent → badges retirés puis reposés, la
 // seule fois où le retrait est un vrai changement, pas juste un rendu répété (revue Reefact
@@ -129,10 +128,8 @@ function decorationBadges(
   return badges;
 }
 
-/** Tout ce qui détermine l'APPARENCE des badges d'un commentaire résolu — pas les mêmes
- * clés que fingerprint() (§9.2.2), qui répond à une question différente (deux composants
- * s'accordent-ils sur le VERDICT ?) et exclut pour cette raison badgeStyle/labels[].color/
- * icon. Deux appels avec la même signature doivent produire des badges identiques ; deux
+/** Tout ce qui détermine l'APPARENCE des badges d'un commentaire résolu — `badgeStyle`,
+ * `labels[].color` et `icon` compris, qui ne changent aucun verdict. Deux appels avec la même signature doivent produire des badges identiques ; deux
  * appels avec une signature différente peuvent en produire des différents. Prend `shown`/
  * `hiddenDescriptive` — déjà bornés par selectDecorationsForRender() — jamais le tableau
  * `decorations` brut d'analyze(), pour rester elle-même bornée (revue Codex, PR #38). */

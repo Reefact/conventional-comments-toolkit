@@ -1,28 +1,12 @@
-// La ligne machine cc/1 (§6.3.1) — la seule couture entre les deux composants, écrite et
-// testée une seule fois, dans core/ (§9.2.2). L'ordre des couples est normatif à
-// l'écriture ; le décodeur lit par clé et tolère les espaces multiples.
+// La ligne machine cc/1 qu'un vérificateur publiait — retiré, avec son encodeur (§2). Seul le
+// DÉCODEUR reste, parce que l'adaptateur GitHub la lit encore ; il partira avec cette lecture.
+// Il lit par clé et tolère les espaces multiples.
 
-import type { ComplianceResult, PublishedSummary } from './types.js';
+import type { PublishedSummary } from './types.js';
 import { SUMMARY_PREFIX } from './version.js';
 
 const STATES = ['success', 'failure', 'neutral'] as const;
 const MODES = ['off', 'assist', 'warn', 'enforce'] as const;
-
-export function encodeSummary(result: ComplianceResult): string {
-  const pairs: [string, string][] = [
-    ['state', result.state],
-    ['draft', result.isDraft ? '1' : '0'],
-    ['exempt', result.exemption ? '1' : '0'],
-    ['mode', result.mode],
-    ['activated', result.activatedAt ?? '-'],
-    ['core', result.coreVersion],
-    ['cfg', result.configFingerprint],
-    ['t', String(result.counts.unresolvedThreads)],
-    ['c', String(result.counts.nonCompliantComments)],
-    ['w', String(result.counts.warnings)],
-  ];
-  return `${SUMMARY_PREFIX} ${pairs.map(([k, v]) => `${k}=${v}`).join(' ')}`;
-}
 
 /** Décode une ligne cc/1. Rend null — l'extension se comporte alors comme si aucun
  * résultat n'était publié — sur : préfixe de version inconnu, champ obligatoire manquant,

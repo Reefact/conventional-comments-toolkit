@@ -62,51 +62,34 @@ describe('CA-30 — configuration en direct, dans les deux sens', () => {
     const without = resolved({ decorations: { known: [{ id: 'urgent', forces: null }] } });
     expect(without.decorations.known.find((d) => d.id === 'urgent')!.forces).toBeNull();
   });
-
-  it('avancer `activatedAt` prend effet, et le repousser aussi', () => {
-    expect(resolved({ activation: { activatedAt: '2026-06-01T00:00:00Z' } }).activation.activatedAt).toBe('2026-06-01T00:00:00Z');
-    expect(resolved({ activation: { activatedAt: '2026-12-01T00:00:00Z' } }).activation.activatedAt).toBe('2026-12-01T00:00:00Z');
-  });
-
-  it('`overrideLabel` suit le document courant', () => {
-    // Épinglée autrefois : une PR ouverte gardait le nom d'étiquette de son ouverture.
-    expect(resolved({ overrideLabel: 'nouvelle-etiquette' }).overrideLabel).toBe('nouvelle-etiquette');
-  });
 });
 
 describe('CA-27, CA-31 — le plancher d’entreprise, en direct dans les deux sens', () => {
   it('CA-31 : durcir le plancher sur `mode` prend effet', () => {
-    expect(resolved({ mode: 'warn' }, { minimumMode: 'enforce' }).mode).toBe('enforce');
+    expect(resolved({ mode: 'assist' }, { minimumMode: 'enforce' }).mode).toBe('enforce');
   });
 
   it('CA-31 contre-épreuve : l’assouplir vaut tout aussi immédiatement', () => {
     // LE sens qu'un cliquet raterait — une implémentation qui n'appliquerait en direct que
-    // les durcissements laisserait rouge une PR que la configuration courante accepte.
-    expect(resolved({ mode: 'warn' }, { minimumMode: 'off' }).mode).toBe('warn');
+    // les durcissements continuerait de bloquer un envoi que la configuration courante accepte.
+    expect(resolved({ mode: 'assist' }, { minimumMode: 'off' }).mode).toBe('assist');
   });
 
-  it('CA-27 : revenir de `enforce` à `warn` au niveau organisation débloque', () => {
-    // Le retour arrière du §6.3.3 : le document d'organisation repasse en `warn`, et le
-    // vérificateur publie alors un statut jamais en échec (§6.2.2) — sans qu'on ait touché
-    // à la protection de branche d'un seul dépôt.
+  it('CA-27 : le document d’organisation repassé de `enforce` à `assist` est résolu `assist`', () => {
+    // La moitié « résolution » du retour arrière (§8.1.3, règle 3) : ce que l'extension relit
+    // avant de bloquer se résout bien au mode assoupli, pour tout dépôt qui n'écrit pas le sien.
+    // Le blocage retenu puis libéré se teste côté extension (editor-controller.test.ts).
     const enforcing = resolveConfig(null, found({ mode: 'enforce' }), absent).config;
     expect(enforcing.mode).toBe('enforce');
-    const rolledBack = resolveConfig(null, found({ mode: 'warn' }), absent).config;
-    expect(rolledBack.mode).toBe('warn');
+    const rolledBack = resolveConfig(null, found({ mode: 'assist' }), absent).config;
+    expect(rolledBack.mode).toBe('assist');
+    // Un dépôt qui écrit lui-même `enforce` l'emporte sur l'organisation (§8.1.2).
+    expect(resolveConfig(null, found({ mode: 'assist' }), found({ mode: 'enforce' })).config.mode).toBe('enforce');
   });
 
-  it('le plancher durcit `activatedAt` en direct : la date la plus ancienne gagne (§8.1.1)', () => {
-    const config = resolved(
-      { activation: { activatedAt: '2026-09-01T00:00:00Z' } },
-      { minimumMode: 'off', activation: { activatedAt: '2026-01-01T00:00:00Z' } }
-    );
-    expect(config.activation.activatedAt).toBe('2026-01-01T00:00:00Z');
-  });
-
-  it('`configCacheTtlSeconds` et `docUrl` suivent le document', () => {
-    const config = resolved({ configCacheTtlSeconds: 60, docUrl: 'https://doc.example/' });
-    expect(config.configCacheTtlSeconds).toBe(60);
-    expect(config.docUrl).toBe('https://doc.example/');
+  it('`configCacheTtlSeconds` suit le document', () => {
+    expect(resolved({ configCacheTtlSeconds: 60 }).configCacheTtlSeconds).toBe(60);
+    expect(resolved({ configCacheTtlSeconds: 600 }).configCacheTtlSeconds).toBe(600);
   });
 });
 

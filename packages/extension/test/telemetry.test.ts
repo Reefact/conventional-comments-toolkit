@@ -267,12 +267,11 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     };
     const config = defaultConfig();
     config.mode = 'enforce';
-    config.activation.activatedAt = '2026-09-01T00:00:00Z';
     const events: TelemetryEvent[] = [];
     const controller = new EditorController({
       adapter: adapter as PlatformAdapter,
       editor,
-      resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
+      resolved: { config, notices: [], degraded: false, degradedReason: null },
       published: null,
       lang: 'fr',
       currentUserLogin: 'alice',
@@ -596,7 +595,6 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
     };
     const config = defaultConfig();
     config.mode = 'enforce';
-    config.activation.activatedAt = '2026-09-01T00:00:00Z';
     // La configuration du dépôt ne porte PLUS la télémétrie : si ce faux la portait, il
     // décrirait un monde où un dépôt peut désigner le collecteur — celui qu'on vient
     // justement de fermer.

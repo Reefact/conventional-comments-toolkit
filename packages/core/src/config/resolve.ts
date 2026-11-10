@@ -56,25 +56,12 @@ export function resolveConfig(
     }
     // invalide → repli sur le dernier niveau valide : organisation, puis défauts (§8.1.5)
   }
-  // Un fichier de dépôt ABSENT ne produit aucun signal ici : le §8.1.5 fait d'abord le même
-  // repli que l'extension, et c'est la configuration résolue qui tranche ensuite — si aucun
-  // niveau ne date l'activation, le vérificateur arme `activation-undated` (§6.2.2, §8.1.5).
-  // Une rédaction antérieure distinguait ici le dépôt « déjà évalué » de celui qui ne
-  // l'avait jamais été ; c'était une mémoire par dépôt, que le §9.2.2 ne tient plus.
-
-  // Activation : min(plancher, niveau inférieur) — une date plus ancienne durcit (§8.1.1).
-  const floorAt = vetted.unsupported ? undefined : vetted.floor.activation?.activatedAt;
-  const lowerAt = config.activation.activatedAt;
-  let liveActivation: string | null;
-  if (floorAt === undefined) liveActivation = lowerAt;
-  else if (lowerAt === null) liveActivation = floorAt;
-  else liveActivation = Date.parse(floorAt) < Date.parse(lowerAt) ? floorAt : lowerAt;
-
-  config.activation = { activatedAt: liveActivation };
+  // Un fichier de dépôt ABSENT ne produit aucun signal ici : c'est le cas nominal du §8.1.5,
+  // repli sur le niveau inférieur.
 
   // Bornes d'entreprise (§8.1.1) — en direct : il n'existe plus de configuration épinglée.
   if (!vetted.unsupported) {
-    const floored = applyFloor(config, vetted.floor, written, { skipActivation: true });
+    const floored = applyFloor(config, vetted.floor, written);
     config = floored.config;
     notices.push(...floored.notices);
   }
@@ -90,7 +77,7 @@ export function resolveConfig(
     config.mode = 'assist';
   } else if (unsupportedDocument) {
     // Document qu'on sait lire mais qu'on ne sait pas appliquer entièrement : mode assist,
-    // ou le plancher en vigueur s'il est plus strict — identique pour A et B (§8.1.5).
+    // ou le plancher en vigueur s'il est plus strict (§8.1.5).
     config.mode = maxMode('assist', vetted.floor.minimumMode ?? 'off');
   }
 
@@ -151,8 +138,7 @@ export function resolveConfig(
  * entrée éteinte retire un alias à un label actif, ou signale tout dépôt possédant son propre
  * label `fixed` alors que le `done` livré, qui porte cet alias, est désactivé.
  *
- * Le nom retiré quitte la configuration effective, donc le domaine de `fingerprint()` : les
- * deux composants voient la même liste, quel que soit celui qui applique la règle.
+ * Le nom retiré quitte la configuration effective.
  */
 function withoutShadowing(labels: LabelConfig[], notices: Notice[]): LabelConfig[] {
   const lower = (n: string) => n.toLowerCase();

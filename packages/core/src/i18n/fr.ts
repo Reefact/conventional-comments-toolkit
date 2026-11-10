@@ -52,46 +52,13 @@ export const fr: Record<string, string> = {
   'diag.W-SESSION-MULTIPLE':
     'Ce commentaire porte {count} marqueurs de session : aucun n’est affiché. N’en gardez qu’une ligne « [session:…] ».',
   'diag.W-NOT-BLOCKABLE':
-    'Ce label est bloquant, mais cette zone ne permet pas de résoudre un fil — il ne bloquera pas la complétion.',
-  // Sortie du check (§6.3.1)
-  'headline':
-    '{threads} fil(s) bloquant(s) non résolu(s), {comments} commentaire(s) non conforme(s), {warnings} avertissement(s).',
-  'headline.out-of-scope.before-activation':
-    'PR antérieure à l’activation ({activatedAt}) — hors périmètre.',
-  'headline.out-of-scope.no-activation-date':
-    'Activation non datée — aucune PR n’est dans le périmètre.',
-  'headline.draft': 'PR en brouillon — statut informatif uniquement.',
-  'headline.exempted': 'PR exemptée par {by} le {at}.',
-  'headline.invalid-config': 'Configuration invalide : {detail}',
-  'headline.activation-undated':
-    'Aucun niveau de configuration ne date l’activation de ce dépôt.',
-  // Notices (§6.3.1)
-  'notice.resolution-refused':
-    'Résolution du fil bloquant {ref} refusée : {cause}. Rouvrez le fil et faites-le résoudre par l’auteur du commentaire racine, ou postez-y une réponse « decision » valide.',
-  'notice.resolution-refused.not-author':
-    'résolu par {login}, qui n’est pas l’auteur du commentaire racine, et aucune réponse « decision » valide n’est présente',
-  'notice.resolution-refused.decision-missing':
-    'résolu par un membre habilité mais le fil ne contient aucune réponse « decision » valide',
-  'notice.resolution-unattributed':
-    'Résolution du fil {ref} acceptée sans résolveur connu : cette plateforme n’expose pas qui a résolu un fil. La règle de gouvernance du §6.1 n’y est pas appliquée.',
+    'Ce label est bloquant, mais cette zone ne permet pas de résoudre un fil — il ne sera pas compté parmi les fils bloquants.',
+  // Avis de configuration (§5.3, §9.2.1)
   'notice.floor-override':
     'Clé de configuration de dépôt « {ref} » ignorée : elle assouplirait le plancher d’entreprise.',
   'notice.invalid-config': 'Configuration invalide : {detail}',
   'notice.config-warning': '{detail}',
-  'notice.activation-undated':
-    'Aucun niveau de configuration ne résout activation.activatedAt : le dépôt n’est daté ni par son fichier, ni par celui de l’organisation, ni par le plancher. Statut neutre publié, quel que soit le mode (§8.1.5).',
-  'notice.exemption-reset':
-    'Exemption de PR remise à zéro : un nouveau fil bloquant est apparu. L’étiquette a été retirée et le critère 2 s’applique de nouveau.',
-  'notice.exemption-refused':
-    'Étiquette d’exemption posée par {login}, non membre de resolverOverrideGroup : l’exemption est refusée et l’étiquette est laissée en place.',
   'notice.unsupported-version': '{detail}',
-  // Sortie humaine du statut (§6.3.1) — sa langue suit la règle du §8.1, comme le reste
-  'output.unresolved-blocking-threads': 'Fils bloquants non résolus',
-  'output.format-diagnostics': 'Diagnostics de format',
-  'output.notices': 'Faits signalés',
-  'output.fix': 'correction',
-  'output.doc-link': 'Documentation de la convention',
-  'output.empty-body': '(vide)',
   // Divers
   'and': 'et',
 };

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { defaultConfig, type PrRef } from '@cct/core';
+import { defaultConfig, resolveConfig, type PrRef } from '@cct/core';
 import { ClientConfigResolver, type ResolvedClientConfig } from '../src/config-resolver.js';
 import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controller.js';
 import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
@@ -17,7 +17,7 @@ const pr: PrRef = {
 };
 
 function setup(
-  mode: 'enforce' | 'warn' = 'enforce',
+  mode: 'enforce' | 'assist' = 'enforce',
   opts: {
     telemetry?: (event: TelemetryEvent) => boolean;
     initialCountedCodes?: ReadonlySet<string>;
@@ -228,7 +228,7 @@ describe('§5 — contrôleur d’éditeur', () => {
     // le désarmait TOUJOURS : `enforce` ne bloquait rien.
     const ancient: PrRef = { ...pr, createdAt: '2001-01-01T00:00:00Z', number: 1 };
     const { controller, textarea, submit } = setup('enforce', { pr: ancient });
-    expect(controller.config.activation.activatedAt).toBeNull(); // aucune date d'activation nulle part
+    expect('activation' in controller.config).toBe(false); // la clé n'existe même plus (§8.2)
     controller.attach();
     writeToTextField(textarea, 'pas de label ici'); // E-NO-LABEL
     await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
@@ -508,13 +508,27 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.dispose();
   });
 
-  it('mode warn : diagnostics affichés, jamais de blocage (CA-09)', async () => {
-    const { controller, textarea, submit } = setup('warn');
-    controller.attach();
-    writeToTextField(textarea, 'pas de label ici');
-    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
-    expect(submit.hasAttribute('aria-disabled')).toBe(false);
-    controller.dispose();
+  it('mode assist — et `warn`, son alias (§7) : diagnostics affichés, jamais de blocage (CA-09)', async () => {
+    // `warn` n'est plus un mode : une configuration qui l'écrit est résolue `assist` (§7).
+    const fromWarn = resolveConfig(null, { status: 'absent' }, { status: 'found', text: '{"mode": "warn"}' });
+    expect(fromWarn.config.mode).toBe('assist');
+    for (const resolved of [
+      undefined, // `setup('assist')` : les défauts au mode assist
+      { config: fromWarn.config, notices: fromWarn.notices, degraded: false, degradedReason: null },
+    ]) {
+      const { controller, textarea, submit, host } = setup('assist', resolved ? { resolved } : {});
+      controller.attach();
+      writeToTextField(textarea, 'pas de label ici');
+      await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+      expect(host.querySelector('.cct-diagnostics li[data-code="E-NO-LABEL"]')).not.toBeNull();
+      expect(submit.hasAttribute('aria-disabled')).toBe(false);
+      let clicked = false;
+      submit.addEventListener('click', () => (clicked = true));
+      submit.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      expect(clicked).toBe(true);
+      controller.dispose();
+      host.remove();
+    }
   });
 
   it('correction en un clic : réécrit la ligne de préfixe (§5.3)', async () => {

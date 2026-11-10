@@ -272,11 +272,10 @@ describe('§9.4 — un champ de commentaire qui plante est relevé « pendant la
     };
     const config = defaultConfig();
     config.mode = 'enforce';
-    config.activation.activatedAt = '2026-09-01T00:00:00Z';
     const controller = new EditorController({
       adapter: adapter as PlatformAdapter,
       editor,
-      resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
+      resolved: { config, notices: [], degraded: false, degradedReason: null },
       published: null,
       lang: 'fr',
       currentUserLogin: 'alice',

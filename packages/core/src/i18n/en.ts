@@ -50,44 +50,13 @@ export const en: Record<string, string> = {
   'diag.W-SESSION-MULTIPLE':
     'This comment carries {count} session markers: none is shown. Keep a single "[session:…]" line.',
   'diag.W-NOT-BLOCKABLE':
-    'This label is blocking, but this area cannot hold a resolvable thread — it will not block completion.',
-  // Sortie du check (§6.3.1)
-  'headline':
-    '{threads} unresolved blocking thread(s), {comments} non-compliant comment(s), {warnings} warning(s).',
-  'headline.out-of-scope.before-activation': 'PR created before activation ({activatedAt}) — not in scope.',
-  'headline.out-of-scope.no-activation-date': 'Activation not dated — no PR is in scope.',
-  'headline.draft': 'Draft PR — informative status only.',
-  'headline.exempted': 'PR exempted by {by} on {at}.',
-  'headline.invalid-config': 'Invalid configuration: {detail}',
-  'headline.activation-undated':
-    'No configuration level dates this repository’s activation.',
-  // Notices (§6.3.1)
-  'notice.resolution-refused':
-    'Resolution of blocking thread {ref} refused: {cause}. Reopen the thread and have it resolved by the root author, or post a valid "decision" reply.',
-  'notice.resolution-refused.not-author':
-    'resolved by {login}, who is not the root comment author, and no valid "decision" reply is present',
-  'notice.resolution-refused.decision-missing':
-    'resolved by an authorized member but the thread contains no valid "decision" reply',
-  'notice.resolution-unattributed':
-    'Resolution of thread {ref} accepted without a known resolver: this platform does not expose who resolved a thread. The governance rule of §6.1 is not enforced here.',
+    'This label is blocking, but this area cannot hold a resolvable thread — it will not be counted among blocking threads.',
+  // Avis de configuration (§5.3, §9.2.1)
   'notice.floor-override':
     'Repository configuration key "{ref}" ignored: it would relax the enterprise floor.',
   'notice.invalid-config': 'Invalid configuration: {detail}',
   'notice.config-warning': '{detail}',
-  'notice.activation-undated':
-    'No configuration level resolves activation.activatedAt: the repository is dated neither by its own file, nor by the organisation’s, nor by the floor. A neutral status is published, whatever the mode (§8.1.5).',
-  'notice.exemption-reset':
-    'PR exemption reset: a new blocking thread appeared. The label was removed and criterion 2 applies again.',
-  'notice.exemption-refused':
-    'Exemption label posted by {login}, who is not a member of resolverOverrideGroup: the exemption is refused and the label is left in place.',
   'notice.unsupported-version': '{detail}',
-  // Sortie humaine du statut (§6.3.1) — sa langue suit la règle du §8.1, comme le reste
-  'output.unresolved-blocking-threads': 'Unresolved blocking threads',
-  'output.format-diagnostics': 'Format diagnostics',
-  'output.notices': 'Reported facts',
-  'output.fix': 'fix',
-  'output.doc-link': 'Convention documentation',
-  'output.empty-body': '(empty)',
   // Divers
   'and': 'and',
 };

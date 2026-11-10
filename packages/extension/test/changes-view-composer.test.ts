@@ -266,11 +266,10 @@ describe('§4.3 — la garde d’envoi sur le composeur de la nouvelle vue', () 
     const { adapter: a, editors } = observe();
     const config = defaultConfig();
     config.mode = 'enforce';
-    config.activation.activatedAt = '2026-09-01T00:00:00Z';
     const controller = new EditorController({
       adapter: a,
       editor: editors[0]!,
-      resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
+      resolved: { config, notices: [], degraded: false, degradedReason: null },
       published: null,
       lang: 'fr',
       currentUserLogin: 'alice',
@@ -335,11 +334,10 @@ describe('§4.3 — la garde d’envoi sur le panneau de revue', () => {
     const { adapter: a, editors } = observe();
     const config = defaultConfig();
     config.mode = 'enforce';
-    config.activation.activatedAt = '2026-09-01T00:00:00Z';
     const controller = new EditorController({
       adapter: a,
       editor: editors[0]!,
-      resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
+      resolved: { config, notices: [], degraded: false, degradedReason: null },
       published: null,
       lang: 'fr',
       currentUserLogin: 'alice',

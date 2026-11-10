@@ -1,8 +1,6 @@
 import type {
   CommentInfo,
   EffectiveConfig,
-  EvaluationContext,
-  EvaluationInput,
   PlatformProfile,
   PrRef,
   ThreadInfo,
@@ -32,7 +30,7 @@ export const GITHUB_TOOL_COMMANDS = [
 ];
 
 export function user(login: string, opts: Partial<UserInfo> = {}): UserInfo {
-  return { id: `id-${login}`, login, isServiceAccount: false, ...opts };
+  return { id: `id-${login}`, login, ...opts };
 }
 
 export function config(overrides: (c: EffectiveConfig) => void = () => {}): EffectiveConfig {
@@ -59,7 +57,6 @@ export function comment(body: string, opts: Partial<CommentInfo> = {}): CommentI
 export function pr(opts: Partial<PrRef> = {}): PrRef {
   return {
     platform: 'github',
-    createdAt: '2026-10-01T00:00:00Z',
     host: 'github.com',
     scope: ['acme', 'demo'],
     number: 42,
@@ -89,30 +86,6 @@ export function vInput(body: string, opts: Partial<ValidationInput> = {}): Valid
     zone: 'thread-root' as Zone,
     canCarryBlockingState: true,
     author: user('reviewer'),
-    ...opts,
-  };
-}
-
-export function ctx(opts: Partial<EvaluationContext> = {}): EvaluationContext {
-  return {
-    activatedAt: '2026-09-01T00:00:00Z',
-    isDraft: false,
-    isOverrideMember: () => false,
-    knownBlockingThreadIds: [],
-    firstVerdicts: {},
-    ...opts,
-  };
-}
-
-export function evalInput(opts: Partial<EvaluationInput> = {}): EvaluationInput {
-  return {
-    pr: pr(),
-    platform: githubProfile,
-    threads: [],
-    loose: [],
-    config: config(),
-    configNotices: [],
-    ctx: ctx(),
     ...opts,
   };
 }

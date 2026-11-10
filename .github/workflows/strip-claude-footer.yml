@@ -1,12 +1,19 @@
-# Retire de la description d'une PR le pied d'attribution d'une session Claude Code
-# (décision du propriétaire, 2026-11-10). Le pourquoi et les formes reconnues sont en tête de
-# `scripts/lib/claude-footer.mjs`.
+# Retire le pied d'attribution d'une session Claude Code (décision du propriétaire,
+# 2026-11-10) :
+#   - de la description d'une PR, toujours ;
+#   - d'un commentaire (conversation, revue en ligne, texte d'ensemble d'une revue),
+#     SEULEMENT quand un marqueur de session (§3.6) le précède.
+# Le pourquoi et les formes reconnues sont en tête de `scripts/lib/claude-footer.mjs`.
 #
-# `pull_request_target` plutôt que `pull_request` : c'est le seul déclencheur dont le jeton
-# peut écrire sur une PR venue d'un fork. Il n'est sûr ici QUE parce que ce workflow
-# n'exécute jamais le code de la PR : le checkout par défaut de `pull_request_target` est la
-# branche de BASE, et seule la description — une donnée — est lue. Ne jamais y ajouter
-# `ref: ${{ github.event.pull_request.head.sha }}`.
+# Ce workflow n'exécute JAMAIS le code d'une PR : il extrait la branche par défaut du dépôt,
+# réduite au seul module, quel que soit l'événement. C'est explicite parce que les événements
+# de revue extraient par défaut le commit de fusion de la PR, et c'est ce qui rend sûr
+# `pull_request_target` — le seul déclencheur dont le jeton peut écrire sur une PR venue
+# d'un fork. Ne jamais remplacer ce `ref` par celui de la PR.
+#
+# Limite : sur une PR venue d'un fork, les événements de revue ne reçoivent qu'un jeton en
+# lecture seule. Le pied d'une revue ou d'un commentaire de revue y reste ; le workflow le
+# signale par un avertissement au lieu d'échouer.
 #
 # Pas de boucle : une modification faite avec le `GITHUB_TOKEN` ne déclenche aucun workflow.
 name: Pied Claude Code
@@ -14,45 +21,100 @@ name: Pied Claude Code
 on:
   pull_request_target:
     types: [opened, edited, reopened]
+  issue_comment:
+    types: [created, edited]
+  pull_request_review_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted, edited]
 
 permissions:
   contents: read
+  issues: write
   pull-requests: write
-
-concurrency:
-  group: strip-claude-footer-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
 
 jobs:
   strip:
-    if: contains(github.event.pull_request.body, 'Claude Code') || contains(github.event.pull_request.body, 'claude.ai/code/session_')
+    if: >-
+      contains(github.event.comment.body || github.event.review.body || github.event.pull_request.body, 'Claude Code')
+      || contains(github.event.pull_request.body, 'claude.ai/code/session_')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.repository.default_branch }}
           sparse-checkout: scripts/lib/claude-footer.mjs
           sparse-checkout-cone-mode: false
       - uses: actions/github-script@v7
         with:
           script: |
-            const { stripClaudeFooter } = await import(
+            const { stripClaudeFooter, stripClaudeFooterAfterSessionMarker } = await import(
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/claude-footer.mjs`
             );
-            // La description COURANTE, pas celle de l'événement : une modification survenue
-            // entre-temps ne doit pas être écrasée par une version périmée.
-            const { data: pr } = await github.rest.pulls.get({
-              ...context.repo,
-              pull_number: context.payload.pull_request.number,
-            });
-            const body = pr.body ?? '';
-            const cleaned = stripClaudeFooter(body);
+            const { owner, repo } = context.repo;
+            const payload = context.payload;
+
+            // Pour chaque événement : relire le texte COURANT (une modification survenue
+            // entre-temps ne doit pas être écrasée par la version de l'événement), le nettoyer,
+            // le réécrire.
+            let target;
+            switch (context.eventName) {
+              case 'pull_request_target': {
+                const pull_number = payload.pull_request.number;
+                target = {
+                  what: `description de la PR #${pull_number}`,
+                  clean: stripClaudeFooter,
+                  read: async () => (await github.rest.pulls.get({ owner, repo, pull_number })).data.body,
+                  write: (body) => github.rest.pulls.update({ owner, repo, pull_number, body }),
+                };
+                break;
+              }
+              case 'issue_comment': {
+                const comment_id = payload.comment.id;
+                target = {
+                  what: `commentaire ${comment_id}`,
+                  clean: stripClaudeFooterAfterSessionMarker,
+                  read: async () => (await github.rest.issues.getComment({ owner, repo, comment_id })).data.body,
+                  write: (body) => github.rest.issues.updateComment({ owner, repo, comment_id, body }),
+                };
+                break;
+              }
+              case 'pull_request_review_comment': {
+                const comment_id = payload.comment.id;
+                target = {
+                  what: `commentaire de revue ${comment_id}`,
+                  clean: stripClaudeFooterAfterSessionMarker,
+                  read: async () => (await github.rest.pulls.getReviewComment({ owner, repo, comment_id })).data.body,
+                  write: (body) => github.rest.pulls.updateReviewComment({ owner, repo, comment_id, body }),
+                };
+                break;
+              }
+              case 'pull_request_review': {
+                const pull_number = payload.pull_request.number;
+                const review_id = payload.review.id;
+                target = {
+                  what: `revue ${review_id} de la PR #${pull_number}`,
+                  clean: stripClaudeFooterAfterSessionMarker,
+                  read: async () => (await github.rest.pulls.getReview({ owner, repo, pull_number, review_id })).data.body,
+                  write: (body) => github.rest.pulls.updateReview({ owner, repo, pull_number, review_id, body }),
+                };
+                break;
+              }
+              default:
+                core.setFailed(`Événement inattendu : ${context.eventName}`);
+                return;
+            }
+
+            const body = (await target.read()) ?? '';
+            const cleaned = target.clean(body);
             if (cleaned === body) {
-              core.info('Aucun pied Claude Code en fin de description.');
+              core.info(`${target.what} : rien à retirer.`);
               return;
             }
-            await github.rest.pulls.update({
-              ...context.repo,
-              pull_number: pr.number,
-              body: cleaned,
-            });
-            core.info('Pied Claude Code retiré de la description.');
+            try {
+              await target.write(cleaned);
+              core.info(`${target.what} : pied Claude Code retiré.`);
+            } catch (error) {
+              if (error.status !== 403) throw error;
+              core.warning(`${target.what} : pied laissé en place, jeton en lecture seule (PR venue d'un fork ?).`);
+            }

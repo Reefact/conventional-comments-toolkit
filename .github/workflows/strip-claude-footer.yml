@@ -15,6 +15,13 @@
 # lecture seule. Le pied d'une revue ou d'un commentaire de revue y reste ; le workflow le
 # signale par un avertissement au lieu d'échouer.
 #
+# Les événements de revue (`pull_request_review`, `pull_request_review_comment`) exécutent la
+# version de CE FICHIER portée par la PR, pas celle de la branche par défaut — mesuré sur la
+# PR #167, où ce workflow a tourné avant toute fusion. Sur une PR qui l'introduit ou le
+# modifie, le module extrait de la branche par défaut peut donc manquer ou dater : le
+# workflow s'efface alors, sans échouer. Le jeton reste celui que GitHub accorde à la PR —
+# en lecture seule pour un fork.
+#
 # Pas de boucle : une modification faite avec le `GITHUB_TOKEN` ne déclenche aucun workflow.
 name: Pied Claude Code
 
@@ -48,9 +55,12 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            const { stripClaudeFooter, stripClaudeFooterAfterSessionMarker } = await import(
-              `${process.env.GITHUB_WORKSPACE}/scripts/lib/claude-footer.mjs`
-            );
+            const modulePath = `${process.env.GITHUB_WORKSPACE}/scripts/lib/claude-footer.mjs`;
+            if (!require('fs').existsSync(modulePath)) {
+              core.notice('Module absent de la branche par défaut (PR qui introduit ce workflow ?) : rien à faire.');
+              return;
+            }
+            const { stripClaudeFooter, stripClaudeFooterAfterSessionMarker } = await import(modulePath);
             const { owner, repo } = context.repo;
             const payload = context.payload;
 

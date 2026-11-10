@@ -152,7 +152,8 @@ export const selectors = {
    * Le pied de l'éditeur est une rangée de boutons dont *Cancel* est TOUJOURS le premier (01, 02,
    * 04, 06 — les quatre sortes d'éditeur), suivi de :
    *   - nouveau fil : *Comment* (`#__bolt-comment--<n>`, primaire) ;
-   *   - réponse : *Reply & resolve* puis *Reply* (primaire) ;
+   *   - réponse : *Reply & resolve* puis *Reply* (primaire) — *Reply & reactivate* à la place du
+   *     premier sur un fil déjà résolu (vu le 2026-11-10, hors des captures) ;
    *   - modification : *Update & resolve* puis *Update* (primaire).
    * D'où « tout bouton de la rangée sauf le premier », sans aucun libellé. Champ vide, ils portent
    * `aria-disabled="true"` et la classe `disabled`, SANS l'attribut `disabled` (01, 02, 06) : aucun

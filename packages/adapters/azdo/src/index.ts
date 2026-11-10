@@ -199,8 +199,12 @@ export class AzdoClientAdapter implements PlatformAdapter {
   }
 
   /** Les boutons d'envoi de l'éditeur : tous ceux de sa rangée sauf le premier, *Cancel*
-   * (selectors.ts, `submitButtons`). Le primaire publie ; l'autre — *Reply & resolve*, *Update &
-   * resolve* — publie ET change l'état du fil (§B.6, §4.3). */
+   * (selectors.ts, `submitButtons`). Le primaire publie ; l'autre publie ET change l'état du fil
+   * (§B.6, §4.3) — il le RÉSOUT sur un fil actif (*Reply & resolve*, *Update & resolve*), et le
+   * ROUVRE sur un fil résolu (*Reply & reactivate*, vu le 2026-11-10 sur un fil `closed`).
+   * Classé `submit-and-resolve` dans les deux cas : le libellé seul les distingue, il est
+   * localisé, et aucun code ne lit ce `kind` — le blocage porte sur tous les contrôles d'envoi,
+   * quel que soit leur genre. */
   getSubmitControls(editor: EditorHandle): SubmitControl[] {
     const box = closestChain(editor.element, selectors.editorContainer).element;
     if (!box) return [];

@@ -160,24 +160,31 @@ describe('CA-53 — repli : sans projection sûre, le marqueur reste lisible tel
   });
 });
 
-describe('CA-53 — écart au-dessus de la mention : le double de l’écart normal (§5.5)', () => {
-  // La GÉOMÉTRIE est mesurée dans Chromium (`check:session-line`) ; ici, la valeur que
-  // `sessionGap()` pose, selon que la mention ouvre son paragraphe ou suit un saut de ligne.
+describe('CA-53 — écart au-dessus de la mention : un écart de paragraphe, quelle que soit l’écriture (§5.5)', () => {
+  // La GÉOMÉTRIE est mesurée dans Chromium (`check:session-line`, deux écritures rendues à
+  // l'identique) ; ici, ce que `sessionGap()` décide d'ajouter selon le cas.
   afterEach(() => {
     document.body.innerHTML = '';
   });
   const gap = (el: Element) => (el.querySelector('.cct-session') as HTMLElement).style.getPropertyValue('--cct-session-gap');
 
-  it('paragraphe à part : la marge du paragraphe précédent compte déjà pour un écart, il en ajoute un', () => {
-    const el = body('<p style="margin-bottom: 16px">note: x</p>\n<p style="margin-bottom: 16px">Detail.</p>\n<p>[session:a]</p>');
+  it('paragraphe à part : la marge du paragraphe précédent EST l’écart, rien n’est ajouté', () => {
+    const el = body('<p>note: x</p>\n<p>Detail.</p>\n<p>[session:a]</p>');
     decorate(el);
-    expect(gap(el)).toBe('16px');
+    expect(gap(el)).toBe('0px');
   });
 
-  it('après un saut de ligne : aucun écart n’existe, il en pose deux', () => {
-    const el = body('<p style="margin-bottom: 16px">note: x</p>\n<p>Detail.<br>\n[session:a]</p>');
+  it('après un saut de ligne : un écart de paragraphe est ajouté, lu sur la page', () => {
+    const style = document.createElement('style');
+    style.textContent = '.gap-test p { margin: 0 0 16px; }';
+    document.head.appendChild(style);
+    const el = body('<p>note: x<br>\nDetail.<br>\n[session:a]</p>');
+    el.className = 'gap-test';
     decorate(el);
-    expect(gap(el)).toBe('32px');
+    // La sonde n'est pas restée dans le corps.
+    expect(el.querySelectorAll('p')).toHaveLength(1);
+    expect(gap(el)).toBe('16px');
+    style.remove();
   });
 
   it('seule dans le corps : rien au-dessus, aucun écart', () => {
@@ -186,12 +193,12 @@ describe('CA-53 — écart au-dessus de la mention : le double de l’écart nor
     expect(gap(el)).toBe('0px');
   });
 
-  it('sans écart normal lisible, `1em` en tient lieu', () => {
-    const own = body('<p>note: x</p>\n<p>[session:a]</p>');
-    decorate(own);
-    expect(gap(own)).toBe('1em');
-    const br = body('<p>note: x<br>\n[session:a]</p>');
-    decorate(br);
-    expect(gap(br)).toBe('2em');
+  it('l’écart est calculé à la construction, pas réécrit à chaque passage', () => {
+    const el = body('<p>note: x<br>\n[session:a]</p>');
+    decorate(el);
+    const shown = el.querySelector('.cct-session') as HTMLElement;
+    shown.style.setProperty('--cct-session-gap', '7px');
+    decorate(el);
+    expect(gap(el)).toBe('7px');
   });
 });

@@ -440,7 +440,7 @@ const SUBJECT_BREAK_CLASS = 'cct-subject-break';
  * passage : un `<br>` peut apparaître ou disparaître d'une édition à l'autre, et l'espaceur ne
  * doit jamais survivre au saut de ligne qui le justifiait. Purement décoratif, sans texte :
  * `commentBodyText()` relit le même corps avec ou sans lui. */
-function markSubjectBreak(wrapper: Element, shape: RenderedBodyShape): void {
+function markSubjectBreak(wrapper: Element, shape: RenderedBodyShape, body: Element): void {
   const next = wrapper.nextSibling;
   const lineBreak =
     next !== null && next.nodeType === 1 && (next as Element).tagName === shape.lineBreakTag
@@ -455,6 +455,9 @@ function markSubjectBreak(wrapper: Element, shape: RenderedBodyShape): void {
   existing?.remove();
   const spacer = globalThis.document.createElement('span');
   spacer.className = SUBJECT_BREAK_CLASS;
+  // Le même écart qu'entre deux paragraphes : `issue: x` puis le corps à la ligne suivante se lit
+  // alors exactement comme `issue: x`, une ligne blanche, puis le corps (demande Reefact, #163).
+  spacer.style.setProperty(PARAGRAPH_GAP_VAR, paragraphGap(body, shape));
   lineBreak.after(spacer);
 }
 
@@ -462,10 +465,10 @@ function markSubjectBreak(wrapper: Element, shape: RenderedBodyShape): void {
  * comme le masquage lui-même : une réhydratation de plateforme peut emporter ce wrapper sans
  * toucher aux badges. Un sujet VIDE (`issue:` seul, §3.5 E-EMPTY-SUBJECT) ne reçoit rien —
  * un span vide n'a rien à mettre en gras. */
-function wrapSubject(hidden: Element, shape: RenderedBodyShape): void {
+function wrapSubject(hidden: Element, shape: RenderedBodyShape, body: Element): void {
   const next = hidden.nextSibling;
   if (next !== null && next.nodeType === 1 && (next as Element).classList.contains(SUBJECT_CLASS)) {
-    markSubjectBreak(next as Element, shape); // wrapper déjà là : seul l'espaceur reste à réentretenir
+    markSubjectBreak(next as Element, shape, body); // wrapper déjà là : seul l'espaceur reste à réentretenir
     return;
   }
   const nodes = subjectNodes(hidden, shape);
@@ -474,7 +477,7 @@ function wrapSubject(hidden: Element, shape: RenderedBodyShape): void {
   wrapper.className = SUBJECT_CLASS;
   hidden.after(wrapper);
   for (const node of nodes) wrapper.appendChild(node);
-  markSubjectBreak(wrapper, shape);
+  markSubjectBreak(wrapper, shape, body);
 }
 
 /** Rend les enfants d'un wrapper à son parent, à leur place exacte, et referme la coupure —
@@ -571,7 +574,7 @@ function applyPrefixVisibility(
   }
   const { prefixLine, shape } = masking;
   if (existing) {
-    wrapSubject(existing, shape); // réentretien, comme le masquage lui-même : gratuit si rien n'a bougé
+    wrapSubject(existing, shape, commentBodyElement); // réentretien, comme le masquage lui-même : gratuit si rien n'a bougé
     return;
   }
   // Un `.cct-subject` sans son préfixe masqué, avant de reconstruire : `wrapSubject()`
@@ -602,7 +605,7 @@ function applyPrefixVisibility(
   hidden.className = 'cct-hidden-prefix';
   target.replaceWith(hidden);
   hidden.appendChild(target);
-  wrapSubject(hidden, shape);
+  wrapSubject(hidden, shape, commentBodyElement);
 }
 
 // ————— Marqueur de session (§3.6, §5.5) —————
@@ -673,41 +676,48 @@ function sessionLine(body: Element, marker: SessionMarker, shape: RenderedBodySh
   return { node, start };
 }
 
-/** Écart au-dessus de la mention (demande Reefact, #163) : le DOUBLE de l'écart normal entre deux
- * paragraphes du corps, quelle que soit la façon dont l'auteur a séparé le marqueur — paragraphe
- * à part, saut de ligne simple, ou autant de lignes blanches qu'il voulait, que le rendu Markdown
- * a déjà repliées. L'écart normal est LU sur la page (`margin-bottom` calculée du premier
- * paragraphe du corps qui en a une), jamais supposé : il diffère d'une plateforme à l'autre.
+/** Variable portée par l'espaceur du sujet : l'écart normal entre deux paragraphes. */
+const PARAGRAPH_GAP_VAR = '--cct-paragraph-gap';
+/** Variable portée par la mention de session : ce qu'il faut ajouter au-dessus d'elle. */
+const SESSION_GAP_VAR = '--cct-session-gap';
+
+/** L'écart normal entre deux paragraphes du corps, tel que la PAGE l'applique — jamais supposé, il
+ * diffère d'une plateforme à l'autre. Lu sur un paragraphe SONDE, posé en tête du corps puis
+ * retiré dans la même tâche : un paragraphe existant ne suffit pas, le seul paragraphe d'un
+ * commentaire écrit d'un bloc est aussi le dernier, que les plateformes privent de marge
+ * (`.markdown-body > *:last-child` sur GitHub). La sonde n'est jamais la dernière.
  *
- * Ce qui est posé est un `padding-top` sur la mention, devenue un bloc. Un `margin-top` ne
- * s'ajouterait pas à la marge du paragraphe précédent, il fusionnerait avec elle. D'où deux cas :
- * - la mention ouvre son propre paragraphe : la marge du paragraphe précédent donne déjà un écart
- *   normal, le `padding-top` en ajoute UN ;
- * - elle suit du texte dans le même paragraphe (saut de ligne) : aucun écart n'existe, il en faut
- *   DEUX.
- * Seule dans le corps, rien n'est au-dessus d'elle : aucun écart. Sans écart lisible (paragraphe
- * sans marge, environnement sans mise en page), `1em` tient lieu d'écart normal. */
+ * Sans marge lisible — plateforme qui n'en met pas, environnement sans mise en page —, la taille
+ * de police du CORPS en tient lieu, en pixels : un `em` résolu plus tard sur la mention, écrite
+ * plus petit, donnerait un autre écart que celui de l'en-tête. */
+function paragraphGap(body: Element, shape: RenderedBodyShape): string {
+  const view = body.ownerDocument.defaultView;
+  const tag = shape.paragraphTags[0];
+  if (!view || !tag) return '1em';
+  const probe = body.ownerDocument.createElement(tag.toLowerCase());
+  body.insertBefore(probe, body.firstChild);
+  const margin = Number.parseFloat(view.getComputedStyle(probe).marginBottom);
+  probe.remove();
+  if (Number.isFinite(margin) && margin > 0) return `${margin}px`;
+  const font = Number.parseFloat(view.getComputedStyle(body).fontSize);
+  return Number.isFinite(font) && font > 0 ? `${font}px` : '1em';
+}
+
+/** Ce qu'il faut AJOUTER au-dessus de la mention pour qu'elle soit à un écart de paragraphe, et
+ * un seul, du texte qui la précède — la même séparation que celle de l'en-tête, si bien qu'un
+ * commentaire écrit avec des lignes blanches et le même écrit d'un bloc se rendent à l'identique
+ * (demande Reefact, #163). Les lignes blanches, elles, n'existent plus au rendu : Markdown les
+ * replie. Trois cas :
+ * - la mention ouvre son propre paragraphe : la marge du bloc précédent EST l'écart, rien à ajouter ;
+ * - elle suit du texte dans le même paragraphe (saut de ligne simple) : un écart à ajouter ;
+ * - elle est seule dans le corps : rien au-dessus, rien à ajouter.
+ * Un `padding-top`, posé par la feuille de style : une marge fusionnerait avec celle du bloc
+ * précédent au lieu de s'y ajouter. */
 function sessionGap(body: Element, wrapper: Element, shape: RenderedBodyShape): string {
-  const host = wrapper.parentElement;
   let previous = wrapper.previousSibling;
   while (previous !== null && (isBlank(previous) || isOwn(previous))) previous = previous.previousSibling;
-  const opensParagraph = previous === null && host !== null && host !== body;
-  let before: Element | null = host?.previousElementSibling ?? null;
-  while (before !== null && before.classList.contains('cct-badge')) before = before.previousElementSibling;
-  if (opensParagraph && before === null) return '0px';
-  if (previous === null && host === body) return '0px';
-  const view = body.ownerDocument.defaultView;
-  let normal: number | null = null;
-  for (const child of body.children) {
-    if (!shape.paragraphTags.includes(child.tagName)) continue;
-    const margin = Number.parseFloat(view?.getComputedStyle(child).marginBottom ?? '');
-    if (Number.isFinite(margin) && margin > 0) {
-      normal = margin;
-      break;
-    }
-  }
-  const factor = opensParagraph ? 1 : 2;
-  return normal === null ? `${factor}em` : `${factor * normal}px`;
+  if (previous === null) return '0px'; // ouvre son paragraphe, ou seule dans le corps
+  return paragraphGap(body, shape);
 }
 
 /** Défait la projection : texte d'origine rendu à sa place, affichage retiré. */
@@ -739,11 +749,7 @@ function applySessionProjection(
     const shown = hidden.nextElementSibling;
     if (hidden.textContent === marker.raw && shown?.classList.contains(SESSION_CLASS)) {
       if (shown.textContent !== expected) shown.textContent = expected; // icône changée
-      const gap = sessionGap(body, hidden, shape);
-      if ((shown as HTMLElement).style.getPropertyValue('--cct-session-gap') !== gap) {
-        (shown as HTMLElement).style.setProperty('--cct-session-gap', gap);
-      }
-      return;
+      return; // l'écart est calculé à la construction : la sonde ne tourne pas à chaque passage
     }
     revealSession(body); // marqueur changé, ou affichage emporté par la plateforme : reconstruire
   } else if (body.querySelector(`.${SESSION_CLASS}`) !== null) {
@@ -761,7 +767,7 @@ function applySessionProjection(
   shown.className = SESSION_CLASS;
   shown.textContent = expected;
   wrapper.after(shown);
-  shown.style.setProperty('--cct-session-gap', sessionGap(body, wrapper, shape));
+  shown.style.setProperty(SESSION_GAP_VAR, sessionGap(body, wrapper, shape));
 }
 
 export function decorateComment(

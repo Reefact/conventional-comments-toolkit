@@ -43,9 +43,11 @@ permissions:
 
 jobs:
   strip:
-    # Chaque forme reconnue contient « Claude Code » : un lien de session seul n'est jamais
-    # retiré (revue de la PR #167), il n'a donc pas à déclencher le passage.
-    if: contains(github.event.comment.body || github.event.review.body || github.event.pull_request.body, 'Claude Code')
+    # Chaque forme reconnue contient « Claude Code », sauf le lien de session seul : les deux
+    # sont cherchés dans le texte de l'événement, quel qu'il soit (revue de la PR #167).
+    if: >-
+      contains(github.event.comment.body || github.event.review.body || github.event.pull_request.body, 'Claude Code')
+      || contains(github.event.comment.body || github.event.review.body || github.event.pull_request.body, 'claude.ai/code/session_')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

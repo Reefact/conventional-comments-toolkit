@@ -32,10 +32,14 @@ describe('stripClaudeFooter (descriptions)', () => {
     expect(stripClaudeFooter(`${BODY}\n\n${SESSION_FORM}\n\n${TOOL_FORM}`)).toBe(BODY);
   });
 
-  it('laisse un lien de session cité seul : une référence voulue, pas un pied', () => {
-    const body = `See the original session:\n\n${SESSION}`;
+  it('retire un lien de session resté seul en dernière ligne, avec ou sans le pied après lui', () => {
+    expect(stripClaudeFooter(`${BODY}\n\n${SESSION}`)).toBe(BODY);
+    expect(stripClaudeFooter(`${BODY}\n\n${SESSION}\n\n${TOOL_FORM}`)).toBe(BODY);
+  });
+
+  it('garde un lien de session cité au milieu du texte', () => {
+    const body = `See ${SESSION} for the original session.\n\nFin.`;
     expect(stripClaudeFooter(body)).toBe(body);
-    expect(stripClaudeFooter(`${body}\n\n${TOOL_FORM}`)).toBe(body);
   });
 
   it('accepte les fins de ligne CRLF et les blancs finaux', () => {
@@ -92,6 +96,11 @@ describe('stripClaudeFooterAfterSessionMarker (commentaires)', () => {
   it('garde le pied quand le marqueur a une valeur vide', () => {
     const posted = `${REPLY}\n\n[session:  ]\n\n${COMMENT_FOOTER}`;
     expect(stripClaudeFooterAfterSessionMarker(posted)).toBe(posted);
+  });
+
+  it('retire un lien de session seul quand un marqueur le précède', () => {
+    const posted = `${MARKED}\n\nhttps://claude.ai/code/session_xyz`;
+    expect(stripClaudeFooterAfterSessionMarker(posted)).toBe(MARKED);
   });
 
   it('rend le commentaire intact quand il ne porte aucun pied', () => {

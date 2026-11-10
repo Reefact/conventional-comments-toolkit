@@ -58,4 +58,17 @@ describe('§4.1, §9.4 — Azure DevOps : le repli de zone sur les pages captur�
     // La zone ne change pas : seul le journal en dit plus.
     expect(after.editors.map((e) => e.context.zone)).toEqual(before.editors.map((e) => e.context.zone));
   }, T);
+
+  it('une modification dont le commentaire n’est plus reconnu arrive au repli, et y est journalisée (revue Reefact, PR #174)', () => {
+    const file = '06-overview-modification-commentaire.html';
+    const before = load(file);
+    expect(before.editors.map((e) => e.context.action)).toContain('edit');
+    // Le commentaire édité perd la classe que `comment` reconnaît ; le champ, lui, reste trouvé.
+    const after = load(file, (doc) => {
+      for (const el of doc.querySelectorAll('.repos-discussion-comment')) el.classList.remove('repos-discussion-comment');
+    });
+    expect(after.editors.length).toBe(before.editors.length);
+    expect(after.editors.map((e) => e.context.action)).not.toContain('edit');
+    expect([...after.lines.keys()]).toContain('general-composer');
+  }, T);
 });

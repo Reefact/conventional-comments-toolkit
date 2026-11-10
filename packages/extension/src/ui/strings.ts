@@ -29,12 +29,13 @@ const fr: Record<string, string> = {
   'label.typo': 'Signaler une faute de frappe.',
   'label.polish': 'Proposer une finition, sans changer le sens.',
   'label.quibble': 'Signaler un détail discutable.',
-  // Labels ajoutés (§3.2) — les labels de réponse et `reviewed`, extension propre à cette
+  // Labels ajoutés (§3.2) — les labels de réponse, `summary` et `reviewed`, extension propre à cette
   // boîte à outils, absente de Conventional Comments (§3.1). `ack` est du jargon : son badge l'ENSEIGNE (§10).
   'label.thanks': 'Remercier, sans prendre position.',
   'label.ack': 'Accepter un point sans changer le code à ce stade.',
   'label.done': 'Indiquer que la correction est poussée, avec son commit.',
   'label.disagree': 'Décliner une remarque en disant pourquoi.',
+  'label.summary': 'Faire le point sur une passe : vérifié, encore ouvert. Ne clôt pas la revue.',
   'label.reviewed': 'Clore votre revue quand tous vos points sont traités. N’approuve rien.',
   // Badge d'un commentaire publié (§5.5) : ce que le commentaire VEUT DIRE, pour qui le lit —
   // positif, sans exemple, et sans rien promettre que le label ne garantit pas. Le bouton
@@ -56,6 +57,7 @@ const fr: Record<string, string> = {
   'badge.label.ack': 'Bien reçu (« ack », pour acknowledged) : le point est accepté, sans changement de code pour l’instant.',
   'badge.label.done': 'Le code a été modifié suite à la remarque : le changement est à vérifier.',
   'badge.label.disagree': 'Un avis différent, argumenté : la discussion reste ouverte.',
+  'badge.label.summary': 'Le point sur la revue en cours : ce qui est vérifié, ce qui reste ouvert.',
   'badge.label.reviewed': 'Le relecteur a terminé sa revue : il n’a plus rien à ajouter.',
   'label.example': 'Exemple : « {example} »',
   'example.praise': 'praise: gestion d’erreur très lisible',
@@ -77,6 +79,7 @@ const fr: Record<string, string> = {
   'example.ack': 'ack: bien noté, je garde ça pour le module suivant',
   'example.done': 'done: jeton propre à la plateforme retiré',
   'example.disagree': 'disagree: la correspondance est volontairement indépendante de la plateforme',
+  'example.summary': 'summary: deux points vérifiés, un reste ouvert',
   'example.reviewed': 'reviewed: corrections vérifiées, rien à ajouter',
   'filter.aria': 'Filtrer les fils par label',
   'filter.all': 'tous',
@@ -148,11 +151,11 @@ const fr: Record<string, string> = {
   'options.order.rejected': 'Ignorés, ce ne sont pas des noms de label : {rejected}.',
   'options.responses.heading': "Labels ajoutés",
   'options.responses.sub':
-    "Cinq labels propres à cette extension, absents de Conventional Comments : thanks, done, ack et disagree pour répondre à une remarque, reviewed pour clore sa revue. Ils sont activés par défaut. Ils se désactivent dans le fichier .conventional-comments.json du dépôt, partagé par l'équipe, et non depuis cette page. Le bloc ci-dessous les désactive : sans fichier existant, il peut servir de fichier complet ; sinon, ajoutez ses cinq entrées au tableau labels existant, ou créez cette propriété, sans remplacer les autres clés.",
+    "Six labels propres à cette extension, absents de Conventional Comments : thanks, done, ack et disagree pour répondre à une remarque, summary pour faire le point sur une passe, reviewed pour clore sa revue. Ils sont activés par défaut. Ils se désactivent dans le fichier .conventional-comments.json du dépôt, partagé par l'équipe, et non depuis cette page. Le bloc ci-dessous les désactive : sans fichier existant, il peut servir de fichier complet ; sinon, ajoutez ses six entrées au tableau labels existant, ou créez cette propriété, sans remplacer les autres clés.",
   'options.responses.snippet': "Configuration qui désactive les labels ajoutés",
   'options.responses.copy': 'Copier la configuration',
   'options.responses.copied':
-    "Copié. Sans configuration existante, ce bloc peut servir de fichier .conventional-comments.json complet ; sinon, ajoutez ses cinq entrées au tableau labels existant.",
+    "Copié. Sans configuration existante, ce bloc peut servir de fichier .conventional-comments.json complet ; sinon, ajoutez ses six entrées au tableau labels existant.",
   'options.responses.manual': 'Le presse-papiers a refusé la copie : le bloc est sélectionné, copiez-le avec Ctrl+C (⌘C sur Mac).',
   'options.status.degraded': 'Configuration non lue ({reason}) : l’extension assiste sans bloquer.',
   'options.status.ok': 'Configuration lue normalement.',
@@ -240,7 +243,7 @@ const fr: Record<string, string> = {
     'Une combinaison de touches insère directement un label dans le commentaire en cours de rédaction. Une ligne par raccourci ; une ligne sans label désactive celui d’origine.',
   'tour.responses.title': "Labels ajoutés",
   'tour.responses.body':
-    "Thanks, done, ack, disagree et reviewed sont actifs par défaut. Pour s'en tenir à Conventional Comments, désactivez-les dans le fichier .conventional-comments.json du dépôt : le bouton copie le bloc à y mettre.",
+    "Thanks, done, ack, disagree, summary et reviewed sont actifs par défaut. Pour s'en tenir à Conventional Comments, désactivez-les dans le fichier .conventional-comments.json du dépôt : le bouton copie le bloc à y mettre.",
   'tour.telemetry.title': 'Télémétrie',
   'tour.telemetry.body':
     'Désactivée par défaut, et sans effet tant que votre organisation n’a pas déclaré de point de collecte. Elle n’émet que des compteurs — jamais le texte d’un commentaire, d’un code ou d’un diff, ni l’adresse de la page.',
@@ -294,6 +297,7 @@ const en: Record<string, string> = {
   'label.ack': 'Accept a point without changing the code at this stage.',
   'label.done': 'Say the fix is pushed, citing its commit.',
   'label.disagree': 'Decline a remark and say why.',
+  'label.summary': 'Recap a pass: what is checked, what is still open. Does not close the review.',
   'label.reviewed': 'Close your review once all your points are dealt with. Approves nothing.',
   'badge.label.praise': 'The reviewer is pointing out something done well in this code.',
   'badge.label.nitpick': 'A small matter of preference: up to you whether to follow it.',
@@ -312,6 +316,7 @@ const en: Record<string, string> = {
   'badge.label.ack': 'Acknowledged (“ack”): the point is accepted, with no code change for now.',
   'badge.label.done': 'The code was changed in response to the remark; the change is there to check.',
   'badge.label.disagree': 'A different, reasoned view: the discussion stays open.',
+  'badge.label.summary': 'Where the review stands: what is checked, what is still open.',
   'badge.label.reviewed': 'The reviewer has finished their review: nothing more to add.',
   'label.example': 'Example: "{example}"',
   'example.praise': 'praise: very readable error handling',
@@ -331,6 +336,7 @@ const en: Record<string, string> = {
   'example.ack': "ack: understood, I'll keep it in mind for the next module",
   'example.done': 'done: removed the platform-specific token',
   'example.disagree': 'disagree: the mapping is intentionally platform-independent',
+  'example.summary': 'summary: two points checked, one still open',
   'example.reviewed': 'reviewed: fixes checked, nothing to add',
   'filter.aria': 'Filter threads by label',
   'filter.all': 'all',
@@ -401,11 +407,11 @@ const en: Record<string, string> = {
   'options.order.rejected': 'Ignored, not label names: {rejected}.',
   'options.responses.heading': "Added labels",
   'options.responses.sub':
-    "Five labels of this extension's own, not part of Conventional Comments: thanks, done, ack and disagree for replying to a review comment, reviewed for closing your review. They are enabled by default. They are disabled in the repository's .conventional-comments.json file, shared by the team, not from this page. The block below disables them: with no existing file, it can serve as the whole file; otherwise, add its five entries to the existing labels array, or create that property, without replacing the other keys.",
+    "Six labels of this extension's own, not part of Conventional Comments: thanks, done, ack and disagree for replying to a review comment, summary for recapping a pass, reviewed for closing your review. They are enabled by default. They are disabled in the repository's .conventional-comments.json file, shared by the team, not from this page. The block below disables them: with no existing file, it can serve as the whole file; otherwise, add its six entries to the existing labels array, or create that property, without replacing the other keys.",
   'options.responses.snippet': "Configuration that disables the added labels",
   'options.responses.copy': 'Copy the configuration',
   'options.responses.copied':
-    "Copied. With no existing configuration, this block can serve as the whole .conventional-comments.json file; otherwise, add its five entries to the existing labels array.",
+    "Copied. With no existing configuration, this block can serve as the whole .conventional-comments.json file; otherwise, add its six entries to the existing labels array.",
   'options.responses.manual': 'The clipboard refused the copy: the block is selected, copy it with Ctrl+C (⌘C on Mac).',
   'options.status.degraded': 'Configuration not read ({reason}): the extension assists without blocking.',
   'options.status.ok': 'Configuration read normally.',
@@ -492,7 +498,7 @@ const en: Record<string, string> = {
     'A key combination inserts a label straight into the comment being written. One shortcut per line; a line with no label disables the original one.',
   'tour.responses.title': "Added labels",
   'tour.responses.body':
-    "Thanks, done, ack, disagree and reviewed are enabled by default. To stick to Conventional Comments, disable them in the repository's .conventional-comments.json file: the button copies the block to put there.",
+    "Thanks, done, ack, disagree, summary and reviewed are enabled by default. To stick to Conventional Comments, disable them in the repository's .conventional-comments.json file: the button copies the block to put there.",
   'tour.telemetry.title': 'Telemetry',
   'tour.telemetry.body':
     'Off by default, and inert until your organisation declares a collection endpoint. It only emits counters — never the text of a comment, of code or of a diff, nor the page address.',

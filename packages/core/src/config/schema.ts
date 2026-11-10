@@ -164,8 +164,8 @@ export function parseConfigDocument(
             }
           }
           if ('kind' in e) {
-            if (e['kind'] !== 'remark' && e['kind'] !== 'reply') {
-              bad(key, `"kind" of label "${e['id']}" must be "remark" or "reply"`);
+            if (e['kind'] !== 'remark' && e['kind'] !== 'status' && e['kind'] !== 'reply') {
+              bad(key, `"kind" of label "${e['id']}" must be "remark", "status" or "reply"`);
               ok = false;
             } else label['kind'] = e['kind'];
           }

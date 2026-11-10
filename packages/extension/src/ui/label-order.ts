@@ -1,10 +1,12 @@
 // Ordre d'affichage des labels (§5.1, §5.2) — préférence PERSONNELLE (§8.1.2), lue par la
 // barre d'outils et par la liste de complétion, qui doivent dire le même ordre.
 //
-// L'ordre par défaut est celui de la configuration résolue : rien n'est trié. La préférence
-// ne fait que placer certains labels en tête de LEUR groupe ; elle ne déplace jamais un label
-// d'un groupe à l'autre — le type (`labels[].kind`) appartient au dépôt, que la page d'options
-// ne connaît pas, d'où une seule liste pour les deux groupes plutôt qu'une par groupe.
+// Chaque type forme un groupe : la zone du dessus porte le groupe `remark` PUIS le groupe
+// `status`, celle du dessous le groupe `reply` (§5.1). Dans un groupe, l'ordre par défaut est
+// celui de la configuration résolue : rien d'autre n'est trié. La préférence ne fait que placer
+// certains labels en tête de LEUR groupe ; elle ne déplace jamais un label d'un groupe à
+// l'autre — le type (`labels[].kind`) appartient au dépôt, que la page d'options ne connaît pas,
+// d'où une seule liste pour tous les groupes plutôt qu'une par groupe.
 
 import { enabledLabels, type EffectiveConfig, type LabelConfig } from '@cct/core';
 
@@ -33,9 +35,14 @@ export function normalizeStoredOrder(stored: unknown): string[] {
   return parseLabelOrder(stored.filter((x): x is string => typeof x === 'string').join(',')).order;
 }
 
-/** Les labels ACTIFS, rangés par groupe — remarques, réponses : dans chacun, ceux que la
- * préférence nomme d'abord, dans son ordre, puis les autres dans l'ordre de la configuration. Un nom inconnu ou désactivé
- * sur ce dépôt n'a simplement aucun label à placer. */
+/** Les labels ACTIFS, rangés par zone — celle du dessus (`remark`, puis `status`), celle des
+ * réponses : dans chaque groupe, ceux que la préférence nomme d'abord, dans son ordre, puis les
+ * autres dans l'ordre de la configuration. Un nom inconnu ou désactivé sur ce dépôt n'a
+ * simplement aucun label à placer.
+ *
+ * La zone du dessus garde le nom `remark` : elle porte les remarques, puis les labels `status`
+ * QUI LES SUIVENT TOUJOURS — un label qu'une équipe crée, ajouté en fin de configuration, ne
+ * s'intercale pas entre les remarques et `summary`, `reviewed`, qui ferment la rangée. */
 export function labelsByZone(
   config: EffectiveConfig,
   order: readonly string[] = []
@@ -46,5 +53,8 @@ export function labelsByZone(
     .map((l, i) => ({ l, k: key(l, i) }))
     .sort((a, b) => a.k - b.k)
     .map((x) => x.l);
-  return { remark: sorted.filter((l) => l.kind !== 'reply'), reply: sorted.filter((l) => l.kind === 'reply') };
+  return {
+    remark: [...sorted.filter((l) => l.kind === 'remark'), ...sorted.filter((l) => l.kind === 'status')],
+    reply: sorted.filter((l) => l.kind === 'reply'),
+  };
 }

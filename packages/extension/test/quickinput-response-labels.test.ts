@@ -72,6 +72,11 @@ describe('CA-47 — une abréviation livrée ne se déplie que vers un label act
     expect(tabAfter('?ty', defaultConfig()).value).toBe('typo: '); // actifs par défaut
   });
 
+  it('CA-55 — `?sum` compose `summary: `, et `?su` reste `suggestion: `', () => {
+    expect(tabAfter('?sum', defaultConfig()).value).toBe('summary: ');
+    expect(tabAfter('?su', defaultConfig()).value).toBe('suggestion: ');
+  });
+
   it('une abréviation écrite par une configuration n’est pas concernée', () => {
     // Une équipe qui déclare sa propre abréviation l'obtient, même vers un label éteint : ce
     // qu'elle écrit lui appartient. Seule la table LIVRÉE est gardée.

@@ -33,31 +33,40 @@ describe('CA-41 — labels ajoutés désactivés par un dépôt : eux seuls disp
 
   it('tous actifs par défaut sauf `quibble` ; désactiver les labels ajoutés ne retire qu’eux', () => {
     const cc = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish'];
-    expect(enabledLabels(defaultConfig()).map((l) => l.id)).toEqual([...cc, 'reviewed', 'thanks', 'done', 'ack', 'decision', 'disagree']);
+    expect(enabledLabels(defaultConfig()).map((l) => l.id)).toEqual([...cc, 'summary', 'reviewed', 'thanks', 'done', 'ack', 'decision', 'disagree']);
     expect(enabledLabels(repo(OFF).config).map((l) => l.id)).toEqual([...cc, 'decision']);
     for (const l of defaultConfig().labels) {
-      expect(l.kind, l.id).toBe(['thanks', 'done', 'ack', 'decision', 'disagree'].includes(l.id) ? 'reply' : 'remark');
+      const kind = ['thanks', 'done', 'ack', 'decision', 'disagree'].includes(l.id)
+        ? 'reply'
+        : ['summary', 'reviewed'].includes(l.id) ? 'status' : 'remark';
+      expect(l.kind, l.id).toBe(kind);
     }
   });
 
   it('désactivé, un label de réponse est un mot inconnu comme un autre', () => {
     expect(codes('done: rebasé sur main', repo(OFF).config)).toEqual(['E-UNKNOWN-LABEL']);
     expect(codes('reviewed: rien à ajouter', repo(OFF).config)).toEqual(['E-UNKNOWN-LABEL']);
+    expect(codes('summary: deux points vérifiés, un reste ouvert', repo(OFF).config)).toEqual(['E-UNKNOWN-LABEL']);
     expect(resolveLabel('fixed', repo(OFF).config)).toBeNull(); // un alias d'un label désactivé non plus
   });
 
   it('les labels ajoutés SONT ceux que le §3.2 déclare — identifiants et alias', () => {
     // Une liste close d'identifiants, la forme qui vieillit : les deux tableaux du §3.2 font
-    // foi — celui des labels de réponse, puis celui de `reviewed`.
+    // foi — celui des labels de réponse, puis ceux de `summary` et de `reviewed`, dans l'ordre de
+    // la définition livrée, qui est celui des boutons (§5.1).
     const spec = readFileSync(new URL('../../../specifications-fr.md', import.meta.url), 'utf8');
     const tableAfter = (heading: string) => {
       const block = spec.slice(spec.indexOf(heading));
       return block.slice(0, block.indexOf('\n\n', block.indexOf('| Label |')));
     };
-    const rows = [tableAfter('**Labels de réponse — extension du produit'), tableAfter('**`reviewed` — clore sa revue')]
+    const rows = [
+      tableAfter('**Labels de réponse — extension du produit'),
+      tableAfter('**`summary` — faire le point sur une passe'),
+      tableAfter('**`reviewed` — clore sa revue'),
+    ]
       .flatMap((table) => [...table.matchAll(/^\| `([a-z]+)` \|[^\n]*\| ([^|\n]*) \|$/gm)])
       .map((m) => ({ id: m[1], aliases: [...m[2]!.matchAll(/`([a-z]+)`/g)].map((a) => a[1]) }));
-    expect(rows.map((r) => r.id)).toEqual(['thanks', 'done', 'ack', 'disagree', 'reviewed']);
+    expect(rows.map((r) => r.id)).toEqual(['thanks', 'done', 'ack', 'disagree', 'summary', 'reviewed']);
     expect(ADDED_LABELS.map((l) => ({ id: l.id, aliases: [...l.aliases] }))).toEqual(rows);
   });
 });
@@ -72,6 +81,7 @@ describe('CA-42 — vocabulaire actif : des labels ordinaires, les mêmes mécan
     expect(codes('done (perf*): rebasé sur main', on())).toEqual(['E-DECORATION-SYNTAX']);
     expect(codes('disagree: la correspondance est volontairement indépendante', on())).toEqual([]);
     expect(codes('reviewed: rien à ajouter', on())).toEqual([]);
+    expect(codes('summary: deux points vérifiés, un reste ouvert', on())).toEqual([]);
   });
 
   it('le type `reply` ne change aucun verdict', () => {
@@ -88,7 +98,7 @@ describe('CA-42 — vocabulaire actif : des labels ordinaires, les mêmes mécan
   });
 
   it("aucun d'eux n'est bloquant, et le mode effectif ne bouge pas", () => {
-    for (const id of ['ack', 'done', 'disagree', 'reviewed']) {
+    for (const id of ['ack', 'done', 'disagree', 'reviewed', 'summary']) {
       expect(isBlocking(input(`${id}: un sujet assez long`), on()), id).toBe(false);
     }
     expect(on().mode).toBe(defaultConfig().mode);
@@ -121,13 +131,13 @@ describe('CA-43 — orthogonalité avec `scope.validateReplies`', () => {
 describe('CA-44 — le plancher ne rend jamais bloquant un label toujours non bloquant', () => {
   it('imposer la famille force `enabled` et laisse le caractère non bloquant', () => {
     const { config } = resolveConfig(
-      { floorVersion: 1, labels: { minimum: ['ack', 'done', 'disagree', 'reviewed'] } },
+      { floorVersion: 1, labels: { minimum: ['ack', 'done', 'disagree', 'reviewed', 'summary'] } },
       absent,
       absent,
       null,
       false
     );
-    for (const id of ['ack', 'done', 'disagree', 'reviewed']) {
+    for (const id of ['ack', 'done', 'disagree', 'reviewed', 'summary']) {
       const l = config.labels.find((x) => x.id === id)!;
       expect([l.enabled, l.blockingByDefault, l.alwaysNonBlocking], id).toEqual([true, false, true]);
     }
@@ -168,7 +178,7 @@ describe('CA-44 — le plancher ne rend jamais bloquant un label toujours non bl
 describe('CA-45 — le dépôt garde la maîtrise de son vocabulaire', () => {
   it('désactiver un seul label, en réactiver un que l’organisation désactivait, surcharger sans tout redire', () => {
     const minusDone = repo({ labels: [{ id: 'done', enabled: false }] }).config;
-    expect(enabledLabels(minusDone).filter((l) => ADDED_LABELS.some((a) => a.id === l.id)).map((l) => l.id)).toEqual(['reviewed', 'thanks', 'ack', 'disagree']);
+    expect(enabledLabels(minusDone).filter((l) => ADDED_LABELS.some((a) => a.id === l.id)).map((l) => l.id)).toEqual(['summary', 'reviewed', 'thanks', 'ack', 'disagree']);
 
     const orgOff = found(OFF);
     const plusAck = repo({ labels: [{ id: 'ack', enabled: true }] }, null, orgOff).config;
@@ -270,11 +280,28 @@ describe('CA-46 — activation en direct, et sans effet sur le décompte des fil
 });
 
 describe('CA-49 — le type d’un label se lit et se valide comme ses autres propriétés', () => {
-  it('déclaré `reply`, retenu ; déclaré sans type, `remark` ; un label livré redéclaré garde le sien', () => {
-    const { config } = repo({ labels: [{ id: 'merci', kind: 'reply' }, { id: 'maison' }, { id: 'ack', color: '#123456' }] });
+  it('déclaré `reply` ou `status`, retenu ; déclaré sans type, `remark` ; un label livré redéclaré garde le sien', () => {
+    const { config } = repo({
+      labels: [
+        { id: 'merci', kind: 'reply' },
+        { id: 'recap', kind: 'status' },
+        { id: 'maison' },
+        { id: 'ack', color: '#123456' },
+        { id: 'summary', color: '#123456' },
+      ],
+    });
     expect(config.labels.find((l) => l.id === 'merci')!.kind).toBe('reply');
+    expect(config.labels.find((l) => l.id === 'recap')!.kind).toBe('status');
     expect(config.labels.find((l) => l.id === 'maison')!.kind).toBe('remark');
     expect(config.labels.find((l) => l.id === 'ack')!.kind).toBe('reply');
+    expect(config.labels.find((l) => l.id === 'summary')!.kind).toBe('status');
+  });
+
+  it('le type `status` ne change aucun verdict', () => {
+    const asStatus = repo({ labels: [{ id: 'note', kind: 'status' }] }).config;
+    for (const body of ['note: ce module part en refonte', 'Note: x', 'note (blocking): ce module part en refonte']) {
+      expect(codes(body, asStatus), body).toEqual(codes(body, defaultConfig()));
+    }
   });
 
   it('une autre valeur rend la configuration invalide, comme toute propriété mal typée de `labels[]`', () => {
@@ -284,5 +311,34 @@ describe('CA-49 — le type d’un label se lit et se valide comme ses autres pr
     expect(bad.config.labels.find((l) => l.id === 'merci')).toBeUndefined();
     expect(mistyped.notices.some((n) => n.kind === 'invalid-config')).toBe(true);
     expect(bad.config.mode).toBe(mistyped.config.mode);
+  });
+});
+
+describe('CA-55 — `summary`, livré', () => {
+  it('activé, de type `status`, jamais bloquant, parmi les labels ajoutés', () => {
+    const summary = defaultConfig().labels.find((l) => l.id === 'summary')!;
+    expect([summary.enabled, summary.kind, summary.blockingByDefault, summary.alwaysNonBlocking]).toEqual([
+      true,
+      'status',
+      false,
+      true,
+    ]);
+    // Le bloc de désactivation de la page d'options est construit depuis cette définition (§8.2).
+    expect(ADDED_LABELS.some((l) => l.id === 'summary')).toBe(true);
+  });
+
+  it("aucun diagnostic, aucun fil bloquant ; `(blocking)` produit `E-CONFLICT`", () => {
+    const on = defaultConfig();
+    expect(codes('summary: deux points vérifiés, un reste ouvert', on)).toEqual([]);
+    expect(isBlocking(input('summary: deux points vérifiés, un reste ouvert'), on)).toBe(false);
+    expect(codes('summary (blocking): deux points vérifiés, un reste ouvert', on)).toEqual(['E-CONFLICT']);
+  });
+
+  it('contre-épreuve : désactivé par un dépôt, `summary` seul devient un mot inconnu', () => {
+    const { config } = repo({ labels: [{ id: 'summary', enabled: false }] });
+    expect(codes('summary: deux points vérifiés, un reste ouvert', config)).toEqual(['E-UNKNOWN-LABEL']);
+    expect(enabledLabels(config).map((l) => l.id)).toEqual(
+      enabledLabels(defaultConfig()).map((l) => l.id).filter((id) => id !== 'summary')
+    );
   });
 });

@@ -46,22 +46,23 @@ const label = (
 
 /**
  * Les labels AJOUTÉS du §3.2, tels que le produit les LIVRE — ACTIVÉS, toujours non bloquants,
- * avec leurs alias : les quatre labels de réponse, de type `reply`, et `reviewed`, de type
- * `remark` — il ne répond à aucun point, il fait le point sur la revue. Le groupe ne recoupe pas
+ * avec leurs alias : les quatre labels de réponse, de type `reply`, puis `summary` et `reviewed`,
+ * de type `status` — ils n'ouvrent ni ne répondent à aucun point, ils font le point sur la revue. Le groupe ne recoupe pas
  * le type : il dit ce que le produit ajoute à Conventional Comments et qu'une équipe désactive
  * d'un même geste. Une seule définition, lue par `defaultConfig()` ci-dessous, par le test qui
  * affirme que l'ensemble est celui que le §3.2 déclare, et par la page d'options de
  * l'extension, qui en tire le bloc qui les DÉSACTIVE.
  *
  * Couleurs mesurées, comme toutes les autres, contre les neuf fonds Primer de github.com
- * (`config.test.ts`) : #6A7FDB 3,48:1, #6B8E23 3,44:1, #8A7B6E 3,21:1, #D04A7A 3,08:1, #9C8C1A 3,19:1 au
- * pire. La
+ * (`config.test.ts`) : #6A7FDB 3,48:1, #6B8E23 3,44:1, #8A7B6E 3,21:1, #D04A7A 3,08:1, #9C8C1A 3,19:1,
+ * #B160C9 3,36:1 au pire. La
  * contrainte de contraste enferme la luminance dans une bande étroite, si bien que la teinte
  * seule distingue un label d'un autre : `done` en olive (vers 80°, entre `suggestion` et
  * `praise`), `thanks` en or (vers 53°, entre `suggestion` et `done`), `ack` en indigo (vers 230°, entre `question` et `thought`), `disagree` en taupe —
  * désaturé, donc neutre comme le §5.5 l'exige, mais CHAUD là où le neutre existant, `nitpick`
  * (#76818E), est froid —, `reviewed` en framboise (vers 340°, entre `typo` et `issue`, à 15° du
- * premier). `disagree` et `nitpick` sont à luminance quasi égale
+ * premier), `summary` en orchidée (vers 286°, entre `decision` et `typo`, à 21° du premier — la
+ * couleur que ce dépôt lui donnait quand il le déclarait lui-même). `disagree` et `nitpick` sont à luminance quasi égale
  * (écart 0,008) : seule la teinte les sépare, ce que le garde de contraste ne vérifie pas — il
  * n'écarte que les doublons exacts.
  */
@@ -70,7 +71,8 @@ export const ADDED_LABELS: readonly LabelConfig[] = [
   label('done', '\u{2705}', '#6B8E23', false, true, true, ['fixed'], 'reply'),
   label('ack', '\u{1F44C}', '#6A7FDB', false, true, true, ['acknowledged'], 'reply'),
   label('disagree', '\u{270B}', '#8A7B6E', false, true, true, [], 'reply'),
-  label('reviewed', '\u{1F389}', '#D04A7A', false, true, true, [], 'remark'),
+  label('summary', '\u{1F4CB}', '#B160C9', false, true, true, [], 'status'),
+  label('reviewed', '\u{1F389}', '#D04A7A', false, true, true, [], 'status'),
 ];
 
 /** Une copie de la définition livrée : la configuration rendue est mutée par la fusion, la
@@ -106,9 +108,12 @@ export function defaultConfig(): EffectiveConfig {
       // Labels ajoutés (§3.2) — une extension propre à cette boîte à outils, absente de
       // Conventional Comments (§3.1), livrée activée ; un dépôt qui veut s'en tenir à la liste de
       // l'amont les désactive. L'ordre de cette liste EST l'ordre par défaut des boutons (§5.1) :
-      // `reviewed` clôt la zone `remark`, puis la zone `reply` va du plus conciliant au plus
-      // tranché — `thanks`, `done`, `ack`, `decision`, `disagree`. `decision`, propre au produit lui aussi,
+      // `summary` puis `reviewed`, de la passe à la clôture, ferment la rangée du dessus — et la
+      // fermeraient de toute façon, le groupe `status` venant après tout `remark` (`label-order.ts`) ;
+      // puis la zone `reply` va du plus conciliant au plus tranché — `thanks`, `done`, `ack`,
+      // `decision`, `disagree`. `decision`, propre au produit lui aussi,
       // n'est pas un label ajouté (§3.2) : il s'intercale, il ne rejoint pas le groupe.
+      added('summary'),
       added('reviewed'),
       added('thanks'),
       added('done'),
@@ -148,6 +153,9 @@ export function defaultConfig(): EffectiveConfig {
         '?do': 'done: ',
         '?di': 'disagree: ',
         '?r': 'reviewed: ',
+        // `?su` est `suggestion` et ne se redéfinit pas : seule l'abréviation au moment de `Tab`
+        // doit être unique (§5.2).
+        '?sum': 'summary: ',
         '?thx': 'thanks: ', // comme l'alias `thx` ; `?th` est `thought` et ne se redéfinit pas (§5.2)
         '?ib': 'issue (blocking): ',
         '?su': 'suggestion: ',

@@ -63,7 +63,7 @@ describe('page d’options — le texte nomme tous les labels que le bloc désac
   }
 
   it('le texte annonce le bon nombre de labels', () => {
-    const words: Record<number, { fr: string; en: string }> = { 5: { fr: 'Cinq', en: 'Five' } };
+    const words: Record<number, { fr: string; en: string }> = { 6: { fr: 'Six', en: 'Six' } };
     const n = words[ADDED_LABELS.length];
     expect(n, `nombre de labels ajoutés : ${ADDED_LABELS.length}`).toBeDefined();
     expect(ui('fr', 'options.responses.sub').startsWith(`${n!.fr} labels`)).toBe(true);

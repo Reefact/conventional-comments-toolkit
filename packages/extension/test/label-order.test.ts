@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
-// CA-50 — l'ordre des boutons (§5.1, §5.2) : par défaut celui de la configuration, et une
-// préférence personnelle, UNE seule liste pour les deux zones, qui place des labels en tête de
-// leur zone. La barre d'outils et la liste de complétion disent le même ordre.
+// CA-50 — l'ordre des boutons (§5.1, §5.2) : chaque type forme un groupe, la zone du dessus
+// porte les `remark` PUIS les `status`, et dans chaque groupe l'ordre est celui de la
+// configuration ; une préférence personnelle, UNE seule liste pour tous les groupes, place des
+// labels en tête de leur groupe. La barre d'outils et la liste de complétion disent le même ordre.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { defaultConfig, resolveConfig, type EffectiveConfig } from '@cct/core';
@@ -14,7 +15,10 @@ const resolved = (doc: object): EffectiveConfig =>
   resolveConfig(null, { status: 'absent' }, { status: 'found', text: JSON.stringify(doc) }, null, false).config;
 const ids = (zone: { id: string }[]) => zone.map((l) => l.id);
 
-const REMARK = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'reviewed'];
+const REMARKS = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish'];
+const STATUS = ['summary', 'reviewed'];
+/** La zone du dessus : les remarques, puis les labels `status`, qui la ferment. */
+const REMARK = [...REMARKS, ...STATUS];
 const REPLY = ['thanks', 'done', 'ack', 'decision', 'disagree'];
 
 describe('CA-50 — ordre des boutons', () => {
@@ -26,13 +30,20 @@ describe('CA-50 — ordre des boutons', () => {
 
   it('les labels créés suivent, dans l’ordre d’écriture ; redéclarer ne déplace pas', () => {
     const zones = labelsByZone(resolved({ labels: [{ id: 'merci', kind: 'reply' }, { id: 'perf' }, { id: 'praise', color: '#123456' }] }));
-    expect(ids(zones.remark)).toEqual([...REMARK, 'perf']);
+    // Une remarque créée ferme son GROUPE, pas la zone : `summary` et `reviewed` restent après elle.
+    expect(ids(zones.remark)).toEqual([...REMARKS, 'perf', ...STATUS]);
     expect(ids(zones.reply)).toEqual([...REPLY, 'merci']);
+  });
+
+  it('un label `status` créé rejoint son groupe, après les remarques et les `status` livrés', () => {
+    const zones = labelsByZone(resolved({ labels: [{ id: 'recap', kind: 'status' }, { id: 'perf' }] }));
+    expect(ids(zones.remark)).toEqual([...REMARKS, 'perf', ...STATUS, 'recap']);
+    expect(ids(zones.reply)).toEqual(REPLY);
   });
 
   it('la liste passe en tête de CHAQUE zone, le reste suit dans l’ordre par défaut', () => {
     const zones = labelsByZone(defaultConfig(), parseLabelOrder('suggestion,nitpick,disagree,praise,ack').order);
-    expect(ids(zones.remark)).toEqual(['suggestion', 'nitpick', 'praise', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'reviewed']);
+    expect(ids(zones.remark)).toEqual(['suggestion', 'nitpick', 'praise', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', ...STATUS]);
     expect(ids(zones.reply)).toEqual(['disagree', 'ack', 'thanks', 'done', 'decision']);
   });
 
@@ -52,6 +63,11 @@ describe('CA-50 — ordre des boutons', () => {
     expect(ids(zones.remark)[0]).toBe('note');
     expect(ids(zones.remark)).not.toContain('typo');
     expect(ids(zones.reply)).toEqual(REPLY); // `fixed` est un alias de `done` : il ne le déplace pas
+  });
+
+  it('la préférence place un `status` en tête de SON groupe, jamais devant une remarque', () => {
+    const zones = labelsByZone(defaultConfig(), parseLabelOrder('reviewed,praise').order);
+    expect(ids(zones.remark)).toEqual([...REMARKS, 'reviewed', 'summary']);
   });
 
   it('contre-épreuve : un label déclaré `reply` par le dépôt se place en tête de la zone `reply`, jamais à gauche', () => {

@@ -317,9 +317,10 @@ still open, what you could not check, and the state of your review — **open**,
 `reviewed`**.
 
 **A review body is a comment too.** The body of a submitted review, or any recap of a pass you
-publish, starts with a label like every other comment. It raises no finding: use the label whose
-`description` or `usage` in the repository's configuration says it is for recaps, if there is
-one, and `note` otherwise. It never stands in for `reviewed`.
+publish, starts with a label like every other comment. It raises no finding: use `summary`, the
+toolkit's label for recapping a review or a pass. If the repository's configuration disables it,
+use the label whose `description` or `usage` says it is for recaps, if there is one, and `note`
+otherwise. It never stands in for `reviewed`.
 
 **Correct a comment by editing it, not by posting it again.** A duplicate leaves two versions on
 the pull request, and the later one lands out of order. Where you cannot edit it, say so to

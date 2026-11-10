@@ -261,7 +261,7 @@ need a signed-in session and are not checked live.
 | P1' | Programmatic-write spike (GitHub React + Azure DevOps) | Assumption validated in Chromium; remaining platform assumptions documented with their fallbacks (`spikes/p1-prime/README-fr.md`) |
 | P2 | Extension `assist` on GitHub | Implemented |
 | P3 | Azure DevOps adapter | Implemented, with the P1' fallbacks in place |
-| P4 | Opt-in telemetry and the §12 indicators | Opt-in counters implemented (labels used, diagnostic codes, mode, repository — never free text), sent only to a collection point declared by enterprise policy and accepted by the person |
+| P4 | Opt-in telemetry and the §12 indicators | **Partly implemented.** Opt-in counters ship: a label inserted through the extension, a diagnostic code shown, a selector degradation — with mode and repository, never free text —, sent only to a collection point declared by enterprise policy and accepted by the person. **The §12 indicators do not follow from them yet**: no event counts written or submitted comments, so the compliance and warning *rates* have no denominator, and a label typed or pasted by hand is missing from the distribution. Those events and the restitution remain to be built |
 | P6 | `enforce` (send guard, §5.4) on a pilot repo, then rollout | The send guard is implemented; the pilot is an operational step. Prerequisite and rollback order: [`docs/operations-fr.md`](./docs/operations-fr.md) |
 
 P5 (the verifier) and P0 (the baseline measurement, which only served an indicator that needed

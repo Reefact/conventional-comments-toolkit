@@ -120,12 +120,13 @@ vérifiés partiellement ».
 |---|-------|-----|
 | 1 | Essayer l'extension en vrai (§3 ci-dessus) | Vous |
 | 2 | Choisir un dépôt pilote et suivre la trajectoire `assist → enforce` (§7) ; écrire avant la bascule la procédure de retour arrière et la liste des dépôts qui écrivent leur propre `mode` — `docs/operations-fr.md` | Vous |
+| 2b | **Développement** — rendre calculables les indicateurs du §12 : un événement par commentaire envoyé (conforme ou non, avec ou sans avertissement) pour donner un dénominateur aux taux, et le décompte d'un label quelle que soit la façon dont il a été écrit. Puis leur restitution | Moi |
 | 3 | Soumission aux stores (Chrome Web Store, Firefox Add-ons) : **toute livraison de l'extension y passe** (§10, §14), et c'est le seul chemin qui donne la mise à jour automatique. Les zips de release (`docs/release-fr.md`) servent à l'essai et aux postes sans chaîne de build, ils ne s'y substituent pas | Vous |
 | 4 | Fournir des captures DOM réelles pour le smoke test de sélecteurs (§9.4) | Vous (ou moi, avec un accès) |
 | 5 | Vérifier sur un vrai tenant Azure DevOps ce que le spike n'a pas tranché : type d'éditeur, lisibilité du fichier de config, et **la forme du corps rendu** — quelle balise enveloppe une ligne de Markdown ordinaire, laquelle matérialise une fin de ligne simple (`renderedBodyShape()`, §9.2.3). Replis dégradés déjà en place, documentés dans `spikes/p1-prime/README-fr.md` | Vous (ou moi, avec un accès) |
 
-Aucune ligne n'est du développement : ce sont des étapes d'**exploitation** ou de **mesure**
-sur une vraie plateforme.
+Une seule ligne est du développement, la 2b : les indicateurs du §12. Les autres sont des
+étapes d'**exploitation** ou de **mesure** sur une vraie plateforme.
 
 ## 5. Où trouver le reste
 

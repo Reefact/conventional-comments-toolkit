@@ -20,8 +20,7 @@ la résolution obligatoire des conversations.*
 À partir du mode `assist` livré par défaut :
 
 ```
-assist (suivi du taux de conformité si la télémétrie est activée, §12)
-      → enforce sur un dépôt pilote → généralisation
+assist → enforce sur un dépôt pilote → généralisation
 ```
 
 L'échelle a trois modes : `off`, `assist`, `enforce`. **`warn` est retiré** : il était
@@ -97,9 +96,16 @@ d'hôte : un délai subi, à intégrer au calendrier de `P6`.
 
 ## Indicateurs (§12)
 
-Ils se limitent à ce que la télémétrie de l'extension compte — désactivée par défaut, opt-in
-explicite, compteurs agrégés sans texte libre (§10) : taux de conformité à la saisie, taux
-d'avertissement suivi séparément, répartition par label (labels de réponse comptés à part).
-Sans télémétrie activée, aucun indicateur n'est produit. L'extension ne relit pas l'historique
-des PR : délais de résolution ou de revue, fils clos par une `decision` et part des comptes de
-service ne font pas partie des indicateurs.
+Le §12 les limite à ce que la télémétrie de l'extension compte — désactivée par défaut,
+opt-in explicite, compteurs agrégés sans texte libre (§10) : taux de conformité à la saisie,
+taux d'avertissement suivi séparément, répartition par label (labels de réponse comptés à
+part). L'extension ne relit pas l'historique des PR : délais de résolution ou de revue, fils
+clos par une `decision` et part des comptes de service n'en font pas partie.
+
+**Ces indicateurs ne sont pas encore calculables.** La télémétrie livrée émet trois compteurs
+(`TelemetryEvent`, `packages/extension/src/telemetry.ts`) : un label posé **par l'extension**
+(barre d'outils, saisie rapide), un code de diagnostic apparu, une dégradation de sélecteur.
+Aucun événement ne compte les commentaires saisis ou envoyés, ni leur issue conforme ou non :
+les deux taux n'ont donc pas de dénominateur, et un label tapé ou collé à la main manque à la
+répartition. Le suivi de la phase `assist` se fait, en attendant, à l'œil — pastille et
+bandeau —, pas sur un taux.

@@ -198,6 +198,19 @@ export const selectors = {
     candidates: ['.gl-drawer-body'],
   } satisfies SelectorChain,
 
+  /** Le composeur d'un NOUVEAU fil de ligne de diff — le cas que le repli de `#contextOf()` classe
+   * `thread-root` sans l'avoir reconnu (§4.1, §9.4, #168). Ne sert qu'à DÉCIDER si ce repli est le
+   * cas nominal ou un champ qu'aucune règle n'a situé, journalisé alors sans que la zone change.
+   *
+   * MESURÉ le 2026-11-10 sur toutes les captures : le repli n'est atteint que par le champ des
+   * captures 04 de l'onglet Changes, rendu sous la ligne commentée — `tr.rd-discussion-row` en
+   * Rapid Diffs (04, 04-…-mr2), `.notes_holder` dans la vue classique (04-changes-classique). */
+  diffLineComposer: {
+    name: 'diff-line-composer',
+    problem: 'editor-zone',
+    candidates: ['tr.rd-discussion-row', '.notes_holder'],
+  } satisfies SelectorChain,
+
   /** Contrôles d'ENVOI, cherchés DANS le formulaire de l'éditeur. Les `data-testid` changent
    * selon la vue et l'état — MESURÉ, aucun n'est commun à tous les contextes :
    *   - formulaire principal : `button[type="submit"]` (« Comment », « Start thread », « Add

@@ -898,7 +898,12 @@ export class GithubClientAdapter implements PlatformAdapter {
       return { zone: 'conversation', action, pr, ...editIds, canCarryBlockingState: false, inScope: true };
     }
     // Commentaire inline sur une ligne de diff, ou racine de fil : porte un état de
-    // résolution (§4.1).
+    // résolution (§4.1). Le seul cas mesuré qui arrive ici est le nouveau commentaire de ligne
+    // (`diffLineComposer`) : un champ qui n'en est pas un garde la même zone, mais aucune règle ne
+    // l'a situé, et le journal le dit (§9.4, #168).
+    if (!closestChain(el, selectors.diffLineComposer).element) {
+      this.#degraded(selectors.diffLineComposer, this.#doc, { subject: printElement(el) });
+    }
     return { zone: 'thread-root', action, pr, ...editIds, canCarryBlockingState: true, inScope: true };
   }
 }

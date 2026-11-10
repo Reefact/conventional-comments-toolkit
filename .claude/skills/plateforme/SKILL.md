@@ -494,8 +494,11 @@ nulle part : le canari connecté attend une décision du propriétaire. Le seul 
 pages est le journal de sélecteurs de l'utilisateur. Un composeur sans aucun bouton d'envoi y
 est écrit par le code partagé, pour toutes les plateformes, à partir de ce que rend
 `getSubmitControls()` : la chaîne qu'il rend doit porter `problem: 'submit-control'`. Un
-composeur non reconnu, classé par le repli de zone, ne l'est encore nulle part (#168). Dire, dans
-la PR, quels états sont surveillés en ligne et lesquels ne le sont que par les captures.
+composeur que le repli de zone classe sans l'avoir reconnu y est écrit par l'adaptateur : mesurer
+sur les captures quels champs atteignent le repli, reconnaître ce cas nominal par une chaîne qui
+porte `problem: 'editor-zone'`, et journaliser tout autre champ qui y arrive, sans changer sa zone
+(#168 ; `editor-zone.test.ts` de chaque adaptateur). Dire, dans la PR, quels états sont surveillés
+en ligne et lesquels ne le sont que par les captures.
 
 Pour Azure DevOps, l'issue #50 affirme qu'une PR n'y est pas lisible sans authentification.
 C'est À VÉRIFIER avant de conclure qu'aucun canari en ligne n'y est possible : la plateforme

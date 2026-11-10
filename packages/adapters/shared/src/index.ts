@@ -557,6 +557,7 @@ export const SELECTOR_PROBLEMS = [
   'comment-writer',
   'pr-creation-date',
   'submit-control',
+  'editor-zone',
 ] as const;
 
 export type SelectorProblem = (typeof SELECTOR_PROBLEMS)[number];

@@ -393,7 +393,15 @@ export class GitlabClientAdapter implements PlatformAdapter {
         ? { zone: 'thread-root', action: 'edit', pr, threadId: threadId ?? commentId, commentId, canCarryBlockingState: true, inScope: true }
         : { zone: 'reply', action: 'edit', pr, threadId: threadId ?? commentId, commentId, canCarryBlockingState: false, inScope: true };
     }
-    // Nouveau fil sur une ligne de diff : porte un état de résolution (§4.1).
+    // Nouveau fil sur une ligne de diff : porte un état de résolution (§4.1). C'est le seul cas
+    // mesuré qui arrive ici (`diffLineComposer`) : un champ qui n'en est pas un garde la même zone,
+    // mais aucune règle ne l'a situé, et le journal le dit (§9.4, #168).
+    if (!closestChain(el, selectors.diffLineComposer).element) {
+      this.log.degraded(
+        selectors.diffLineComposer,
+        chainEvidence(this.#doc, selectors.diffLineComposer, { subject: printElement(el) })
+      );
+    }
     return { zone: 'thread-root', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
   }
 }

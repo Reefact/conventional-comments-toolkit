@@ -54,9 +54,14 @@ jobs:
             const { owner, repo } = context.repo;
             const payload = context.payload;
 
-            // Pour chaque événement : relire le texte COURANT (une modification survenue
-            // entre-temps ne doit pas être écrasée par la version de l'événement), le nettoyer,
-            // le réécrire.
+            // Pour chaque événement : lire le texte COURANT plutôt que celui de l'événement, le
+            // nettoyer, le RELIRE juste avant d'écrire et renoncer s'il a changé — la
+            // modification survenue entre-temps a déclenché son propre passage, qui s'en
+            // chargera. Cela RÉTRÉCIT la fenêtre d'écrasement sans la fermer : une modification
+            // tombant entre la seconde lecture et l'écriture serait perdue. Cette API REST n'a
+            // pas d'écriture conditionnelle, à notre connaissance (non vérifié) ; la fenêtre
+            // résiduelle se compte en millisecondes, sur un texte qu'un humain modifie à la
+            // main (revue de la PR #167).
             let target;
             switch (context.eventName) {
               case 'pull_request_target': {
@@ -109,6 +114,10 @@ jobs:
             const cleaned = target.clean(body);
             if (cleaned === body) {
               core.info(`${target.what} : rien à retirer.`);
+              return;
+            }
+            if (((await target.read()) ?? '') !== body) {
+              core.info(`${target.what} : modifié pendant le passage, laissé au passage suivant.`);
               return;
             }
             try {

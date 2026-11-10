@@ -490,8 +490,11 @@ des PR FERMÉES, dont l'état ne bouge plus, et seulement les chaînes mesurées
 sans session.
 
 Ce qui demande une session — les zones de saisie et leurs boutons — n'est vérifié en ligne
-nulle part (#81). Dire, dans la PR, quels états sont surveillés en ligne et lesquels ne le
-sont que par les captures.
+nulle part : le canari connecté attend une décision du propriétaire. Le seul signal sur ces
+pages est le journal de sélecteurs de l'utilisateur, à condition que l'adaptateur y écrive un
+bouton d'envoi introuvable et un composeur non reconnu — ce qu'aucune plateforme ne fait encore
+(#168). Dire, dans la PR, quels états sont surveillés en ligne et lesquels ne le sont que par
+les captures.
 
 Pour Azure DevOps, l'issue #50 affirme qu'une PR n'y est pas lisible sans authentification.
 C'est À VÉRIFIER avant de conclure qu'aucun canari en ligne n'y est possible : la plateforme

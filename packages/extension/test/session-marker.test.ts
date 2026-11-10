@@ -4,7 +4,7 @@
 // `<icône> session: <valeur en minuscules>`. Purement client, réversible, idempotent ; dans le
 // doute, le marqueur reste visible tel qu'écrit.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { commentBodyText } from '@cct/adapter-shared';
 import { defaultConfig, type EffectiveConfig } from '@cct/core';
 import { clearCommentDecorations, decorateComment } from '../src/ui/badges.js';
@@ -160,45 +160,76 @@ describe('CA-53 — repli : sans projection sûre, le marqueur reste lisible tel
   });
 });
 
-describe('CA-53 — écart au-dessus de la mention : un écart de paragraphe, quelle que soit l’écriture (§5.5)', () => {
-  // La GÉOMÉTRIE est mesurée dans Chromium (`check:session-line`, deux écritures rendues à
-  // l'identique) ; ici, ce que `sessionGap()` décide d'ajouter selon le cas.
+describe('CA-53 — écarts : en-tête à deux tiers d’écart de paragraphe, pied à un écart, quelle que soit l’écriture (§5.5)', () => {
+  // La GÉOMÉTRIE est mesurée dans Chromium (`check:session-line` : les deux écritures aux mêmes
+  // positions) ; ici, ce que badges.ts pose dans chaque cas, avec une marge de paragraphe de 16 px.
+  let style: HTMLStyleElement;
+  beforeEach(() => {
+    style = document.createElement('style');
+    style.textContent = '.gap p { margin: 0 0 16px; }';
+    document.head.appendChild(style);
+  });
   afterEach(() => {
+    style.remove();
     document.body.innerHTML = '';
   });
-  const gap = (el: Element) => (el.querySelector('.cct-session') as HTMLElement).style.getPropertyValue('--cct-session-gap');
+  const gapped = (html: string) => {
+    const el = body(html);
+    el.className = 'gap';
+    return el;
+  };
+  const sessionGap = (el: Element) => (el.querySelector('.cct-session') as HTMLElement).style.getPropertyValue('--cct-session-gap');
+  const spacerGap = (el: Element) => (el.querySelector('.cct-subject-break') as HTMLElement | null)?.style.getPropertyValue('--cct-paragraph-gap') ?? null;
 
-  it('paragraphe à part : la marge du paragraphe précédent EST l’écart, rien n’est ajouté', () => {
-    const el = body('<p>note: x</p>\n<p>Detail.</p>\n<p>[session:a]</p>');
+  it('écrit aéré : la marge du paragraphe du sujet est resserrée à deux tiers, et la sonde ne reste pas', () => {
+    const el = gapped('<p>note: x</p>\n<p>Detail.</p>\n<p>[session:a]</p>');
     decorate(el);
-    expect(gap(el)).toBe('0px');
+    expect((el.querySelector('p') as HTMLElement).style.marginBottom).toBe('10.67px');
+    expect(el.querySelectorAll('p')).toHaveLength(3);
+    // Le pied ouvre son paragraphe, après un bloc à marge pleine : rien à ajouter.
+    expect(sessionGap(el)).toBe('0px');
   });
 
-  it('après un saut de ligne : un écart de paragraphe est ajouté, lu sur la page', () => {
-    const style = document.createElement('style');
-    style.textContent = '.gap-test p { margin: 0 0 16px; }';
-    document.head.appendChild(style);
-    const el = body('<p>note: x<br>\nDetail.<br>\n[session:a]</p>');
-    el.className = 'gap-test';
+  it('écrit d’un bloc : l’espaceur du sujet fait deux tiers d’écart, le pied un écart entier', () => {
+    const el = gapped('<p>note: x<br>\nDetail.<br>\n[session:a]</p>');
     decorate(el);
-    // La sonde n'est pas restée dans le corps.
-    expect(el.querySelectorAll('p')).toHaveLength(1);
-    expect(gap(el)).toBe('16px');
-    style.remove();
+    expect(spacerGap(el)).toBe('10.67px');
+    expect(sessionGap(el)).toBe('16px');
   });
 
-  it('seule dans le corps : rien au-dessus, aucun écart', () => {
-    const el = body('<p>[session:a]</p>');
-    decorate(el);
-    expect(gap(el)).toBe('0px');
+  it('sujet et marqueur seuls : le pied complète l’écart resserré jusqu’à un écart entier', () => {
+    const spaced = gapped('<p>note: x</p>\n<p>[session:a]</p>');
+    decorate(spaced);
+    expect(sessionGap(spaced)).toBe('5.33px');
+    const tight = gapped('<p>note: x<br>\n[session:a]</p>');
+    decorate(tight);
+    expect(sessionGap(tight)).toBe('5.33px');
   });
 
-  it('l’écart est calculé à la construction, pas réécrit à chaque passage', () => {
-    const el = body('<p>note: x<br>\n[session:a]</p>');
+  it('la marge resserrée est rendue telle qu’elle était quand l’extension se retire', () => {
+    const el = gapped('<p style="color: red">note: x</p>\n<p>Detail.</p>');
+    const subject = el.querySelector('p') as HTMLElement;
     decorate(el);
-    const shown = el.querySelector('.cct-session') as HTMLElement;
-    shown.style.setProperty('--cct-session-gap', '7px');
+    expect(subject.style.marginBottom).toBe('10.67px');
+    clearCommentDecorations(document);
+    expect(subject.style.marginBottom).toBe('');
+    expect(subject.style.color).toBe('red');
+    expect(subject.hasAttribute('data-cct-header-margin')).toBe(false);
+    const bare = gapped('<p>note: x</p>\n<p>Detail.</p>');
+    decorate(bare);
+    clearCommentDecorations(document);
+    expect((bare.querySelector('p') as HTMLElement).hasAttribute('style')).toBe(false);
+  });
+
+  it('un sujet en dernier bloc n’est pas resserré : sa marge n’écarte rien', () => {
+    const el = gapped('<p>note: x</p>');
     decorate(el);
-    expect(gap(el)).toBe('7px');
+    expect((el.querySelector('p') as HTMLElement).hasAttribute('data-cct-header-margin')).toBe(false);
+  });
+
+  it('seule dans le corps, la mention n’a aucun écart', () => {
+    const el = gapped('<p>[session:a]</p>');
+    decorate(el);
+    expect(sessionGap(el)).toBe('0px');
   });
 });

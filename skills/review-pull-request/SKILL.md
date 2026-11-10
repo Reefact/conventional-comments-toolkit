@@ -65,9 +65,9 @@ Use every relevant label: `issue`, `suggestion`, `question`, `nitpick`, `praise`
 only if the repository enables it.
 
 The reply labels `thanks`, `done`, `ack` and `disagree`, and their aliases (`thx`, `fixed`,
-`acknowledged`), belong to the author of the pull request: never use them as a reviewer. Never
-post `decision` either: it is reserved to the human members of the repository's
-`resolverOverrideGroup`.
+`acknowledged`), belong to the people who carry the pull request, its author and its
+maintainers: never use them as a reviewer. Never post `decision` either: it is their answer to a
+remark, recording that they will not address it.
 
 Use `(blocking)` or `(non-blocking)` according to their meaning.
 

@@ -110,9 +110,11 @@ about whether the review is complete: your label still says what you did.
 
 ## 3. What you never post
 
-- **`decision`**: it records that the team deliberately leaves a point unaddressed, and it is
-  reserved to the human members of the repository's `resolverOverrideGroup`. When you think a
-  blocking point should not be addressed, answer `disagree:` with your reason, and tell the
+- **`decision`**: it answers a remark by recording, with the reason, that the point will not be
+  addressed. It is a gesture of your side of the review, but not one for you to make: giving up
+  on what a reviewer asked for is a call for the people who carry the pull request, its author
+  and its maintainers. When you think a point should not be addressed, answer `ack:` if it is
+  valid but out of reach, or `disagree:` if you contest it, with your reason, and tell the
   person you work for that a `decision` may be needed.
 - **`reviewed`**: it closes a reviewer's review, not yours.
 - The other labels that raise a point (`issue`, `suggestion`, `nitpick`, `praise`…): you are
@@ -138,10 +140,9 @@ Answer every finding and question, including optional findings, `(non-blocking)`
 - **A non-blocking thread**: you may resolve it yourself once your fix is pushed, or your answer
   is final, and you have no doubt that it settles the point. When in doubt, leave it open for the
   reviewer.
-- **A blocking thread**: leave it to its reviewer. Under the toolkit's governance rule
-  (specification §6.1), a blocking thread is resolved by the author of its comment, or through a
-  `decision`; a resolution by anyone else is refused by the toolkit's verifier, wherever one is
-  deployed.
+- **A blocking thread**: leave it to its reviewer, who judges whether the point is addressed
+  (specification §6.1.1). A `decision` does not resolve it either: resolving a thread stays a
+  gesture of the platform.
 
 ## 6. After pushing
 

@@ -804,6 +804,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
       directShortcuts,
       labelOrder,
       telemetry: count,
+      log,
       // Repris tel quel de l'ancien contrôleur (revue Codex, PR #39) : cette reconstruction
       // peut survenir sans que le diagnostic affiché change (langue, style de badge, TTL,
       // état dégradé) — un `#countedCodes` reparti de zéro recompterait alors un code

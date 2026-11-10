@@ -13,7 +13,7 @@ import {
   type PrRef,
   type ValidationInput,
 } from '@cct/core';
-import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import type { EditorHandle, PlatformAdapter, SelectorLog, SubmitControl } from '@cct/adapter-shared';
 import { computePrefixInsertion, matchesSubmitKeystroke, shiftSelection } from '@cct/adapter-shared';
 import { decideGuard, feedbackState, type GuardDecision } from './guard.js';
 import { framedAncestor, ringIsClipped, stackingMountFor, usableMount } from './ui/stacking.js';
@@ -103,6 +103,10 @@ export interface ControllerDeps {
    * avant de prononcer un blocage, jamais à la frappe. Absente (tests, doublures), le blocage
    * se prononce sur la configuration en main, comme avant la règle. */
   rereadConfig?: () => Promise<ResolvedClientConfig>;
+  /** Le journal de sélecteurs de la page (§9.4), celui que l'adaptateur a reçu : ce contrôleur y
+   * écrit qu'un éditeur n'a AUCUN contrôle d'envoi (`#submitControls`). Absent hors extension et
+   * dans les tests qui ne s'y intéressent pas. */
+  log?: SelectorLog;
 }
 
 /** Table par défaut des raccourcis directs (§5.2) — surchargable par les préférences. */
@@ -419,7 +423,7 @@ export class EditorController {
       clearTimeout(this.#timer);
       this.#timer = null;
     }
-    for (const control of this.deps.adapter.getSubmitControls(this.deps.editor)) {
+    for (const control of this.#submitControls()) {
       unblockSubmit(control);
     }
     for (const d of this.#disposers) d();
@@ -465,7 +469,7 @@ export class EditorController {
       aliasRewrite: analysis.aliasRewrite,
       onFix: (replacement) => this.applyLineFix(replacement),
     });
-    for (const control of this.deps.adapter.getSubmitControls(this.deps.editor)) {
+    for (const control of this.#submitControls()) {
       // aria-disabled, jamais l'attribut natif disabled : il retirerait le bouton de
       // l'ordre de tabulation (§5.4, CA-12). La valeur NATIVE, si le bouton en portait déjà
       // une pour son propre compte, est capturée/restaurée plutôt qu'écrasée (revue Codex,
@@ -473,6 +477,26 @@ export class EditorController {
       if (decision.block) blockSubmit(control);
       else unblockSubmit(control);
     }
+  }
+
+  /** Les contrôles d'envoi de cet éditeur — et, quand il n'en a AUCUN, une ligne au journal
+   * (§9.4, #168). Tous les appels passent par ici : le garde du clic, le grisage, `dispose()`.
+   *
+   * Une liste vide n'a rien d'anodin : le garde du clic n'a alors rien à arrêter, et sous
+   * `enforce` un commentaire non conforme part sans que rien n'en reste. Aucune absence n'est
+   * normale — sur les captures des trois plateformes, chaque composeur observé a au moins un
+   * bouton d'envoi (mesuré le 2026-11-10) —, si bien que toute liste vide se journalise. La ligne
+   * dit ce qui a été cherché et pas trouvé, jamais pourquoi.
+   *
+   * Seulement pour un champ encore DANS la page : `dispose()` s'exécute aussi quand le champ vient
+   * d'en être retiré, et ne rien trouver autour d'un élément détaché ne dit rien de la plateforme.
+   * Des boutons trouvés après une première absence marquent la ligne rattrapée
+   * (`SelectorLog.recovered`) : la chaîne a été interrogée trop tôt, elle n'a pas pourri. */
+  #submitControls(): SubmitControl[] {
+    const lookup = this.deps.adapter.getSubmitControls(this.deps.editor);
+    if (lookup.controls.length > 0) this.deps.log?.recovered(lookup.searched);
+    else if (this.deps.editor.element.isConnected) this.deps.log?.degraded(lookup.searched, lookup.evidence);
+    return lookup.controls;
   }
 
   /** Compte l'apparition d'un code de diagnostic (§10, « code d'erreur »). */
@@ -684,7 +708,7 @@ export class EditorController {
     const doc = this.deps.editor.element.ownerDocument;
     const targetsSubmitControl = (target: EventTarget | null): boolean => {
       if (!(target instanceof Node)) return false;
-      const controls: SubmitControl[] = this.deps.adapter.getSubmitControls(this.deps.editor);
+      const controls: SubmitControl[] = this.#submitControls();
       return controls.some((c) => c.element === target || c.element.contains(target));
     };
     const onClick = (e: Event) => {

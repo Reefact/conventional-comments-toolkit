@@ -32,11 +32,13 @@ import {
   type PlatformAdapter,
   type RenderedBodyShape,
   type SubmitControl,
+  type SubmitControlsLookup,
   type SubmitKeystrokes,
 } from '@cct/adapter-shared';
 import { ClientConfigResolver } from '../src/config-resolver.js';
 import { EditorController } from '../src/editor-controller.js';
 import { observePrChromeNavigation } from '../src/content-internal.js';
+import { submitLookup } from './helpers/submit-lookup.js';
 
 /** La page d'une PR « acme » : un en-tête, deux fils (l'un bloquant et ouvert, l'autre résolu)
  * et un composeur. Aucun nom n'y vient de GitHub ni d'Azure DevOps. */
@@ -104,9 +106,9 @@ class AcmeClientAdapter implements PlatformAdapter {
     return { field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }], control: [] };
   }
 
-  getSubmitControls(editor: EditorHandle): SubmitControl[] {
+  getSubmitControls(editor: EditorHandle): SubmitControlsLookup {
     const button = editor.element.parentElement?.querySelector('button.acme-send');
-    return button ? [{ element: button, kind: 'submit' }] : [];
+    return submitLookup(button ? [{ element: button, kind: 'submit' }] : []);
   }
 
   readValue(editor: EditorHandle): string {

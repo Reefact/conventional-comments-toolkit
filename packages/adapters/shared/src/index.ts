@@ -2,7 +2,7 @@
 // d'écriture programmatique §9.3, chaînes de sélecteurs avec repli §9.4/§A.5.
 
 import { EMOJI_TOKEN_SOURCE, matchPrefix, splitBody } from '@cct/core';
-import type { SelectorEvidence } from './evidence.js';
+import { selectorEvidence, type SelectorEvidence } from './evidence.js';
 
 export * from './evidence.js';
 import type {
@@ -55,6 +55,25 @@ export interface SubmitControl {
   // les trois adaptateurs l'écrivent encore : le retirer ici ne compilerait pas. Il part avec
   // la dernière plateforme nettoyée.
   kind: 'submit' | 'submit-and-resolve' | 'complete-pr';
+}
+
+/** Ce que `getSubmitControls()` a trouvé, et ce qu'il a CHERCHÉ pour le trouver (§4.3, §5.4, §9.4).
+ *
+ * Une liste vide disait « aucun bouton d'envoi » et rien d'autre : le garde du clic n'avait alors
+ * rien à arrêter, un commentaire non conforme partait sous `enforce`, et aucune ligne n'en restait
+ * nulle part — une rupture déjà livrée une fois (PR #82), et la même absence de trace sur chaque
+ * plateforme (#168). L'adaptateur rend donc aussi la chaîne qu'il a interrogée et le relevé
+ * de la page à cet endroit : c'est le code partagé qui journalise une liste vide, au même endroit
+ * pour toutes les plateformes, et le compilateur qui pose la question à une plateforme nouvelle.
+ *
+ * `searched` porte un `problem` (`submit-control`) : la page d'options en tire la phrase lue. */
+export interface SubmitControlsLookup {
+  controls: SubmitControl[];
+  /** La chaîne qui a cherché les contrôles d'envoi de CET éditeur. */
+  searched: SelectorChain;
+  /** Le relevé de la page là où elle a cherché — une FONCTION, évaluée seulement si la ligne part
+   * (`SelectorLog.degraded`). */
+  evidence: () => SelectorEvidence;
 }
 
 /** Une combinaison de touches qui PUBLIE (§4.3, §5.4). `key` est la valeur de
@@ -312,7 +331,9 @@ export interface PlatformAdapter {
   getRepoConfig(pr: PrRef, opts?: { bypassCache: boolean }): Promise<ConfigRead>;
   getOrgConfig(url: string | null, opts?: { bypassCache: boolean }): Promise<ConfigRead>;
   observeEditors(cb: (editor: EditorHandle) => void): Disposable;
-  getSubmitControls(editor: EditorHandle): SubmitControl[];
+  /** §4.3 — tous les points de sortie, §5.4 — interception ; §9.4 — ce qui a été cherché
+   * (`SubmitControlsLookup`), pour que le code partagé journalise une liste vide. */
+  getSubmitControls(editor: EditorHandle): SubmitControlsLookup;
   /** §4.3, §5.4 — les touches qui publient depuis cet éditeur ou ses contrôles d'envoi
    * (`SubmitKeystrokes`). Obligatoire pour la même raison que `getEditorChrome` : une plateforme
    * nouvelle doit se voir poser la question, et le garde partagé n'a aucune réponse par défaut. */
@@ -535,6 +556,7 @@ export const SELECTOR_PROBLEMS = [
   'comment-text',
   'comment-writer',
   'pr-creation-date',
+  'submit-control',
 ] as const;
 
 export type SelectorProblem = (typeof SELECTOR_PROBLEMS)[number];
@@ -545,6 +567,19 @@ export interface SelectorChain {
   candidates: string[];
   /** Ce que la chaîne sert à faire — absent, le journal affiche le nom. */
   problem?: SelectorProblem;
+}
+
+/** Le relevé d'une chaîne qui n'a rien trouvé sous `root` (§9.4, `SelectorEvidence`), rendu à
+ * évaluer seulement si la ligne part : la trace de ses candidats, les contrôles voisins, et ce que
+ * l'appelant sait de plus (`extra`). Le geste que chaque adaptateur répétait — ou omettait : deux
+ * d'entre eux journalisaient sans aucun relevé, et leurs lignes ne se comprenaient qu'en rouvrant
+ * une capture (#168). */
+export function chainEvidence(
+  root: ParentNode,
+  chain: SelectorChain,
+  extra: SelectorEvidence = {}
+): () => SelectorEvidence {
+  return () => ({ ...selectorEvidence(root, chain.candidates), ...extra });
 }
 
 export interface SelectorOutcome {

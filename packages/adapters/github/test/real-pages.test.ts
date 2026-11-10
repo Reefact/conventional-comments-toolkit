@@ -111,7 +111,7 @@ describe('§4.1, §5.4 — Files changed : panneau de revue (capture 07)', () =>
   });
 
   it('intercepte « Submit review », jamais « Cancel »', () => {
-    const controls = page.adapter.getSubmitControls(page.editors[0]!);
+    const controls = page.adapter.getSubmitControls(page.editors[0]!).controls;
     expect(controls).toHaveLength(1);
     expect(controls[0]!.element.textContent).toMatch(/^Submit review/);
   });

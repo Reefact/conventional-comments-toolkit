@@ -17,6 +17,7 @@ import type { EntryGuard } from '@cct/adapter-shared';
 import type { ErrorEntry, JournalEntry, SelectorFailure } from '../src/journal-entry.js';
 import { decompressSkeleton, SKELETON_KEY, type StoredSkeleton } from '../src/skeletons.js';
 import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
+import { submitLookup } from './helpers/submit-lookup.js';
 
 // Chaque `bootstrap()` pose ses écouteurs sur la `window` PARTAGÉE de happy-dom : un test qui
 // ne défait pas le sien laisse ses gestionnaires d'erreur aux suivants, et une seule exception
@@ -132,7 +133,7 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
           // plutôt que sur ce qu'il mesure.
           matches: () => true,
           platformProfile: () => ({ id: 'github', suggestionInfoString: null }),
-          getSubmitControls: () => [],
+          getSubmitControls: () => submitLookup([]),
           submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
           readValue: () => '',
           writeValue: () => {},

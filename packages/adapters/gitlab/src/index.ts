@@ -22,9 +22,11 @@ import type {
 import {
   bypassCacheInit,
   adapterFetch,
+  chainEvidence,
   closestChain,
   commentBodyText,
   matchesChain,
+  printElement,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -38,6 +40,7 @@ import {
   type PlatformAdapter,
   type RenderedBodyShape,
   type SubmitControl,
+  type SubmitControlsLookup,
   type SubmitKeystrokes,
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
@@ -151,14 +154,21 @@ export class GitlabClientAdapter implements PlatformAdapter {
    * qui publie le commentaire quand le champ en porte un. Champ vide, il ne fait que fermer : la
    * validation l'exempte alors (corps vide, §4.2), et il n'est pas bloqué. Jamais un bouton qui
    * annule (`cancelButtons`), jamais le bouton de fusion. */
-  getSubmitControls(editor: EditorHandle): SubmitControl[] {
+  getSubmitControls(editor: EditorHandle): SubmitControlsLookup {
     const form = editor.element.closest('form');
-    if (!form) return [];
-    const controls = [
-      ...queryChainAll(form, selectors.submitButtons),
-      ...queryChainAll(form, selectors.closeReopenButton),
-    ];
-    return controls.map((element) => ({ element, kind: 'submit' as const }));
+    const controls = form
+      ? [...queryChainAll(form, selectors.submitButtons), ...queryChainAll(form, selectors.closeReopenButton)]
+      : [];
+    // Le relevé est pris sous le formulaire, là où les boutons auraient dû être ; dans le document
+    // entier si le champ n'est dans aucun formulaire. La chaîne journalisée est `submitButtons` :
+    // « … and close merge request » s'y ajoute, il ne la remplace pas (§9.4).
+    return {
+      controls: controls.map((element) => ({ element, kind: 'submit' as const })),
+      searched: selectors.submitButtons,
+      evidence: chainEvidence(form ?? this.#doc, selectors.submitButtons, {
+        subject: printElement(editor.element),
+      }),
+    };
   }
 
   readValue(editor: EditorHandle): string {
@@ -255,7 +265,7 @@ export class GitlabClientAdapter implements PlatformAdapter {
       // pas une rupture (selectors.ts, `mergeButton`). Partout ailleurs, la chaîne est journalisée.
       const onChanges = MR_PATH.exec(this.#doc.location?.pathname ?? '')?.[4] !== undefined;
       if (!onChanges && !queryChain(this.#doc, selectors.prSettledState).element) {
-        this.log.degraded(selectors.mergeButton);
+        this.log.degraded(selectors.mergeButton, chainEvidence(this.#doc, selectors.mergeButton));
       }
       return null;
     }
@@ -335,7 +345,7 @@ export class GitlabClientAdapter implements PlatformAdapter {
     const createdAt = queryChain(this.#doc, selectors.prCreatedAt).element?.getAttribute('datetime') ?? '';
     if (createdAt) this.log.recovered(selectors.prCreatedAt);
     // Une date inconnue vaut mieux qu'une date fausse : l'extension ne bloque alors jamais.
-    else this.log.degraded(selectors.prCreatedAt);
+    else this.log.degraded(selectors.prCreatedAt, chainEvidence(this.#doc, selectors.prCreatedAt));
     return {
       platform: 'gitlab',
       createdAt,

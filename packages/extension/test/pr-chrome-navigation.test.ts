@@ -58,6 +58,7 @@ import {
   RENDER_RETRY_WINDOW_MS,
 } from '../src/content-internal.js';
 import { testFactories } from './helpers/factories.js';
+import { submitLookup } from './helpers/submit-lookup.js';
 // CONFIG_POLL_INTERVAL_MS n'est pas importée : les tests du sondage périodique lui
 // substituent une valeur courte (voir `configPollIntervalMs`, dernier paramètre de
 // `observePrChromeNavigation`) pour ne pas attendre les cinq minutes de production.
@@ -140,7 +141,7 @@ function makeAdapter(
     observeEditors: () => ({ dispose: () => {} }),
     getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
     renderedBodyShape: () => HTML_SHAPE,
-    getSubmitControls: () => [],
+    getSubmitControls: () => submitLookup([]),
     submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
     readValue: () => '',
     writeValue: () => {},
@@ -537,7 +538,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
       observeEditors: () => ({ dispose: () => {} }),
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
       renderedBodyShape: () => HTML_SHAPE,
-      getSubmitControls: () => [],
+      getSubmitControls: () => submitLookup([]),
       submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
       readValue: () => '',
       writeValue: () => {},

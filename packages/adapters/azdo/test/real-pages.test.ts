@@ -15,8 +15,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { EditorHandle } from '@cct/adapter-shared';
+import { SelectorLog, type EditorHandle, type SelectorEvidence } from '@cct/adapter-shared';
 import { AzdoClientAdapter } from '../src/index.js';
+import { selectors } from '../src/selectors.js';
 
 const PAGES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'pages');
 const PR = (n: number, view?: 'files') =>
@@ -29,10 +30,10 @@ interface LoadedPage {
 }
 
 /** Une page capturée, à l'URL où elle a été prise. `DOMParser` : ni script ni feuille de style. */
-function load(file: string, path: string): LoadedPage {
+function load(file: string, path: string, log?: SelectorLog): LoadedPage {
   const doc = new DOMParser().parseFromString(readFileSync(join(PAGES, file), 'utf8'), 'text/html');
   Object.defineProperty(doc, 'location', { value: new URL(`https://dev.azure.com${path}`), configurable: true });
-  const adapter = new AzdoClientAdapter({ documentRef: doc });
+  const adapter = new AzdoClientAdapter({ documentRef: doc, ...(log ? { log } : {}) });
   const editors: EditorHandle[] = [];
   adapter.observeEditors((e) => editors.push(e)).dispose();
   return { adapter, doc, editors };
@@ -43,7 +44,7 @@ const only = (page: LoadedPage): EditorHandle => {
   return page.editors[0]!;
 };
 const submits = (page: LoadedPage, editor: EditorHandle) =>
-  page.adapter.getSubmitControls(editor).map((c) => [(c.element.textContent ?? '').trim(), c.kind]);
+  page.adapter.getSubmitControls(editor).controls.map((c) => [(c.element.textContent ?? '').trim(), c.kind]);
 const loggedChains = (page: LoadedPage) => page.adapter.log.failures.map((f) => f.chain);
 const firstLine = (text: string) => text.split('\n').find((l) => l.trim() !== '')?.trim();
 
@@ -55,7 +56,7 @@ describe('§4.3, skill plateforme — aucune page ne fait d’un bouton qui annu
   it.each(readdirSync(PAGES).filter((f) => f.endsWith('.html')))('%s', (file) => {
     const page = load(file, PR(1, file.includes('-files-') ? 'files' : undefined));
     for (const editor of page.editors) {
-      for (const control of page.adapter.getSubmitControls(editor)) {
+      for (const control of page.adapter.getSubmitControls(editor).controls) {
         expect((control.element.textContent ?? '').trim()).not.toBe('Cancel');
       }
     }
@@ -365,6 +366,17 @@ describe('§6.5, §9.4 — le bouton de complétion là où son absence est la n
     page.adapter.getBannerMount()!.querySelector('.repos-pr-header-complete-button')!.remove();
     expect(page.adapter.getCompletionControl()).toBeNull();
     expect(loggedChains(page)).toContain('complete-button');
+  }, T);
+
+  it('la ligne porte le relevé de la page — la trace de ses candidats (§9.4, #168)', () => {
+    const evidence = new Map<string, SelectorEvidence>();
+    const log = new SelectorLog(null, (chain, e) => evidence.set(chain.name, e));
+    const page = load('03-overview-commentaires-prefixes.html', PR(1), log);
+    page.adapter.getBannerMount()!.querySelector('.repos-pr-header-complete-button')!.remove();
+    page.adapter.getCompletionControl();
+    expect(evidence.get('complete-button')?.trace?.map((t) => t.candidate)).toEqual(
+      selectors.completeButton.candidates
+    );
   }, T);
 });
 

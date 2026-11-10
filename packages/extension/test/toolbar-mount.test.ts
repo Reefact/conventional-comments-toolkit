@@ -22,9 +22,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
 import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { HTML_SHAPE } from './helpers/decorate.js';
-import type { EditorChrome, EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import type { EditorChrome, EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
 import { EditorController } from '../src/editor-controller.js';
 import { framedAncestor, ringIsClipped, stackingMountFor } from '../src/ui/stacking.js';
+import { submitLookup } from './helpers/submit-lookup.js';
 
 const pr: PrRef = {
   platform: 'github',
@@ -107,7 +108,7 @@ function attachOn(
     platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
     getEditorChrome: chrome,
     renderedBodyShape: () => HTML_SHAPE,
-    getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+    getSubmitControls: () => submitLookup([{ element: submit, kind: 'submit' }]),
     submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
     readValue: () => champ.value,
     writeValue: (_e, text, caret) => writeToTextField(champ, text, caret),

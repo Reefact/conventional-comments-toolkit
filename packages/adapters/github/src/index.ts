@@ -16,6 +16,7 @@ import {
 import {
   bypassCacheInit,
   adapterFetch,
+  chainEvidence,
   closestChain,
   commentBodyText,
   matchesChain,
@@ -36,6 +37,7 @@ import {
   type EditorHandle,
   type PlatformAdapter,
   type SubmitControl,
+  type SubmitControlsLookup,
   type SubmitKeystrokes,
 } from '@cct/adapter-shared';
 import {
@@ -104,11 +106,14 @@ export class GithubClientAdapter implements PlatformAdapter {
    * Le relevé n'est calculé que si la ligne part (`SelectorLog`, une fois par chaîne et par
    * visite) : cette méthode est appelée à chaque mutation du DOM. */
   #degraded(chain: SelectorChain, root: ParentNode = this.#doc, extra: SelectorEvidence = {}): void {
-    this.log.degraded(chain, () => ({
-      ...selectorEvidence(root, chain.candidates),
-      ...extra,
-      facts: this.#pageFacts(),
-    }));
+    this.log.degraded(chain, this.#evidence(chain, root, extra));
+  }
+
+  /** Le relevé que `#degraded` joint à sa ligne, rendu à évaluer plus tard : c'est aussi celui que
+   * `getSubmitControls()` remet au code partagé, qui journalise pour lui (`SubmitControlsLookup`). */
+  #evidence(chain: SelectorChain, root: ParentNode, extra: SelectorEvidence = {}): () => SelectorEvidence {
+    const evidence = chainEvidence(root, chain, extra);
+    return () => ({ ...evidence(), facts: this.#pageFacts() });
   }
 
   /** Ce que la page dit d'elle-même, tel qu'elle le dit — `absent` quand elle ne le dit pas. */
@@ -436,7 +441,7 @@ export class GithubClientAdapter implements PlatformAdapter {
     return { field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }], control: [] };
   }
 
-  getSubmitControls(editor: EditorHandle): SubmitControl[] {
+  getSubmitControls(editor: EditorHandle): SubmitControlsLookup {
     // On retient le premier conteneur qui porte réellement des boutons, et NON le premier qui
     // matche. La nuance vient d'une mesure : dans le panneau « Finish your comments », le champ
     // est bien dans un `MarkdownEditor-module__container` — candidat qui matche — mais les
@@ -457,9 +462,16 @@ export class GithubClientAdapter implements PlatformAdapter {
       // Jamais de contrôle `complete-pr` ici : seul getCompletionControl() l'expose, et il
       // n'est jamais intercepté (§9.2.3).
       const controls = queryChainAll(container, chain);
-      if (controls.length > 0) return controls.map((element) => ({ element, kind: 'submit' as const }));
+      if (controls.length > 0) {
+        const found = controls.map((element) => ({ element, kind: 'submit' as const }));
+        return { controls: found, searched: chain, evidence: this.#evidence(chain, container) };
+      }
     }
-    return [];
+    // Rien trouvé : le relevé est pris sous le conteneur le plus proche du champ — c'est là que les
+    // boutons auraient dû être —, et nomme le champ lui-même.
+    const root = containers[0] ?? this.#doc;
+    const evidence = this.#evidence(chain, root, { subject: printElement(editor.element) });
+    return { controls: [], searched: chain, evidence };
   }
 
   readValue(editor: EditorHandle): string {

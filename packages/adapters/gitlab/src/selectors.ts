@@ -212,6 +212,7 @@ export const selectors = {
    * aucun candidat ne filtre sur `:disabled` / `:enabled`, qui ne le verraient pas. */
   submitButtons: {
     name: 'submit-buttons',
+    problem: 'submit-control',
     candidates: [
       'button[type="submit"], button[data-testid="start-review-button"], button[data-testid="add-to-review-button"], ' +
         'button[data-testid="add-comment-now-button"], button[data-testid="comment-now-button"], ' +

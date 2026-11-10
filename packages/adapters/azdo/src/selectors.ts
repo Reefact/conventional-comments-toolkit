@@ -161,6 +161,7 @@ export const selectors = {
    * forme, mentions, suggestion) sont dans une autre rangée. */
   submitButtons: {
     name: 'submit-buttons',
+    problem: 'submit-control',
     candidates: ['.justify-end > .flex-row > button.bolt-button:not(:first-child)'],
   } satisfies SelectorChain,
 

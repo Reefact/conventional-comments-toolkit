@@ -184,6 +184,8 @@ const fr: Record<string, string> = {
     'Auteur d’un commentaire illisible : nom absent du bandeau, exemption par auteur impossible',
   'options.journal.problem.pr-creation-date':
     'Date de création de la PR introuvable : PR tenue hors périmètre, rien n’est bloqué',
+  'options.journal.problem.submit-control':
+    'Bouton d’envoi introuvable : impossible de le griser ou d’en arrêter le clic',
   'options.status.selectors.clear': 'Effacer le journal',
   'options.status.selectors.page.unknown': 'Page non enregistrée.',
   'options.status.selectors.copy.aria': 'Copier le détail de « {what} » pour le débogage',
@@ -437,6 +439,8 @@ const en: Record<string, string> = {
     'Comment author unreadable: name missing from the banner, per-author exemption cannot apply',
   'options.journal.problem.pr-creation-date':
     'PR creation date not found: PR treated as out of scope, nothing is blocked',
+  'options.journal.problem.submit-control':
+    'Submit button not found: it cannot be greyed out, nor its click stopped',
   'options.status.selectors.clear': 'Clear the log',
   'options.status.selectors.page.unknown': 'Page not recorded.',
   'options.status.selectors.copy.aria': 'Copy the details of “{what}” for debugging',

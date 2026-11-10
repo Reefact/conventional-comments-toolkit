@@ -4,8 +4,9 @@ import { defaultConfig, type PrRef } from '@cct/core';
 import { ClientConfigResolver, type ResolvedClientConfig } from '../src/config-resolver.js';
 import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controller.js';
 import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
-import type { EditorHandle, PlatformAdapter, SubmitControl, SubmitKeystrokes } from '@cct/adapter-shared';
+import type { EditorHandle, PlatformAdapter, SubmitKeystrokes } from '@cct/adapter-shared';
 import type { TelemetryEvent } from '../src/telemetry.js';
+import { submitLookup } from './helpers/submit-lookup.js';
 
 const pr: PrRef = {
   platform: 'github',
@@ -62,7 +63,7 @@ function setup(
   const adapter: Partial<PlatformAdapter> = {
     platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
     getEditorChrome: () => ({ ...NEUTRAL_EDITOR_CHROME, framedContainer: framed }),
-    getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+    getSubmitControls: () => submitLookup([{ element: submit, kind: 'submit' }]),
     submitKeystrokes: () => opts.keystrokes ?? { field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }], control: [] },
     readValue: () => textarea.value,
     writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),

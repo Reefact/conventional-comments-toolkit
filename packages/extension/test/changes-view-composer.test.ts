@@ -253,7 +253,7 @@ describe('§4.3 — la garde d’envoi sur le composeur de la nouvelle vue', () 
   it('les deux boutons qui publient sont des contrôles d’envoi, jamais celui qui annule', () => {
     document.body.innerHTML = COMPOSEUR_COMPLET;
     const { adapter: a, editors } = observe();
-    const ids = a.getSubmitControls(editors[0]!).map((c) => (c.element as HTMLElement).id);
+    const ids = a.getSubmitControls(editors[0]!).controls.map((c) => (c.element as HTMLElement).id);
     expect(ids).toEqual(['repondre', 'revue']);
     expect(ids).not.toContain('annuler');
   });
@@ -326,7 +326,7 @@ describe('§4.3 — la garde d’envoi sur le panneau de revue', () => {
     document.body.innerHTML = PANNEAU_AVEC_BOUTONS;
     const { adapter: a, editors } = observe();
     expect(editors[0]!.context.zone).toBe('review-body'); // on est bien dans le panneau
-    const ids = a.getSubmitControls(editors[0]!).map((c) => (c.element as HTMLElement).id);
+    const ids = a.getSubmitControls(editors[0]!).controls.map((c) => (c.element as HTMLElement).id);
     expect(ids).toEqual(['soumettre']);
   });
 

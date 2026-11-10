@@ -13,7 +13,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SOURCE = readFileSync(join(HERE, '../src/index.ts'), 'utf8');
 
 describe('§9.4 — Azure DevOps : chaque chaîne journalisée dit à quoi elle sert', () => {
-  const calls = [...SOURCE.matchAll(/\.log\.degraded\(\s*([A-Za-z_.]+)\s*\)/g)].map((m) => m[1]!);
+  const calls = [...SOURCE.matchAll(/\.log\.degraded\(\s*([A-Za-z_.]+)\s*[,)]/g)].map((m) => m[1]!);
 
   it('l’adaptateur appelle bien `degraded()` — sinon ce test ne vérifierait rien', () => {
     expect(calls.length).toBeGreaterThanOrEqual(2);

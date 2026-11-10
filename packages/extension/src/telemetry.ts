@@ -30,8 +30,8 @@
 // explicite » est celui d'une personne, pas d'une administration. Les deux premières sont
 // désormais hors de portée de tout dépôt.
 //
-// La clé `telemetry.*` du §8.2 reste lue et validée par `core/` — le composant serveur s'en
-// sert, et le schéma ne change pas. C'est l'EXTENSION qui ne l'écoute plus.
+// La clé `telemetry.*` du §8.2 reste lue et validée par `core/`, et le schéma ne change pas :
+// c'est l'EXTENSION qui ne l'écoute plus.
 
 /** Ce qu'un composant peut compter. Aucune de ces valeurs n'est du texte saisi : un
  * identifiant de label vient de la configuration, un code de diagnostic de `core/`, un nom

@@ -193,7 +193,8 @@ On all 21 captures, `draftBadge` finds nothing.
 `checkRunTitles` found nothing either, so the published `cc/1` line was never read from the page.
 **Measured and fixed on 2026-11-09**, first on PR 551 (CodeQL publishes a check title), then on PR
 552, where a temporary workflow published a real `conventional-comments` check run with a `cc/1`
-title, as the verifier would (§A.8), first as `success`, then as `failure`. In both views, each
+title, as the verifier would (§A.8 at the time; the verifier is retired since, §2), first as
+`success`, then as `failure`. In both views, each
 check of the list is an `li` whose accessible name carries the check's name, and whose
 `span.titleDescription__…` renders the state then the title — the whole `cc/1` line. Captures
 `03-overview-checks-deplies.html`, `03-conversation-checks-deplies.html` (PR 551) and

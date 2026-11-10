@@ -23,7 +23,7 @@ reconnaîtra que c'est réussi, puis attend son retour avant la suivante. Ne pas
 protocole : à la première question, deux ou trois lignes situent le chemin, puis vient la
 première étape. Ce fichier s'adresse à l'agent ; il ne se recopie pas à la personne.
 
-Une décision dont l'étape en cours n'a pas besoin — amendement de la spec, composant B,
+Une décision dont l'étape en cours n'a pas besoin — amendement de la spec,
 périmètre d'hôtes — attend l'étape où elle sert. La poser d'avance, c'est le gros bloc.
 
 (Retour du propriétaire, 2026-11-08, premier usage du skill, pour GitLab : la première réponse

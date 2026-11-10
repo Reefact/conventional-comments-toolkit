@@ -5,7 +5,7 @@ dist/
 dist-ext/
 dist-meta/
 
-# Artefacts d'exécution locale du composant B (smoke tests, dumps FileStorage, journaux) —
+# Artefacts d'exécution locale (smoke tests, journaux) —
 # jamais destinés au dépôt.
 *.log
 *.tmp

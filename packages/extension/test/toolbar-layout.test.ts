@@ -120,13 +120,13 @@ describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
   const labelsIn = (root: Element) =>
     [...root.querySelectorAll('.cct-label-button')].map((b) => (b as HTMLElement).dataset['label']);
 
-  it('les labels `remark` — `reviewed` compris —, puis une rangée `reply` à part, puis les décorations', () => {
+  it('les labels `remark`, puis les `status` — `summary`, `reviewed` —, puis une rangée `reply` à part, puis les décorations', () => {
     const bar = toolbar();
     const [labels, replies, decorations] = [...bar.querySelectorAll('.cct-toolbar-row')];
     expect(replies!.classList.contains('cct-reply-row')).toBe(true);
     expect(labelsIn(labels!)).toEqual([
       'praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish',
-      'reviewed',
+      'summary', 'reviewed',
     ]);
     expect(labelsIn(replies!)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);
     expect(decorations!.querySelector('.cct-label-button')).toBeNull();
@@ -140,6 +140,14 @@ describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
     expect(labelsIn(labels!)).toContain('done');
   });
 
+  it('un label `status` va sur la rangée du dessus, après la dernière remarque, jamais sur celle des réponses', () => {
+    const bar = toolbar(resolved({ labels: [{ id: 'recap', kind: 'status' }, { id: 'perf' }] }));
+    const [labels, replies] = [...bar.querySelectorAll('.cct-toolbar-row')];
+    const upper = labelsIn(labels!);
+    expect(upper.slice(-4)).toEqual(['perf', 'summary', 'reviewed', 'recap']);
+    expect(labelsIn(replies!)).not.toContain('recap');
+  });
+
   it('sans label `reply` actif, ni rangée ni trait simple ; le double trait des décorations reste', () => {
     const bar = toolbar(resolved({ labels: ['thanks', 'done', 'ack', 'decision', 'disagree'].map((id) => ({ id, enabled: false })) }));
     expect(bar.querySelectorAll('.cct-toolbar-row')).toHaveLength(2);
@@ -147,8 +155,8 @@ describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
     expect(bar.querySelector('.cct-decoration-row')).not.toBeNull();
   });
 
-  it('sans label `remark` actif, la rangée des réponses n’a pas de trait : il ne séparerait rien', () => {
-    const remarks = defaultConfig().labels.filter((l) => l.kind === 'remark').map((l) => ({ id: l.id, enabled: false }));
+  it('sans label `remark` ni `status` actif, la rangée des réponses n’a pas de trait : il ne séparerait rien', () => {
+    const remarks = defaultConfig().labels.filter((l) => l.kind !== 'reply').map((l) => ({ id: l.id, enabled: false }));
     const bar = toolbar(resolved({ labels: remarks }));
     expect(labelsIn(bar)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);
     expect(bar.querySelector('.cct-reply-row')).toBeNull();

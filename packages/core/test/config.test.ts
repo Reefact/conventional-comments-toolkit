@@ -10,16 +10,18 @@ const found = (o: object): ConfigRead => ({ status: 'found', text: JSON.stringif
 const foundText = (t: string): ConfigRead => ({ status: 'found', text: t });
 
 describe('§8.2 — valeurs par défaut du produit', () => {
-  it('dix-huit labels livrés, tous actifs sauf `quibble` — Conventional Comments, `decision` et les labels ajoutés — et les décorations du §3.3', () => {
+  it('dix-neuf labels livrés, tous actifs sauf `quibble` — Conventional Comments, `decision` et les labels ajoutés — et les décorations du §3.3', () => {
     const c = defaultConfig();
-    expect(c.labels).toHaveLength(18);
+    expect(c.labels).toHaveLength(19);
     // `quibble` est livré, pour rester fidèle à la liste de l'amont, mais désactivé : l'amont le
     // définit lui-même comme un `nitpick` sous un autre nom (§3.2).
     expect(c.labels.filter((l) => !l.enabled).map((l) => l.id)).toEqual(['quibble']);
     // L'ordre de la liste est l'ordre par défaut des boutons (§5.1) : la zone `reply` va du plus
-    // conciliant au plus tranché. `reviewed` est ajouté mais n'ouvre ni ne répond à aucun point
-    // précis : il est `remark`. `decision` répond à un point : il est `reply`.
+    // conciliant au plus tranché. `summary` et `reviewed` sont ajoutés et n'ouvrent ni ne
+    // répondent à aucun point : ils sont `status`, de la passe à la clôture. `decision` répond à
+    // un point : il est `reply`.
     expect(c.labels.filter((l) => l.kind === 'reply').map((l) => l.id)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);
+    expect(c.labels.filter((l) => l.kind === 'status').map((l) => l.id)).toEqual(['summary', 'reviewed']);
     expect(c.labels.filter((l) => l.blockingByDefault).map((l) => l.id).sort()).toEqual([
       'chore',
       'issue',
@@ -33,6 +35,7 @@ describe('§8.2 — valeurs par défaut du produit', () => {
       'nitpick',
       'note',
       'reviewed',
+      'summary',
       'thanks',
       'thought',
     ]);
@@ -52,6 +55,9 @@ describe('§8.2 — valeurs par défaut du produit', () => {
     expect(new Set(keys).size).toBe(keys.length);
     expect(abbr['?que']).toBe('question: ');
     expect(abbr['?qui']).toBe('quibble: ');
+    // `?su` reste `suggestion` ; `summary` prend `?sum` (§5.2, CA-55).
+    expect(abbr['?su']).toBe('suggestion: ');
+    expect(abbr['?sum']).toBe('summary: ');
   });
 
   it('chaque label porte une icône et une couleur par défaut (issue #18) — sans elles, le rendu du §5.1/§5.5 reste monochrome sur tout dépôt sans configuration propre', () => {

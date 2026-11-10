@@ -95,10 +95,12 @@ export interface ValidationInput {
 export type Mode = 'off' | 'assist' | 'enforce';
 export type Severity = 'off' | 'warn' | 'error';
 
-/** Type d'un label (§3.2, `labels[].kind`) : `remark` OUVRE un point, `reply` n'en ouvre
- * aucun — il répond à un point ou referme l'échange. Ne change aucun verdict : il range le
- * bouton dans sa zone de la barre (§5.1) et sépare les indicateurs (§12). */
-export type LabelKind = 'remark' | 'reply';
+/** Type d'un label (§3.2, `labels[].kind`) : `remark` OUVRE un point, `reply` y RÉPOND, et
+ * `status` ne fait ni l'un ni l'autre — il dit où en est la revue (`summary`, `reviewed`). Ne
+ * change aucun verdict : il range le bouton dans sa zone de la barre (§5.1) et sépare les
+ * indicateurs (§12) — c'est pour ce second effet que `status` existe, un récapitulatif rangé en
+ * `remark` entrant au dénominateur du ratio `praise`. */
+export type LabelKind = 'remark' | 'status' | 'reply';
 
 export interface LabelConfig {
   id: string;

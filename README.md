@@ -85,12 +85,12 @@ still carries them stays readable: each is an unknown key, ignored and reported 
 configuration warning, with no fallback. `"mode": "warn"` is read as `"assist"`, with an
 "obsolete value" warning (§7). Remove them to clear the warnings.
 
-### Response labels and `reviewed` (on by default, not part of Conventional Comments)
+### Response labels, `summary` and `reviewed` (on by default, not part of Conventional Comments)
 
 Conventional Comments gives review **feedback** a vocabulary and says nothing about **replying**
-to it. The toolkit adds four response labels of its own, plus `reviewed` to close your review.
-These five **added labels** are **not part of Conventional Comments**: an extension of this tool,
-shipped enabled, that a repository can turn off (§3.1, §3.2). Every label the toolkit ships is
+to it. The toolkit adds four response labels of its own, plus `summary` to recap a review pass
+and `reviewed` to close your review. These six **added labels** are **not part of Conventional
+Comments**: an extension of this tool, shipped enabled, that a repository can turn off (§3.1, §3.2). Every label the toolkit ships is
 enabled by default, including Conventional Comments' `typo` and `polish`; disable the ones you
 don't want. The one exception is `quibble`, shipped but disabled: Conventional Comments itself
 defines it as a `nitpick` under another name. Enable it with `{ "id": "quibble", "enabled": true }`.
@@ -101,6 +101,7 @@ defines it as a `nitpick` under another name. Enable it with `{ "id": "quibble",
 | `done` | The code changed because of the remark. | `fixed` |
 | `ack` | Received and accepted; the code has not changed. | `acknowledged` |
 | `disagree` | Declines the remark, and the subject says why. Carries no authority, resolves nothing. | |
+| `summary` | Recaps the review or one pass: what was checked, what is still open. Raises no point, answers none, closes nothing. | |
 | `reviewed` | Closes your own review: your points are dealt with, you have nothing to add. Approves nothing. | |
 
 ```text
@@ -112,6 +113,12 @@ done: removed the platform-specific token
 over; approval stays with the platform's own control. It is not a reply: it answers no point,
 it says where your review stands. `thanks` fills the gap a plain "thanks!" reply left: with
 `scope.validateReplies` on, it had to be written `note: thanks`.
+
+`summary` is the recap of a review pass — what was checked, what is still open — that used to be
+written as plain prose or under `note:`. It is the counterpart of `reviewed`: `summary` says where
+an ongoing review stands, `reviewed` that it is closed. A `summary` never stands in for
+`reviewed`, even when no point is left open; posted after your `reviewed`, it reads as if your
+review had reopened.
 
 **When to post `reviewed`.** It closes your review as a whole, not one reading pass: a review
 covers raising points, following how they are handled and checking the fixes. Post it once each
@@ -142,16 +149,20 @@ one:
 empty (`""`), it removes that tooltip; left out, a shipped label keeps its texts. They are shown
 as written, whatever the interface language, and change no verdict.
 
-Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` does not. The
-toolbar shows the remark labels first — `reviewed` among them —, then, always on a line of their
-own under a thin horizontal rule, the reply labels: `thanks`, `done`, `ack`, `decision`,
-`disagree`. A thin double rule then separates the labels from the decorations. A label you declare is `"remark"` unless
-you write `"kind": "reply"`. The kind changes no verdict.
+Every label has a **kind** (`labels[].kind`): `"remark"` raises a point, `"reply"` answers one,
+and `"status"` does neither — it says where the review stands (`summary`, `reviewed`). The
+toolbar shows the remark labels first, then the status labels, which always close that line;
+then, always on a line of their own under a thin horizontal rule, the reply labels: `thanks`,
+`done`, `ack`, `decision`, `disagree`. A thin double rule then separates the labels from the
+decorations. A label you declare is `"remark"` unless you write `"kind": "status"` or
+`"kind": "reply"`. The kind changes no verdict; it keeps replies and status labels out of the
+label statistics that measure review culture, such as the share of `praise`.
 
-**Button order.** By default, the order of conventionalcomments.org, then `reviewed`; the replies
-go from the warmest to the firmest. In the extension's options, *Button order* takes a
+**Button order.** By default, the order of conventionalcomments.org, then `summary` and
+`reviewed`; the replies go from the warmest to the firmest. A remark label you create comes
+before `summary` and `reviewed`, which close the first line. In the extension's options, *Button order* takes a
 comma-separated list, for example `suggestion,nitpick,disagree`: the labels you list come first
-in their own group, remarks or replies, the others follow in the default order. Spaces are ignored. It is a personal
+in their own group — remarks, status labels or replies —, the others follow in the default order. Spaces are ignored. It is a personal
 preference, synced by your browser; it changes no verdict and applies to the next comment box
 that opens. The completion list (`/` or `:`) follows the same order.
 
@@ -163,22 +174,23 @@ switch (§8.2). The extension's options page shows this block and copies it for 
               { "id": "done", "enabled": false },
               { "id": "ack", "enabled": false },
               { "id": "disagree", "enabled": false },
+              { "id": "summary", "enabled": false },
               { "id": "reviewed", "enabled": false } ] }
 ```
 
 With no existing `.conventional-comments.json`, this block can be the whole file. Otherwise, add
-the five entries to its existing `labels` array, or create that property, without replacing the
+the six entries to its existing `labels` array, or create that property, without replacing the
 other keys: pasting the block into an existing file makes it invalid JSON, and replacing the file
 drops your other settings.
 
 The labels change **which labels exist**, nothing else. They do not require replies to carry a
 label: that is `scope.validateReplies`, still `false` by default, so a reply is not validated at
-all unless you turn it on (§4.1). They do not change the mode, and none of the five can make a
+all unless you turn it on (§4.1). They do not change the mode, and none of the six can make a
 thread blocking. `decision` is unchanged: it is the reply with which those who carry the pull
 request — its author, its maintainers — record, with a reason, that a point will not be addressed
 (§6.1.1). `disagree` is an opinion. Neither resolves a thread.
 
-**Upgrading with a label already called `thanks`, `done`, `ack`, `disagree` or `reviewed`.** Your entry
+**Upgrading with a label already called `thanks`, `done`, `ack`, `disagree`, `summary` or `reviewed`.** Your entry
 now merges into the shipped one (§8.1.4) and inherits `alwaysNonBlocking: true`, so
 `done (blocking):` becomes `E-CONFLICT`. Restore your label with:
 

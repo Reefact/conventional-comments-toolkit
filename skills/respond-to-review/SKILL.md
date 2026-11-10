@@ -8,7 +8,8 @@ description: As the author of a GitHub pull request, answer its review findings 
 You are the author of the pull request: you wrote its code, and you are answering its review.
 Every finding or question a reviewer raises gets an answer, in its own thread, and the answer
 says what you did about it. A reviewer's `reviewed:` comment is not one of them: it closes their
-review, raises no point and asks nothing, so it needs no reply.
+review, raises no point and asks nothing, so it needs no reply. Nor does a `summary:`, which
+recaps where their review stands: answer the findings it points to, in their own threads.
 
 ## 0. Language
 
@@ -133,7 +134,7 @@ For each comment that calls for a change:
 4. Push, then answer `done:` with the commit.
 
 Answer every finding and question, including optional findings, `(non-blocking)` ones and
-`praise`. A standalone `reviewed:` closure needs no answer.
+`praise`. A standalone `reviewed:` closure or `summary:` recap needs no answer.
 
 ## 5. Resolving threads
 

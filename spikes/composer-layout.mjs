@@ -205,6 +205,9 @@ const toolbarBundle = await build({
           : defaultConfig();
         return buildToolbar({ config, lang: 'fr', onLabel() {}, onFreeDecoration() {}, currentPrefix: prefix }).element;
       };
+      // Les labels LIVRÉS, lus dans la configuration par défaut : une liste recopiée ici a vieilli
+      // le jour où \`summary\` a été livré, et le cas « aucun label actif » en gardait un d'actif.
+      globalThis.cctShippedLabels = defaultConfig().labels.map((l) => l.id);
     `,
     resolveDir: root,
     loader: 'ts',
@@ -298,8 +301,7 @@ assert(
   await zonesPage.evaluate(async () => {
     const hote = document.getElementById('hote');
     hote.innerHTML = '';
-    const tous = ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question', 'thought', 'chore', 'note', 'typo', 'polish', 'quibble', 'reviewed', 'thanks', 'done', 'ack', 'decision', 'disagree'];
-    hote.appendChild(globalThis.cctBar({ labels: tous.map((id) => ({ id, enabled: false })) }));
+    hote.appendChild(globalThis.cctBar({ labels: globalThis.cctShippedLabels.map((id) => ({ id, enabled: false })) }));
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const rangees = [...hote.querySelectorAll('.cct-toolbar-row')];
     return rangees.length === 1 && rangees.every((r) => getComputedStyle(r).borderTopStyle === 'none');

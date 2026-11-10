@@ -32,8 +32,10 @@ describe('stripClaudeFooter (descriptions)', () => {
     expect(stripClaudeFooter(`${BODY}\n\n${SESSION_FORM}\n\n${TOOL_FORM}`)).toBe(BODY);
   });
 
-  it('retire un lien de session resté seul en dernière ligne', () => {
-    expect(stripClaudeFooter(`${BODY}\n\n${SESSION}`)).toBe(BODY);
+  it('laisse un lien de session cité seul : une référence voulue, pas un pied', () => {
+    const body = `See the original session:\n\n${SESSION}`;
+    expect(stripClaudeFooter(body)).toBe(body);
+    expect(stripClaudeFooter(`${body}\n\n${TOOL_FORM}`)).toBe(body);
   });
 
   it('accepte les fins de ligne CRLF et les blancs finaux', () => {

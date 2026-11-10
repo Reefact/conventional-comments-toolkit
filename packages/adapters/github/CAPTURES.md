@@ -125,7 +125,7 @@ every earlier capture.
 
 | Page | Where | When it is absent |
 |---|---|---|
-| Classic (03 `-pr-ouverte`) | `[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-variant="primary"]`, *Rebase and merge* | merged/closed/draft (`prSettledState`); a failing required check: mergeability icon `aria-label="Checks failing"` (diagnostic skeleton of #113) — nominal |
+| Classic (03 `-pr-ouverte`, 03 `-cc1-en-echec`) | `[data-testid="mergebox-partial"] [data-component="ButtonGroup"] > :first-child > button[data-component="Button"]`, *Rebase and merge* — `data-variant="primary"` when the page says *Ready to merge*, `default` when a NON-required check fails (*Able to merge*, 2026-11-10): the variant is GitHub's recommendation, not the button | merged/closed/draft (`prSettledState`); a failing required check: mergeability icon `aria-label="Checks failing"` (diagnostic skeleton of #113) — nominal |
 | Overview (03) | `[data-testid="for-you-item-row"][data-item-id="ready-to-merge"] button[data-variant="primary"]`, *Rebase and merge* | checks running: row `data-item-id="pending-checks"`, only *Enable auto-merge (rebase)*, `default` (01) — nominal; merged (08) |
 | Files changed (04 `-pr-ouverte`) | none, on an open PR | always — the tab is not probed (#103) |
 

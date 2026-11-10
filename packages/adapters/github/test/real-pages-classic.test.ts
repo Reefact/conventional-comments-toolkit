@@ -251,3 +251,26 @@ describe('§6.5, §9.4 — Conversation : PR ouverte, fusion possible ou non (ca
     });
   });
 });
+
+describe('§6.5, §9.4 — Conversation : un check NON requis en échec, la PR reste fusionnable (PR 552) — #103', () => {
+  // GitHub dit « Able to merge » et rend le même « Rebase and merge » en `data-variant="default"`,
+  // plus en `primary`. Le premier candidat exigeait `primary` : le bouton n'était pas trouvé, donc
+  // pas grisé, et `merge-button` était journalisé pour une chaîne qui n'avait rien de pourri.
+  let page: LoadedPage;
+  beforeAll(() => {
+    page = load('03-conversation-cc1-en-echec.html', '/Reefact/just-dummies/pull/552');
+  }, T);
+
+  it('la capture montre bien ce cas : icône « Able to merge », bouton en variante default', () => {
+    expect(page.doc.querySelector('[data-testid="mergeability-icon-wrapper"] svg')?.getAttribute('aria-label')).toBe('Able to merge');
+    const groupButtons = page.doc.querySelectorAll('[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button');
+    expect([...groupButtons].map((b) => b.getAttribute('data-variant'))).toEqual(['default']);
+  });
+
+  it('trouve « Rebase and merge », et ne journalise rien', () => {
+    const control = page.adapter.getCompletionControl();
+    expect(control?.kind).toBe('complete-pr');
+    expect(control?.element.textContent?.trim()).toBe('Rebase and merge');
+    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
+  });
+});

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
+import { ClientConfigResolver, type ResolvedClientConfig } from '../src/config-resolver.js';
 import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controller.js';
 import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import type { EditorHandle, PlatformAdapter, SubmitControl, SubmitKeystrokes } from '@cct/adapter-shared';
@@ -31,6 +32,10 @@ function setup(
     keystrokes?: SubmitKeystrokes;
     /** La PR de l'éditeur — par défaut une PR récente. */
     pr?: PrRef;
+    /** La configuration RÉSOLUE en main — par défaut, les défauts du produit au `mode` donné. */
+    resolved?: ResolvedClientConfig;
+    /** La relecture sans cache que le contrôleur lance avant de bloquer (§8.1.3, règle 3). */
+    rereadConfig?: () => Promise<ResolvedClientConfig>;
   } = {}
 ) {
   const host = document.createElement('div');
@@ -70,7 +75,8 @@ function setup(
   const controller = new EditorController({
     adapter: adapter as PlatformAdapter,
     editor,
-    resolved: { config, notices: [], degraded: false, degradedReason: null },
+    resolved: opts.resolved ?? { config, notices: [], degraded: false, degradedReason: null },
+    ...(opts.rereadConfig ? { rereadConfig: opts.rereadConfig } : {}),
     lang: opts.lang ?? 'fr',
     currentUserLogin: 'alice',
     telemetry: opts.telemetry,
@@ -590,6 +596,181 @@ describe('§5.3 + §8.1.2 — le message d’un diagnostic suit la langue RÉSOL
     for (const id of ['praise', 'nitpick', 'suggestion', 'issue', 'todo', 'question']) {
       expect(message).toContain(id);
     }
+    controller.dispose();
+  });
+});
+
+describe('§8.1.3 règle 3 — relire la configuration avant de bloquer un envoi (second geste)', () => {
+  const ORG_URL = 'https://interne.example/cc/organisation.json';
+
+  /** Un résolveur RÉEL, dont la lecture d'organisation vient d'un texte que le test change
+   * « côté plateforme », sans rien notifier à l'extension. Le plancher désigne le document
+   * d'organisation (§8.1.1) ; le fichier de dépôt est absent. */
+  function orgBacked(initialOrg: object) {
+    let orgText = JSON.stringify(initialOrg);
+    const reads: { bypassCache: boolean }[] = [];
+    const adapter = {
+      getRepoConfig: async () => ({ status: 'absent' as const }),
+      getOrgConfig: async (_url: string | null, o?: { bypassCache: boolean }) => {
+        reads.push({ bypassCache: o?.bypassCache === true });
+        return { status: 'found' as const, text: orgText };
+      },
+    } as unknown as PlatformAdapter;
+    const resolver = new ClientConfigResolver(async () => ({ floorVersion: 1, configUrl: ORG_URL }));
+    return {
+      reads,
+      setOrg: (doc: object) => {
+        orgText = JSON.stringify(doc);
+      },
+      resolve: () => resolver.resolve(adapter, pr),
+      reread: () => resolver.resolve(adapter, pr, { bypassCache: true }),
+    };
+  }
+
+  async function attachWith(
+    resolved: ResolvedClientConfig,
+    rereadConfig: () => Promise<ResolvedClientConfig>,
+    body: string
+  ) {
+    const s = setup('enforce', { resolved, rereadConfig });
+    s.controller.attach();
+    writeToTextField(s.textarea, body);
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    return s;
+  }
+
+  function click(el: Element): { clicked: boolean; prevented: boolean } {
+    let clicked = false;
+    const listener = () => (clicked = true);
+    el.addEventListener('click', listener);
+    const notCanceled = el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    el.removeEventListener('click', listener);
+    return { clicked, prevented: !notCanceled };
+  }
+
+  const flushReread = () => new Promise((r) => setTimeout(r, 0));
+
+  it('CA-27 : organisation en cache en enforce, passée à assist sans notification — l’envoi est retenu, la configuration relue, le contrôle libéré avec un message', async () => {
+    const org = orgBacked({ mode: 'enforce' });
+    const cached = await org.resolve(); // la configuration EN CACHE : enforce
+    expect(cached.config.mode).toBe('enforce');
+    org.setOrg({ mode: 'assist' }); // assoupli côté plateforme, rien n'est notifié
+
+    const { controller, textarea, submit, host } = await attachWith(cached, org.reread, 'pas de label ici');
+    expect(submit.getAttribute('aria-disabled')).toBe('true'); // l'affichage suit encore le cache
+
+    // La tentative d'envoi est RETENUE : jamais publiée sur une configuration non relue.
+    const first = click(submit);
+    expect(first.prevented).toBe(true);
+    expect(first.clicked).toBe(false);
+    await flushReread();
+
+    // Relue sans cache (§8.1.3, règle 3), elle est en assist : le contrôle est libéré, et un
+    // message invite à renvoyer — l'extension ne rejoue rien elle-même.
+    expect(submit.hasAttribute('aria-disabled')).toBe(false);
+    expect(host.querySelector('.cct-released')?.textContent).toContain('Renvoyez');
+    expect(org.reads.at(-1)).toEqual({ bypassCache: true });
+    expect(host.querySelector('.cct-live')?.textContent).toContain('Renvoyez');
+
+    // Le second geste passe : plus aucun blocage, ni au clic ni au clavier.
+    const second = click(submit);
+    expect(second.prevented).toBe(false);
+    expect(second.clicked).toBe(true);
+    const key = new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true });
+    textarea.dispatchEvent(key);
+    expect(key.defaultPrevented).toBe(false);
+    controller.dispose();
+  });
+
+  it('CA-27 contre-épreuve : configuration inchangée — après la relecture, l’envoi reste bloqué', async () => {
+    const org = orgBacked({ mode: 'enforce' });
+    const cached = await org.resolve();
+    const { controller, submit, host } = await attachWith(cached, org.reread, 'pas de label ici');
+
+    expect(click(submit).prevented).toBe(true);
+    await flushReread();
+
+    expect(org.reads.at(-1)).toEqual({ bypassCache: true }); // relue, et toujours enforce
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+    expect(host.querySelector('.cct-released')).toBeNull();
+    expect(host.querySelector('.cct-live')?.textContent).toContain('Envoi bloqué');
+    expect(click(submit).prevented).toBe(true); // toujours retenu
+    await flushReread();
+    controller.dispose();
+  });
+
+  it('CA-33 : un label ajouté par l’organisation est accepté dès la première saisie qu’il aurait fallu bloquer', async () => {
+    const org = orgBacked({ mode: 'enforce' });
+    const cached = await org.resolve();
+    org.setOrg({ mode: 'enforce', labels: [{ id: 'kudos', enabled: true, blockingByDefault: false }] });
+
+    // `kudos:` est inconnu de la configuration en cache : E-UNKNOWN-LABEL, donc bloqué.
+    const { controller, submit, host } = await attachWith(cached, org.reread, 'kudos: joli découpage du module');
+    expect(host.querySelector('.cct-diagnostics li[data-code="E-UNKNOWN-LABEL"]')).not.toBeNull();
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+
+    expect(click(submit).prevented).toBe(true);
+    await flushReread();
+
+    // Relue, l'organisation déclare `kudos` : plus aucune erreur, le contrôle est libéré —
+    // sans attendre l'expiration du cache (3600 s par défaut).
+    expect(host.querySelector('.cct-diagnostics li[data-code="E-UNKNOWN-LABEL"]')).toBeNull();
+    expect(submit.hasAttribute('aria-disabled')).toBe(false);
+    expect(host.querySelector('.cct-released')).not.toBeNull();
+    // Et le cache a été réécrit : la résolution ordinaire suivante voit déjà le label.
+    expect((await org.resolve()).config.labels.some((l) => l.id === 'kudos')).toBe(true);
+    controller.dispose();
+  });
+
+  it('une seule relecture en vol par éditeur : les tentatives suivantes restent retenues sans en lancer d’autre', async () => {
+    let calls = 0;
+    let release: ((r: ResolvedClientConfig) => void) | null = null;
+    const enforce = defaultConfig();
+    enforce.mode = 'enforce';
+    const cached: ResolvedClientConfig = { config: enforce, notices: [], degraded: false, degradedReason: null };
+    const reread = () => {
+      calls++;
+      return new Promise<ResolvedClientConfig>((resolve) => {
+        release = resolve;
+      });
+    };
+    const { controller, textarea, submit, host } = await attachWith(cached, reread, 'pas de label ici');
+
+    expect(click(submit).prevented).toBe(true);
+    expect(click(submit).prevented).toBe(true); // retenu pendant la relecture
+    const key = new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true });
+    textarea.dispatchEvent(key);
+    expect(key.defaultPrevented).toBe(true);
+    expect(calls).toBe(1);
+
+    const assist = defaultConfig();
+    assist.mode = 'assist';
+    release!({ config: assist, notices: [], degraded: false, degradedReason: null });
+    await flushReread();
+    expect(submit.hasAttribute('aria-disabled')).toBe(false);
+    expect(host.querySelector('.cct-released')).not.toBeNull();
+    controller.dispose();
+  });
+
+  it('aucune relecture à la frappe : seule une tentative d’envoi la déclenche', async () => {
+    let calls = 0;
+    const enforce = defaultConfig();
+    enforce.mode = 'enforce';
+    const cached: ResolvedClientConfig = { config: enforce, notices: [], degraded: false, degradedReason: null };
+    const { controller, textarea } = await attachWith(
+      cached,
+      async () => {
+        calls++;
+        return cached;
+      },
+      'pas de label ici'
+    );
+
+    for (const text of ['pas de label', 'toujours pas', 'issue: enfin un label']) {
+      writeToTextField(textarea, text);
+      await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    }
+    expect(calls).toBe(0);
     controller.dispose();
   });
 });

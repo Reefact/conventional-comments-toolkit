@@ -99,6 +99,10 @@ export interface ControllerDeps {
    * recompter un code encore présent, jamais disparu, gonflant la télémétrie opt-in (§10)
    * à chaque rendu forcé plutôt qu'à chaque apparition RÉELLE. */
   initialCountedCodes?: ReadonlySet<string>;
+  /** Relit la configuration de CET éditeur en contournant le cache (§8.1.3, règle 3) — appelée
+   * avant de prononcer un blocage, jamais à la frappe. Absente (tests, doublures), le blocage
+   * se prononce sur la configuration en main, comme avant la règle. */
+  rereadConfig?: () => Promise<ResolvedClientConfig>;
 }
 
 /** Table par défaut des raccourcis directs (§5.2) — surchargable par les préférences. */
@@ -151,6 +155,11 @@ export class EditorController {
   readonly deps: ControllerDeps;
   #feedback: FeedbackView | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
+  /** La relecture de configuration en vol (§8.1.3, règle 3), s'il y en a une : UNE par
+   * éditeur. Tant qu'elle court, tout envoi que la configuration en main bloquerait reste
+   * retenu, sans en lancer une seconde. */
+  #reread: Promise<void> | null = null;
+  #disposed = false;
   #lastAnalysis: CommentAnalysis | null = null;
   /** La barre, pour la réaligner sur le texte à chaque validation (§5.1). */
   #toolbar: Toolbar | null = null;
@@ -365,7 +374,7 @@ export class EditorController {
         if (this.#shouldBlockNow()) {
           ke.preventDefault();
           ke.stopPropagation();
-          this.#announceBlock();
+          this.#holdAndReread();
         }
       }
     };
@@ -389,6 +398,7 @@ export class EditorController {
    * déjà programmé exécuté APRÈS ce `dispose()` réécrirait cet état juste après l'avoir
    * retiré, sur un contrôleur que plus rien ne doit toucher. */
   dispose(): void {
+    this.#disposed = true;
     if (this.#timer) {
       clearTimeout(this.#timer);
       this.#timer = null;
@@ -560,6 +570,40 @@ export class EditorController {
     this.#feedback?.announceBlocked(this.#lastAnalysis?.diagnostics ?? []);
   }
 
+  /** Un envoi que la configuration EN MAIN bloquerait vient d'être retenu (l'appelant a déjà
+   * intercepté l'événement). Avant de prononcer le blocage, la configuration est relue en
+   * contournant le cache, puis le texte revalidé dessus (§8.1.3, règle 3) : un `mode`
+   * assoupli ou un label ajouté depuis la dernière lecture vaut dès cette tentative.
+   *
+   * SECOND GESTE (décision du propriétaire, 2026-11-10) : si la configuration relue ne bloque
+   * plus, le contrôle d'envoi est libéré et un message invite à renvoyer — l'envoi retenu
+   * n'est jamais rejoué par l'extension. Si elle bloque encore, le blocage est annoncé comme
+   * avant. Une seule relecture en vol par éditeur ; pendant qu'elle court, les tentatives
+   * suivantes restent retenues sans en lancer d'autre. */
+  #holdAndReread(): void {
+    const reread = this.deps.rereadConfig;
+    if (!reread) {
+      this.#announceBlock();
+      return;
+    }
+    if (this.#reread) return;
+    this.#reread = (async () => {
+      try {
+        const resolved = await reread();
+        if (this.#disposed) return;
+        this.updateResolved(resolved); // revalide, et pose ou retire `aria-disabled` (§5.4)
+        if (this.evaluateNow().block) this.#announceBlock();
+        else this.#feedback?.announceReleased();
+      } catch {
+        // Relecture impossible à mener : on reste sur la configuration en main, et ce qu'elle
+        // décide — le blocage — est annoncé. Rien ne remonte à l'utilisateur (§9.4).
+        if (!this.#disposed) this.#announceBlock();
+      } finally {
+        this.#reread = null;
+      }
+    })();
+  }
+
   /** Un SEUL écouteur, en capture sur le DOCUMENT, qui demande à l'adaptateur au moment du clic
    * quels sont les contrôles d'envoi de cet éditeur — et non un écouteur posé, à `attach()`, sur
    * chacun des contrôles d'alors.
@@ -593,7 +637,7 @@ export class EditorController {
       if (this.#shouldBlockNow()) {
         e.preventDefault();
         e.stopPropagation();
-        this.#announceBlock();
+        this.#holdAndReread();
       }
     };
     const onControlKey = (e: Event) => {
@@ -603,7 +647,7 @@ export class EditorController {
       if (this.#shouldBlockNow()) {
         ke.preventDefault();
         ke.stopPropagation();
-        if (ke.type === 'keydown') this.#announceBlock();
+        if (ke.type === 'keydown') this.#holdAndReread();
       }
     };
     const guardedClick = guarded('editor', onClick);

@@ -229,3 +229,45 @@ describe('écart A — §5.2 : la table des abréviations ne fuit pas le prototy
     expect(Object.hasOwn(abbr, '?i')).toBe(true);
   });
 });
+
+describe('§8.1.3 règle 3, CA-27 — la relecture sans cache, et ce qu’elle laisse au cache', () => {
+  const pr: PrRef = { platform: 'github', createdAt: '', host: 'github.com', scope: ['acme', 'demo'], number: 42 };
+
+  function adapterReading(read: (opts?: { bypassCache: boolean }) => Promise<ConfigRead>): PlatformAdapter {
+    return {
+      getRepoConfig: (_pr: PrRef, opts?: { bypassCache: boolean }) => read(opts),
+      getOrgConfig: async () => ({ status: 'absent' }),
+    } as unknown as PlatformAdapter;
+  }
+
+  it('contourne un cache valide, sans rejoindre la lecture ordinaire en vol — et la plus récemment partie garde le cache', async () => {
+    let releaseOrdinary: ((read: ConfigRead) => void) | null = null;
+    let text = JSON.stringify({ mode: 'enforce' });
+    const resolver = new ClientConfigResolver(async () => null);
+    const adapter = adapterReading((opts) =>
+      opts?.bypassCache
+        ? Promise.resolve({ status: 'found', text })
+        : new Promise<ConfigRead>((resolve) => {
+            releaseOrdinary = resolve;
+          })
+    );
+
+    // Une lecture ordinaire part, et tarde : elle rapportera l'état d'AVANT la modification.
+    const ordinary = resolver.resolve(adapter, pr);
+    await Promise.resolve();
+    text = JSON.stringify({ mode: 'assist' });
+    // La relecture ne la rejoint pas : elle lit l'état d'APRÈS.
+    expect((await resolver.resolve(adapter, pr, { bypassCache: true })).config.mode).toBe('assist');
+
+    // L'ordinaire aboutit EN DERNIER, avec l'ancien état : elle ne doit pas écraser le cache.
+    releaseOrdinary!({ status: 'found', text: JSON.stringify({ mode: 'enforce' }) });
+    await ordinary;
+    let reads = 0;
+    const cachedOnly = adapterReading(async () => {
+      reads++;
+      return { status: 'found', text: JSON.stringify({ mode: 'enforce' }) };
+    });
+    expect((await resolver.resolve(cachedOnly, pr)).config.mode).toBe('assist'); // servi par le cache
+    expect(reads).toBe(0);
+  });
+});

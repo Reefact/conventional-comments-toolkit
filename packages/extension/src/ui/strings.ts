@@ -11,6 +11,7 @@ const fr: Record<string, string> = {
   'pastille.degraded':
     'Configuration non lue : l’extension assiste sans connaître les règles, et ne bloque pas l’envoi.',
   'guard.blocked': 'Envoi bloqué : le commentaire n’est pas conforme. {details}',
+  'guard.released': 'Configuration relue : cet envoi n’est plus bloqué. Renvoyez votre commentaire.',
   'fix.apply': 'Corriger',
   'alias.rewrite': 'Réécrire « {from} » en « {to} »',
   'banner.count': '{count} fil(s) bloquant(s) non résolu(s)',
@@ -271,6 +272,7 @@ const en: Record<string, string> = {
   'pastille.degraded':
     'Configuration unread: the extension assists without knowing the rules, and does not block sending.',
   'guard.blocked': 'Sending blocked: the comment is not compliant. {details}',
+  'guard.released': 'Configuration re-read: this comment is no longer blocked. Send it again.',
   'fix.apply': 'Fix',
   'alias.rewrite': 'Rewrite "{from}" as "{to}"',
   'banner.count': '{count} unresolved blocking thread(s)',

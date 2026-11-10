@@ -51,6 +51,7 @@ import { decorateWithHtmlShape, HTML_SHAPE } from './helpers/decorate.js';
 import { applyLabelFilter, clearLabelFilter } from '../src/ui/thread-filter.js';
 import {
   bootstrap,
+  contentSignatureOf,
   observePrChromeNavigation,
   prKeyFor,
   RENDER_RETRY_THROTTLE_MS,
@@ -669,6 +670,75 @@ describe('D3 — des fils arrivés après coup sont adoptés, même une fois la 
 
     expect(bannerTitles(doc)[0]).toContain('1');
     expect(activeFilter(doc)).toBe('praise');
+  });
+});
+
+describe('§5.5 — résoudre ou rouvrir un fil recalcule le bandeau, même rendu hors de son conteneur', () => {
+  // Sur la vue `…/changes` de GitHub, l'état d'un fil est porté par un bouton VOISIN de son
+  // conteneur (`#resolvedMarkerBeside()`, adaptateur GitHub) : résoudre le fil ne change ni son
+  // identifiant, ni son texte, ni le nombre de corps rendus — rien de ce que regardaient les
+  // signatures de reprise. L'adaptateur expose donc l'état avec l'élément rendu (`resolution`),
+  // et la signature en tient compte.
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  function issueThread(prRef: PrRef, resolution: ThreadInfo['resolution']): ThreadInfo {
+    return {
+      id: 't1',
+      pr: prRef,
+      root: {
+        id: 't1-root',
+        author: { id: 'login:x', login: 'x', isServiceAccount: false },
+        body: 'issue: le retry ne borne pas le backoff',
+        createdAt: '2026-01-01T00:00:00Z',
+        permalink: '#t1',
+        isSystemGenerated: false,
+        canCarryBlockingState: true,
+      },
+      replies: [],
+      resolution,
+      canCarryBlockingState: true,
+    };
+  }
+
+  it('deux pages identiques sauf l’état de résolution d’un fil n’ont pas la même signature', () => {
+    const element = document.createElement('div');
+    const page = (resolution: ThreadInfo['resolution']) =>
+      makeAdapter(() => pr(80), () => null, {
+        getRenderedThreadElements: () => [{ id: 't1', element, resolution }],
+      });
+    expect(contentSignatureOf(page('unresolved'))).toBe(contentSignatureOf(page('unresolved')));
+    expect(contentSignatureOf(page('resolved'))).not.toBe(contentSignatureOf(page('unresolved')));
+  });
+
+  it('le décompte suit la résolution, puis la réouverture, sans autre changement de la page', async () => {
+    const doc = document;
+    const current = pr(81);
+    const element = doc.createElement('div');
+    element.textContent = 'issue: le retry ne borne pas le backoff';
+    doc.body.appendChild(element);
+    let resolution: ThreadInfo['resolution'] = 'unresolved';
+    const adapter = makeAdapter(() => current, () => null, {
+      getThreads: async () => [issueThread(current, resolution)],
+      getRenderedThreadElements: () => [{ id: 't1', element, resolution }],
+    });
+    observe(adapter, new ClientConfigResolver(async () => null), doc);
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
+
+    // Le fil est résolu : seul l'état rendu à côté de lui change (simulé ici par une mutation
+    // ailleurs dans la page, qui réveille l'observateur).
+    resolution = 'resolved';
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(0);
+
+    // Rouvert : le bandeau revient.
+    resolution = 'unresolved';
+    doc.body.appendChild(doc.createElement('span'));
+    await flushAll();
+    expect(doc.querySelectorAll('.cct-banner')).toHaveLength(1);
   });
 });
 

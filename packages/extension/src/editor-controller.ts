@@ -120,6 +120,13 @@ export interface ControllerDeps {
  * réécrit avec une chaîne vide, à la restauration. */
 const SUBMIT_NATIVE_ARIA_DISABLED_MARKER = 'cctSubmitNativeAriaDisabled';
 
+/** Par journal et par chaîne, les champs dont la recherche de contrôles d'envoi est restée vide et
+ * qui n'ont pas trouvé les leurs depuis (`EditorController.#submitControls`). Au niveau du module :
+ * chaque éditeur a son contrôleur, et c'est entre contrôleurs qu'il faut savoir si une chaîne est
+ * rattrapée partout. Un champ retiré de la page sans avoir trouvé ses boutons y reste : rien ne
+ * dit qu'il les aurait trouvés, et la ligne ne se déclare pas rattrapée à sa place. */
+const MISSING_SUBMIT = new WeakMap<SelectorLog, Map<string, Set<Element>>>();
+
 /** Pose le grisage de ce contrôleur sur un bouton de soumission (§5.4), en capturant sa
  * valeur native d'`aria-disabled` la toute première fois — jamais aux passages suivants,
  * sous peine d'écraser la valeur native par notre PROPRE écriture lors d'un second cycle
@@ -491,11 +498,26 @@ export class EditorController {
    * Seulement pour un champ encore DANS la page : `dispose()` s'exécute aussi quand le champ vient
    * d'en être retiré, et ne rien trouver autour d'un élément détaché ne dit rien de la plateforme.
    * Des boutons trouvés après une première absence marquent la ligne rattrapée
-   * (`SelectorLog.recovered`) : la chaîne a été interrogée trop tôt, elle n'a pas pourri. */
+   * (`SelectorLog.recovered`) : la chaîne a été interrogée trop tôt, elle n'a pas pourri. Mais
+   * seulement quand TOUS les champs qui l'avaient fait journaliser ont trouvé les leurs
+   * (`MISSING_SUBMIT`) : plusieurs éditeurs d'une page partagent une chaîne, et le journal ne
+   * connaît que son nom — un éditeur sain marquait rattrapée la ligne d'un autre, toujours sans
+   * bouton (revue Codex, PR #172). */
   #submitControls(): SubmitControl[] {
     const lookup = this.deps.adapter.getSubmitControls(this.deps.editor);
-    if (lookup.controls.length > 0) this.deps.log?.recovered(lookup.searched);
-    else if (this.deps.editor.element.isConnected) this.deps.log?.degraded(lookup.searched, lookup.evidence);
+    const log = this.deps.log;
+    if (!log) return lookup.controls;
+    const field = this.deps.editor.element;
+    let byChain = MISSING_SUBMIT.get(log);
+    if (!byChain) MISSING_SUBMIT.set(log, (byChain = new Map()));
+    let missing = byChain.get(lookup.searched.name);
+    if (!missing) byChain.set(lookup.searched.name, (missing = new Set()));
+    if (lookup.controls.length > 0) {
+      if (missing.delete(field) && missing.size === 0) log.recovered(lookup.searched);
+    } else if (field.isConnected) {
+      missing.add(field);
+      log.degraded(lookup.searched, lookup.evidence);
+    }
     return lookup.controls;
   }
 

@@ -84,6 +84,34 @@ describe('CA-11, §9.4 — le contrôleur partagé journalise un éditeur sans c
     expect(recovered).toEqual([FAKE_SUBMIT_CHAIN.name]);
   });
 
+  it('deux éditeurs sur la même chaîne : l’éditeur sain ne rattrape pas la ligne de l’autre (revue Codex, PR #172)', () => {
+    const broken = setup();
+    // Un second éditeur, sain, qui journalise dans le MÊME journal, sur la MÊME chaîne.
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    const healthyAdapter: Partial<PlatformAdapter> = {
+      platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
+      getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
+      getSubmitControls: () => submitLookup([{ element: document.createElement('button'), kind: 'submit' }]),
+      submitKeystrokes: () => ({ field: [], control: [] }),
+      readValue: () => textarea.value,
+      writeValue: () => {},
+    };
+    const healthy = controllerFor(
+      healthyAdapter as PlatformAdapter,
+      { id: 'e2', element: textarea, context: broken.controller.deps.editor.context },
+      broken.log
+    );
+    broken.controller.refresh();
+    healthy.refresh();
+    expect(broken.lines).toHaveLength(1);
+    expect(broken.recovered).toEqual([]);
+    // L'éditeur fautif trouve enfin ses boutons : là seulement, la ligne est rattrapée.
+    broken.setControls([{ element: document.createElement('button'), kind: 'submit' }]);
+    broken.controller.refresh();
+    expect(broken.recovered).toEqual([FAKE_SUBMIT_CHAIN.name]);
+  });
+
   it('un champ retiré de la page n’écrit rien : `dispose()` ne trouve rien autour d’un élément détaché', () => {
     const { controller, lines, textarea } = setup();
     textarea.remove();

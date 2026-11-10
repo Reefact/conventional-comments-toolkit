@@ -153,11 +153,19 @@ export const selectors = {
    * cas nominal ou un champ qu'aucune règle n'a situé, journalisé alors sans que la zone change.
    *
    * MESURÉ le 2026-11-10 sur toutes les captures : le repli n'est atteint que par le champ des
-   * captures 01 de l'Overview, dans le fil d'activité (`activityFeed`, même tableau). */
+   * captures 01 de l'Overview. Son fil, dans le fil d'activité, ne contient QUE la zone de saisie
+   * (`.repos-discussion-thread-reply`, enfant unique) : c'est ce qui le distingue d'une réponse ou
+   * d'une modification, dont le fil porte déjà des commentaires. Le candidat ne trouve ce composeur
+   * que sur les captures 01, et rien sur les autres.
+   *
+   * Le fil d'activité seul (`table.activity-feed-list`, la première version) ne suffisait pas : il
+   * contient aussi les éditions. Une modification dont le commentaire ne serait plus reconnu
+   * (`comment`) arrive à ce repli, et y était tenue pour un nouveau commentaire général, sans ligne
+   * au journal (revue Reefact, PR #174). */
   generalComposer: {
     name: 'general-composer',
     problem: 'editor-zone',
-    candidates: ['table.activity-feed-list'],
+    candidates: ['table.activity-feed-list .repos-discussion-thread > .repos-discussion-thread-reply:only-child'],
   } satisfies SelectorChain,
 
   /** Contrôles d'ENVOI, cherchés DANS le conteneur de l'éditeur (`.repos-comment-editor-fit`).

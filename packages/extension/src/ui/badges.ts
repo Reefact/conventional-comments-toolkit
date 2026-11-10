@@ -690,10 +690,12 @@ function sessionLine(body: Element, marker: SessionMarker, shape: RenderedBodySh
       previous === null || (previous.nodeType === 1 && (previous as Element).tagName === shape.lineBreakTag);
     if (!atLineStart) return null;
   }
-  const line = node.data.slice(lineStart, end);
-  const start = lineStart + (line.length - line.trimStart().length);
-  if (node.data.slice(start, end) !== marker.raw) return null;
-  return { node, start };
+  if (node.data.slice(lineStart, end).trim() !== marker.raw) return null;
+  // La plage rendue est la LIGNE ENTIÈRE, blancs de bordure compris — de son début à la fin du
+  // nœud, où ne restent que des blancs par construction (`end`). Ne prendre que le marqueur
+  // laissait ses espaces de fin dans un nœud de texte visible après la mention (revue Reefact,
+  // PR #163) : la ligne n'était pas remplacée, seulement entamée.
+  return { node, start: lineStart };
 }
 
 /** Variable portée par l'espaceur du sujet : sa hauteur, deux tiers d'écart de paragraphe. */
@@ -830,7 +832,7 @@ function applySessionProjection(
   const expected = sessionText(marker, config);
   if (hidden !== null) {
     const shown = hidden.nextElementSibling;
-    if (hidden.textContent === marker.raw && shown?.classList.contains(SESSION_CLASS)) {
+    if ((hidden.textContent ?? '').trim() === marker.raw && shown?.classList.contains(SESSION_CLASS)) {
       if (shown.textContent !== expected) shown.textContent = expected; // icône changée
       const gap = sessionGap(body, hidden, shape);
       const element = shown as HTMLElement;
@@ -843,8 +845,8 @@ function applySessionProjection(
   }
   const found = sessionLine(body, marker, shape);
   if (found === null) return; // repli : le marqueur reste visible, tel qu'écrit
-  const markerNode = found.node.splitText(found.start);
-  markerNode.splitText(marker.raw.length);
+  // Tout le reste du nœud : la ligne du marqueur, et ses blancs jusqu'à la fin.
+  const markerNode = found.start === 0 ? found.node : found.node.splitText(found.start);
   const wrapper = globalThis.document.createElement('span');
   wrapper.className = HIDDEN_SESSION_CLASS;
   markerNode.replaceWith(wrapper);

@@ -1,0 +1,147 @@
+# Retire le pied d'attribution d'une session Claude Code (décision du propriétaire,
+# 2026-11-10) :
+#   - de la description d'une PR, toujours ;
+#   - d'un commentaire (conversation, revue en ligne, texte d'ensemble d'une revue),
+#     SEULEMENT quand un marqueur de session (§3.6) le précède.
+# Le pourquoi et les formes reconnues sont en tête de `scripts/lib/claude-footer.mjs`.
+#
+# Ce workflow n'exécute JAMAIS le code d'une PR : il extrait la branche par défaut du dépôt,
+# réduite au seul module, quel que soit l'événement. C'est explicite parce que les événements
+# de revue extraient par défaut le commit de fusion de la PR, et c'est ce qui rend sûr
+# `pull_request_target` — le seul déclencheur dont le jeton peut écrire sur une PR venue
+# d'un fork. Ne jamais remplacer ce `ref` par celui de la PR.
+#
+# Limite : sur une PR venue d'un fork, les événements de revue ne reçoivent qu'un jeton en
+# lecture seule. Le pied d'une revue ou d'un commentaire de revue y reste ; le workflow le
+# signale par un avertissement au lieu d'échouer. Partout ailleurs, un refus fait échouer
+# le passage.
+#
+# Les événements de revue (`pull_request_review`, `pull_request_review_comment`) exécutent la
+# version de CE FICHIER portée par la PR, pas celle de la branche par défaut — mesuré sur la
+# PR #167, où ce workflow a tourné avant toute fusion. Sur une PR qui l'introduit ou le
+# modifie, le module extrait de la branche par défaut peut donc manquer ou dater : le
+# workflow s'efface alors, sans échouer. Le jeton reste celui que GitHub accorde à la PR —
+# en lecture seule pour un fork.
+#
+# Pas de boucle : une modification faite avec le `GITHUB_TOKEN` ne déclenche aucun workflow.
+name: Pied Claude Code
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created, edited]
+  pull_request_review_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  strip:
+    # Chaque forme reconnue contient « Claude Code » : un lien de session seul n'est jamais
+    # retiré (revue de la PR #167), il n'a donc pas à déclencher le passage.
+    if: contains(github.event.comment.body || github.event.review.body || github.event.pull_request.body, 'Claude Code')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: scripts/lib/claude-footer.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const modulePath = `${process.env.GITHUB_WORKSPACE}/scripts/lib/claude-footer.mjs`;
+            if (!require('fs').existsSync(modulePath)) {
+              core.notice('Module absent de la branche par défaut (PR qui introduit ce workflow ?) : rien à faire.');
+              return;
+            }
+            const { stripClaudeFooter, stripClaudeFooterAfterSessionMarker } = await import(modulePath);
+            const { owner, repo } = context.repo;
+            const payload = context.payload;
+
+            // Pour chaque événement : lire le texte COURANT plutôt que celui de l'événement, le
+            // nettoyer, le RELIRE juste avant d'écrire et renoncer s'il a changé — la
+            // modification survenue entre-temps a déclenché son propre passage, qui s'en
+            // chargera. Cela RÉTRÉCIT la fenêtre d'écrasement sans la fermer : une modification
+            // tombant entre la seconde lecture et l'écriture serait perdue. Cette API REST n'a
+            // pas d'écriture conditionnelle, à notre connaissance (non vérifié) ; la fenêtre
+            // résiduelle se compte en millisecondes, sur un texte qu'un humain modifie à la
+            // main (revue de la PR #167).
+            let target;
+            switch (context.eventName) {
+              case 'pull_request_target': {
+                const pull_number = payload.pull_request.number;
+                target = {
+                  what: `description de la PR #${pull_number}`,
+                  clean: stripClaudeFooter,
+                  read: async () => (await github.rest.pulls.get({ owner, repo, pull_number })).data.body,
+                  write: (body) => github.rest.pulls.update({ owner, repo, pull_number, body }),
+                };
+                break;
+              }
+              case 'issue_comment': {
+                const comment_id = payload.comment.id;
+                target = {
+                  what: `commentaire ${comment_id}`,
+                  clean: stripClaudeFooterAfterSessionMarker,
+                  read: async () => (await github.rest.issues.getComment({ owner, repo, comment_id })).data.body,
+                  write: (body) => github.rest.issues.updateComment({ owner, repo, comment_id, body }),
+                };
+                break;
+              }
+              case 'pull_request_review_comment': {
+                const comment_id = payload.comment.id;
+                target = {
+                  what: `commentaire de revue ${comment_id}`,
+                  clean: stripClaudeFooterAfterSessionMarker,
+                  read: async () => (await github.rest.pulls.getReviewComment({ owner, repo, comment_id })).data.body,
+                  write: (body) => github.rest.pulls.updateReviewComment({ owner, repo, comment_id, body }),
+                };
+                break;
+              }
+              case 'pull_request_review': {
+                const pull_number = payload.pull_request.number;
+                const review_id = payload.review.id;
+                target = {
+                  what: `revue ${review_id} de la PR #${pull_number}`,
+                  clean: stripClaudeFooterAfterSessionMarker,
+                  read: async () => (await github.rest.pulls.getReview({ owner, repo, pull_number, review_id })).data.body,
+                  write: (body) => github.rest.pulls.updateReview({ owner, repo, pull_number, review_id, body }),
+                };
+                break;
+              }
+              default:
+                core.setFailed(`Événement inattendu : ${context.eventName}`);
+                return;
+            }
+
+            const body = (await target.read()) ?? '';
+            const cleaned = target.clean(body);
+            if (cleaned === body) {
+              core.info(`${target.what} : rien à retirer.`);
+              return;
+            }
+            if (((await target.read()) ?? '') !== body) {
+              core.info(`${target.what} : modifié pendant le passage, laissé au passage suivant.`);
+              return;
+            }
+            try {
+              await target.write(cleaned);
+              core.info(`${target.what} : pied Claude Code retiré.`);
+            } catch (error) {
+              // Seul cas toléré : un événement de revue sur une PR venue d'un fork, dont le jeton
+              // est en lecture seule. Tout autre refus — jeton privé d'un droit, revue soumise
+              // qu'on ne peut pas modifier — échoue visiblement (revue de la PR #167).
+              const head = payload.pull_request?.head?.repo?.full_name;
+              const forkReview =
+                context.eventName.startsWith('pull_request_review') &&
+                head !== undefined && head !== payload.repository.full_name;
+              if (error.status !== 403 || !forkReview) throw error;
+              core.warning(`${target.what} : pied laissé en place, PR venue du fork ${head} (jeton en lecture seule).`);
+            }

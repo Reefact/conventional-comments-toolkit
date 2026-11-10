@@ -8,7 +8,7 @@ then on the skill reads that file instead, without asking again.
 From the repository root, check whether Slugger already runs: `dotnet tool restore` then
 `dotnet slugger --version` when the repository has a local tool manifest, or `slugger --version`
 for a global install. If either answers, **use Slugger for this session without asking**, with the
-command of the Slugger option below. Then, if you can reach the person you work for, offer to
+command of the Slugger option below that matches the one that answered. Then, if you can reach the person you work for, offer to
 record that choice (sections 3 and 4) so that later sessions skip this file; if you cannot, record
 nothing.
 
@@ -63,11 +63,18 @@ Then draw this session's identifier as the file you wrote says.
 
 This repository names review sessions with Slugger and its `code-review` theme. Do not ask again.
 
-At the start of each new review session, from the repository root:
+At the start of each new review session, from the repository root, when the repository's local
+tool manifest lists Slugger:
 
 ```bash
 dotnet tool restore
 dotnet slugger --theme-dir <skill-dir> --theme code-review --oneshot
+```
+
+When it does not, and Slugger is installed globally instead:
+
+```bash
+slugger --theme-dir <skill-dir> --theme code-review --oneshot
 ```
 
 `<skill-dir>` is the directory of the review skill's `SKILL.md`, which ships `code-review.json`.

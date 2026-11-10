@@ -504,6 +504,16 @@
    préfixe compris. */
 .cct-hidden-prefix { display: none; }
 
+/* Marqueur de session (§3.6, §5.5) : la ligne `[session:…]` telle qu'écrite est masquée, et
+   remplacée à sa place par l'icône et la valeur en minuscules — discret, en bas du commentaire,
+   sans badge ni panneau. Même discipline que le préfixe : purement client, défait dès qu'il
+   n'est plus reconnu (badges.ts, applySessionProjection). */
+.cct-hidden-session { display: none; }
+.cct-session {
+  color: var(--cct-fg-muted);
+  font-size: 12px;
+}
+
 .cct-merge-blocked { opacity: 0.5; }
 
 .cct-quick-list {

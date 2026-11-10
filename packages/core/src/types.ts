@@ -233,6 +233,8 @@ export interface EffectiveConfig {
   coreMinVersion: string;
   configCacheTtlSeconds: number;
   badgeStyle: string;
+  /** Icône du marqueur de session affiché (§3.6, §5.5) — présentation seule, hors empreinte. */
+  sessionIcon: string;
   shortcuts: { abbreviations: Record<string, string> };
   docUrl: string;
   // Ni bloc `server`, ni `exemptionLog` : la fenêtre de coalescence, le délai de grâce,

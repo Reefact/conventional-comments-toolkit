@@ -21,6 +21,9 @@ export {
   type BodyLines,
 } from './preprocess.js';
 
+// §3.6 — marqueur de session
+export { extractSessionMarker, type SessionMarker } from './session.js';
+
 // §3.4.2 — regex de référence
 export {
   REFERENCE_REGEX,

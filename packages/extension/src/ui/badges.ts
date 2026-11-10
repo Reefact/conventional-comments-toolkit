@@ -28,6 +28,7 @@ import {
   type EffectiveConfig,
   type PlatformProfile,
   type ResolvedDecoration,
+  type SessionMarker,
 } from '@cct/core';
 // Ce module ne nomme plus AUCUNE forme de corps rendu : `MARKDOWN_HTML_BODY_SHAPE` n'est plus
 // importé ici. Il l'était pour deux replis — le défaut de `decorateComment()` et le bouche-trou
@@ -513,6 +514,7 @@ function unwrapSubject(commentBodyElement: Element): void {
  * continuait de masquer une partie du texte de l'auteur, jusqu'au rechargement de la page. Le
  * défaisage doit couvrir tout ce que le rendu pose, pas seulement ce qui se voit. */
 export function clearCommentDecorations(root: ParentNode): void {
+  revealSession(root);
   for (const badge of [...root.querySelectorAll('.cct-badge')]) badge.remove();
   // La marque de l'hôte part avec les badges qu'elle désignait : la laisser ferait relire comme
   // « nôtre » un élément où plus rien n'est à nous.
@@ -603,6 +605,123 @@ function applyPrefixVisibility(
   wrapSubject(hidden, shape);
 }
 
+// ————— Marqueur de session (§3.6, §5.5) —————
+//
+// La dernière ligne `[session:<valeur>]` est masquée dans le corps AFFICHÉ et remplacée, à sa
+// place, par `<icône> session: <valeur en minuscules>`. Même discipline que le masquage du
+// préfixe : rien n'est écrit côté plateforme, tout se défait, et dans le doute on renonce — le
+// corps reste alors entier, marqueur compris, lisible tel qu'écrit.
+
+/** Le texte du marqueur, masqué : il reste dans `textContent`, si bien que la relecture du corps
+ * (`commentBodyText()`) retrouve le marqueur tel qu'écrit et que la reconnaissance est stable
+ * d'un passage à l'autre. */
+const HIDDEN_SESSION_CLASS = 'cct-hidden-session';
+/** Ce que l'extension AFFICHE à la place. Il ajoute du texte : `commentBodyText()` l'exclut. */
+const SESSION_CLASS = 'cct-session';
+
+function sessionText(marker: SessionMarker, config: EffectiveConfig): string {
+  return `${config.sessionIcon} session: ${marker.value.toLowerCase()}`;
+}
+
+const isOwn = (node: Node): boolean =>
+  node.nodeType === 1 &&
+  ((node as Element).classList.contains('cct-badge') || (node as Element).classList.contains(SESSION_CLASS));
+
+const isBlank = (node: Node): boolean => node.nodeType === 3 && (node as Text).data.trim() === '';
+
+/** Dernier enfant significatif — ni blanc, ni écriture de l'extension. */
+function lastSignificantChild(parent: Node): ChildNode | null {
+  for (let node = parent.lastChild; node !== null; node = node.previousSibling) {
+    if (isBlank(node) || isOwn(node)) continue;
+    return node;
+  }
+  return null;
+}
+
+/** Le nœud de texte, et la plage, qui portent la DERNIÈRE ligne du corps rendu — à condition que
+ * cette ligne soit le marqueur, et lui seul. Allow-list, comme `firstTextNode()` : le dernier
+ * bloc doit être un paragraphe déclaré par la plateforme (ou du texte posé directement dans le
+ * corps), sa dernière ligne un nœud de texte ENFANT DIRECT de ce bloc, commencée en tête de bloc,
+ * après un saut de ligne déclaré, ou après une fin de ligne littérale du même nœud. Un bloc de
+ * code, une citation, une liste, une mise en forme inline sur la ligne : on renonce. Le texte
+ * vient du DOM rendu, où la syntaxe de ces constructions a pu disparaître — `analyze()` peut
+ * donc reconnaître un marqueur que la source écrivait dans un bloc de code ; ce n'est que dans
+ * un paragraphe simple que la ligne rendue est la ligne écrite. */
+function sessionLine(body: Element, marker: SessionMarker, shape: RenderedBodyShape): { node: Text; start: number } | null {
+  const last = lastSignificantChild(body);
+  if (last === null) return null;
+  let text: ChildNode | null = last;
+  if (last.nodeType === 1) {
+    if (!shape.paragraphTags.includes((last as Element).tagName)) return null;
+    text = lastSignificantChild(last);
+  }
+  if (text === null || text.nodeType !== 3) return null;
+  const node = text as Text;
+  const end = node.data.trimEnd().length;
+  const lineStart = node.data.lastIndexOf('\n', end - 1) + 1;
+  if (lineStart === 0) {
+    // La ligne commence avant ce nœud, sauf en tête de bloc ou juste après un saut de ligne.
+    let previous = node.previousSibling;
+    while (previous !== null && isBlank(previous)) previous = previous.previousSibling;
+    const atLineStart =
+      previous === null || (previous.nodeType === 1 && (previous as Element).tagName === shape.lineBreakTag);
+    if (!atLineStart) return null;
+  }
+  const line = node.data.slice(lineStart, end);
+  const start = lineStart + (line.length - line.trimStart().length);
+  if (node.data.slice(start, end) !== marker.raw) return null;
+  return { node, start };
+}
+
+/** Défait la projection : texte d'origine rendu à sa place, affichage retiré. */
+function revealSession(root: ParentNode): void {
+  for (const shown of [...root.querySelectorAll(`.${SESSION_CLASS}`)]) shown.remove();
+  for (const hidden of [...root.querySelectorAll(`.${HIDDEN_SESSION_CLASS}`)]) {
+    const parent = hidden.parentNode;
+    hidden.replaceWith(globalThis.document.createTextNode(hidden.textContent ?? ''));
+    parent?.normalize();
+  }
+}
+
+/** Pose, réentretient ou défait la projection du marqueur de session (§5.5). `marker` à `null`,
+ * ou une forme de corps non mesurée : on défait — c'est ce qui rend le marqueur à un corps dont
+ * la dernière ligne n'en est plus un, et à une plateforme qui cesse de répondre. Idempotent. */
+function applySessionProjection(
+  body: Element,
+  marker: SessionMarker | null,
+  config: EffectiveConfig,
+  shape: RenderedBodyShape | null
+): void {
+  const hidden = body.querySelector(`.${HIDDEN_SESSION_CLASS}`);
+  if (marker === null || shape === null) {
+    revealSession(body);
+    return;
+  }
+  const expected = sessionText(marker, config);
+  if (hidden !== null) {
+    const shown = hidden.nextElementSibling;
+    if (hidden.textContent === marker.raw && shown?.classList.contains(SESSION_CLASS)) {
+      if (shown.textContent !== expected) shown.textContent = expected; // icône changée
+      return;
+    }
+    revealSession(body); // marqueur changé, ou affichage emporté par la plateforme : reconstruire
+  } else if (body.querySelector(`.${SESSION_CLASS}`) !== null) {
+    revealSession(body);
+  }
+  const found = sessionLine(body, marker, shape);
+  if (found === null) return; // repli : le marqueur reste visible, tel qu'écrit
+  const markerNode = found.node.splitText(found.start);
+  markerNode.splitText(marker.raw.length);
+  const wrapper = globalThis.document.createElement('span');
+  wrapper.className = HIDDEN_SESSION_CLASS;
+  markerNode.replaceWith(wrapper);
+  wrapper.appendChild(markerNode);
+  const shown = globalThis.document.createElement('span');
+  shown.className = SESSION_CLASS;
+  shown.textContent = expected;
+  wrapper.after(shown);
+}
+
 export function decorateComment(
   commentBodyElement: Element,
   bodyText: string,
@@ -680,6 +799,9 @@ export function decorateComment(
   const masking =
     shape !== null && canHidePrefix && a.prefixLine !== null ? { prefixLine: a.prefixLine, shape } : null;
   applyPrefixVisibility(commentBodyElement, masking, bodyText);
+  // Le marqueur de session est une métadonnée, affichée quel que soit le verdict — y compris sur
+  // un commentaire sans label résolu, d'où sa place AVANT le retour anticipé ci-dessous.
+  applySessionProjection(commentBodyElement, a.session, config, shape);
   // Où poser les badges — LU dans le DOM que la ligne ci-dessus vient d'établir, jamais déduit
   // de `canHidePrefix` seul, qui dit ce qu'on VOULAIT faire, pas ce qui a été fait (les replis
   // de `applyPrefixVisibility` renoncent sans le dire à l'appelant). Préfixe masqué → l'élément

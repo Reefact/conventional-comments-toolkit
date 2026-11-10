@@ -139,6 +139,8 @@ export function defaultConfig(): EffectiveConfig {
     coreMinVersion: '1.0.0',
     configCacheTtlSeconds: 3600,
     badgeStyle: 'pill',
+    // Un robot : la convention sert d'abord à reconnaître les sessions de revue d'agents (§3.6).
+    sessionIcon: '\u{1F916}',
     shortcuts: {
       // §5.2 — autant de lettres qu'il en faut pour désigner un label sans ambiguïté :
       // deux pour nitpick/note, todo/thought, praise/polish ; trois pour question/quibble.

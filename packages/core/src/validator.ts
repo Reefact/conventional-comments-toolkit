@@ -10,7 +10,7 @@ import {
   type BodyLines,
 } from './preprocess.js';
 import { matchPrefix, type PrefixMatch } from './regex.js';
-import { extractSessionMarker, type SessionMarker } from './session.js';
+import { extractSessionMarker, SESSION_DIAGNOSTIC, type SessionMarker } from './session.js';
 import {
   parseDecorations,
   resolveLabel,
@@ -199,7 +199,7 @@ export function analyze(rawInput: ValidationInput, config: EffectiveConfig): Com
   // 2, qui jugent le contenu : il est dû que le préfixe soit reconnu ou non.
   if (session !== null && session.value === null) {
     diagnostics.push({
-      code: 'W-SESSION-MULTIPLE',
+      code: SESSION_DIAGNOSTIC,
       severity: 'warn',
       message: t(lang, 'diag.W-SESSION-MULTIPLE', { count: session.lines.length }),
     });
@@ -686,6 +686,9 @@ function finalizeDiagnostics(diagnostics: Diagnostic[], config: EffectiveConfig)
     // Limite basse : un code E- ne descend jamais sous warn (§8.2) — défense en profondeur,
     // la résolution de configuration l'applique déjà.
     if (severity === 'off' && d.code.startsWith('E-')) severity = 'warn';
+    // Limite haute du marqueur de session (§3.6, §8.2) : jamais une erreur — défense en
+    // profondeur, la résolution de configuration l'applique déjà.
+    if (severity === 'error' && d.code === SESSION_DIAGNOSTIC) severity = 'warn';
     if (severity === 'off') continue; // retiré de la liste restituée (§3.5.1)
     out.push({ ...d, severity });
   }

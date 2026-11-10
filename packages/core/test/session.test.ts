@@ -8,6 +8,8 @@ import { analyze, isBlocking, validate } from '../src/validator.js';
 import { defaultConfig } from '../src/config/defaults.js';
 import { parseConfigDocument } from '../src/config/schema.js';
 import { codes, config, vInput } from './helpers.js';
+import { resolveConfig } from '../src/config/resolve.js';
+import { isCompliant } from '../src/validator.js';
 
 const value = (body: string) => extractSessionMarker(body)?.value ?? null;
 
@@ -167,6 +169,27 @@ describe('CA-54 — marqueur en double (§3.6)', () => {
       'E-UNKNOWN-LABEL',
       'W-SESSION-MULTIPLE',
     ]);
+  });
+
+  it('jamais une erreur, même demandée par `severities` — dépôt ou plancher : un avertissement, signalé (§3.6, §8.2)', () => {
+    const doc = { status: 'found', text: JSON.stringify({ severities: { 'W-SESSION-MULTIPLE': 'error' } }) } as const;
+    for (const [floor, repo] of [
+      [null, doc],
+      [{ severities: { 'W-SESSION-MULTIPLE': 'error' } }, { status: 'absent' } as const],
+    ] as const) {
+      const { config: resolved, notices } = resolveConfig(floor as never, { status: 'absent' }, repo);
+      expect(resolved.severities['W-SESSION-MULTIPLE']).toBe('warn');
+      expect(notices.some((n) => n.ref === 'severities.W-SESSION-MULTIPLE')).toBe(true);
+      const diagnostics = validate(vInput('note: titre conforme\n\n[session:a]\n[session:b]'), resolved);
+      expect(diagnostics.map((d) => [d.code, d.severity])).toEqual([['W-SESSION-MULTIPLE', 'warn']]);
+      expect(isCompliant(diagnostics)).toBe(true);
+    }
+    // Défense en profondeur : une configuration qui n'est pas passée par la résolution.
+    const raw = config((c) => (c.severities = { 'W-SESSION-MULTIPLE': 'error' }));
+    expect(isCompliant(validate(vInput('note: titre conforme\n[session:a]\n[session:b]'), raw))).toBe(true);
+    // L'éteindre reste permis.
+    const off = config((c) => (c.severities = { 'W-SESSION-MULTIPLE': 'off' }));
+    expect(validate(vInput('note: titre conforme\n[session:a]\n[session:b]'), off)).toEqual([]);
   });
 
   it('jamais une erreur par défaut : un commentaire conforme le reste', () => {

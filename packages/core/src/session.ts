@@ -30,6 +30,11 @@ export interface SessionMarker {
   contentBody: string;
 }
 
+/** Le seul diagnostic du marqueur (§3.6). Plafonné à `warn` : une erreur de métadonnée ne bloque
+ * jamais l'envoi, et `severities` peut l'éteindre, jamais le porter à `error` (§8.2) — sans ce
+ * plafond, la promesse du §3.6 dépendrait d'une clé de configuration. */
+export const SESSION_DIAGNOSTIC = 'W-SESSION-MULTIPLE';
+
 // Même jeu clos que l'étape 4 du §3.4.1 : \p{White_Space} ∪ {U+FEFF}.
 const EDGE = /^[\p{White_Space}\uFEFF]+|[\p{White_Space}\uFEFF]+$/gu;
 const strip = (s: string): string => s.replace(EDGE, '');

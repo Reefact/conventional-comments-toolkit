@@ -11,6 +11,7 @@ import { defaultConfig } from './defaults.js';
 import { parseConfigDocument } from './schema.js';
 import { mergeLevel } from './merge.js';
 import { applyFloor, maxMode, vetFloor, vettedConfigUrl } from './floor.js';
+import { SESSION_DIAGNOSTIC } from '../session.js';
 
 export interface ResolvedConfig {
   config: EffectiveConfig;
@@ -95,6 +96,17 @@ export function resolveConfig(
 
   // configUrl provient exclusivement du canal de plancher (§8.1.2).
   config.configUrl = vettedConfigUrl(vetted);
+
+  // Limite haute du marqueur de session (§3.6, §8.2), quel que soit le niveau qui la demande,
+  // plancher compris : une erreur de métadonnée ne bloque jamais l'envoi.
+  if (config.severities[SESSION_DIAGNOSTIC] === 'error') {
+    config.severities[SESSION_DIAGNOSTIC] = 'warn';
+    notices.push({
+      kind: 'config-warning',
+      message: `severity of "${SESSION_DIAGNOSTIC}" cannot go above "warn" (§3.6): value "error" lowered to "warn"`,
+      ref: `severities.${SESSION_DIAGNOSTIC}`,
+    });
+  }
 
   // Limite basse de sévérité (§8.2), appliquée quel que soit le chemin — y compris quand
   // le plancher n'a pas pu être appliqué : un code E- ne descend jamais sous warn.

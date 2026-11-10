@@ -509,9 +509,17 @@
    sans badge ni panneau. Même discipline que le préfixe : purement client, défait dès qu'il
    n'est plus reconnu (badges.ts, applySessionProjection). */
 .cct-hidden-session { display: none; }
+/* Texte « atténué » (muted, au sens de Primer : `fgColor-muted`, le texte secondaire), en italique :
+   une métadonnée, que l'œil peut sauter. Un BLOC, détaché du texte au-dessus par le double de
+   l'écart normal entre paragraphes : `--cct-session-gap`, calculé et posé par badges.ts
+   (sessionGap) parce que l'écart normal se lit sur la page. Un `padding`, jamais une `margin` :
+   une marge fusionnerait avec celle du paragraphe précédent au lieu de s'y ajouter. */
 .cct-session {
+  display: block;
+  padding-top: var(--cct-session-gap, 1em);
   color: var(--cct-fg-muted);
   font-size: 12px;
+  font-style: italic;
 }
 
 .cct-merge-blocked { opacity: 0.5; }

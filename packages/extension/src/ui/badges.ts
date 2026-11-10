@@ -673,6 +673,43 @@ function sessionLine(body: Element, marker: SessionMarker, shape: RenderedBodySh
   return { node, start };
 }
 
+/** Écart au-dessus de la mention (demande Reefact, #163) : le DOUBLE de l'écart normal entre deux
+ * paragraphes du corps, quelle que soit la façon dont l'auteur a séparé le marqueur — paragraphe
+ * à part, saut de ligne simple, ou autant de lignes blanches qu'il voulait, que le rendu Markdown
+ * a déjà repliées. L'écart normal est LU sur la page (`margin-bottom` calculée du premier
+ * paragraphe du corps qui en a une), jamais supposé : il diffère d'une plateforme à l'autre.
+ *
+ * Ce qui est posé est un `padding-top` sur la mention, devenue un bloc. Un `margin-top` ne
+ * s'ajouterait pas à la marge du paragraphe précédent, il fusionnerait avec elle. D'où deux cas :
+ * - la mention ouvre son propre paragraphe : la marge du paragraphe précédent donne déjà un écart
+ *   normal, le `padding-top` en ajoute UN ;
+ * - elle suit du texte dans le même paragraphe (saut de ligne) : aucun écart n'existe, il en faut
+ *   DEUX.
+ * Seule dans le corps, rien n'est au-dessus d'elle : aucun écart. Sans écart lisible (paragraphe
+ * sans marge, environnement sans mise en page), `1em` tient lieu d'écart normal. */
+function sessionGap(body: Element, wrapper: Element, shape: RenderedBodyShape): string {
+  const host = wrapper.parentElement;
+  let previous = wrapper.previousSibling;
+  while (previous !== null && (isBlank(previous) || isOwn(previous))) previous = previous.previousSibling;
+  const opensParagraph = previous === null && host !== null && host !== body;
+  let before: Element | null = host?.previousElementSibling ?? null;
+  while (before !== null && before.classList.contains('cct-badge')) before = before.previousElementSibling;
+  if (opensParagraph && before === null) return '0px';
+  if (previous === null && host === body) return '0px';
+  const view = body.ownerDocument.defaultView;
+  let normal: number | null = null;
+  for (const child of body.children) {
+    if (!shape.paragraphTags.includes(child.tagName)) continue;
+    const margin = Number.parseFloat(view?.getComputedStyle(child).marginBottom ?? '');
+    if (Number.isFinite(margin) && margin > 0) {
+      normal = margin;
+      break;
+    }
+  }
+  const factor = opensParagraph ? 1 : 2;
+  return normal === null ? `${factor}em` : `${factor * normal}px`;
+}
+
 /** Défait la projection : texte d'origine rendu à sa place, affichage retiré. */
 function revealSession(root: ParentNode): void {
   for (const shown of [...root.querySelectorAll(`.${SESSION_CLASS}`)]) shown.remove();
@@ -702,6 +739,10 @@ function applySessionProjection(
     const shown = hidden.nextElementSibling;
     if (hidden.textContent === marker.raw && shown?.classList.contains(SESSION_CLASS)) {
       if (shown.textContent !== expected) shown.textContent = expected; // icône changée
+      const gap = sessionGap(body, hidden, shape);
+      if ((shown as HTMLElement).style.getPropertyValue('--cct-session-gap') !== gap) {
+        (shown as HTMLElement).style.setProperty('--cct-session-gap', gap);
+      }
       return;
     }
     revealSession(body); // marqueur changé, ou affichage emporté par la plateforme : reconstruire
@@ -720,6 +761,7 @@ function applySessionProjection(
   shown.className = SESSION_CLASS;
   shown.textContent = expected;
   wrapper.after(shown);
+  shown.style.setProperty('--cct-session-gap', sessionGap(body, wrapper, shape));
 }
 
 export function decorateComment(

@@ -148,6 +148,18 @@ export const selectors = {
     candidates: ['.repos-editor-discussion'],
   } satisfies SelectorChain,
 
+  /** Le composeur d'un nouveau commentaire GÉNÉRAL — le cas que le repli de `#contextOf()` classe
+   * `conversation` sans l'avoir reconnu (§4.1, §9.4, #168). Ne sert qu'à DÉCIDER si ce repli est le
+   * cas nominal ou un champ qu'aucune règle n'a situé, journalisé alors sans que la zone change.
+   *
+   * MESURÉ le 2026-11-10 sur toutes les captures : le repli n'est atteint que par le champ des
+   * captures 01 de l'Overview, dans le fil d'activité (`activityFeed`, même tableau). */
+  generalComposer: {
+    name: 'general-composer',
+    problem: 'editor-zone',
+    candidates: ['table.activity-feed-list'],
+  } satisfies SelectorChain,
+
   /** Contrôles d'ENVOI, cherchés DANS le conteneur de l'éditeur (`.repos-comment-editor-fit`).
    * Le pied de l'éditeur est une rangée de boutons dont *Cancel* est TOUJOURS le premier (01, 02,
    * 04, 06 — les quatre sortes d'éditeur), suivi de :

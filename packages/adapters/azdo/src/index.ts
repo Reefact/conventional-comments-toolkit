@@ -450,6 +450,16 @@ export class AzdoClientAdapter implements PlatformAdapter {
     // (03, les fils 1 à 4) — il porte donc un état bloquant, comme sur GitLab et contrairement à
     // GitHub. Exception au §4.1, décision du propriétaire écrite au §B.6 (2026-11-10, revue de
     // la PR #146).
+    //
+    // Le seul cas mesuré qui arrive ici est ce commentaire général (`generalComposer`) : un champ
+    // qui n'en est pas un garde la même zone, mais aucune règle ne l'a situé, et le journal le dit
+    // (§9.4, #168).
+    if (!closestChain(el, selectors.generalComposer).element) {
+      this.log.degraded(
+        selectors.generalComposer,
+        chainEvidence(this.#doc, selectors.generalComposer, { subject: printElement(el) })
+      );
+    }
     return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
   }
 }

@@ -163,6 +163,23 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
+  /** Le composeur d'un NOUVEAU commentaire de ligne de diff — le cas que le repli de
+   * `#contextOf()` classe `thread-root` sans l'avoir reconnu (§4.1, §9.4, #168). Ne sert qu'à
+   * DÉCIDER si ce repli est le cas nominal ou un champ qu'aucune règle n'a situé, journalisé alors
+   * sans que la zone change.
+   *
+   * MESURÉ le 2026-11-10 sur toutes les captures : le repli n'est atteint que par le champ de
+   * `04-files-commentaire-ligne.html` et `04-files-commentaire-ligne-pr-ouverte.html`, rendu dans la
+   * cellule de la ligne commentée, `tr.diff-line-row > td.diff-text-cell[role="dialog"]`. Les fils
+   * déjà publiés sont dans la même rangée, mais reconnus avant (`threadContainer`). La vue héritée
+   * des fichiers modifiés n'est pas capturée : un composeur de ligne y serait journalisé — à
+   * vérifier si elle est encore servie. */
+  diffLineComposer: {
+    name: 'diff-line-composer',
+    problem: 'editor-zone',
+    candidates: ['tr.diff-line-row'],
+  } satisfies SelectorChain,
+
   /** Boutons d'envoi d'un formulaire de commentaire (§4.3). */
   submitButtons: {
     name: 'submit-buttons',

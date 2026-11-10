@@ -166,6 +166,7 @@ export const selectors = {
   /** Boutons d'envoi d'un formulaire de commentaire (§4.3). */
   submitButtons: {
     name: 'submit-buttons',
+    problem: 'submit-control',
     candidates: [
       'button[type="submit"][data-testid*="submit"]',
       // CLASSIQUE — l'union est MESURÉE le 2026-11-09 sur les captures 01 et 03 de la
@@ -999,6 +1000,7 @@ export const selectors = {
    * commun `SubmitReviewButton__` les y trouve, d'où le second candidat. */
   overviewSubmitButtons: {
     name: 'overview-submit-buttons',
+    problem: 'submit-control',
     candidates: [
       '[data-testid="markdown-editor-footer"] [class*="childrenStyling__"] > div button, ' +
         '[data-testid="markdown-editor-footer"] [class*="childrenStyling__"] > button:not(:first-child), ' +

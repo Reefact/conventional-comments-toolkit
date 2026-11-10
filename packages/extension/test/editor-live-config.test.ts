@@ -27,6 +27,7 @@ import { HTML_SHAPE } from './helpers/decorate.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
 import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
+import { submitLookup } from './helpers/submit-lookup.js';
 
 interface FakeState {
   configText: string;
@@ -116,7 +117,7 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
         return { field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] };
       }
       getSubmitControls() {
-        return [{ element: submit, kind: 'submit' }];
+        return submitLookup([{ element: submit, kind: 'submit' }]);
       }
       platformProfile() {
         return { id: 'github', suggestionInfoString: 'suggestion' };

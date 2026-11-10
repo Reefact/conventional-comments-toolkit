@@ -15,7 +15,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { queryChain, type EditorHandle } from '@cct/adapter-shared';
+import { queryChain, SelectorLog, type EditorHandle, type SelectorEvidence } from '@cct/adapter-shared';
 import { GitlabClientAdapter } from '../src/index.js';
 import { selectors } from '../src/selectors.js';
 
@@ -31,10 +31,10 @@ interface LoadedPage {
 
 /** Une page capturée, à l'URL où elle a été prise. `DOMParser` plutôt que le document de
  * l'environnement : un document analysé ne charge ni script ni feuille de style. */
-function load(file: string, path: string): LoadedPage {
+function load(file: string, path: string, log?: SelectorLog): LoadedPage {
   const doc = new DOMParser().parseFromString(readFileSync(join(PAGES, file), 'utf8'), 'text/html');
   Object.defineProperty(doc, 'location', { value: new URL(`https://gitlab.com${path}`), configurable: true });
-  const adapter = new GitlabClientAdapter({ documentRef: doc });
+  const adapter = new GitlabClientAdapter({ documentRef: doc, ...(log ? { log } : {}) });
   const editors: EditorHandle[] = [];
   adapter.observeEditors((e) => editors.push(e)).dispose();
   return { adapter, doc, editors };
@@ -51,14 +51,14 @@ function editorBy(page: LoadedPage, key: string): EditorHandle {
 
 /** Le libellé des contrôles d'envoi, espaces resserrés. */
 function submitLabels(page: LoadedPage, editor: EditorHandle): string[] {
-  return page.adapter.getSubmitControls(editor).map((c) => (c.element.textContent ?? '').trim().replace(/\s+/g, ' '));
+  return page.adapter.getSubmitControls(editor).controls.map((c) => (c.element.textContent ?? '').trim().replace(/\s+/g, ' '));
 }
 
 /** Aucun contrôle qui ANNULE n'est jamais rendu comme contrôle d'envoi (skill plateforme, étape 4) :
  * l'intercepter enfermerait l'auteur d'un commentaire non conforme. */
 function expectNoCancelAmongSubmits(page: LoadedPage): void {
   for (const editor of page.editors) {
-    for (const control of page.adapter.getSubmitControls(editor)) {
+    for (const control of page.adapter.getSubmitControls(editor).controls) {
       expect(control.element.getAttribute('data-testid') ?? '').not.toMatch(/cancel|discard/i);
       expect((control.element.textContent ?? '').trim()).not.toMatch(/^(Cancel|Discard review|Continue review)$/);
     }
@@ -265,6 +265,17 @@ describe('§6.5, §9.4 — Bouton de fusion : son absence est la norme hors de l
     expect(page.adapter.getCompletionControl()).toBeNull();
     expect(loggedChains(page)).toEqual([]);
     expect(submitLabels(page, editorBy(page, 'comment-field'))).toEqual(['Comment', 'Start review', 'Reopen merge request']);
+  }, T);
+
+  it('Overview ouverte sans bouton de fusion : une rupture, journalisée avec son relevé (§9.4, #168)', () => {
+    const evidence = new Map<string, SelectorEvidence>();
+    const log = new SelectorLog(null, (chain, e) => evidence.set(chain.name, e));
+    const page = load('03-overview-commentaires-publies.html', MR1, log);
+    expect(page.adapter.getCompletionControl()).not.toBeNull();
+    for (const button of page.doc.querySelectorAll(selectors.mergeButton.candidates.join(', '))) button.remove();
+    expect(page.adapter.getCompletionControl()).toBeNull();
+    expect(loggedChains(page)).toContain('merge-button');
+    expect(evidence.get('merge-button')?.trace?.map((t) => t.candidate)).toEqual(selectors.mergeButton.candidates);
   }, T);
 
   it('onglet Changes : pas de bouton de fusion, rien de journalisé (04)', () => {

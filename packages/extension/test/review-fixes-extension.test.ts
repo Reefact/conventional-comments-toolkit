@@ -7,6 +7,7 @@ import { HTML_SHAPE } from './helpers/decorate.js';
 import { defaultConfig, type ConfigRead, type PrRef } from '@cct/core';
 import { ClientConfigResolver } from '../src/config-resolver.js';
 import type { PlatformAdapter } from '@cct/adapter-shared';
+import { submitLookup } from './helpers/submit-lookup.js';
 
 describe('écart A — §3.4.1 : l’insertion de préfixe vise la ligne de préfixe, pas la première ligne', () => {
   it('cliquer un label sous une citation n’écrase jamais la citation', () => {
@@ -123,7 +124,7 @@ describe('écart A — §5.4 cond. 4 : une lecture unreachable n’est jamais ma
       observeEditors: () => ({ dispose: () => {} }),
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
       renderedBodyShape: () => HTML_SHAPE,
-      getSubmitControls: () => [],
+      getSubmitControls: () => submitLookup([]),
       submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
       readValue: () => '',
       writeValue: () => {},
@@ -184,7 +185,7 @@ describe('revue Codex, PR #39 : deux résolutions concurrentes pour la même cl�
       observeEditors: () => ({ dispose: () => {} }),
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
       renderedBodyShape: () => HTML_SHAPE,
-      getSubmitControls: () => [],
+      getSubmitControls: () => submitLookup([]),
       submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
       readValue: () => '',
       writeValue: () => {},

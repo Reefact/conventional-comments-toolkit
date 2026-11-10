@@ -22,7 +22,8 @@ import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controll
 import { selectorFor, type PosedPrefix } from '../src/ui/toolbar.js';
 import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { HTML_SHAPE } from './helpers/decorate.js';
-import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
+import { submitLookup } from './helpers/submit-lookup.js';
 
 const pr: PrRef = {
   platform: 'github',
@@ -50,7 +51,7 @@ function setup(tweak: (config: ReturnType<typeof defaultConfig>) => void = () =>
     platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
     getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
       renderedBodyShape: () => HTML_SHAPE,
-    getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+    getSubmitControls: () => submitLookup([{ element: submit, kind: 'submit' }]),
     submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
     readValue: () => textarea.value,
     writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),

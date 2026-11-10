@@ -1140,6 +1140,17 @@ interface SubmitControl {
   kind: 'submit' | 'submit-and-resolve';
 }
 
+// Ce que `getSubmitControls()` a trouvé, ET ce qu'il a cherché pour le trouver. Une liste vide est
+// un échec de détection au sens du §9.4 — le garde du clic n'a alors rien à arrêter (§5.4) — et
+// c'est le composant A qui la journalise, au même endroit pour toutes les plateformes ; il lui faut
+// pour cela la chaîne interrogée et le relevé de la page (décision du propriétaire, #168).
+interface SubmitControlsLookup {
+  controls: SubmitControl[];
+  searched: SelectorChain;             // la chaîne qui a cherché les contrôles d'envoi de CET éditeur
+  evidence: () => SelectorEvidence;    // le relevé de la page là où elle a cherché, évalué seulement
+                                       // si la ligne de journal part
+}
+
 // Ce que seule la plateforme sait du CHÂSSIS entourant une zone de saisie. Chaque champ vaut `null`
 // pour dire « je ne me prononce pas », et le composant A applique alors une règle qui ne nomme
 // personne — voir la prose ci-dessous, qui dit pourquoi ce type existe et ce qu'il n'a pas le droit
@@ -1194,7 +1205,11 @@ interface PlatformAdapter {
   getEditorChrome(editor: EditorHandle): EditorChrome;  // §5.1, §5.3 — où l'extension s'accroche dans CE
                                        // composeur. Obligatoire : une méthode optionnelle laisserait une
                                        // plateforme nouvelle compiler sans jamais répondre
-  getSubmitControls(editor: EditorHandle): SubmitControl[];  // §4.3 — tous les points de sortie, §5.4 — interception
+  getSubmitControls(editor: EditorHandle): SubmitControlsLookup;  // §4.3 — tous les points de sortie,
+                                       // §5.4 — interception ; §9.4 — une liste vide, pour un champ encore
+                                       // dans la page, est journalisée par le composant A. Aucune n'est
+                                       // normale : sur les captures des trois plateformes, chaque
+                                       // composeur a au moins un contrôle d'envoi
   submitKeystrokes(editor: EditorHandle): SubmitKeystrokes;  // §4.3, §5.4 — les touches qui PUBLIENT sur cette
                                        // plateforme : depuis le champ (`field`) et sur un contrôle d'envoi qui a
                                        // le focus (`control`). Le composant A n'en connaît aucune : il arrête ce

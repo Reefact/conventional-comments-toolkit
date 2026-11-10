@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
 import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { HTML_SHAPE } from './helpers/decorate.js';
-import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
 import { EditorController } from '../src/editor-controller.js';
 import {
   TELEMETRY_CONSENT_KEY,
@@ -26,6 +26,7 @@ import {
 } from '../src/telemetry.js';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
 import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
+import { submitLookup } from './helpers/submit-lookup.js';
 
 const ENDPOINT = 'https://collecte.example/cc';
 
@@ -259,7 +260,7 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
       platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
       renderedBodyShape: () => HTML_SHAPE,
-      getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+      getSubmitControls: () => submitLookup([{ element: submit, kind: 'submit' }]),
       submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
       readValue: () => textarea.value,
       writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),
@@ -648,7 +649,7 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
           return HTML_SHAPE;
         }
         getSubmitControls() {
-          return [];
+          return submitLookup([]);
         }
         platformProfile() {
           return { id: 'github', suggestionInfoString: 'suggestion' };

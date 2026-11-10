@@ -19,7 +19,11 @@ const complete: PlatformAdapter = {
   observeEditors: () => ({ dispose: () => {} }),
   getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
   renderedBodyShape: () => null,
-  getSubmitControls: () => [],
+  getSubmitControls: () => ({
+    controls: [],
+    searched: { name: 'submit-buttons', candidates: ['button'] },
+    evidence: () => ({}),
+  }),
   submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
   readValue: () => '',
   writeValue: () => {},

@@ -35,7 +35,7 @@ export function editorOf(page: LoadedPage, field: Element | null): EditorHandle 
 
 /** Le libellé des contrôles d'envoi, espaces resserrés. */
 export function submitLabels(page: LoadedPage, editor: EditorHandle): string[] {
-  return page.adapter.getSubmitControls(editor).map((c) => (c.element.textContent ?? '').trim().replace(/\s+/g, ' '));
+  return page.adapter.getSubmitControls(editor).controls.map((c) => (c.element.textContent ?? '').trim().replace(/\s+/g, ' '));
 }
 
 // Analyser une page de 3 Mo prend quelques secondes : une seule fois par fichier.

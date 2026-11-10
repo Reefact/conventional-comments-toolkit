@@ -21,8 +21,10 @@ import type {
 import {
   bypassCacheInit,
   adapterFetch,
+  chainEvidence,
   closestChain,
   commentBodyText,
+  printElement,
   queryChain,
   queryChainAll,
   writeToTextField,
@@ -36,6 +38,7 @@ import {
   type PlatformAdapter,
   type RenderedBodyShape,
   type SubmitControl,
+  type SubmitControlsLookup,
   type SubmitKeystrokes,
 } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
@@ -206,13 +209,23 @@ export class AzdoClientAdapter implements PlatformAdapter {
    * Classé `submit-and-resolve` dans les deux cas : le libellé seul les distingue, il est
    * localisé, et aucun code ne lit ce `kind` — le blocage porte sur tous les contrôles d'envoi,
    * quel que soit leur genre. */
-  getSubmitControls(editor: EditorHandle): SubmitControl[] {
+  getSubmitControls(editor: EditorHandle): SubmitControlsLookup {
     const box = closestChain(editor.element, selectors.editorContainer).element;
-    if (!box) return [];
-    return queryChainAll(box, selectors.submitButtons).map((element) => ({
-      element,
-      kind: element.matches(selectors.primarySubmit.candidates[0]!) ? ('submit' as const) : ('submit-and-resolve' as const),
-    }));
+    const controls = box
+      ? queryChainAll(box, selectors.submitButtons).map((element) => ({
+          element,
+          kind: element.matches(selectors.primarySubmit.candidates[0]!) ? ('submit' as const) : ('submit-and-resolve' as const),
+        }))
+      : [];
+    // Le relevé est pris sous la boîte de l'éditeur, là où les boutons auraient dû être ; dans le
+    // document entier si la boîte elle-même manque — sa trace le dit alors (§9.4).
+    return {
+      controls,
+      searched: selectors.submitButtons,
+      evidence: chainEvidence(box ?? this.#doc, selectors.submitButtons, {
+        subject: printElement(editor.element),
+      }),
+    };
   }
 
   readValue(editor: EditorHandle): string {
@@ -309,7 +322,9 @@ export class AzdoClientAdapter implements PlatformAdapter {
     if (queryChain(this.#doc, selectors.prSettledState).element) return null;
     const { element } = queryChain(this.#doc, selectors.completeButton);
     if (!element) {
-      if (!queryChain(this.#doc, selectors.fullScreen).element) this.log.degraded(selectors.completeButton);
+      if (!queryChain(this.#doc, selectors.fullScreen).element) {
+        this.log.degraded(selectors.completeButton, chainEvidence(this.#doc, selectors.completeButton));
+      }
       return null;
     }
     this.log.recovered(selectors.completeButton);
@@ -382,7 +397,9 @@ export class AzdoClientAdapter implements PlatformAdapter {
     if (createdAt) this.log.recovered(selectors.prCreatedAt);
     // Une date inconnue vaut mieux qu'une date fausse : l'extension ne bloque alors jamais. La
     // vue Files ne porte AUCUNE date de création (MESURÉ) : son absence n'y est pas une rupture.
-    else if (!this.#isFilesView()) this.log.degraded(selectors.prCreatedAt);
+    else if (!this.#isFilesView()) {
+      this.log.degraded(selectors.prCreatedAt, chainEvidence(this.#doc, selectors.prCreatedAt));
+    }
     return {
       platform: 'azdo',
       createdAt,

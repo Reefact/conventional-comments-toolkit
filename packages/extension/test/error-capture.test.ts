@@ -11,9 +11,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
 import { NEUTRAL_EDITOR_CHROME, writeToTextField } from '@cct/adapter-shared';
-import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
 import { captureErrors, guarded, listen, type CapturedError, type ErrorCapture } from '../src/error-capture.js';
 import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controller.js';
+import { submitLookup } from './helpers/submit-lookup.js';
 
 let capture: ErrorCapture | null = null;
 let recorded: CapturedError[] = [];
@@ -256,7 +257,7 @@ describe('§9.4 — un champ de commentaire qui plante est relevé « pendant la
     const adapter: Partial<PlatformAdapter> = {
       platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
       getEditorChrome: () => ({ ...NEUTRAL_EDITOR_CHROME, framedContainer: host }),
-      getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+      getSubmitControls: () => submitLookup([{ element: submit, kind: 'submit' }]),
       submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
       readValue: () => {
         if (broken) throw new Error('field unreadable');

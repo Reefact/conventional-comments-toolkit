@@ -78,6 +78,34 @@ A reviewer's `question` gets the label that says what followed: `note:` when you
 information, `done:` when it led to a pushed change. `ack:` is not a neutral answer: keep it for a
 point you accept.
 
+### Session marker
+
+A reviewer's comment may end with a session marker, on its own last line:
+
+```text
+[session:melancholy-coordinated-value-object]
+```
+
+It tells which review session the comment belongs to. When the comment you answer carries one,
+**end your reply with the same marker, copied exactly**, on its own last line after a blank line:
+
+```text
+done: fixed in a1b2c3d, an empty result now returns an error
+
+The code now returns the error the contract requires, with a regression test.
+
+[session:melancholy-coordinated-value-object]
+```
+
+- Copy the marker of **the comment you are answering**, in its own thread. Several review sessions
+  may run on the same pull request, so two of your replies can carry two different markers.
+- When that comment carries no marker, add none: never make one up, and never borrow one from
+  another comment or thread.
+- Never draw a session identifier of your own: the marker identifies the reviewer's session.
+
+The marker is metadata. It is not a finding, an acceptance or a resolution, and it says nothing
+about whether the review is complete: your label still says what you did.
+
 ## 3. What you never post
 
 - **`decision`**: it records that the team deliberately leaves a point unaddressed, and it is

@@ -122,7 +122,11 @@ issue (blocking): This state can produce a wrong result.
 returns a success, against the contract.
 
 ![[P2]](https://img.shields.io/badge/P2-yellow?style=flat) No test covers this behaviour.
+
+[session:melancholy-coordinated-value-object]
 ```
+
+The last line is your session marker (section 9).
 
 Group findings only when they concern exactly the same subject or location.
 
@@ -242,7 +246,43 @@ never after: posted after it, it reads as if the review had reopened.
 your review as comments only. Approving and merging belong to the humans responsible for the
 pull request.
 
-## 9. Publishing and reporting
+## 9. Session marker
+
+Several reviewers may work on the same pull request at once, sometimes under the same account.
+A session marker lets a reader tell which comments came from the same review session.
+
+**At the start of a new review session, choose its identifier once**, and keep it for the whole
+session: every finding, every pass, every follow-up. Never draw a new one per comment or per pass.
+When you come back to the same review after fixes or new commits, reuse the identifier you
+already chose; only a genuinely separate review session gets a new one.
+
+Choose a readable, distinctive identifier, preferably in lowercase kebab-case. By default, draw it
+with [Slugger](https://github.com/Reefact/slugger) and its `code-review` theme:
+
+```bash
+slugger --theme code-review --oneshot
+```
+
+That theme does not ship inside the tool: download
+[`themes/code-review.json`](https://github.com/Reefact/slugger/blob/main/themes/code-review.json)
+and register it first with `slugger --register code-review.json`. Slugger is a .NET tool
+(`dotnet tool install --global Slugger.Cli`). If it, its theme or .NET is not available, make up a
+readable identifier of the same kind yourself, such as `patient-stubborn-null-check`. A GUID is not
+required, and is not what you should reach for.
+
+**End every comment of the session with the marker**, on its own last line, after a blank line:
+
+```text
+[session:melancholy-coordinated-value-object]
+```
+
+That covers inline findings, general findings, recaps of a pass, follow-ups, and the final
+`reviewed:` comment. Nothing follows the marker.
+
+The marker is metadata. It does not replace the label, the priority or the discussion, and it
+changes nothing in the rules above.
+
+## 10. Publishing and reporting
 
 **Publish your comments on the pull request itself**, not only in your answer to whoever asked
 for the review. Do not change the code and do not merge.

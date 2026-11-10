@@ -367,3 +367,15 @@ describe('§6.5, §9.4 — le bouton de complétion là où son absence est la n
     expect(loggedChains(page)).toContain('complete-button');
   }, T);
 });
+
+describe('§5.5 — getRenderedThreadElements() expose l’état de résolution de getThreads() (03-overview-fils-resolus)', () => {
+  // La signature de reprise du code partagé compare cet état à chaque mutation : il doit être
+  // celui de `getThreads()`, fil pour fil, lu sur le fil et non sur la rangée rendue.
+  it('même identifiant, même état, et les deux états sont présents', async () => {
+    const page = load('03-overview-fils-resolus.html', PR(1));
+    const rendered = page.adapter.getRenderedThreadElements().map((t) => [t.id, t.resolution]);
+    const threads = (await page.adapter.getThreads()).map((t) => [t.id, t.resolution]);
+    expect(rendered).toEqual(threads);
+    expect(new Set(rendered.map(([, r]) => r))).toEqual(new Set(['resolved', 'unresolved']));
+  }, T);
+});

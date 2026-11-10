@@ -18,6 +18,7 @@ import {
   type Disposable,
   type PlatformProfile,
   type PrRef,
+  type ResolutionState,
   type ThreadInfo,
   type UserInfo,
 } from '@cct/core';
@@ -149,8 +150,12 @@ class AcmeClientAdapter implements PlatformAdapter {
     return this.getRenderedThreadElements()[0]?.element ?? null;
   }
 
-  getRenderedThreadElements(): { id: string; element: Element }[] {
-    return [...this.#doc.querySelectorAll('article.acme-thread')].map((element) => ({ id: element.id, element }));
+  getRenderedThreadElements(): { id: string; element: Element; resolution: ResolutionState }[] {
+    return [...this.#doc.querySelectorAll('article.acme-thread')].map((element) => ({
+      id: element.id,
+      element,
+      resolution: element.getAttribute('data-status') === 'resolved' ? 'resolved' : 'unresolved',
+    }));
   }
 
   getRenderedComments(): { element: Element; bodyText: string }[] {

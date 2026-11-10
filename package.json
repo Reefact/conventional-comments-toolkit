@@ -39,6 +39,7 @@
     "check:platform-isolation": "node scripts/check-platform-isolation.mjs",
     "check:content-script-cors": "node spikes/content-script-cors.mjs",
     "check:relay-cors": "node spikes/relay-cors.mjs",
+    "check:config-cache-bypass": "node spikes/config-cache-bypass.mjs",
     "check:subject-line": "node spikes/subject-line.mjs",
     "check:session-line": "node spikes/session-line.mjs",
     "check:composer-layout": "node spikes/composer-layout.mjs",

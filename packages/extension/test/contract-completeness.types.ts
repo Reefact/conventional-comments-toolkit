@@ -20,6 +20,7 @@ const complete: PlatformAdapter = {
   getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
   renderedBodyShape: () => null,
   getSubmitControls: () => [],
+  submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
   readValue: () => '',
   writeValue: () => {},
   getThreads: async () => [],
@@ -61,4 +62,8 @@ const { getThreadFilterMount: _getThreadFilterMount, ...withoutFilterMount } = c
 // @ts-expect-error — sans `getThreadFilterMount`, le code partagé déciderait seul où poser le filtre (§5.5).
 const incomplete7: PlatformAdapter = withoutFilterMount;
 
-export const proofs = [incomplete1, incomplete2, incomplete3, incomplete4, incomplete5, incomplete6, incomplete7];
+const { submitKeystrokes: _submitKeystrokes, ...withoutKeystrokes } = complete;
+// @ts-expect-error — sans `submitKeystrokes`, le garde partagé arrêterait des touches qu'aucune plateforme n'a déclarées (§5.4, 2026-11-10).
+const incomplete8: PlatformAdapter = withoutKeystrokes;
+
+export const proofs = [incomplete1, incomplete2, incomplete3, incomplete4, incomplete5, incomplete6, incomplete7, incomplete8];

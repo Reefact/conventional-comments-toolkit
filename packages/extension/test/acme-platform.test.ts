@@ -32,6 +32,7 @@ import {
   type PlatformAdapter,
   type RenderedBodyShape,
   type SubmitControl,
+  type SubmitKeystrokes,
 } from '@cct/adapter-shared';
 import { ClientConfigResolver } from '../src/config-resolver.js';
 import { EditorController } from '../src/editor-controller.js';
@@ -111,6 +112,11 @@ class AcmeClientAdapter implements PlatformAdapter {
   /** Jamais mesurée : pas de masquage de préfixe, les badges restent (§5.5). */
   renderedBodyShape(): RenderedBodyShape | null {
     return null;
+  }
+
+  /** Une plateforme fictive déclare ses touches comme les autres (§9.2.3) : Ctrl+Entrée au champ. */
+  submitKeystrokes(_editor: EditorHandle): SubmitKeystrokes {
+    return { field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }], control: [] };
   }
 
   getSubmitControls(editor: EditorHandle): SubmitControl[] {

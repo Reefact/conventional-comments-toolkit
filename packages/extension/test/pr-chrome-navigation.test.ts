@@ -133,6 +133,7 @@ function makeAdapter(
     getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
     renderedBodyShape: () => HTML_SHAPE,
     getSubmitControls: () => [],
+    submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
     readValue: () => '',
     writeValue: () => {},
     getThreads: opts.getThreads ?? (async () => []),
@@ -581,6 +582,7 @@ describe('D2 — le rattrapage de l’hydratation est borné dans le TEMPS, pas 
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
       renderedBodyShape: () => HTML_SHAPE,
       getSubmitControls: () => [],
+      submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
       readValue: () => '',
       writeValue: () => {},
       // Rien à montrer (pas de résumé publié, aucun fil) : `observePrChromeNavigation` reste

@@ -260,6 +260,7 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
       getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
       renderedBodyShape: () => HTML_SHAPE,
       getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+      submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
       readValue: () => textarea.value,
       writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),
     };

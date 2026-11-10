@@ -108,6 +108,7 @@ function attachOn(
     getEditorChrome: chrome,
     renderedBodyShape: () => HTML_SHAPE,
     getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+    submitKeystrokes: () => ({ field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' as const }], control: [] }),
     readValue: () => champ.value,
     writeValue: (_e, text, caret) => writeToTextField(champ, text, caret),
   };

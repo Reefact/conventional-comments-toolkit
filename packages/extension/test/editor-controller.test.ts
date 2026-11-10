@@ -3,7 +3,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { defaultConfig, type PrRef } from '@cct/core';
 import { EditorController, VALIDATION_DEBOUNCE_MS } from '../src/editor-controller.js';
 import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
-import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
+import type { EditorHandle, PlatformAdapter, SubmitControl, SubmitKeystrokes } from '@cct/adapter-shared';
 import type { TelemetryEvent } from '../src/telemetry.js';
 
 const pr: PrRef = {
@@ -26,6 +26,9 @@ function setup(
     configLanguage?: string | null;
     /** Ordre personnel des boutons (§5.1) — préférence locale lue par le script de contenu. */
     labelOrder?: string[];
+    /** Les touches que la plateforme fictive DÉCLARE (§5.4) — par défaut, Ctrl+Entrée au champ et
+     * rien sur le bouton, la règle de GitHub. */
+    keystrokes?: SubmitKeystrokes;
   } = {}
 ) {
   const host = document.createElement('div');
@@ -53,6 +56,7 @@ function setup(
     platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
     getEditorChrome: () => ({ ...NEUTRAL_EDITOR_CHROME, framedContainer: framed }),
     getSubmitControls: (): SubmitControl[] => [{ element: submit, kind: 'submit' }],
+    submitKeystrokes: () => opts.keystrokes ?? { field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }], control: [] },
     readValue: () => textarea.value,
     writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),
   };
@@ -350,6 +354,104 @@ describe('§5 — contrôleur d’éditeur', () => {
     textarea.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     controller.dispose();
+  });
+
+  describe('§5.4 : le garde n’arrête QUE les touches que la plateforme déclare (`submitKeystrokes`, 2026-11-10)', () => {
+    // Le faux bouton agit sur la TOUCHE, sans émettre de `click` : c'est ce que fait le bouton
+    // *Comment* d'Azure DevOps (Entrée, Ctrl+Entrée et Espace, mesurés par une sonde qui
+    // bloquait la publication). Ce qui se teste ici est le CONTRAT : le garde partagé arrête ce
+    // que l'adaptateur déclare, et rien de ce qu'il ne déclare pas.
+    const AZDO_LIKE: SubmitKeystrokes = {
+      field: [{ key: 'Enter', modifiers: 'ctrl-or-meta' }],
+      control: [
+        { key: 'Enter', modifiers: 'any' },
+        { key: ' ', modifiers: 'any' },
+      ],
+    };
+
+    function buttonPublishesOnKeys(submit: HTMLButtonElement): string[] {
+      const published: string[] = [];
+      for (const type of ['keydown', 'keyup'] as const) {
+        submit.addEventListener(type, (e) => {
+          const key = (e as KeyboardEvent).key;
+          if (key === 'Enter' || key === ' ') published.push(`${type}:${key}`);
+        });
+      }
+      return published;
+    }
+
+    async function nonCompliant(keystrokes: SubmitKeystrokes) {
+      const s = setup('enforce', { keystrokes });
+      s.controller.attach();
+      writeToTextField(s.textarea, 'pas de label ici');
+      await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+      return s;
+    }
+
+    it.each([
+      ['Entrée', { key: 'Enter' }],
+      ['Ctrl+Entrée', { key: 'Enter', ctrlKey: true }],
+      ['Espace', { key: ' ' }],
+    ])('touches déclarées sur le bouton — %s, commentaire en erreur : rien n’atteint le bouton', async (_name, init) => {
+      const { controller, submit } = await nonCompliant(AZDO_LIKE);
+      const published = buttonPublishesOnKeys(submit);
+      for (const type of ['keydown', 'keyup']) {
+        const event = new KeyboardEvent(type, { ...init, bubbles: true, cancelable: true });
+        submit.dispatchEvent(event);
+        expect(event.defaultPrevented, type).toBe(true);
+      }
+      expect(published).toEqual([]);
+      controller.dispose();
+    });
+
+    it('une plateforme qui ne déclare RIEN sur ses boutons n’est pas touchée par celles qui déclarent', async () => {
+      // Le cas de GitHub et de GitLab : leurs boutons émettent un `click`, arrêté par l'autre
+      // garde. La touche elle-même n'est jamais interceptée — la règle d'Azure DevOps ne fuit pas.
+      const { controller, submit } = await nonCompliant({ field: AZDO_LIKE.field, control: [] });
+      const published = buttonPublishesOnKeys(submit);
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      submit.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(published).toEqual(['keydown:Enter']);
+      controller.dispose();
+    });
+
+    it('aucune touche n’est écrite dans le garde : un champ qui ne déclare rien laisse passer Ctrl+Entrée', async () => {
+      const { controller, textarea } = await nonCompliant({ field: [], control: [] });
+      const event = new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true });
+      textarea.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      controller.dispose();
+    });
+
+    it('une touche propre à une plateforme est arrêtée au champ dès qu’elle est déclarée', async () => {
+      const { controller, textarea } = await nonCompliant({ field: [{ key: 'Enter', modifiers: 'any' }], control: [] });
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      textarea.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      controller.dispose();
+    });
+
+    it('commentaire conforme : la touche déclarée passe, le bouton agit', async () => {
+      const { controller, textarea, submit } = setup('enforce', { keystrokes: AZDO_LIKE });
+      controller.attach();
+      writeToTextField(textarea, 'issue (blocking): le nom de cette variable est ambigu\n\nIl désigne deux choses.');
+      await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+      const published = buttonPublishesOnKeys(submit);
+      submit.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      expect(published).toEqual(['keydown:Enter']);
+      controller.dispose();
+    });
+
+    it('une touche déclarée mais visant autre chose qu’un bouton d’envoi n’est jamais arrêtée', async () => {
+      const { controller, host } = await nonCompliant(AZDO_LIKE);
+      const other = document.createElement('button');
+      host.appendChild(other);
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      other.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      controller.dispose();
+    });
   });
 
   it('CA-02 : clic sur un label insère le préfixe et conserve le texte', async () => {

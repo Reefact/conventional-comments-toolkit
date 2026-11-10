@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const fixture = readFileSync(join(here, 'fixture.html'), 'utf8');
 
 const EXECUTABLE =
-  process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 
 const results = [];
 function assert(name, condition, detail) {

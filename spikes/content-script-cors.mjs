@@ -104,7 +104,7 @@ const corsServer = createServer((q, res) => {
 console.log("\nCORS d'un script de contenu — extension SANS permission d'hôte\n");
 
 const ctx = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'cct-cors-')), {
-  executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath(),
   headless: true,
   args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`, '--no-sandbox'],
 });

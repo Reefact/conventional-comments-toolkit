@@ -23,7 +23,7 @@ import { chromium } from 'playwright-core';
 import http from 'node:http';
 
 const EXECUTABLE =
-  process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 
 const results = [];
 function assert(name, condition, detail) {

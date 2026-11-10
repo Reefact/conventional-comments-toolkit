@@ -68,25 +68,31 @@ describe('§9.4 — `editors` : le relevé nomme le champ que la sonde ne conna�
 });
 
 describe('§9.4 — `merge-button` : le relevé dit ce que la boîte de fusion contenait', () => {
-  /** Capture 01, PR ouverte, sans le bouton primaire : la forme d'une boîte de fusion que nos
-   * candidats ne connaissent pas. */
+  /** Capture 01, PR ouverte, un bouton de fusion que nos candidats ne reconnaissent pas : la forme
+   * d'une boîte de fusion inconnue. Altéré sur `data-component`, ce qui DÉSIGNE le bouton — la
+   * variante n'est que la recommandation de GitHub (`primary` ou `default`, PR 552, #103) : la
+   * passer à `invisible` ne rend plus le bouton méconnaissable. */
   const withoutPrimary = (doc: Document) =>
     doc
-      .querySelector('[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-variant="primary"]')!
-      .setAttribute('data-variant', 'invisible');
+      .querySelector('[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-component="Button"]')!
+      .setAttribute('data-component', 'UnknownButton');
 
   it('capture 01 : l’ancêtre atteint, les boutons à la place, l’état de la PR', () => {
     const page = load('01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/1', withoutPrimary);
     expect(page.adapter.getCompletionControl()).toBeNull();
 
     const evidence = lineOf(page, 'merge-button')!;
-    // Premier candidat : la boîte et le groupe existent, le bouton primaire non.
-    expect(evidence.trace![0]!.steps).toEqual([1, 1, 0]);
-    expect(evidence.anchor).toMatchObject({ attrs: { 'data-component': 'ButtonGroup' } });
+    // Premier candidat : la boîte, le groupe et son premier item existent, le bouton reconnu non.
+    expect(evidence.trace![0]!.steps).toEqual([1, 1, 1, 0]);
+    // L'ancre est l'item atteint, et ses ancêtres nomment le groupe et la boîte de fusion.
+    expect(evidence.anchor).toMatchObject({ tag: 'div' });
+    expect(evidence.anchor!.ancestors).toEqual(
+      expect.arrayContaining(['div[data-component="ButtonGroup"]', 'div[data-testid="mergebox-partial"]'])
+    );
     // Le bouton se reconnaît à ses attributs d'interface ; son texte n'est jamais relevé
     // (revue Reefact, PR #110 : aucun texte, pas même un libellé de bouton).
     expect(evidence.nearby).toContainEqual(
-      expect.objectContaining({ tag: 'button', attrs: expect.objectContaining({ 'data-variant': 'invisible' }) })
+      expect.objectContaining({ tag: 'button', attrs: expect.objectContaining({ 'data-component': 'UnknownButton' }) })
     );
     expect(JSON.stringify(evidence)).not.toContain('Rebase and merge');
     expect(evidence.facts).toEqual({ prState: 'pullOpened', release: '3649ec8d4252' });

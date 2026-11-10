@@ -739,13 +739,20 @@ export const selectors = {
    * github.com. Le journal le disait — `merge-button`, sur chaque page —, noyé dans les entrées
    * des PR fusionnées où l'absence est la norme (cf. `prSettledState`).
    *
+   * La VARIANTE ne désigne pas le bouton, elle dit seulement si GitHub recommande de fusionner.
+   * MESURÉ le 2026-11-10 sur `03-conversation-cc1-en-echec.html` (PR 552, un check NON requis en
+   * échec, icône « Able to merge ») : le même « Rebase and merge », au même endroit, porte
+   * `data-variant="default"`. Le premier candidat exigeait `primary` : la PR restait fusionnable,
+   * le §6.5 ne la grisait pas, et `merge-button` était journalisé (#103). Ce qui désigne le
+   * bouton, c'est sa place : le PREMIER item du groupe — le second est le choix de la méthode.
+   *
    * Non mesuré : l'étape de confirmation qui suit le clic, si GitHub en rend une. Le grisage ne
    * porte que sur le bouton affiché à l'arrivée sur la page. */
   mergeButton: {
     name: 'merge-button',
     problem: 'completion-control',
     candidates: [
-      '[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button[data-variant="primary"]', // MESURÉ
+      '[data-testid="mergebox-partial"] [data-component="ButtonGroup"] > :first-child > button[data-component="Button"]', // MESURÉ (01, 03 -pr-ouverte, 03 -cc1-en-echec)
       '[data-testid="mergebox-partial"] button.btn-primary',
       'button[data-testid*="merge-button"]',
       '.merge-message button.btn-group-merge',

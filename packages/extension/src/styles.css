@@ -491,8 +491,9 @@
    cette feuille de style. */
 .cct-subject-break {
   display: block;
-  /* L'écart normal entre paragraphes, mesuré sur la page (badges.ts, paragraphGap) : le corps
-     écrit à la ligne suivante se lit comme s'il était séparé par une ligne blanche. */
+  /* Deux tiers de l'écart normal entre paragraphes, mesuré sur la page (badges.ts,
+     markSubjectBreak) : le corps écrit à la ligne suivante est à la même distance du sujet que le
+     corps écrit après une ligne blanche, dont la marge est resserrée d'autant. */
   height: var(--cct-paragraph-gap, 1em);
 }
 

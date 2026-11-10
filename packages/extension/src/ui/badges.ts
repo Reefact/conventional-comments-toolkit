@@ -446,18 +446,36 @@ function markSubjectBreak(wrapper: Element, shape: RenderedBodyShape, body: Elem
     next !== null && next.nodeType === 1 && (next as Element).tagName === shape.lineBreakTag
       ? (next as Element)
       : null;
-  const existing = wrapper.parentElement?.querySelector(`:scope > .${SUBJECT_BREAK_CLASS}`) ?? null;
+  const host = wrapper.parentElement;
+  const existing = host?.querySelector(`:scope > .${SUBJECT_BREAK_CLASS}`) ?? null;
+  // L'écart entre la ligne du sujet et le corps : deux tiers d'écart de paragraphe, que le corps
+  // reprenne au paragraphe suivant ou à la ligne suivante (demande Reefact, #163) — les deux
+  // écritures se rendent à l'identique.
+  const headerGap = cssLength(paragraphGapPx(body, shape), HEADER_GAP_RATIO);
   if (lineBreak === null) {
-    existing?.remove(); // le corps enchaîne sur un autre bloc : la plateforme espace déjà
+    existing?.remove();
+    // Le corps reprend au paragraphe suivant : la marge de la PLATEFORME sépare déjà, et c'est
+    // elle qu'il faut resserrer, sur le paragraphe du sujet lui-même — une règle de notre feuille
+    // ne l'emporterait pas à coup sûr sur celle de la plateforme. Seulement si un bloc suit : la
+    // marge d'un dernier bloc n'écarte rien, et la poser en ajouterait.
+    if (host !== null && host !== body && host.nextElementSibling !== null) {
+      setHeaderMargin(host as HTMLElement, headerGap);
+    } else if (host !== null) {
+      releaseHeaderMargin(host);
+    }
     return;
   }
-  if (existing !== null && existing.previousSibling === lineBreak) return; // déjà en place
+  if (host !== null) releaseHeaderMargin(host);
+  if (existing !== null && existing.previousSibling === lineBreak) {
+    // déjà en place : seul l'écart peut avoir changé
+    const spacer = existing as HTMLElement;
+    if (spacer.style.getPropertyValue(PARAGRAPH_GAP_VAR) !== headerGap) spacer.style.setProperty(PARAGRAPH_GAP_VAR, headerGap);
+    return;
+  }
   existing?.remove();
   const spacer = globalThis.document.createElement('span');
   spacer.className = SUBJECT_BREAK_CLASS;
-  // Le même écart qu'entre deux paragraphes : `issue: x` puis le corps à la ligne suivante se lit
-  // alors exactement comme `issue: x`, une ligne blanche, puis le corps (demande Reefact, #163).
-  spacer.style.setProperty(PARAGRAPH_GAP_VAR, paragraphGap(body, shape));
+  spacer.style.setProperty(PARAGRAPH_GAP_VAR, headerGap);
   lineBreak.after(spacer);
 }
 
@@ -503,6 +521,7 @@ function revealPrefix(hidden: Element): void {
  * n'est ni un `<br>` ni une fin de ligne, donc il APPARTIENT au sujet au sens de
  * `subjectNodes()`), et le sujet se retrouverait emballé deux fois. */
 function unwrapSubject(commentBodyElement: Element): void {
+  releaseHeaderMargin(commentBodyElement);
   for (const spacer of [...commentBodyElement.querySelectorAll(`.${SUBJECT_BREAK_CLASS}`)]) spacer.remove();
   const wrapper = commentBodyElement.querySelector(`.${SUBJECT_CLASS}`);
   if (wrapper) unwrapInPlace(wrapper);
@@ -523,6 +542,7 @@ export function clearCommentDecorations(root: ParentNode): void {
   // « nôtre » un élément où plus rien n'est à nous.
   for (const h of [...root.querySelectorAll(`.${BADGE_HOST_CLASS}`)]) h.classList.remove(BADGE_HOST_CLASS);
   for (const spacer of [...root.querySelectorAll(`.${SUBJECT_BREAK_CLASS}`)]) spacer.remove();
+  releaseHeaderMargin(root);
   // Le sujet AVANT le préfixe : les deux vivent dans le même parent, et défaire le sujet
   // d'abord laisse `revealPrefix()` recoller la ligne entière d'un seul `normalize()`.
   for (const wrapper of [...root.querySelectorAll(`.${SUBJECT_CLASS}`)]) unwrapInPlace(wrapper);
@@ -676,48 +696,111 @@ function sessionLine(body: Element, marker: SessionMarker, shape: RenderedBodySh
   return { node, start };
 }
 
-/** Variable portée par l'espaceur du sujet : l'écart normal entre deux paragraphes. */
+/** Variable portée par l'espaceur du sujet : sa hauteur, deux tiers d'écart de paragraphe. */
 const PARAGRAPH_GAP_VAR = '--cct-paragraph-gap';
 /** Variable portée par la mention de session : ce qu'il faut ajouter au-dessus d'elle. */
 const SESSION_GAP_VAR = '--cct-session-gap';
 
-/** L'écart normal entre deux paragraphes du corps, tel que la PAGE l'applique — jamais supposé, il
- * diffère d'une plateforme à l'autre. Lu sur un paragraphe SONDE, posé en tête du corps puis
- * retiré dans la même tâche : un paragraphe existant ne suffit pas, le seul paragraphe d'un
- * commentaire écrit d'un bloc est aussi le dernier, que les plateformes privent de marge
+/** Part de l'écart de paragraphe entre la ligne du sujet et le corps (demande Reefact, #163) : le
+ * corps rapproché d'un tiers se lit avec son titre, comme un seul bloc. Le pied, une métadonnée,
+ * garde l'écart entier. */
+const HEADER_GAP_RATIO = 2 / 3;
+
+/** Écart normal par corps, une fois mesuré : il tient à la feuille de style de la plateforme, pas
+ * au commentaire, et la sonde qui le lit écrit dans le DOM — la relancer à chaque passage de rendu
+ * ferait de chaque passage la cause du suivant. */
+const paragraphGapCache = new WeakMap<Element, number | null>();
+
+/** L'écart normal entre deux paragraphes du corps, en pixels, tel que la PAGE l'applique — jamais
+ * supposé, il diffère d'une plateforme à l'autre. Lu sur un paragraphe SONDE, posé en tête du
+ * corps puis retiré dans la même tâche : un paragraphe existant ne suffit pas, le seul paragraphe
+ * d'un commentaire écrit d'un bloc est aussi le dernier, que les plateformes privent de marge
  * (`.markdown-body > *:last-child` sur GitHub). La sonde n'est jamais la dernière.
  *
- * Sans marge lisible — plateforme qui n'en met pas, environnement sans mise en page —, la taille
- * de police du CORPS en tient lieu, en pixels : un `em` résolu plus tard sur la mention, écrite
- * plus petit, donnerait un autre écart que celui de l'en-tête. */
-function paragraphGap(body: Element, shape: RenderedBodyShape): string {
+ * Sans marge lisible — plateforme qui n'en met pas —, la taille de police du CORPS en tient lieu,
+ * en pixels : un `em` résolu plus tard sur la mention, écrite plus petit, donnerait un autre écart
+ * que celui de l'en-tête. `null` : pas de mise en page du tout (aucune fenêtre). */
+function paragraphGapPx(body: Element, shape: RenderedBodyShape): number | null {
+  if (paragraphGapCache.has(body)) return paragraphGapCache.get(body)!;
   const view = body.ownerDocument.defaultView;
   const tag = shape.paragraphTags[0];
-  if (!view || !tag) return '1em';
-  const probe = body.ownerDocument.createElement(tag.toLowerCase());
-  body.insertBefore(probe, body.firstChild);
-  const margin = Number.parseFloat(view.getComputedStyle(probe).marginBottom);
-  probe.remove();
-  if (Number.isFinite(margin) && margin > 0) return `${margin}px`;
-  const font = Number.parseFloat(view.getComputedStyle(body).fontSize);
-  return Number.isFinite(font) && font > 0 ? `${font}px` : '1em';
+  let gap: number | null = null;
+  if (view && tag) {
+    const probe = body.ownerDocument.createElement(tag.toLowerCase());
+    body.insertBefore(probe, body.firstChild);
+    const margin = Number.parseFloat(view.getComputedStyle(probe).marginBottom);
+    probe.remove();
+    const font = Number.parseFloat(view.getComputedStyle(body).fontSize);
+    gap = Number.isFinite(margin) && margin > 0 ? margin : Number.isFinite(font) && font > 0 ? font : null;
+  }
+  paragraphGapCache.set(body, gap);
+  return gap;
 }
 
-/** Ce qu'il faut AJOUTER au-dessus de la mention pour qu'elle soit à un écart de paragraphe, et
- * un seul, du texte qui la précède — la même séparation que celle de l'en-tête, si bien qu'un
- * commentaire écrit avec des lignes blanches et le même écrit d'un bloc se rendent à l'identique
- * (demande Reefact, #163). Les lignes blanches, elles, n'existent plus au rendu : Markdown les
- * replie. Trois cas :
- * - la mention ouvre son propre paragraphe : la marge du bloc précédent EST l'écart, rien à ajouter ;
- * - elle suit du texte dans le même paragraphe (saut de ligne simple) : un écart à ajouter ;
+/** Une longueur CSS, arrondie au centième : la valeur relue sur un style est sérialisée par le
+ * navigateur, et une comparaison au caractère près avec un flottant non arrondi réécrirait le
+ * style à chaque passage — chaque écriture déclenchant le passage suivant. */
+function cssLength(px: number | null, factor: number): string {
+  return px === null ? `${Math.round(factor * 100) / 100}em` : `${Math.round(px * factor * 100) / 100}px`;
+}
+
+/** Marge basse d'origine du paragraphe du sujet, gardée pour être rendue telle quelle : la marge
+ * resserrée est un style posé sur un élément de la PLATEFORME, et il doit pouvoir disparaître sans
+ * trace (valeur vide quand le paragraphe n'en portait aucune). */
+const HEADER_MARGIN_ATTR = 'data-cct-header-margin';
+
+function setHeaderMargin(host: HTMLElement, value: string): void {
+  if (!host.hasAttribute(HEADER_MARGIN_ATTR)) host.setAttribute(HEADER_MARGIN_ATTR, host.style.marginBottom);
+  if (host.style.marginBottom !== value) host.style.marginBottom = value;
+}
+
+/** Rend leur marge d'origine aux paragraphes du sujet resserrés sous `root`, `root` compris. */
+function releaseHeaderMargin(root: ParentNode): void {
+  const marked = [...root.querySelectorAll(`[${HEADER_MARGIN_ATTR}]`)] as HTMLElement[];
+  if (root instanceof Element && root.hasAttribute(HEADER_MARGIN_ATTR)) marked.push(root as HTMLElement);
+  for (const host of marked) {
+    host.style.marginBottom = host.getAttribute(HEADER_MARGIN_ATTR) ?? '';
+    host.removeAttribute(HEADER_MARGIN_ATTR);
+    if (host.getAttribute('style') === '') host.removeAttribute('style');
+  }
+}
+
+/** Ce qu'il faut AJOUTER au-dessus de la mention pour qu'elle soit à un écart de paragraphe, et un
+ * seul, du texte qui la précède, quelle que soit l'écriture (demande Reefact, #163) : l'écart
+ * normal, moins celui qui existe déjà.
+ * - elle ouvre son propre paragraphe : la marge du bloc précédent existe déjà — l'écart entier
+ *   d'ordinaire, deux tiers seulement si ce bloc est la ligne du sujet resserrée ;
+ * - elle suit l'espaceur du sujet (le commentaire n'est qu'un sujet et un marqueur) : la hauteur
+ *   de l'espaceur existe déjà ;
+ * - elle suit du texte dans le même paragraphe : rien n'existe, l'écart entier ;
  * - elle est seule dans le corps : rien au-dessus, rien à ajouter.
  * Un `padding-top`, posé par la feuille de style : une marge fusionnerait avec celle du bloc
- * précédent au lieu de s'y ajouter. */
+ * précédent au lieu de s'y ajouter. Relu à chaque passage, sans sonde : la ligne du sujet peut
+ * cesser d'être resserrée après coup (configuration), et l'écart doit la suivre. */
 function sessionGap(body: Element, wrapper: Element, shape: RenderedBodyShape): string {
+  const view = body.ownerDocument.defaultView;
+  const computed = (el: Element, property: 'marginBottom' | 'height'): number => {
+    const value = Number.parseFloat(view?.getComputedStyle(el)[property] ?? '');
+    return Number.isFinite(value) ? value : 0;
+  };
   let previous = wrapper.previousSibling;
   while (previous !== null && (isBlank(previous) || isOwn(previous))) previous = previous.previousSibling;
-  if (previous === null) return '0px'; // ouvre son paragraphe, ou seule dans le corps
-  return paragraphGap(body, shape);
+  let existing = 0;
+  if (previous === null) {
+    const host = wrapper.parentElement;
+    if (host === null || host === body) return '0px';
+    let before = host.previousElementSibling;
+    while (before !== null && before.classList.contains('cct-badge')) before = before.previousElementSibling;
+    if (before === null) return '0px'; // seule dans le corps
+    existing = computed(before, 'marginBottom');
+  } else if (previous.nodeType === 1 && (previous as Element).classList.contains(SUBJECT_BREAK_CLASS)) {
+    // La hauteur que NOUS avons posée, lue telle quelle : elle ne dépend pas d'une mise en page.
+    const posed = Number.parseFloat((previous as HTMLElement).style.getPropertyValue(PARAGRAPH_GAP_VAR));
+    existing = Number.isFinite(posed) ? posed : computed(previous as Element, 'height');
+  }
+  const gap = paragraphGapPx(body, shape);
+  if (gap === null) return existing > 0 ? '0px' : '1em';
+  return cssLength(Math.max(0, gap - existing), 1);
 }
 
 /** Défait la projection : texte d'origine rendu à sa place, affichage retiré. */
@@ -749,7 +832,10 @@ function applySessionProjection(
     const shown = hidden.nextElementSibling;
     if (hidden.textContent === marker.raw && shown?.classList.contains(SESSION_CLASS)) {
       if (shown.textContent !== expected) shown.textContent = expected; // icône changée
-      return; // l'écart est calculé à la construction : la sonde ne tourne pas à chaque passage
+      const gap = sessionGap(body, hidden, shape);
+      const element = shown as HTMLElement;
+      if (element.style.getPropertyValue(SESSION_GAP_VAR) !== gap) element.style.setProperty(SESSION_GAP_VAR, gap);
+      return;
     }
     revealSession(body); // marqueur changé, ou affichage emporté par la plateforme : reconstruire
   } else if (body.querySelector(`.${SESSION_CLASS}`) !== null) {

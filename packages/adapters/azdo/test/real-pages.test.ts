@@ -327,6 +327,25 @@ describe('§4.1, §4.3 — modification (capture 06)', () => {
   }, T);
 });
 
+describe('§4.1 — la description de la PR, en modification, n’est pas une zone (#50)', () => {
+  // Capturée le 2026-11-10 sur la PR 1, « Edit description » cliqué, rien tapé, puis annulé. Le
+  // repli de zone de l'adaptateur classe tout champ observé hors commentaire et hors diff en
+  // commentaire GÉNÉRAL, qui porte un état bloquant : si `editors` attrapait ce champ, la
+  // description deviendrait impossible à enregistrer sans `label:` en mode enforce (§5.4).
+  const page = () => load('06-overview-modification-description.html', PR(1));
+
+  it('la capture montre bien l’éditeur ouvert, dans la carte de la description, hors de tout fil', () => {
+    const fields = [...page().doc.querySelectorAll('.repos-pr-description-card textarea.bolt-textfield-input')]
+      .filter((t) => !t.classList.contains('bolt-textfield-auto-adjust-hidden'));
+    expect(fields).toHaveLength(1);
+    expect(fields[0]!.closest('.repos-discussion-thread')).toBeNull();
+  }, T);
+
+  it('aucun éditeur observé : le champ de la description n’est ni classé ni intercepté', () => {
+    expect(page().editors).toEqual([]);
+  }, T);
+});
+
 describe('§6.5, §9.4 — le bouton de complétion là où son absence est la norme', () => {
   it('PR abandonnée (08) : pas de contrôle — jamais Reactivate —, et rien de journalisé', () => {
     const page = load('08-overview-pr-abandonnee.html', PR(2));

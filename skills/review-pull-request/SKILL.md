@@ -270,10 +270,9 @@ per installation of this skill:
 ```
 
 That covers inline findings, general findings, recaps of a pass, follow-ups, and the final
-`reviewed:` comment. Nothing follows the marker: a marker that is not the last non-blank line is
-not recognized. If your tooling appends a signature or footer to what you publish, put the marker
-after it, or leave the footer out. Check the comment as published, not only your draft, and edit
-it when the marker is not last.
+`reviewed:` comment. Make it the last line when you can; a signature or footer your tooling
+appends after it is fine, since the marker is recognized on any line where it stands alone. Write
+it **once** per comment: a comment with two markers shows an error instead of a session.
 
 The marker is metadata. It does not replace the label, the priority or the discussion, and it
 changes nothing in the rules above.

@@ -48,6 +48,9 @@ export const fr: Record<string, string> = {
     'Ce commentaire est bloquant mais ne comporte aucune discussion : expliquez pourquoi le point doit être traité.',
   'diag.W-MISSING-DECORATION':
     'Un « {label} » sans décoration porteuse est ambigu : ajoutez « (blocking) », « (non-blocking) » ou « (if-minor) ».',
+  // Diagnostic — métadonnée (§3.6)
+  'diag.W-SESSION-MULTIPLE':
+    'Ce commentaire porte {count} marqueurs de session : aucun n’est affiché. N’en gardez qu’une ligne « [session:…] ».',
   'diag.W-NOT-BLOCKABLE':
     'Ce label est bloquant, mais cette zone ne permet pas de résoudre un fil — il ne bloquera pas la complétion.',
   // Sortie du check (§6.3.1)

@@ -203,6 +203,17 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.dispose();
   });
 
+  it('CA-54 : un marqueur de session en double est signalé à la saisie, sans bloquer l’envoi sous `enforce`', async () => {
+    const { controller, textarea, submit, host } = setup('enforce');
+    controller.attach();
+    writeToTextField(textarea, 'note: un titre conforme\n\n[session:a]\n[session:b]');
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+    const item = host.querySelector('.cct-diagnostics li[data-code="W-SESSION-MULTIPLE"]');
+    expect(item?.textContent).toContain('2 marqueurs de session');
+    expect(submit.hasAttribute('aria-disabled')).toBe(false);
+    controller.dispose();
+  });
+
   it('§5.4 : un bouton RECRÉÉ par la page après attach() reste intercepté', async () => {
     // MESURÉ le 2026-11-09 sur la page Overview de GitHub : React remplace l'élément du bouton
     // *Comment* quand le champ se remplit. Un écouteur posé à attach() restait sur l'ancien, et

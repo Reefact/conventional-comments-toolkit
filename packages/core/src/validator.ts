@@ -40,6 +40,7 @@ export const DIAGNOSTIC_ORDER: readonly string[] = [
   'W-NO-DISCUSSION',
   'W-MISSING-DECORATION',
   'W-NOT-BLOCKABLE',
+  'W-SESSION-MULTIPLE',
 ];
 
 export const DEFAULT_SEVERITIES: Record<string, 'warn' | 'error'> = {
@@ -58,6 +59,7 @@ export const DEFAULT_SEVERITIES: Record<string, 'warn' | 'error'> = {
   'W-NO-DISCUSSION': 'warn',
   'W-MISSING-DECORATION': 'warn',
   'W-NOT-BLOCKABLE': 'warn',
+  'W-SESSION-MULTIPLE': 'warn',
 };
 
 export type MalformedMotif =
@@ -105,9 +107,9 @@ export interface CommentAnalysis {
   aliasRewrite: { from: string; to: string; replacement: string } | null;
   /** Ligne de préfixe normalisée (§3.4.1), pour l'affichage et les corrections. */
   prefixLine: string | null;
-  /** Marqueur de session reconnu en dernière ligne (§3.6), ou null. Rendu quelle que soit
-   * l'issue — exempté, zone éteinte, préfixe non reconnu : c'est une métadonnée, que
-   * l'affichage du §5.5 montre indépendamment du verdict. */
+  /** Marqueurs de session reconnus (§3.6), ou null. Rendus quelle que soit l'issue — exempté,
+   * zone éteinte, préfixe non reconnu : c'est une métadonnée, que l'affichage du §5.5 montre
+   * indépendamment du verdict. */
   session: SessionMarker | null;
 }
 
@@ -191,6 +193,17 @@ export function analyze(rawInput: ValidationInput, config: EffectiveConfig): Com
   let hadConflict = false;
   let decorations: ResolvedDecoration[] = [];
   let aliasRewrite: CommentAnalysis['aliasRewrite'] = null;
+
+  // Plusieurs marqueurs : aucune session n'est désignée (§3.6). Le seul diagnostic du marqueur,
+  // et un avertissement — une erreur de métadonnée ne bloque jamais l'envoi. Hors des temps 1 et
+  // 2, qui jugent le contenu : il est dû que le préfixe soit reconnu ou non.
+  if (session !== null && session.value === null) {
+    diagnostics.push({
+      code: 'W-SESSION-MULTIPLE',
+      severity: 'warn',
+      message: t(lang, 'diag.W-SESSION-MULTIPLE', { count: session.lines.length }),
+    });
+  }
 
   if (prefix.proceed && prefix.resolved) {
     // ————— Temps 2 : contrôles de contenu, tous évalués, cumulatifs —————

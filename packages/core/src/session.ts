@@ -1,20 +1,32 @@
-// Marqueur de session (§3.6) : une métadonnée en DERNIÈRE ligne du corps, jamais du contenu de
-// revue. Reconnu ici, une seule fois, pour les deux composants : `analyze()` le retire du corps
+// Marqueur de session (§3.6) : une métadonnée seule sur sa ligne, jamais du contenu de revue.
+// Reconnue ici, une seule fois, pour toute la boîte à outils : `analyze()` la retire du corps
 // avant tout le reste (§3.4.1, §3.5, §4.2), et l'extension l'affiche (§5.5). Une seule
-// reconnaissance, sans quoi l'extension pourrait afficher comme métadonnée une ligne que le
-// vérificateur compterait comme discussion, ou l'inverse.
+// reconnaissance, sans quoi l'extension pourrait afficher comme métadonnée une ligne que la
+// validation compterait comme discussion, ou l'inverse.
+//
+// N'importe quelle ligne, et plus seulement la dernière (#169) : un outil qui signe ce qu'il
+// publie ajoute son pied APRÈS le marqueur, et ne peut ni le déplacer ni l'omettre. La règle de
+// la dernière ligne rendait ces marqueurs illisibles pour l'extension, sans faute de l'auteur.
 
 import { splitBody } from './preprocess.js';
 
-/** Le marqueur reconnu. `raw` est la ligne telle qu'écrite, blancs de bordure retirés (§3.4.1,
+/** Une ligne reconnue. `raw` est la ligne telle qu'écrite, blancs de bordure retirés (§3.4.1,
  * étape 4) — c'est elle que l'extension retrouve dans le corps rendu. `value` est la valeur
  * entre `[session:` et `]`, blancs de bordure retirés, casse INTACTE : la mise en minuscules
- * n'appartient qu'à l'affichage (§5.5). `contentBody` est le corps privé du marqueur et de tout
- * ce qui le suit (des blancs, par construction), au caractère près pour tout ce qui le précède :
- * les indices de lignes de `splitBody()` restent valables d'une forme à l'autre. */
-export interface SessionMarker {
+ * n'appartient qu'à l'affichage (§5.5). */
+export interface SessionLine {
   raw: string;
   value: string;
+}
+
+/** Les marqueurs d'un corps. `lines` en compte au moins un, dans l'ordre d'écriture. `value` est
+ * la valeur à afficher : celle du marqueur quand il est seul, `null` quand le corps en porte
+ * plusieurs — aucune session n'est alors désignée, et `W-SESSION-MULTIPLE` le dit (§3.6).
+ * `contentBody` est le corps privé de TOUTES ces lignes, chacune retirée avec sa fin de ligne :
+ * rien d'autre n'y change, au caractère près. */
+export interface SessionMarker {
+  lines: SessionLine[];
+  value: string | null;
   contentBody: string;
 }
 
@@ -27,34 +39,54 @@ const strip = (s: string): string => s.replace(EDGE, '');
 // de la ligne, jamais le premier `]` rencontré.
 const MARKER_RE = /^\[session:(.*)\]$/u;
 
-/** Le marqueur de session du corps, ou `null` (§3.6). Reconnu seulement s'il occupe à lui seul
- * la dernière ligne non blanche, hors bloc de code délimité et hors citation — les lignes que
- * l'étape 2 du §3.4.1 écarte. Tout autre cas reste du texte ordinaire : jamais un diagnostic. */
-export function extractSessionMarker(body: string): SessionMarker | null {
-  const split = splitBody(body);
-  let index = -1;
-  for (let i = split.lines.length - 1; i >= 0; i--) {
-    if (strip(split.lines[i]!) !== '') {
-      index = i;
-      break;
-    }
-  }
-  if (index === -1 || split.discardedIndexes.has(index)) return null;
-  const raw = strip(split.lines[index]!);
+/** La valeur portée par une ligne, si elle n'est QUE le marqueur ; sinon `null`. */
+function markerValue(line: string): SessionLine | null {
+  const raw = strip(line);
   const m = MARKER_RE.exec(raw);
   if (!m) return null;
   const value = strip(m[1]!);
-  if (value === '') return null;
-  return { raw, value, contentBody: body.slice(0, lineOffset(body, index)) };
+  return value === '' ? null : { raw, value };
 }
 
-/** Position, dans `body`, du premier caractère de la ligne `index` au sens de `splitBody()`
- * (découpage sur /\r?\n/). */
-function lineOffset(body: string, index: number): number {
-  let offset = 0;
-  for (let i = 0; i < index; i++) {
-    const next = body.indexOf('\n', offset);
-    offset = next + 1;
+/** Les marqueurs de session du corps, ou `null` s'il n'en porte aucun (§3.6). Une ligne est un
+ * marqueur si elle se réduit à lui, où qu'elle soit, hors bloc de code délimité et hors
+ * citation — les lignes que l'étape 2 du §3.4.1 écarte. Tout autre cas reste du texte
+ * ordinaire, jamais un diagnostic : seul le marqueur EN DOUBLE en produit un, et ce n'est pas
+ * ici qu'il naît (`analyze()`). */
+export function extractSessionMarker(body: string): SessionMarker | null {
+  const split = splitBody(body);
+  const lines: SessionLine[] = [];
+  const indexes = new Set<number>();
+  for (let i = 0; i < split.lines.length; i++) {
+    if (split.discardedIndexes.has(i)) continue;
+    const found = markerValue(split.lines[i]!);
+    if (found === null) continue;
+    lines.push(found);
+    indexes.add(i);
   }
-  return offset;
+  if (lines.length === 0) return null;
+  return {
+    lines,
+    value: lines.length === 1 ? lines[0]!.value : null,
+    contentBody: withoutLines(body, indexes),
+  };
+}
+
+/** `body` privé des lignes `indexes` (au sens de `splitBody()`, découpage sur /\r?\n/), chacune
+ * avec la fin de ligne qui la TERMINE — ou, pour une dernière ligne sans fin de ligne, celle qui
+ * la précède : sans quoi `a\n[session:x]` laisserait `a\n`, une ligne blanche qui n'était pas
+ * écrite. Les fins de ligne restent celles de l'auteur, `\r\n` compris. */
+function withoutLines(body: string, indexes: Set<number>): string {
+  const parts = body.split(/(\r?\n)/); // [ligne, fin, ligne, fin, …, ligne]
+  const kept: string[] = [];
+  for (let i = 0; i * 2 < parts.length; i++) {
+    const line = parts[i * 2]!;
+    const end = parts[i * 2 + 1];
+    if (!indexes.has(i)) {
+      kept.push(line, end ?? '');
+      continue;
+    }
+    if (end === undefined && kept.length > 0) kept.pop(); // dernière ligne : sa fin est celle d'avant
+  }
+  return kept.join('');
 }

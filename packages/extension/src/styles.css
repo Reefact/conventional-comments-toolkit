@@ -507,11 +507,14 @@
    préfixe compris. */
 .cct-hidden-prefix { display: none; }
 
-/* Marqueur de session (§3.6, §5.5) : la ligne `[session:…]` telle qu'écrite est masquée, et
-   remplacée à sa place par l'icône et la valeur en minuscules — discret, en bas du commentaire,
-   sans badge ni panneau. Même discipline que le préfixe : purement client, défait dès qu'il
-   n'est plus reconnu (badges.ts, applySessionProjection). */
-.cct-hidden-session { display: none; }
+/* Marqueur de session (§3.6, §5.5) : chaque ligne `[session:…]` telle qu'écrite est masquée là
+   où elle est, sans trace, et une seule mention — l'icône et la valeur en minuscules — est posée
+   en bas du commentaire, sans badge ni panneau. Même discipline que le préfixe : purement client,
+   défait dès qu'il n'est plus reconnu (badges.ts, applySessionProjection). La ligne masquée est
+   notre `<span>`, qui emporte le saut de ligne qui la termine, ou le paragraphe de la plateforme
+   réduit au marqueur, masqué EN ENTIER : un paragraphe vide garderait ses marges (#169). */
+.cct-hidden-session,
+.cct-hidden-session-block { display: none; }
 /* Texte « atténué » (muted, au sens de Primer : `fgColor-muted`, le texte secondaire), en italique :
    une métadonnée, que l'œil peut sauter. Un BLOC, à un écart de paragraphe du texte au-dessus —
    la même séparation que l'en-tête, quelle que soit l'écriture : `--cct-session-gap`, calculé et

@@ -804,6 +804,14 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
       // état dégradé) — un `#countedCodes` reparti de zéro recompterait alors un code
       // toujours présent, jamais disparu depuis l'ancien contrôleur.
       initialCountedCodes: previousController?.snapshotCountedCodes(),
+      // §8.1.3, règle 3 : avant de bloquer un envoi, les deux niveaux sont relus sans cache.
+      // Ce que cette relecture apprend réécrit le cache du résolveur — le rendu suivant de la
+      // page et les autres éditeurs en profitent sans relire à leur tour.
+      rereadConfig: async () => {
+        const fresh = await resolver.resolve(adapter, entry.editor.context.pr, { bypassCache: true });
+        writeDegradedState(fresh.degraded, fresh.degradedReason); // §9.2.3 — visible dans les options
+        return fresh;
+      },
     });
     if (disposed || generation !== entry.generation) return;
     previousController?.dispose();
@@ -1077,7 +1085,8 @@ export const CONFIG_POLL_MIN_INTERVAL_MS = 5000;
 
 /** Le CONTENU que la plateforme rend et que `renderPrChrome` peut afficher pour la PR
  * courante : l'identité des fils rendus (pas seulement leur nombre — React peut remplacer un
- * fil par un autre sans changer le compte) et le nombre de corps de commentaire. Sans ces
+ * fil par un autre sans changer le compte), leur état de résolution quand l'adaptateur le
+ * donne, et le nombre de corps de commentaire. Sans ces
  * signaux, un premier rendu fait avant que les fils et les commentaires soient chargés
  * suffirait à figer `showedSomething`, et ce qui arrive ensuite ne recevrait jamais ses badges.
  *
@@ -1091,9 +1100,12 @@ export const CONFIG_POLL_MIN_INTERVAL_MS = 5000;
  *
  * Elle portait aussi le résumé publié par un vérificateur et la présence du bouton de fusion,
  * tous deux retirés avec ce vérificateur (§2). */
-function contentSignatureOf(adapter: PlatformAdapter): string {
+export function contentSignatureOf(adapter: PlatformAdapter): string {
+  // L'état de résolution avec l'identifiant (`id=état`), quand l'adaptateur le donne : résoudre
+  // ou rouvrir un fil change le décompte du bandeau, et la page peut le rendre hors du
+  // conteneur du fil, là où ni son identifiant ni son texte ne bougent.
   const threadIds = adapter.getRenderedThreadElements()
-    .map((t) => t.id)
+    .map((t) => (t.resolution === undefined ? t.id : `${t.id}=${t.resolution}`))
     .join(',');
   // Le nombre de corps que la PLATEFORME rend — **jamais** le nombre de ceux que nous
   // décorons, et les deux ont cessé de coïncider le jour où la description de la PR est

@@ -113,6 +113,19 @@ export class FeedbackView {
     this.#live.textContent = ui(this.#lang, 'guard.blocked', { details });
   }
 
+  /** La configuration relue ne bloque plus l'envoi retenu (§8.1.3, règle 3) : le dire, en
+   * clair ET dans la zone `aria-live` — l'envoi n'est pas rejoué, c'est à la personne de
+   * renvoyer. Posé APRÈS le rendu qui vient de libérer le contrôle, il disparaît au rendu
+   * suivant : un message de l'instant, pas un état. */
+  announceReleased(): void {
+    const text = ui(this.#lang, 'guard.released');
+    this.#live.textContent = text;
+    const li = globalThis.document.createElement('li');
+    li.className = 'cct-released';
+    li.textContent = text;
+    this.#list.appendChild(li);
+  }
+
   dispose(): void {
     this.#root.remove();
     this.#editor.removeAttribute('aria-describedby');

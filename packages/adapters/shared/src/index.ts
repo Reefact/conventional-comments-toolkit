@@ -10,6 +10,7 @@ import type {
   Disposable,
   PlatformProfile,
   PrRef,
+  ResolutionState,
   ThreadInfo,
   UserInfo,
   Zone,
@@ -289,8 +290,14 @@ export interface PlatformAdapter {
    * à côté d'elle, avec ses hôtes par défaut codés en dur. Les deux sont retirées. */
   currentPr(): PrRef | null;
   platformProfile(): PlatformProfile;
-  getRepoConfig(pr: PrRef): Promise<ConfigRead>;
-  getOrgConfig(url: string | null): Promise<ConfigRead>;
+  /** §8.1.2 niveaux 1 et 2. `bypassCache` est ce qu'exige le §8.1.3 (règle 3) avant de
+   * bloquer un envoi : la lecture ne doit s'appuyer sur aucun cache. OPTIONNEL le temps que
+   * chaque adaptateur l'honore, dans la PR de sa plateforme. Aucun des trois adaptateurs
+   * livrés ne garde de cache à lui (lu dans leur code, ainsi que le relais du service
+   * worker) ; ce que l'option n'écarte pas encore, c'est une réponse servie par le cache HTTP
+   * du navigateur — que personne n'a mesuré. */
+  getRepoConfig(pr: PrRef, opts?: { bypassCache: boolean }): Promise<ConfigRead>;
+  getOrgConfig(url: string | null, opts?: { bypassCache: boolean }): Promise<ConfigRead>;
   observeEditors(cb: (editor: EditorHandle) => void): Disposable;
   getSubmitControls(editor: EditorHandle): SubmitControl[];
   /** §4.3, §5.4 — les touches qui publient depuis cet éditeur ou ses contrôles d'envoi
@@ -350,8 +357,19 @@ export interface PlatformAdapter {
   getThreadFilterMount(): Element | null;
   /** §5.5 — les conteneurs de fils rendus, pour le filtre local. Les `id` sont CEUX de
    * `getThreads()`, même dérivation : c'est par eux que le filtre retrouve le label d'un fil, et
-   * deux dérivations qui divergeraient masqueraient les mauvais fils sans rien dire. */
-  getRenderedThreadElements(): { id: string; element: Element }[];
+   * deux dérivations qui divergeraient masqueraient les mauvais fils sans rien dire.
+   *
+   * `resolution` : l'état de résolution du fil, LU COMME `getThreads()` le lit — la même
+   * valeur, sans appel réseau. Le code partagé en fait une partie de la signature de reprise
+   * (`contentSignatureOf`) : sans lui, résoudre ou rouvrir un fil dont l'état est rendu HORS de
+   * son conteneur (le bouton voisin de la vue `…/changes` de GitHub, `#resolvedMarkerBeside()`)
+   * ne change rien de ce que la signature regarde, et le bandeau n'est pas recalculé.
+   * `getThreads()` ne peut pas servir à cette sonde : elle est asynchrone, et elle lit le corps
+   * de chaque fil — un clone de sous-arbre par fil, à chaque mutation de la page.
+   *
+   * OPTIONNEL, et seulement le temps que chaque adaptateur le renseigne dans la PR de sa
+   * plateforme : absent, la signature ne voit pas les changements d'état, comme avant. */
+  getRenderedThreadElements(): { id: string; element: Element; resolution?: ResolutionState }[];
   /** §5.5 — les corps de commentaire à DÉCORER (badges, masquage du préfixe), avec leur texte
    * tel que `commentBodyText()` le lit — nos propres badges exclus, sans quoi un second rendu
    * lirait le premier. */

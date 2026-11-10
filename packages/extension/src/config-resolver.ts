@@ -59,6 +59,17 @@ export class ClientConfigResolver {
   // clé rejoint donc celle-ci au lieu d'en démarrer une concurrente : il n'existe alors plus
   // qu'une seule réponse possible, jamais une course entre deux.
   #inFlight = new Map<string, Promise<{ read: ConfigRead; degraded: boolean }>>();
+  // Pendant de `#inFlight` pour les relectures qui CONTOURNENT le cache (§8.1.3, règle 3) :
+  // elles ne rejoignent jamais une lecture ordinaire déjà en vol — partie avant elles, celle-ci
+  // peut rapporter l'état d'avant la modification qu'on cherche justement à voir —, mais
+  // deux relectures concurrentes de la même clé n'en font qu'une.
+  #bypassInFlight = new Map<string, Promise<{ read: ConfigRead; degraded: boolean }>>();
+  // Ordre de DÉPART des lectures, et dernier ordre écrit au cache pour chaque clé. Deux
+  // lectures d'une même clé peuvent désormais courir ensemble (une ordinaire, une qui
+  // contourne) : seule la plus récemment PARTIE a le droit d'écrire, quelle que soit celle qui
+  // aboutit en dernier — le défaut que `#inFlight` fermait, rouvert sinon par le contournement.
+  #started = 0;
+  #written = new Map<string, number>();
   #now: () => number;
   #lastTtl = 3600; // la clé vit dans le document qu'elle sert à mettre en cache (§9.2.3)
 
@@ -68,20 +79,34 @@ export class ClientConfigResolver {
   }
 
   /** Résolution complète pour une PR. Les lectures sont mises en cache pour
-   * `configCacheTtlSeconds` et faites hors du chemin critique par l'appelant (§9.2.3). */
-  async resolve(adapter: PlatformAdapter, pr: PrRef): Promise<ResolvedClientConfig> {
+   * `configCacheTtlSeconds` et faites hors du chemin critique par l'appelant (§9.2.3).
+   *
+   * `bypassCache` : relecture des DEUX niveaux sans consulter le cache, puis réécriture du
+   * cache avec ce qui a été lu — la relecture que le §8.1.3 (règle 3) exige avant de bloquer
+   * un envoi. Ce qui est contourné, c'est le cache de CETTE classe ; l'option est passée aux
+   * adaptateurs (`getRepoConfig`/`getOrgConfig`), qui ne l'honorent pas encore, si bien que
+   * le cache HTTP du navigateur, lui, n'est pas contourné — et que son effet sur ces lectures
+   * n'a pas été mesuré. Le plancher, lu à chaque résolution, n'a pas de cache à contourner. */
+  async resolve(
+    adapter: PlatformAdapter,
+    pr: PrRef,
+    opts: { bypassCache?: boolean } = {}
+  ): Promise<ResolvedClientConfig> {
+    const bypassCache = opts.bypassCache === true;
     const floor = await this.#floorProvider().catch(() => null);
     // Le plancher VÉRIFIÉ, jamais le brut : un plancher de version non supportée ne doit
     // pas désigner le document d'organisation ni déclencher sa lecture (§8.1.1).
     const configUrl = vettedConfigUrl(vetFloor(floor));
 
-    const repo = await this.#cached(`repo:${pr.host}/${pr.scope.join('/')}`, () =>
-      adapter.getRepoConfig(pr)
+    const repo = await this.#cached(
+      `repo:${pr.host}/${pr.scope.join('/')}`,
+      () => adapter.getRepoConfig(pr, { bypassCache }),
+      bypassCache
     );
     const org =
       configUrl === null
         ? { read: { status: 'absent' } as ConfigRead, degraded: false }
-        : await this.#cached(`org:${configUrl}`, () => adapter.getOrgConfig(configUrl));
+        : await this.#cached(`org:${configUrl}`, () => adapter.getOrgConfig(configUrl, { bypassCache }), bypassCache);
 
     const { config, notices } = resolveConfig(floor, org.read, repo.read);
     this.#lastTtl = config.configCacheTtlSeconds;
@@ -100,20 +125,27 @@ export class ClientConfigResolver {
 
   async #cached(
     key: string,
-    fetcher: () => Promise<ConfigRead>
+    fetcher: () => Promise<ConfigRead>,
+    bypassCache = false
   ): Promise<{ read: ConfigRead; degraded: boolean }> {
     const entry = this.#cache.get(key);
-    if (entry && this.#now() - entry.fetchedAt < this.#lastTtl * 1000) {
+    if (!bypassCache && entry && this.#now() - entry.fetchedAt < this.#lastTtl * 1000) {
       return { read: entry.value, degraded: false };
     }
     // Rejoint la lecture déjà en vol pour cette clé plutôt que d'en démarrer une seconde —
-    // voir le commentaire de `#inFlight` plus haut.
-    const pending = this.#inFlight.get(key);
+    // voir le commentaire de `#inFlight` plus haut. Une relecture qui contourne ne rejoint que
+    // ses semblables (`#bypassInFlight`).
+    const inFlight = bypassCache ? this.#bypassInFlight : this.#inFlight;
+    const pending = inFlight.get(key);
     if (pending) return pending;
+    const started = ++this.#started;
     const promise = (async (): Promise<{ read: ConfigRead; degraded: boolean }> => {
       const value = await fetcher();
       if (value.status !== 'unreachable') {
-        this.#cache.set(key, { value, fetchedAt: this.#now() });
+        if (started > (this.#written.get(key) ?? 0)) {
+          this.#written.set(key, started);
+          this.#cache.set(key, { value, fetchedAt: this.#now() });
+        }
         return { read: value, degraded: false };
       }
       // Lecture impossible : le repli normatif est le NIVEAU INFÉRIEUR, en état dégradé
@@ -124,11 +156,11 @@ export class ClientConfigResolver {
       // qu'elle n'a pas pu relire. La valeur en cache ne sert que pendant son TTL.
       return { read: value, degraded: true };
     })();
-    this.#inFlight.set(key, promise);
+    inFlight.set(key, promise);
     try {
       return await promise;
     } finally {
-      this.#inFlight.delete(key);
+      inFlight.delete(key);
     }
   }
 

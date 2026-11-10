@@ -336,14 +336,22 @@ function stripCssComments(css) {
 
 const cssVocabularies = new Map(); // plateforme -> Set(noms de variables de la plateforme)
 const cssRoles = new Map(); // plateforme -> Set(rôles --cct-* que sa feuille DÉCLARE)
+const missingSheets = new Set(); // plateformes sans `src/platform.css`
 for (const platform of readdirSync(ADAPTERS)) {
   if (platform === 'shared') continue;
   const sheet = join(ADAPTERS, platform, 'src', 'platform.css');
   let css;
   try {
     css = stripCssComments(readFileSync(sheet, 'utf8'));
-  } catch {
-    continue; // pas de feuille pour cette plateforme : rien à dériver
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+    // Pas de feuille : aucun vocabulaire à dériver, mais la plateforme reste INTERROGÉE — elle
+    // ne répond à rien. C'est le pire cas que la section des rôles existe pour voir : chaque
+    // `var(--cct-…)` sans repli y devient invalide, sans un mot. La sauter laissait le garde
+    // vert sur une plateforme créée sans feuille (#138, mesuré en retirant celle de GitLab).
+    missingSheets.add(platform);
+    cssRoles.set(platform, new Set());
+    continue;
   }
   const names = new Set(
     [...css.matchAll(/--[A-Za-z0-9_-]+/g)].map((m) => m[0]).filter((n) => !n.startsWith('--cct-'))
@@ -438,7 +446,7 @@ if (
     asked === 0
       ? `✓ rôles : la feuille partagée ne pose aucune question sans repli.`
       : `✓ rôles : ${asked} question(s) sans repli — ${roleQuestions.join(', ')} — auxquelles les ` +
-          `${cssRoles.size} feuille(s) de plateforme répondent.`
+          `${cssRoles.size} plateforme(s) — ${[...cssRoles.keys()].join(', ')} — répondent.`
   );
   process.exit(0);
 }
@@ -485,7 +493,12 @@ if (unanswered.length > 0) {
   console.error(
     `\n${unanswered.length} rôle(s) que ${SHARED_SHEET} demande sans repli et qu'une feuille de\n` +
       'plateforme ne déclare pas :\n' +
-      unanswered.map((u) => `  - ${u.platform} : «${u.role}»`).join('\n') +
+      unanswered
+        .map((u) => {
+          const why = missingSheets.has(u.platform) ? ' (aucune src/platform.css)' : '';
+          return `  - ${u.platform}${why} : «${u.role}»`;
+        })
+        .join('\n') +
       "\n\nUn `var()` sans repli est une QUESTION posée à la plateforme ; sans réponse, la déclaration\n" +
       "devient invalide et la propriété reprend sa valeur initiale — une perte de mise en page que\n" +
       "rien ne signale. Déclarez le rôle sous le marqueur de cette plateforme, ou, si la feuille\n" +

@@ -193,8 +193,10 @@ them together.
 ## Review skills for AI agents
 
 Two skills let an AI agent take part in a review the way this toolkit expects. Each is a
-`SKILL.md` file that Claude Code loads as is, and that any other agent can be given as
-instructions:
+directory under `skills/`, whose `SKILL.md` Claude Code loads as is and any other agent can be
+given as instructions. Install or hand over **the whole directory**, not the `SKILL.md` alone: the
+reviewer's relies on the files beside it — how to choose session identifiers, and the Slugger
+theme it draws them from.
 
 - [`skills/review-pull-request`](./skills/review-pull-request/SKILL.md), for the **reviewer**:
   publishes findings as Conventional Comments, rated P0 to P3, follows them up until each fix is
@@ -209,8 +211,9 @@ Both read the repository's `.conventional-comments.json` first, so they only use
 enables. The reviewer ends each of its comments with a `[session:<identifier>]` line, the same for
 the whole review session, and the author copies it into the reply to that comment, so a reader can
 tell parallel review sessions apart. The identifier is a readable name drawn by
-[Slugger](https://github.com/Reefact/slugger), or a GUID: the reviewer skill asks once, then
-records the answer in a committed `session-id.md` beside it.
+[Slugger](https://github.com/Reefact/slugger), used without asking when it already runs; otherwise
+the reviewer skill offers it once, and records the answer — Slugger, or a GUID — in a committed
+`session-id.md` beside it.
 
 ## Modes and adoption (§7)
 

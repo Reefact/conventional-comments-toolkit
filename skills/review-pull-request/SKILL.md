@@ -256,7 +256,8 @@ session: every finding, every pass, every follow-up. Never draw a new one per co
 When you come back to the same review after fixes or new commits, reuse the identifier you
 already chose; only a genuinely separate review session gets a new one.
 
-How the identifier is drawn — Slugger or a GUID — is decided once per installation of this skill:
+How the identifier is drawn — with Slugger, or as a GUID when Slugger was declined — is settled once
+per installation of this skill:
 
 - if `session-id.md` exists beside the `SKILL.md` your agent loaded as the skill — usually this
   file; when another `SKILL.md` sent you here, beside that one — follow it;

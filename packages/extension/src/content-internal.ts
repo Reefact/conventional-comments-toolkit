@@ -1228,7 +1228,13 @@ function ownOutputSignatureOf(adapter: PlatformAdapter, doc: Document): string {
  * la projection en badges serait à perte, dont le sujet n'a pas pu être borné, ou dont le
  * corps reprend au paragraphe suivant (donc sans espaceur), n'a jamais le wrapper
  * correspondant — et son `0` est le même d'un rendu au suivant, stable, donc sans boucle. */
-const TEXTLESS_WRITES = ['.cct-hidden-prefix', '.cct-subject', '.cct-subject-break', '.cct-hidden-session'];
+const TEXTLESS_WRITES = [
+  '.cct-hidden-prefix',
+  '.cct-subject',
+  '.cct-subject-break',
+  '.cct-hidden-session',
+  '.cct-hidden-session-block',
+];
 
 function textlessWritesMapOf(commentElements: Element[]): string {
   let map = '';

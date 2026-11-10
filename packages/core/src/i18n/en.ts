@@ -46,6 +46,9 @@ export const en: Record<string, string> = {
     'This comment is blocking but has no discussion: explain why the point must be addressed.',
   'diag.W-MISSING-DECORATION':
     'A "{label}" without a carrying decoration is ambiguous: add "(blocking)", "(non-blocking)" or "(if-minor)".',
+  // Diagnostic — métadonnée (§3.6)
+  'diag.W-SESSION-MULTIPLE':
+    'This comment carries {count} session markers: none is shown. Keep a single "[session:…]" line.',
   'diag.W-NOT-BLOCKABLE':
     'This label is blocking, but this area cannot hold a resolvable thread — it will not block completion.',
   // Sortie du check (§6.3.1)

@@ -102,10 +102,8 @@ The code now returns the error the contract requires, with a regression test.
 - When that comment carries no marker, add none: never make one up, and never borrow one from
   another comment or thread.
 - Never draw a session identifier of your own: the marker identifies the reviewer's session.
-- Nothing follows the marker: one that is not the last non-blank line is not recognized. If your
-  tooling appends a signature or footer to what you publish, put the marker after it, or leave
-  the footer out. Check the reply as published, not only your draft, and edit it when the marker
-  is not last.
+- Write it **once**, on a line of its own, last when you can; a signature or footer your tooling
+  appends after it is fine. A reply with two markers shows an error instead of a session.
 
 The marker is metadata. It is not a finding, an acceptance or a resolution, and it says nothing
 about whether the review is complete: your label still says what you did.

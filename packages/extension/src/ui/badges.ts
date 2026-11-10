@@ -29,6 +29,7 @@ import {
   type PlatformProfile,
   type ResolvedDecoration,
   type SessionMarker,
+  t,
 } from '@cct/core';
 // Ce module ne nomme plus AUCUNE forme de corps rendu : `MARKDOWN_HTML_BODY_SHAPE` n'est plus
 // importé ici. Il l'était pour deux replis — le défaut de `decorateComment()` et le bouche-trou
@@ -301,6 +302,9 @@ function firstTextNode(
   if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
     const element = node as Element;
     if (element.classList.contains('cct-badge')) return null;
+    // Une ligne de marqueur masquée (§3.6) n'est pas le début du corps affiché : un marqueur
+    // AU-DESSUS de la ligne de préfixe laisse celle-ci en tête de ce que le lecteur voit.
+    if (isHiddenSession(element)) return null;
     if (!isRoot && (depth >= 1 || !shape.paragraphTags.includes(element.tagName))) return ABORT;
   }
   const nextDepth = isRoot ? depth : depth + 1;
@@ -399,6 +403,8 @@ function subjectNodes(hidden: Element, shape: RenderedBodyShape): ChildNode[] {
     if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
       const element = node as Element;
       if (element.tagName === shape.lineBreakTag) break;
+      // Une ligne de marqueur masquée commence une autre ligne : le sujet s'arrête avant elle.
+      if (isHiddenSession(element)) break;
       // borne interne : on ne sait pas border proprement
       if (element.querySelector(shape.lineBreakTag) !== null) return [];
     }
@@ -436,14 +442,30 @@ function subjectNodes(hidden: Element, shape: RenderedBodyShape): ChildNode[] {
  * vraie, ce soit constaté et non deviné. */
 const SUBJECT_BREAK_CLASS = 'cct-subject-break';
 
+/** Le bloc VISIBLE qui suit `block` : ni la mention de session, ni un paragraphe réduit à un
+ * marqueur masqué (§3.6). Resserrer la marge du sujet au-dessus d'un tel bloc rapprocherait la
+ * mention, qui doit rester à un écart entier. */
+function nextVisibleBlock(block: Element): Element | null {
+  for (let next = block.nextElementSibling; next !== null; next = next.nextElementSibling) {
+    if (isOwn(next) || isHiddenSession(next)) continue;
+    return next;
+  }
+  return null;
+}
+
 /** Pose ou retire l'espaceur selon ce que le DOM porte VRAIMENT après le sujet, à chaque
  * passage : un `<br>` peut apparaître ou disparaître d'une édition à l'autre, et l'espaceur ne
  * doit jamais survivre au saut de ligne qui le justifiait. Purement décoratif, sans texte :
  * `commentBodyText()` relit le même corps avec ou sans lui. */
 function markSubjectBreak(wrapper: Element, shape: RenderedBodyShape, body: Element): void {
   const next = wrapper.nextSibling;
+  // Un saut de ligne que ne suit plus rien de VISIBLE — la ligne d'après était un marqueur de
+  // session, masqué (§3.6) — ne fait reprendre aucun corps : l'espaceur ferait un écart sous rien.
   const lineBreak =
-    next !== null && next.nodeType === 1 && (next as Element).tagName === shape.lineBreakTag
+    next !== null &&
+    next.nodeType === 1 &&
+    (next as Element).tagName === shape.lineBreakTag &&
+    significantSibling(next, 'nextSibling') !== null
       ? (next as Element)
       : null;
   const host = wrapper.parentElement;
@@ -458,7 +480,7 @@ function markSubjectBreak(wrapper: Element, shape: RenderedBodyShape, body: Elem
     // elle qu'il faut resserrer, sur le paragraphe du sujet lui-même — une règle de notre feuille
     // ne l'emporterait pas à coup sûr sur celle de la plateforme. Seulement si un bloc suit : la
     // marge d'un dernier bloc n'écarte rien, et la poser en ajouterait.
-    if (host !== null && host !== body && host.nextElementSibling !== null) {
+    if (host !== null && host !== body && nextVisibleBlock(host) !== null) {
       setHeaderMargin(host as HTMLElement, headerGap);
     } else if (host !== null) {
       releaseHeaderMargin(host);
@@ -630,79 +652,151 @@ function applyPrefixVisibility(
 
 // ————— Marqueur de session (§3.6, §5.5) —————
 //
-// La dernière ligne `[session:<valeur>]` est masquée dans le corps AFFICHÉ et remplacée, à sa
-// place, par `<icône> session: <valeur en minuscules>`. Même discipline que le masquage du
-// préfixe : rien n'est écrit côté plateforme, tout se défait, et dans le doute on renonce — le
-// corps reste alors entier, marqueur compris, lisible tel qu'écrit.
+// Chaque ligne `[session:<valeur>]` reconnue est masquée LÀ OÙ ELLE EST dans le corps AFFICHÉ, sans
+// laisser de trace — ni ligne vide, ni paragraphe blanc, ni écart doublé —, et une seule mention,
+// `<icône> session: <valeur en minuscules>`, est posée tout en BAS du corps : sous un pied de
+// signature, quand le marqueur le précède (#169). Même discipline que le masquage du préfixe :
+// rien n'est écrit côté plateforme, tout se défait, et dans le doute on renonce — le corps reste
+// alors entier, marqueurs compris, lisible tel qu'écrit.
 
-/** Le texte du marqueur, masqué : il reste dans `textContent`, si bien que la relecture du corps
- * (`commentBodyText()`) retrouve le marqueur tel qu'écrit et que la reconnaissance est stable
- * d'un passage à l'autre. */
+/** Une ligne de marqueur, masquée : notre `<span>`, qui garde le texte d'origine dans
+ * `textContent`, si bien que la relecture du corps (`commentBodyText()`) retrouve le marqueur tel
+ * qu'écrit et que la reconnaissance est stable d'un passage à l'autre. Il emporte le saut de
+ * ligne qui la termine, quand il y en a un : sans lui, une ligne vide resterait à sa place. */
 const HIDDEN_SESSION_CLASS = 'cct-hidden-session';
-/** Ce que l'extension AFFICHE à la place. Il ajoute du texte : `commentBodyText()` l'exclut. */
+/** Un paragraphe de la plateforme réduit au seul marqueur, masqué EN ENTIER : masquer son seul
+ * texte laisserait un paragraphe vide, dont les marges font un écart de trop. Une classe posée sur
+ * un élément de la PLATEFORME, comme la marge resserrée du sujet : retirée avec le reste. */
+const HIDDEN_SESSION_BLOCK_CLASS = 'cct-hidden-session-block';
+/** Ce que l'extension AFFICHE, en bas du corps. Il ajoute du texte : `commentBodyText()` l'exclut. */
 const SESSION_CLASS = 'cct-session';
 
+/** Le texte de la mention : la valeur, ou `#ERROR` quand le corps porte plusieurs marqueurs —
+ * aucune session n'est alors désignée (§3.6), et `W-SESSION-MULTIPLE` dit pourquoi. */
 function sessionText(marker: SessionMarker, config: EffectiveConfig): string {
-  return `${config.sessionIcon} session: ${marker.value.toLowerCase()}`;
+  return `${config.sessionIcon} session: ${marker.value === null ? '#ERROR' : marker.value.toLowerCase()}`;
 }
 
+/** Une écriture de l'extension sans texte d'auteur : badge, mention, espaceur du sujet. */
 const isOwn = (node: Node): boolean =>
   node.nodeType === 1 &&
-  ((node as Element).classList.contains('cct-badge') || (node as Element).classList.contains(SESSION_CLASS));
+  ((node as Element).classList.contains('cct-badge') ||
+    (node as Element).classList.contains(SESSION_CLASS) ||
+    (node as Element).classList.contains(SUBJECT_BREAK_CLASS));
+
+/** Une ligne de marqueur déjà masquée par nous — span ou paragraphe. Ce qui la suit ou la précède
+ * se lit comme si elle n'existait pas : c'est la définition même de « sans trace ». */
+const isHiddenSession = (node: Node): boolean =>
+  node.nodeType === 1 &&
+  ((node as Element).classList.contains(HIDDEN_SESSION_CLASS) ||
+    (node as Element).classList.contains(HIDDEN_SESSION_BLOCK_CLASS));
 
 const isBlank = (node: Node): boolean => node.nodeType === 3 && (node as Text).data.trim() === '';
 
-/** Dernier enfant significatif — ni blanc, ni écriture de l'extension. */
-function lastSignificantChild(parent: Node): ChildNode | null {
-  for (let node = parent.lastChild; node !== null; node = node.previousSibling) {
-    if (isBlank(node) || isOwn(node)) continue;
-    return node;
+/** Frère significatif voisin — ni blanc, ni écriture de l'extension, ni ligne masquée. */
+function significantSibling(node: Node, direction: 'previousSibling' | 'nextSibling'): ChildNode | null {
+  for (let n = node[direction]; n !== null; n = n[direction]) {
+    if (isBlank(n) || isOwn(n) || isHiddenSession(n)) continue;
+    return n;
   }
   return null;
 }
 
-/** Le nœud de texte, et la plage, qui portent la DERNIÈRE ligne du corps rendu — à condition que
- * cette ligne soit le marqueur, et lui seul. Allow-list, comme `firstTextNode()` : le dernier
- * bloc doit être un paragraphe déclaré par la plateforme (ou du texte posé directement dans le
- * corps), sa dernière ligne un nœud de texte ENFANT DIRECT de ce bloc, commencée en tête de bloc,
- * après un saut de ligne déclaré, ou après une fin de ligne littérale du même nœud. Un bloc de
- * code, une citation, une liste, une mise en forme inline sur la ligne : on renonce. Le texte
- * vient du DOM rendu, où la syntaxe de ces constructions a pu disparaître — `analyze()` peut
- * donc reconnaître un marqueur que la source écrivait dans un bloc de code ; ce n'est que dans
- * un paragraphe simple que la ligne rendue est la ligne écrite. */
-function sessionLine(body: Element, marker: SessionMarker, shape: RenderedBodyShape): { node: Text; start: number } | null {
-  const last = lastSignificantChild(body);
-  if (last === null) return null;
-  let text: ChildNode | null = last;
-  if (last.nodeType === 1) {
-    if (!shape.paragraphTags.includes((last as Element).tagName)) return null;
-    text = lastSignificantChild(last);
+/** Une ligne de marqueur trouvée dans le corps rendu : un paragraphe entier, ou une plage d'un
+ * nœud de texte — `[start, end)` — suivie, le cas échéant, du saut de ligne déclaré qui la termine. */
+type MarkerHit =
+  | { kind: 'block'; block: Element; raw: string }
+  | { kind: 'range'; node: Text; start: number; end: number; lineBreak: Element | null; raw: string };
+
+/** Les lignes du corps rendu qui sont des marqueurs, dans l'ordre du document. Allow-list, comme
+ * `firstTextNode()` : un marqueur n'est cherché que dans un paragraphe déclaré par la plateforme,
+ * ou dans du texte posé directement dans le corps, et sa ligne doit être un nœud de texte ENFANT
+ * DIRECT de ce bloc, bornée de part et d'autre par le bord du bloc, un saut de ligne déclaré, ou
+ * une fin de ligne littérale du même nœud. Un bloc de code, une citation, une liste, une mise en
+ * forme inline sur la ligne : rien n'y est cherché. Le texte vient du DOM rendu, où la syntaxe de
+ * ces constructions a pu disparaître — `analyze()` peut donc reconnaître un marqueur que la
+ * source écrivait dans un bloc de code ; ce n'est que dans un paragraphe simple que la ligne
+ * rendue est la ligne écrite. */
+function markerHits(body: Element, raws: ReadonlySet<string>, shape: RenderedBodyShape): MarkerHit[] {
+  const hits: MarkerHit[] = [];
+  const isBreak = (n: Node | null): boolean => n !== null && n.nodeType === 1 && (n as Element).tagName === shape.lineBreakTag;
+  const isParagraph = (n: Node | null): boolean =>
+    n !== null && n.nodeType === 1 && shape.paragraphTags.includes((n as Element).tagName);
+
+  const scan = (container: Element, inBody: boolean): void => {
+    // Dans le corps lui-même, un paragraphe voisin borne la ligne autant qu'un saut déclaré.
+    const bounds = (n: Node | null): boolean => n === null || isBreak(n) || (inBody && isParagraph(n));
+    for (const child of [...container.childNodes]) {
+      if (child.nodeType !== 3) continue;
+      const node = child as Text;
+      const segments = node.data.split('\n');
+      let offset = 0;
+      for (let k = 0; k < segments.length; k++) {
+        const segment = segments[k]!;
+        const at = offset;
+        offset += segment.length + 1;
+        const raw = segment.trim();
+        if (!raws.has(raw)) continue;
+        // Dernière ligne ÉCRITE du nœud : seuls des blancs la suivent dans ce nœud.
+        const last = k === segments.length - 1 || node.data.slice(at + segment.length).trim() === '';
+        if (k === 0 && !bounds(significantSibling(node, 'previousSibling'))) continue;
+        const next = last ? significantSibling(node, 'nextSibling') : null;
+        if (last && !bounds(next)) continue;
+        if (!last) {
+          // Au milieu du nœud : la ligne part avec la fin de ligne qui la termine.
+          hits.push({ kind: 'range', node, start: at, end: at + segment.length + 1, lineBreak: null, raw });
+        } else if (isBreak(next)) {
+          // Un saut déclaré la termine : il part avec elle.
+          hits.push({ kind: 'range', node, start: at, end: node.data.length, lineBreak: next as Element, raw });
+        } else {
+          // Dernière ligne de son bloc : les blancs qui la précèdent dans ce nœud partent avec elle
+          // — une plateforme qui préserverait les blancs les afficherait (revue Reefact, PR #163).
+          // Le saut déclaré qui la précède, lui, reste : en fin de bloc, il ne fait aucune ligne.
+          const start = k === 0 ? 0 : node.data.slice(0, at).trimEnd().length;
+          hits.push({ kind: 'range', node, start, end: node.data.length, lineBreak: null, raw });
+        }
+      }
+    }
+  };
+
+  for (const child of [...body.childNodes]) {
+    if (!isParagraph(child)) continue;
+    const block = child as Element;
+    const content = [...block.childNodes].filter((n) => !isBlank(n) && !isOwn(n));
+    if (content.length === 1 && content[0]!.nodeType === 3 && raws.has((content[0] as Text).data.trim())) {
+      hits.push({ kind: 'block', block, raw: (content[0] as Text).data.trim() });
+      continue;
+    }
+    scan(block, false);
   }
-  if (text === null || text.nodeType !== 3) return null;
-  const node = text as Text;
-  const end = node.data.trimEnd().length;
-  const lineStart = node.data.lastIndexOf('\n', end - 1) + 1;
-  if (lineStart === 0) {
-    // La ligne commence avant ce nœud, sauf en tête de bloc ou juste après un saut de ligne.
-    let previous = node.previousSibling;
-    while (previous !== null && isBlank(previous)) previous = previous.previousSibling;
-    const atLineStart =
-      previous === null || (previous.nodeType === 1 && (previous as Element).tagName === shape.lineBreakTag);
-    if (!atLineStart) return null;
+  scan(body, true);
+  // `scan(body)` vient en dernier : remettre les lignes dans l'ordre du document.
+  return hits.sort((x, y) => {
+    const a = x.kind === 'block' ? x.block : x.node;
+    const b = y.kind === 'block' ? y.block : y.node;
+    if (a === b) return (x as { start: number }).start - (y as { start: number }).start;
+    return a.compareDocumentPosition(b) & 4 /* Node.DOCUMENT_POSITION_FOLLOWING */ ? -1 : 1;
+  });
+}
+
+/** Masque une ligne trouvée. Appelée de la DERNIÈRE à la première : scinder un nœud de texte à
+ * partir de la fin laisse valables les positions de ce qui le précède. */
+function hideHit(hit: MarkerHit): void {
+  if (hit.kind === 'block') {
+    hit.block.classList.add(HIDDEN_SESSION_BLOCK_CLASS);
+    return;
   }
-  if (node.data.slice(lineStart, end).trim() !== marker.raw) return null;
-  // La plage rendue est la LIGNE ENTIÈRE, blancs de bordure compris — jusqu'à la fin du nœud, où
-  // ne restent que des blancs par construction (`end`). Ne prendre que le marqueur laissait ses
-  // espaces de fin visibles après la mention (revue Reefact, PR #163).
-  //
-  // Et elle commence juste après le dernier caractère ÉCRIT qui la précède dans ce nœud : les
-  // fins de ligne et les lignes blanches entre le texte et le marqueur partent avec lui. Un
-  // rendu Markdown ne les met pas dans un même nœud — une ligne blanche y devient une frontière
-  // de paragraphe, une fin de ligne simple un saut déclaré (`renderedBodyShape()`) —, et en HTML
-  // ordinaire elles se replient de toute façon. Mais une plateforme qui préserverait les blancs
-  // les afficherait, et la mention ne serait plus à un seul écart du texte (revue Reefact,
-  // PR #163). Les masquer ne coûte rien : la mention est un bloc, l'écart est le sien.
-  return { node, start: node.data.slice(0, lineStart).trimEnd().length };
+  const { node, start, end, lineBreak } = hit;
+  if (end < node.data.length) node.splitText(end);
+  const line = start > 0 ? node.splitText(start) : node;
+  const wrapper = globalThis.document.createElement('span');
+  wrapper.className = HIDDEN_SESSION_CLASS;
+  line.replaceWith(wrapper);
+  wrapper.appendChild(line);
+  if (lineBreak !== null) {
+    while (wrapper.nextSibling !== null && wrapper.nextSibling !== lineBreak) wrapper.appendChild(wrapper.nextSibling);
+    wrapper.appendChild(lineBreak);
+  }
 }
 
 /** Variable portée par l'espaceur du sujet : sa hauteur, deux tiers d'écart de paragraphe. */
@@ -776,93 +870,94 @@ function releaseHeaderMargin(root: ParentNode): void {
 
 /** Ce qu'il faut AJOUTER au-dessus de la mention pour qu'elle soit à un écart de paragraphe, et un
  * seul, du texte qui la précède, quelle que soit l'écriture (demande Reefact, #163) : l'écart
- * normal, moins celui qui existe déjà.
- * - elle ouvre son propre paragraphe : la marge du bloc précédent existe déjà — l'écart entier
- *   d'ordinaire, deux tiers seulement si ce bloc est la ligne du sujet resserrée ;
- * - elle suit l'espaceur du sujet (le commentaire n'est qu'un sujet et un marqueur) : la hauteur
- *   de l'espaceur existe déjà ;
- * - elle suit du texte dans le même paragraphe : rien n'existe, l'écart entier ;
- * - elle est seule dans le corps : rien au-dessus, rien à ajouter.
+ * normal, moins celui qui existe déjà. La mention est le dernier enfant du corps ; ce qui la
+ * précède, lignes masquées sautées, est :
+ * - un bloc : sa marge existe déjà — l'écart entier d'ordinaire, un bloc n'étant plus le dernier ;
+ * - du texte posé directement dans le corps : rien n'existe, l'écart entier ;
+ * - rien : elle est seule dans le corps, rien au-dessus, rien à ajouter.
  * Un `padding-top`, posé par la feuille de style : une marge fusionnerait avec celle du bloc
- * précédent au lieu de s'y ajouter. Relu à chaque passage, sans sonde : la ligne du sujet peut
- * cesser d'être resserrée après coup (configuration), et l'écart doit la suivre. */
-function sessionGap(body: Element, wrapper: Element, shape: RenderedBodyShape): string {
-  const view = body.ownerDocument.defaultView;
-  const computed = (el: Element, property: 'marginBottom' | 'height'): number => {
-    const value = Number.parseFloat(view?.getComputedStyle(el)[property] ?? '');
-    return Number.isFinite(value) ? value : 0;
-  };
-  let previous = wrapper.previousSibling;
-  while (previous !== null && (isBlank(previous) || isOwn(previous))) previous = previous.previousSibling;
+ * précédent au lieu de s'y ajouter. Relu à chaque passage, sans sonde : la marge du bloc
+ * précédent peut changer après coup (sujet resserré ou non), et l'écart doit la suivre. */
+function sessionGap(body: Element, shown: Element, shape: RenderedBodyShape): string {
+  const previous = significantSibling(shown, 'previousSibling');
+  if (previous === null) return '0px';
   let existing = 0;
-  if (previous === null) {
-    const host = wrapper.parentElement;
-    if (host === null || host === body) return '0px';
-    let before = host.previousElementSibling;
-    while (before !== null && before.classList.contains('cct-badge')) before = before.previousElementSibling;
-    if (before === null) return '0px'; // seule dans le corps
-    existing = computed(before, 'marginBottom');
-  } else if (previous.nodeType === 1 && (previous as Element).classList.contains(SUBJECT_BREAK_CLASS)) {
-    // La hauteur que NOUS avons posée, lue telle quelle : elle ne dépend pas d'une mise en page.
-    const posed = Number.parseFloat((previous as HTMLElement).style.getPropertyValue(PARAGRAPH_GAP_VAR));
-    existing = Number.isFinite(posed) ? posed : computed(previous as Element, 'height');
+  if (previous.nodeType === 1) {
+    const value = Number.parseFloat(body.ownerDocument.defaultView?.getComputedStyle(previous as Element).marginBottom ?? '');
+    existing = Number.isFinite(value) ? value : 0;
   }
   const gap = paragraphGapPx(body, shape);
   if (gap === null) return existing > 0 ? '0px' : '1em';
   return cssLength(Math.max(0, gap - existing), 1);
 }
 
-/** Défait la projection : texte d'origine rendu à sa place, affichage retiré. */
+/** Défait la projection : lignes d'origine rendues à leur place, mention retirée. */
 function revealSession(root: ParentNode): void {
   for (const shown of [...root.querySelectorAll(`.${SESSION_CLASS}`)]) shown.remove();
-  for (const hidden of [...root.querySelectorAll(`.${HIDDEN_SESSION_CLASS}`)]) {
-    const parent = hidden.parentNode;
-    hidden.replaceWith(globalThis.document.createTextNode(hidden.textContent ?? ''));
-    parent?.normalize();
+  for (const hidden of [...root.querySelectorAll(`.${HIDDEN_SESSION_CLASS}`)]) unwrapInPlace(hidden);
+  for (const block of [...root.querySelectorAll(`.${HIDDEN_SESSION_BLOCK_CLASS}`)]) {
+    block.classList.remove(HIDDEN_SESSION_BLOCK_CLASS);
+    if (block.classList.length === 0) block.removeAttribute('class');
   }
 }
 
-/** Pose, réentretient ou défait la projection du marqueur de session (§5.5). `marker` à `null`,
- * ou une forme de corps non mesurée : on défait — c'est ce qui rend le marqueur à un corps dont
- * la dernière ligne n'en est plus un, et à une plateforme qui cesse de répondre. Idempotent. */
+/** Les lignes masquées et la mention sont-elles DÉJÀ celles qu'il faut ? Mêmes lignes, dans le même
+ * ordre, et la mention encore à sa place, dernier enfant significatif du corps. */
+function sessionProjectionHolds(body: Element, marker: SessionMarker): boolean {
+  const hidden = [...body.querySelectorAll(`.${HIDDEN_SESSION_CLASS}, .${HIDDEN_SESSION_BLOCK_CLASS}`)];
+  if (hidden.length !== marker.lines.length) return false;
+  if (hidden.some((h, i) => (h.textContent ?? '').trim() !== marker.lines[i]!.raw)) return false;
+  const shown = body.querySelector(`:scope > .${SESSION_CLASS}`);
+  if (shown === null) return false;
+  for (let n = shown.nextSibling; n !== null; n = n.nextSibling) if (!isBlank(n)) return false;
+  return true;
+}
+
+/** Pose, réentretient ou défait le masquage des lignes de marqueur (§5.5), et pose la mention.
+ * `marker` à `null`, ou une forme de corps non mesurée : on défait — c'est ce qui rend le marqueur
+ * à un corps qui n'en porte plus, et à une plateforme qui cesse de répondre. Idempotent.
+ *
+ * Appelée AVANT le masquage du préfixe : le sujet mis en avant et sa respiration se règlent sur
+ * ce qui reste VISIBLE, lignes masquées sautées. L'écart de la mention, lui, se règle APRÈS
+ * (`placeSessionGap`), sur les marges que ce masquage vient de fixer. */
 function applySessionProjection(
   body: Element,
   marker: SessionMarker | null,
   config: EffectiveConfig,
+  lang: string,
   shape: RenderedBodyShape | null
 ): void {
-  const hidden = body.querySelector(`.${HIDDEN_SESSION_CLASS}`);
   if (marker === null || shape === null) {
     revealSession(body);
     return;
   }
-  const expected = sessionText(marker, config);
-  if (hidden !== null) {
-    const shown = hidden.nextElementSibling;
-    if ((hidden.textContent ?? '').trim() === marker.raw && shown?.classList.contains(SESSION_CLASS)) {
-      if (shown.textContent !== expected) shown.textContent = expected; // icône changée
-      const gap = sessionGap(body, hidden, shape);
-      const element = shown as HTMLElement;
-      if (element.style.getPropertyValue(SESSION_GAP_VAR) !== gap) element.style.setProperty(SESSION_GAP_VAR, gap);
-      return;
-    }
-    revealSession(body); // marqueur changé, ou affichage emporté par la plateforme : reconstruire
-  } else if (body.querySelector(`.${SESSION_CLASS}`) !== null) {
-    revealSession(body);
+  if (!sessionProjectionHolds(body, marker)) {
+    revealSession(body); // marqueurs changés, ou affichage emporté par la plateforme : reconstruire
+    const raws = new Set(marker.lines.map((line) => line.raw));
+    const hits = markerHits(body, raws, shape);
+    // Toutes les lignes, ou aucune : n'en masquer qu'une partie ferait mentir la mention.
+    if (hits.length !== marker.lines.length || hits.some((hit, i) => hit.raw !== marker.lines[i]!.raw)) return;
+    for (const hit of [...hits].reverse()) hideHit(hit);
+    const created = globalThis.document.createElement('span');
+    created.className = SESSION_CLASS;
+    body.appendChild(created);
   }
-  const found = sessionLine(body, marker, shape);
-  if (found === null) return; // repli : le marqueur reste visible, tel qu'écrit
-  // Tout le reste du nœud : la ligne du marqueur, et ses blancs jusqu'à la fin.
-  const markerNode = found.start === 0 ? found.node : found.node.splitText(found.start);
-  const wrapper = globalThis.document.createElement('span');
-  wrapper.className = HIDDEN_SESSION_CLASS;
-  markerNode.replaceWith(wrapper);
-  wrapper.appendChild(markerNode);
-  const shown = globalThis.document.createElement('span');
-  shown.className = SESSION_CLASS;
-  shown.textContent = expected;
-  wrapper.after(shown);
-  shown.style.setProperty(SESSION_GAP_VAR, sessionGap(body, wrapper, shape));
+  const shown = body.querySelector(`:scope > .${SESSION_CLASS}`) as HTMLElement;
+  const expected = sessionText(marker, config);
+  if (shown.textContent !== expected) shown.textContent = expected; // icône changée
+  // Le doublon dit pourquoi aucune session n'est affichée, au survol : le diagnostic lui-même
+  // n'est montré qu'à la saisie, avec les autres (§5.3).
+  const title = marker.value === null ? t(lang, 'diag.W-SESSION-MULTIPLE', { count: marker.lines.length }) : '';
+  if (title === '') shown.removeAttribute('title');
+  else if (shown.title !== title) shown.title = title;
+}
+
+/** Règle l'écart au-dessus de la mention, une fois les marges du corps fixées. */
+function placeSessionGap(body: Element, shape: RenderedBodyShape | null): void {
+  const shown = body.querySelector(`:scope > .${SESSION_CLASS}`) as HTMLElement | null;
+  if (shown === null || shape === null) return;
+  const gap = sessionGap(body, shown, shape);
+  if (shown.style.getPropertyValue(SESSION_GAP_VAR) !== gap) shown.style.setProperty(SESSION_GAP_VAR, gap);
 }
 
 export function decorateComment(
@@ -941,10 +1036,13 @@ export function decorateComment(
   // produire une forme, et il y passait la forme Markdown — inutilisée, mais écrite.
   const masking =
     shape !== null && canHidePrefix && a.prefixLine !== null ? { prefixLine: a.prefixLine, shape } : null;
-  applyPrefixVisibility(commentBodyElement, masking, bodyText);
   // Le marqueur de session est une métadonnée, affichée quel que soit le verdict — y compris sur
-  // un commentaire sans label résolu, d'où sa place AVANT le retour anticipé ci-dessous.
-  applySessionProjection(commentBodyElement, a.session, config, shape);
+  // un commentaire sans label résolu, d'où sa place AVANT le retour anticipé ci-dessous. Ses
+  // lignes sont masquées AVANT le préfixe, qui se règle sur ce qui reste visible ; l'écart de la
+  // mention APRÈS, sur les marges que le préfixe vient de fixer.
+  applySessionProjection(commentBodyElement, a.session, config, lang, shape);
+  applyPrefixVisibility(commentBodyElement, masking, bodyText);
+  placeSessionGap(commentBodyElement, shape);
   // Où poser les badges — LU dans le DOM que la ligne ci-dessus vient d'établir, jamais déduit
   // de `canHidePrefix` seul, qui dit ce qu'on VOULAIT faire, pas ce qui a été fait (les replis
   // de `applyPrefixVisibility` renoncent sans le dire à l'appelant). Préfixe masqué → l'élément

@@ -1,4 +1,4 @@
-// En-tête et marqueur de session (§3.6, §5.5) — rendu MESURÉ dans un vrai Chromium.
+// CA-53, CA-54 — en-tête et marqueur de session (§3.6, §5.5) — rendu MESURÉ dans un vrai Chromium.
 //
 // Ce que happy-dom ne sait pas dire : où les lignes sont peintes. La demande (Reefact, #163) est
 // géométrique : un commentaire écrit avec des lignes blanches entre préfixe, corps et marqueur,
@@ -8,6 +8,11 @@
 //
 // Contrôle DIFFÉRENTIEL : sans les écarts posés par badges.ts (variables, marge du paragraphe du
 // sujet), les deux écritures doivent différer — sinon la comparaison ne prouverait rien.
+//
+// Où que soit le marqueur (#169) — au milieu du corps, au-dessus du préfixe, avant un pied de
+// signature, en double —, sa ligne est masquée SANS TRACE : chaque variante est comparée à la même
+// mise en page écrite avec le marqueur en bas, que les mesures ci-dessus établissent. Mêmes
+// positions de tout ce qui se lit, au pixel près, ou la ligne a laissé quelque chose derrière elle.
 //
 // Le style de plateforme (marge de paragraphe de 16 px, dernière marge nulle) est une
 // APPROXIMATION de github.com ; les assertions portent sur des rapports à l'écart normal MESURÉ
@@ -73,6 +78,33 @@ const SHORT = {
   shortTight: `<p dir="auto">reviewed: blah-blah-blah<br>\n[session:some-session-id]</p>`,
 };
 
+// Variante → référence au marqueur en bas. `Lorem` et `More` sont les lignes dont la position
+// trahirait une trace ; `Footer` le pied de signature, que la mention doit suivre.
+const SHORT_LOREM = 'Lorem ipsum dolor sit amet.';
+const ANYWHERE = {
+  midParagraph: [
+    `<p dir="auto">reviewed: blah</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">[session:a]</p>\n<p dir="auto">More text.</p>`,
+    `<p dir="auto">reviewed: blah</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">More text.</p>\n<p dir="auto">[session:a]</p>`,
+  ],
+  midLine: [
+    `<p dir="auto">reviewed: blah<br>\n${SHORT_LOREM}<br>\n[session:a]<br>\nMore text.</p>`,
+    `<p dir="auto">reviewed: blah<br>\n${SHORT_LOREM}<br>\nMore text.<br>\n[session:a]</p>`,
+  ],
+  abovePrefix: [
+    `<p dir="auto">[session:a]</p>\n<p dir="auto">reviewed: blah</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">More text.</p>`,
+    `<p dir="auto">reviewed: blah</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">More text.</p>\n<p dir="auto">[session:a]</p>`,
+  ],
+  abovePrefixSameParagraph: [
+    `<p dir="auto">[session:a]<br>\nreviewed: blah<br>\n${SHORT_LOREM}<br>\nMore text.</p>`,
+    `<p dir="auto">reviewed: blah<br>\n${SHORT_LOREM}<br>\nMore text.<br>\n[session:a]</p>`,
+  ],
+  duplicate: [
+    `<p dir="auto">reviewed: blah</p>\n<p dir="auto">[session:a]</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">More text.<br>\n[session:b]</p>`,
+    `<p dir="auto">reviewed: blah</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">More text.</p>\n<p dir="auto">[session:a]</p>`,
+  ],
+};
+const FOOTER = `<p dir="auto">reviewed: blah</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">[session:a]</p>\n<hr>\n<p dir="auto"><em>Footer line</em></p>`;
+
 const browser = await chromium.launch({ executablePath: EXECUTABLE });
 const page = await browser.newPage();
 await page.setContent(`<!doctype html><html><head><style>
@@ -84,6 +116,8 @@ await page.setContent(`<!doctype html><html><head><style>
 </style></head><body>
   ${Object.entries(CASES).map(([id, html]) => `<div class="markdown-body" id="${id}">${html}</div>`).join('\n')}
   ${Object.entries(SHORT).map(([id, html]) => `<div class="markdown-body short" id="${id}">${html}</div>`).join('\n')}
+  ${Object.entries(ANYWHERE).map(([id, [variant, reference]]) => `<div class="markdown-body anywhere" id="${id}">${variant}</div><div class="markdown-body anywhere" id="${id}-ref">${reference}</div>`).join('\n')}
+  <div class="markdown-body anywhere" id="footer">${FOOTER}</div>
   <script>${bundled.outputFiles[0].text}</script>
 </body></html>`);
 
@@ -94,7 +128,7 @@ await page.setContent(`<!doctype html><html><head><style>
 async function measure(undo) {
   return page.evaluate((undo) => {
     const out = {};
-    for (const el of document.querySelectorAll('.markdown-body:not(.short)')) {
+    for (const el of document.querySelectorAll('.markdown-body:not(.short):not(.anywhere)')) {
       if (!el.querySelector('.cct-session')) {
         cct.decorateComment(el, cct.commentBodyText(el), cct.defaultConfig(), { id: 'github', suggestionInfoString: 'suggestion' }, 'en', cct.GITHUB_BODY_SHAPE);
       }
@@ -161,6 +195,40 @@ const short = await page.evaluate(() => {
   }
   return out;
 });
+// Ce que le lecteur voit, relatif au haut du corps : ligne du sujet, lignes de texte, pied, mention.
+const anywhere = await page.evaluate(() => {
+  const out = {};
+  for (const el of document.querySelectorAll('.markdown-body.anywhere')) {
+    cct.decorateComment(el, cct.commentBodyText(el), cct.defaultConfig(), { id: 'github', suggestionInfoString: 'suggestion' }, 'en', cct.GITHUB_BODY_SHAPE);
+    const top = el.getBoundingClientRect().top;
+    const textTop = (needle) => {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (!n.data.includes(needle) || n.parentElement.closest('.cct-hidden-session, .cct-hidden-session-block')) continue;
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        return range.getClientRects()[0].top - top;
+      }
+      return NaN;
+    };
+    const shown = el.querySelector('.cct-session');
+    const subject = el.querySelector('.cct-subject');
+    const subjectRange = document.createRange();
+    if (subject) subjectRange.selectNodeContents(subject);
+    const footer = el.querySelector('em');
+    out[el.id] = {
+      subject: subject ? subjectRange.getClientRects()[0].top - top : NaN,
+      lorem: textTop('Lorem'),
+      more: textTop('More text'),
+      session: shown ? shown.getBoundingClientRect().top + parseFloat(getComputedStyle(shown).paddingTop) - top : NaN,
+      footerBottom: footer ? footer.closest('p').getBoundingClientRect().bottom - top : NaN,
+      height: el.getBoundingClientRect().height,
+      last: el.lastElementChild?.className,
+      text: shown?.textContent ?? null,
+    };
+  }
+  return out;
+});
 const after = await measure(false);
 const before = await measure(true);
 await browser.close();
@@ -195,6 +263,25 @@ assert('sujet et marqueur seuls : un écart de paragraphe sous le sujet', same(s
 for (const [id, m] of Object.entries(after)) {
   assert(`${id} : la mention est remplacée, en bloc et en italique`, m.text === '\u{1F916} session: some-session-id' && m.display === 'block' && m.italic === 'italic', `${m.text}, ${m.display}, ${m.italic}`);
 }
+
+console.log('\nOù que soit le marqueur (#169) — comparé au même commentaire, marqueur en bas\n');
+for (const id of Object.keys(ANYWHERE)) {
+  const v = anywhere[id];
+  const r = anywhere[`${id}-ref`];
+  const keys = ['subject', 'lorem', 'more', 'session', 'height'];
+  const off = keys.filter((k) => !same(v[k], r[k]));
+  assert(
+    `${id} : aucune trace — sujet, texte, mention et hauteur aux positions de la référence`,
+    off.length === 0 && Number.isFinite(v.session),
+    off.length === 0 ? `mention à ${v.session.toFixed(1)} px` : off.map((k) => `${k} ${v[k].toFixed(1)} / ${r[k].toFixed(1)}`).join(', ')
+  );
+}
+assert('duplicate : la mention dit `#ERROR`', anywhere.duplicate.text === '\u{1F916} session: #ERROR', anywhere.duplicate.text);
+assert(
+  'pied de signature : la mention passe dessous, à un écart de paragraphe',
+  anywhere.footer.last === 'cct-session' && same(anywhere.footer.session - anywhere.footer.footerBottom, 16),
+  `${(anywhere.footer.session - anywhere.footer.footerBottom).toFixed(1)} px sous le pied`
+);
 
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\nMarqueur de session : ${results.length} mesures, ${failed === 0 ? 'toutes conformes' : `${failed} en échec`}.`);

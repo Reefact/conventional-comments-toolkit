@@ -10,7 +10,6 @@ import type {
   Disposable,
   PlatformProfile,
   PrRef,
-  PublishedSummary,
   ThreadInfo,
   UserInfo,
   Zone,
@@ -25,7 +24,9 @@ export interface EditorContext {
   threadId?: string;
   commentId?: string;
   canCarryBlockingState: boolean;
-  inScope: boolean;
+  /** Périmètre d'activation d'un vérificateur retiré (§2) : plus rien ne le lit. Optionnel le
+   * temps que les adaptateurs cessent de l'écrire, chacun dans sa PR ; retiré ensuite. */
+  inScope?: boolean;
 }
 
 export interface EditorHandle {
@@ -36,6 +37,9 @@ export interface EditorHandle {
 
 export interface SubmitControl {
   element: Element;
+  // `'complete-pr'` ne sert plus à rien (le grisage du bouton de fusion est retiré, §2), mais
+  // les trois adaptateurs l'écrivent encore : le retirer ici ne compilerait pas. Il part avec
+  // la dernière plateforme nettoyée.
   kind: 'submit' | 'submit-and-resolve' | 'complete-pr';
 }
 
@@ -273,9 +277,9 @@ export interface ClientAdapterOptions {
 export type EntryGuard = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A) => R;
 
 export interface PlatformAdapter {
-  /** §2, §6.2.3 — la PR que la page AFFICHE à cet instant, lue dans l'URL et le DOM ; `null`
+  /** §2 — la PR que la page AFFICHE à cet instant, lue dans l'URL et le DOM ; `null`
    * hors d'une page de PR. Le code partagé décide de TOUT le chrome de PR sur cette réponse
-   * — bandeau, filtre, badges, grisage du bouton de complétion — : `null` veut dire « pas de
+   * — bandeau, filtre, badges — : `null` veut dire « pas de
    * PR », jamais « je ne sais pas ».
    *
    * L'ACTIVATION d'un hôte ne passe pas par ici. Elle se décide sur la répartition des hôtes
@@ -323,9 +327,7 @@ export interface PlatformAdapter {
   readValue(editor: EditorHandle): string;
   writeValue(editor: EditorHandle, text: string, caret?: number): void;
   getThreads(): Promise<ThreadInfo[]>;
-  getCompletionControl(): SubmitControl | null;
   getCurrentUser(): Promise<UserInfo>;
-  readPublishedResult(): PublishedSummary | null;
 
   // ————— Surfaces d'affichage du §5.5 — OBLIGATOIRES, pour la même raison que
   // `getEditorChrome` : une méthode optionnelle laisse une plateforme nouvelle compiler sans
@@ -355,7 +357,7 @@ export interface PlatformAdapter {
    * lirait le premier. */
   getRenderedComments(): { element: Element; bodyText: string }[];
   /** §5.5, §9.4 — les corps que la PLATEFORME rend, éléments seuls, sans `bodyText` : la SONDE
-   * des signatures de reprise du code partagé (`chromeSignatureOf` en compte la longueur,
+   * des signatures de reprise du code partagé (`contentSignatureOf` en compte la longueur,
    * `ownOutputSignatureOf` en compare le texte). Jamais `getRenderedComments()` pour ça :
    * celle-ci clone chaque sous-arbre décoré pour en lire le texte, un coût qu'un observateur
    * paierait à chaque mutation pour la durée de vie de l'onglet.
@@ -565,7 +567,7 @@ export const OWN_SESSION = '.cct-session';
 /** Texte d'un corps de commentaire, badges de l'extension EXCLUS (§5.5) : `decorateComment`
  * (extension/src/ui/badges.ts) insère un badge de label, suivi d'un badge par décoration
  * résolue (§3.3), dans l'élément que `getThreads()`/`getRenderedComments()` lisent ensuite.
- * Un rendu répété sur la même PR (résumé publié changé après coup, §5.5) relirait sinon
+ * Un rendu répété sur la même PR (contenu de la page changé après coup, §5.5) relirait sinon
  * leur texte mêlé au corps réel, cassant la reconnaissance du préfixe par `analyze()` au
  * tour suivant — d'où `querySelectorAll` : un commentaire à plusieurs décorations pose
  * plusieurs badges, il faut tous les retirer, pas seulement le premier trouvé.
@@ -638,9 +640,10 @@ export class SelectorLog {
   readonly failures: { chain: string; at: string }[] = [];
   #telemetry: ((event: { kind: 'selector-degradation'; chain: string }) => void) | null;
   // UNE entrée par chaîne, pas une par appel — et c'est un défaut constaté, pas une
-  // optimisation. `getCompletionControl()` journalise dès qu'il ne trouve pas le bouton de
-  // fusion, et il est appelé à chaque mutation du DOM : sur une PR fermée, où l'absence du
-  // bouton est la NORME, une seule visite écrivait des dizaines d'entrées identiques. Le
+  // optimisation. La sonde du bouton de fusion (`getCompletionControl()`, retirée avec le
+  // grisage, §2) journalisait dès qu'elle ne le trouvait pas, et elle était appelée à chaque
+  // mutation du DOM : sur une PR fermée, où l'absence du bouton est la NORME, une seule visite
+  // écrivait des dizaines d'entrées identiques. Le
   // journal étant plafonné (50 entrées côté extension), une PR fusionnée le remplissait
   // intégralement de `merge-button` et ÉVINÇAIT toute vraie dégradation : le diagnostic censé
   // révéler qu'un sélecteur a pourri était aveuglé par un non-événement.
@@ -663,8 +666,8 @@ export class SelectorLog {
 
   // Début de la visite en cours, et les chaînes journalisées pendant elle qu'on a fini par
   // trouver. Le moment d'un échec est ce qui sépare une chaîne pourrie d'une chaîne interrogée
-  // TROP TÔT : `getCompletionControl()` est sondé pendant toute l'hydratation de la page, et un
-  // bouton rendu après l'en-tête de la PR échoue d'abord, puis répond. Sans ces deux relevés,
+  // TROP TÔT : une chaîne sondée pendant toute l'hydratation de la page — le bouton de fusion
+  // l'a été, tant que le grisage existait — échoue d'abord, puis répond. Sans ces deux relevés,
   // les deux cas écrivaient la même ligne.
   #visitStart = Date.now();
   #recoveredThisVisit = new Set<string>();
@@ -720,7 +723,7 @@ export class SelectorLog {
 
   /** Oublie ce qui a déjà été signalé, pour que la page SUIVANTE puisse l'être à son tour.
    *
-   * `#seen` borne le BRUIT — `getCompletionControl()` journalise à chaque mutation du DOM —,
+   * `#seen` borne le BRUIT — une sonde appelée à chaque mutation du DOM journaliserait autant —,
    * pas la durée de vie de l'onglet. Or GitHub navigue d'une PR à l'autre sans recharger :
    * une chaîne déjà signalée restait muette sur toutes les PR suivantes, si bien que l'entrée
    * gardait la page et l'horodatage de la PREMIÈRE. Un onglet ouvert sur dix PR n'en
@@ -751,7 +754,7 @@ export class SelectorLog {
     // ce tableau depuis qu'il s'oublie à chaque changement de PR : sans cette recherche, un
     // onglet promené sur cent PR y accumulerait cent lignes par chaîne pourrie, alors que le
     // dépôt s'interdit ailleurs de le laisser croître au rythme des observations
-    // (`chromeSignatureOf`, extension/src/content-internal.ts) — revue Reefact, PR #70.
+    // (`contentSignatureOf`, extension/src/content-internal.ts) — revue Reefact, PR #70.
     //
     // C'est aussi la règle du journal PERSISTÉ (`appendToJournal`, dédupliqué par chaîne) :
     // une seule sémantique à tenir en tête des deux côtés, en mémoire comme sur le disque.

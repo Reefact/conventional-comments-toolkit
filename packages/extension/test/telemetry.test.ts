@@ -638,9 +638,6 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
         currentPr() {
           return prFromLocation(document);
         }
-        readPublishedResult() {
-          return null;
-        }
         getThreads() {
           return [];
         }
@@ -655,9 +652,6 @@ describe('E — la LIGNE DE TEMPS D’UN ONGLET (l’axe qui manquait, revue Cod
         }
         platformProfile() {
           return { id: 'github', suggestionInfoString: 'suggestion' };
-        }
-        getCompletionControl() {
-          return null;
         }
         decorateComment() {
           return undefined;
@@ -1125,9 +1119,6 @@ describe('D — dégradation de sélecteur : journal local TOUJOURS, télémétr
               return [];
             },
             currentPr() {
-              return null;
-            },
-            readPublishedResult() {
               return null;
             },
           });

@@ -18,7 +18,6 @@ import {
   type Disposable,
   type PlatformProfile,
   type PrRef,
-  type PublishedSummary,
   type ThreadInfo,
   type UserInfo,
 } from '@cct/core';
@@ -38,8 +37,8 @@ import { ClientConfigResolver } from '../src/config-resolver.js';
 import { EditorController } from '../src/editor-controller.js';
 import { observePrChromeNavigation } from '../src/content-internal.js';
 
-/** La page d'une PR « acme » : un en-tête, deux fils (l'un bloquant et ouvert, l'autre résolu),
- * un composeur et un bouton de complétion. Aucun nom n'y vient de GitHub ni d'Azure DevOps. */
+/** La page d'une PR « acme » : un en-tête, deux fils (l'un bloquant et ouvert, l'autre résolu)
+ * et un composeur. Aucun nom n'y vient de GitHub ni d'Azure DevOps. */
 const PAGE = `
   <header id="acme-header">PR #7</header>
   <main>
@@ -53,26 +52,11 @@ const PAGE = `
       <textarea class="acme-field" id="acme-field"></textarea>
       <button type="button" class="acme-send">Envoyer</button>
     </section>
-    <button type="button" id="acme-complete">Fusionner</button>
   </main>`;
 
 function acmePr(): PrRef {
   return { platform: 'acme', createdAt: '2026-01-01T00:00:00Z', host: 'acme.example', scope: ['proj', 'repo'], number: 7 };
 }
-
-/** Résumé publié par un vérificateur « acme » : un fil bloquant non résolu, PR en échec. */
-const PUBLISHED: PublishedSummary = {
-  state: 'failure',
-  isDraft: false,
-  exempted: false,
-  mode: 'enforce',
-  coreVersion: '1.0.0',
-  configFingerprint: 'deadbeef',
-  activatedAt: null,
-  unresolvedBlockingCount: 1,
-  nonCompliantCommentCount: 0,
-  warningCount: 0,
-};
 
 /** Un adaptateur COMPLET au sens du contrat, et rien de plus. `implements` est vérifié par le
  * compilateur (tsconfig.test.json) : retirer un membre ici fait échouer `typecheck:tests`. */
@@ -153,17 +137,8 @@ class AcmeClientAdapter implements PlatformAdapter {
     }));
   }
 
-  getCompletionControl(): SubmitControl | null {
-    const element = this.#doc.getElementById('acme-complete');
-    return element ? { element, kind: 'complete-pr' } : null;
-  }
-
   async getCurrentUser(): Promise<UserInfo> {
     return { id: 'login:alice', login: 'alice', isServiceAccount: false };
-  }
-
-  readPublishedResult(): PublishedSummary | null {
-    return PUBLISHED;
   }
 
   getBannerMount(): Element | null {
@@ -191,7 +166,7 @@ class AcmeClientAdapter implements PlatformAdapter {
     return {
       id: `acme-editor-${this.#seq}`,
       element,
-      context: { zone: 'thread-root', action: 'compose', pr: acmePr(), canCarryBlockingState: true, inScope: true },
+      context: { zone: 'thread-root', action: 'compose', pr: acmePr(), canCarryBlockingState: true },
     };
   }
 }
@@ -232,8 +207,7 @@ describe('une troisième plateforme, « acme », par le seul contrat du §9.2.3'
     new EditorController({
       adapter,
       editor: editors[0]!,
-      resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false, degradedReason: null },
-      published: null,
+      resolved: { config, notices: [], degraded: false, degradedReason: null },
       lang: 'fr',
       currentUserLogin: 'alice',
     }).attach();
@@ -248,7 +222,7 @@ describe('une troisième plateforme, « acme », par le seul contrat du §9.2.3'
     expect(field.value.startsWith('issue')).toBe(true);
   });
 
-  it('le chrome de PR se rend entier : bandeau en tête, filtre avant le premier fil, badges, grisage (§5.5, §6.5)', async () => {
+  it('le chrome de PR se rend entier : bandeau en tête, filtre avant le premier fil, badges (§5.5)', async () => {
     const adapter = new AcmeClientAdapter({ documentRef: document });
     openObservations.push(observePrChromeNavigation(adapter, new ClientConfigResolver(async () => null), document));
     await flushAll();
@@ -256,6 +230,8 @@ describe('une troisième plateforme, « acme », par le seul contrat du §9.2.3'
     const banner = document.querySelector('.cct-banner');
     expect(banner).not.toBeNull();
     expect(banner!.previousElementSibling).toBe(document.getElementById('acme-header'));
+    // Les fils lus dans la page sont la seule source du décompte (§5.5) : th-1, seul ouvert.
+    expect(banner!.querySelector('.cct-banner-count')?.textContent).toContain('1');
 
     const filter = document.querySelector('.cct-thread-filter');
     expect(filter).not.toBeNull();
@@ -267,7 +243,5 @@ describe('une troisième plateforme, « acme », par le seul contrat du §9.2.3'
     // Forme non mesurée (`null`) : les badges sont posés, le préfixe n'est PAS masqué.
     expect(document.querySelector('.cct-hidden-prefix')).toBeNull();
     expect(commentBodyText(bodies[0]!)).toContain('issue (blocking): le nom est ambigu');
-
-    expect(document.getElementById('acme-complete')!.getAttribute('aria-disabled')).toBe('true');
   });
 });

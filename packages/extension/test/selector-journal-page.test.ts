@@ -127,9 +127,6 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
           currentPr() {
             return currentPr();
           },
-          readPublishedResult() {
-            return null;
-          },
           // L'observateur de navigation interroge la page à chaque tour pour décider si elle
           // a bougé : sans ces réponses, il lève, et le test échouerait sur son harnais
           // plutôt que sur ce qu'il mesure.
@@ -142,7 +139,6 @@ async function bootstrapWith(url: string, prs: (PrRef | null)[] = [null]): Promi
           async getThreads() {
             return [];
           },
-          getCompletionControl: () => null,
         });
       }
     });

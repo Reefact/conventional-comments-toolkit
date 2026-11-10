@@ -8,9 +8,8 @@ import { HTML_SHAPE } from './helpers/decorate.js';
 // éditeur CONNU quand `observePrChromeNavigation` lui signale un rendu — via son propre
 // sondage, ou via un simple rendu déclenché par une mutation ordinaire, peu importe.
 //
-// A. `updateResolved()` ne repoussait que la configuration, jamais le résumé publié
-//    (`deps.published`) : un écart d'empreinte constaté pendant qu'un changement de
-//    configuration se propage restait vrai indéfiniment, même une fois le serveur à jour.
+// A. (retiré avec le vérificateur, §2) `updateResolved()` ne repoussait pas le résumé
+//    publié ; l'extension n'en lit plus aucun.
 // D. Le passage au mode `off` désarmait le blocage (`refresh()`) mais laissait la barre
 //    d'outils et la saisie rapide vivantes — construites une fois pour toutes à `attach()`,
 //    donc sur l'ANCIENNE configuration — alors que §7 définit `off` comme une extension
@@ -22,17 +21,32 @@ import { HTML_SHAPE } from './helpers/decorate.js';
 // Toutes les configurations posent `configCacheTtlSeconds: 0` : chaque `resolve()` relit
 // alors la configuration pour de vrai, sans qu'aucun test n'ait à avancer une horloge ou à
 // attendre un TTL réel — un changement de configuration est adopté au prochain rendu
-// (déclenché ici par un changement visible du résumé publié, jamais par une mutation dont le
-// rendu ne dépend pas).
+// (déclenché ici par un changement visible des fils de la page, `state.page`, jamais par une
+// mutation dont le rendu ne dépend pas).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fingerprint, resolveConfig } from '@cct/core';
 import { EXTRA_HOSTS_KEY } from '../src/host-platform.js';
 import { testFactories, fakeAdapter, clearFakeAdapters } from './helpers/factories.js';
 
 interface FakeState {
   configText: string;
-  published: Record<string, unknown> | null;
+  /** Ce que la page porte : `null`, aucun fil ; sinon UN fil, non bloquant, dont l'identifiant
+   * est cette valeur. En changer revient à changer la page — c'est ce qui fait tourner un
+   * nouveau rendu (`contentSignatureOf`), comme le faisait le résumé publié d'un vérificateur
+   * aujourd'hui retiré (§2). */
+  page: string | null;
+}
+
+let pageCounter = 0;
+/** Une page DIFFÉRENTE de toutes les précédentes. */
+function nextPage(): string {
+  return `page-${++pageCounter}`;
+}
+
+const pageElements = new Map<string, Element>();
+function pageThreadElement(id: string): Element {
+  if (!pageElements.has(id)) pageElements.set(id, document.createElement('div'));
+  return pageElements.get(id)!;
 }
 
 function pr7(): { platform: string; createdAt: string; host: string; scope: string[]; number: number } {
@@ -57,7 +71,7 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
       observeEditors(cb: (editor: unknown) => void) {
         cb({
           element,
-          context: { pr: pr7(), zone: 'thread-root', action: 'compose', canCarryBlockingState: true, inScope: true },
+          context: { pr: pr7(), zone: 'thread-root', action: 'compose', canCarryBlockingState: true },
         });
         return { dispose: () => {} };
       }
@@ -65,10 +79,10 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
         return null;
       }
       getThreadFilterMount() {
-        return this.getRenderedThreadElements()[0]?.element ?? null;
+        return null;
       }
       getRenderedThreadElements() {
-        return [];
+        return state.page === null ? [] : [{ id: state.page, element: pageThreadElement(state.page) }];
       }
       getRenderedComments() {
         return [];
@@ -79,11 +93,18 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
       currentPr() {
         return pr7();
       }
-      readPublishedResult() {
-        return state.published;
-      }
       getThreads() {
-        return [];
+        if (state.page === null) return [];
+        const root = {
+          id: `${state.page}-root`,
+          author: { id: 'login:bob', login: 'bob', isServiceAccount: false },
+          body: 'note: rien de bloquant',
+          createdAt: '2026-01-01T00:00:00Z',
+          permalink: `#${state.page}`,
+          isSystemGenerated: false,
+          canCarryBlockingState: true,
+        };
+        return [{ id: state.page, pr: pr7(), root, replies: [], resolution: 'resolved', canCarryBlockingState: true }];
       }
       getEditorChrome() {
         return NEUTRAL_EDITOR_CHROME;
@@ -100,9 +121,6 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
       platformProfile() {
         return { id: 'github', suggestionInfoString: 'suggestion' };
       }
-      getCompletionControl() {
-        return null;
-      }
       readValue() {
         return element.value;
       }
@@ -112,32 +130,6 @@ function installAdapter(state: FakeState, element: HTMLTextAreaElement, submit: 
     });
   fakeAdapter('azdo', class {
     });
-}
-
-/** Empreinte réellement produite pour un texte de configuration de DÉPÔT donné — même
- * calcul que `ClientConfigResolver.resolve()` (organisation absente, aucun plancher, sans
- * épinglage). Sert à poser un `configFingerprint` publié qui CORRESPOND à la configuration
- * du moment, pour qu'un test puisse isoler le blocage dû au seul diagnostic du commentaire
- * sans jamais le confondre avec un écart d'empreinte (§8.1.3, règle 2). */
-function fingerprintFor(configText: string): string {
-  const { config } = resolveConfig(null, { status: 'absent' }, { status: 'found', text: configText });
-  return fingerprint(config);
-}
-
-function published(overrides: Record<string, unknown>): Record<string, unknown> {
-  return {
-    state: 'success',
-    isDraft: false,
-    exempted: false,
-    mode: 'enforce',
-    coreVersion: '1.0.0',
-    configFingerprint: 'deadbeef',
-    activatedAt: null,
-    unresolvedBlockingCount: 0,
-    nonCompliantCommentCount: 0,
-    warningCount: 0,
-    ...overrides,
-  };
 }
 
 function flush(): Promise<void> {
@@ -181,54 +173,6 @@ afterEach(() => {
 });
 
 describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs déjà ouverts', () => {
-  it('A. le résumé publié est relu au moment du rafraîchissement, pas gardé de l’attachement d’origine', async () => {
-    const element = document.createElement('textarea');
-    const submit = document.createElement('button');
-    document.body.append(element, submit);
-
-    const state: FakeState = {
-      configText: JSON.stringify({
-        mode: 'enforce',
-        configCacheTtlSeconds: 0,
-        activation: { activatedAt: '2019-01-01T00:00:00Z' },
-      }),
-      // Aucun résultat publié à l'attachement : pas d'écart d'empreinte possible tant
-      // qu'aucun résumé n'existe (§8.1.3, règle 2) — le blocage joue donc à plein sur le
-      // seul diagnostic du commentaire.
-      published: null,
-    };
-    installAdapter(state, element, submit);
-
-    const { bootstrap } = await import('../src/content-internal.js');
-    Object.defineProperty(document, 'location', { value: new URL('https://github.com/acme/demo/pull/7'), configurable: true });
-    element.value = 'pas de label ici'; // diagnostic bloquant sous enforce
-    disposers.push(await bootstrap(document, testFactories()));
-    await flushAll();
-
-    expect(submit.getAttribute('aria-disabled')).toBe('true'); // bloqué : enforce, en périmètre, pas d'écart
-
-    // La configuration change (une clé quelconque du domaine du fingerprint suffit) — un
-    // rendu la reprend forcément puisque `configCacheTtlSeconds: 0` empêche tout cache.
-    // Le résumé publié, dans le MÊME mouvement, affiche une empreinte QUI NE PEUT PAS
-    // correspondre à la nouvelle configuration : un écart authentique, qui doit désarmer
-    // le blocage (§8.1.3, règle 2) — mais seulement si ce résumé est effectivement LU à cet
-    // instant, jamais celui, `null`, capturé à l'attachement.
-    state.configText = JSON.stringify({
-      mode: 'enforce',
-      configCacheTtlSeconds: 0,
-      activation: { activatedAt: '2019-01-01T00:00:00Z' },
-      exemptUsers: ['someone-else'],
-    });
-    state.published = published({ state: 'failure', unresolvedBlockingCount: 1, configFingerprint: 'NE-PEUT-PAS-CORRESPONDRE' });
-
-    document.body.appendChild(document.createElement('span')); // fait tourner l'observateur
-    await flushAll();
-
-    // Sans le correctif, `deps.published` resterait `null` : aucun écart n'est jamais
-    // constaté, et le bouton resterait bloqué pour la bonne raison (le diagnostic), en
-    // ignorant l'écart d'empreinte qui aurait dû le désarmer.
-    expect(submit.hasAttribute('aria-disabled')).toBe(false);
-  });
 
   it('D. le passage au mode off retire aussi la barre d’outils et la saisie rapide, pas seulement le blocage', async () => {
     const element = document.createElement('textarea');
@@ -242,9 +186,8 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
       configText: JSON.stringify({
         mode: 'enforce',
         configCacheTtlSeconds: 0,
-        activation: { activatedAt: '2019-01-01T00:00:00Z' },
       }),
-      published: published({ state: 'failure', unresolvedBlockingCount: 1 }),
+      page: nextPage(),
     };
     installAdapter(state, element, submit);
 
@@ -256,10 +199,10 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     expect(host.querySelector('.cct-toolbar')).not.toBeNull(); // §5.1 — barre installée
 
     // Le mode passe à `off` — un rendu le reprend forcément (`configCacheTtlSeconds: 0`) dès
-    // qu'un changement visible (ici, le résumé publié qui disparaît) fait tourner
+    // qu'un changement visible (ici, le fil de la page qui disparaît) fait tourner
     // l'observateur.
     state.configText = JSON.stringify({ mode: 'off', configCacheTtlSeconds: 0 });
-    state.published = null;
+    state.page = null;
     document.body.appendChild(document.createElement('span'));
     await flushAll();
 
@@ -282,7 +225,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     const state: FakeState = {
       // Mode off DÈS LA DÉCOUVERTE : l'éditeur n'a donc jamais eu de contrôleur.
       configText: JSON.stringify({ mode: 'off', configCacheTtlSeconds: 0 }),
-      published: null,
+      page: null,
     };
     installAdapter(state, element, submit);
 
@@ -299,9 +242,8 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     state.configText = JSON.stringify({
       mode: 'enforce',
       configCacheTtlSeconds: 0,
-      activation: { activatedAt: '2019-01-01T00:00:00Z' },
     });
-    state.published = published({ state: 'failure', unresolvedBlockingCount: 1 });
+    state.page = nextPage();
     document.body.appendChild(document.createElement('span'));
     await flushAll();
 
@@ -328,9 +270,8 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
       configText: JSON.stringify({
         mode: 'enforce',
         configCacheTtlSeconds: 0,
-        activation: { activatedAt: '2019-01-01T00:00:00Z' },
       }),
-      published: published({ state: 'failure', unresolvedBlockingCount: 1 }),
+      page: nextPage(),
     };
     installAdapter(state, element, submit);
 
@@ -348,13 +289,12 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     state.configText = JSON.stringify({
       mode: 'enforce',
       configCacheTtlSeconds: 0,
-      activation: { activatedAt: '2019-01-01T00:00:00Z' },
       labels: [{ id: 'issue', enabled: false }],
     });
     // Un changement visible fait tourner l'observateur — le compte descend à 0, aucun fil
     // bloquant ne correspondant plus au label retiré n'a de sens ici, seul un changement de
     // `chromeSignatureOf` (état publié) compte pour déclencher un rendu.
-    state.published = published({ state: 'success', unresolvedBlockingCount: 0 });
+    state.page = nextPage();
     document.body.appendChild(document.createElement('span'));
     await flushAll();
 
@@ -375,9 +315,8 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
       configText: JSON.stringify({
         mode: 'enforce',
         configCacheTtlSeconds: 0,
-        activation: { activatedAt: '2019-01-01T00:00:00Z' },
       }),
-      published: published({ state: 'failure', unresolvedBlockingCount: 1 }),
+      page: nextPage(),
     };
     installAdapter(state, element, submit);
 
@@ -424,13 +363,12 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     state.configText = JSON.stringify({
       mode: 'enforce',
       configCacheTtlSeconds: 0,
-      activation: { activatedAt: '2019-01-01T00:00:00Z' },
       labels: [{ id: 'issue', enabled: false }],
     });
-    // Un changement du résumé publié rend ce rendu VISIBLE (`chromeSignatureOf`) — sans lui,
+    // Un changement des fils de la page rend ce rendu VISIBLE (`contentSignatureOf`) — sans lui,
     // rien ne distinguerait ce passage de « rien de neuf », et `run()` renoncerait avant
     // même d'atteindre `reconcile()`.
-    state.published = published({ state: 'failure', unresolvedBlockingCount: 2 });
+    state.page = nextPage();
     document.body.appendChild(document.createElement('span'));
     await flushAll();
     expect(releaseBlockedRead).not.toBeNull(); // la première réconciliation attend bien
@@ -439,7 +377,7 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     // `off`. Aucune lecture de stockage sur ce chemin — elle se conclut immédiatement, avant
     // que la première n'ait eu la moindre chance de reprendre.
     state.configText = JSON.stringify({ mode: 'off', configCacheTtlSeconds: 0 });
-    state.published = null;
+    state.page = null;
     document.body.appendChild(document.createElement('span'));
     await flushAll();
     expect(host.querySelector('.cct-toolbar')).toBeNull(); // off a bien détaché
@@ -465,14 +403,11 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     const initialConfigText = JSON.stringify({
       mode: 'enforce',
       configCacheTtlSeconds: 0,
-      activation: { activatedAt: '2019-01-01T00:00:00Z' },
     });
     const state: FakeState = {
       configText: initialConfigText,
-      // Comme dans le test A : aucun résumé publié à l'attachement, pas d'écart d'empreinte
-      // possible tant qu'aucun résumé n'existe (§8.1.3, règle 2) — le blocage joue à plein
-      // sur le seul diagnostic du commentaire, jamais sur une empreinte à faire concorder.
-      published: null,
+      // Le blocage ne dépend que du mode et du diagnostic du commentaire (§5.4).
+      page: null,
     };
     installAdapter(state, element, submit);
 
@@ -504,27 +439,20 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     element.value = 'pas de label ici'; // diagnostic bloquant sous enforce, déjà présent
     disposers.push(await bootstrap(document, testFactories()));
     await flushAll();
-    expect(submit.getAttribute('aria-disabled')).toBe('true'); // bloqué : enforce, en périmètre, pas d'écart
+    expect(submit.getAttribute('aria-disabled')).toBe('true'); // bloqué : enforce, configuration lue
 
     // Un changement de label EN MODE ACTIF force une reconstruction (test F) — la lecture
     // de langue qu'elle attend est bloquée pour observer la fenêtre entre l'ancien
-    // contrôleur défait et le nouveau prêt. Le résumé publié porte l'empreinte EXACTE de
-    // cette nouvelle configuration (`fingerprintFor`) : le diagnostic reste seul responsable
-    // du blocage observé plus bas, jamais un écart d'empreinte qui le désarmerait pour une
-    // tout autre raison que celle testée ici.
+    // contrôleur défait et le nouveau prêt. La page change dans le même mouvement, pour que
+    // l'observateur rende à nouveau.
     armed = true;
     const nextConfigText = JSON.stringify({
       mode: 'enforce',
       configCacheTtlSeconds: 0,
-      activation: { activatedAt: '2019-01-01T00:00:00Z' },
       labels: [{ id: 'issue', enabled: false }],
     });
     state.configText = nextConfigText;
-    state.published = published({
-      state: 'failure',
-      unresolvedBlockingCount: 1,
-      configFingerprint: fingerprintFor(nextConfigText),
-    });
+    state.page = nextPage();
     document.body.appendChild(document.createElement('span'));
     await flushAll();
     expect(releaseBlockedRead).not.toBeNull(); // la reconstruction attend bien
@@ -556,9 +484,8 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
       configText: JSON.stringify({
         mode: 'enforce',
         configCacheTtlSeconds: 0,
-        activation: { activatedAt: '2019-01-01T00:00:00Z' },
       }),
-      published: published({ state: 'failure', unresolvedBlockingCount: 1 }),
+      page: nextPage(),
     };
     installAdapter(state, element, submit);
 
@@ -597,10 +524,9 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     state.configText = JSON.stringify({
       mode: 'enforce',
       configCacheTtlSeconds: 0,
-      activation: { activatedAt: '2019-01-01T00:00:00Z' },
       labels: [{ id: 'issue', enabled: false }],
     });
-    state.published = published({ state: 'failure', unresolvedBlockingCount: 2 });
+    state.page = nextPage();
     document.body.appendChild(document.createElement('span'));
     await flushAll();
     expect(releaseBlockedRead).not.toBeNull(); // la reconstruction attend bien
@@ -612,10 +538,10 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     host.remove();
     expect(element.isConnected).toBe(false);
 
-    // Un rendu SUIVANT (résumé publié encore différent, pour rester visible) appelle
+    // Un rendu SUIVANT (page encore différente, pour rester visible) appelle
     // `releaseDetached()`, qui doit repérer cette entrée désormais détachée et l'invalider
     // — AVANT que la réconciliation bloquée plus haut ne reprenne.
-    state.published = published({ state: 'failure', unresolvedBlockingCount: 3 });
+    state.page = nextPage();
     document.body.appendChild(document.createElement('span'));
     await flushAll();
 
@@ -641,13 +567,11 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     const initialConfigText = JSON.stringify({
       mode: 'warn', // pas de blocage, même avec un diagnostic présent
       configCacheTtlSeconds: 0,
-      activation: { activatedAt: '2019-01-01T00:00:00Z' },
     });
     const state: FakeState = {
       configText: initialConfigText,
-      // Comme dans les tests A/H : aucun résumé publié à l'attachement, pas d'écart
-      // d'empreinte possible tant qu'aucun résumé n'existe (§8.1.3, règle 2).
-      published: null,
+      // Le blocage ne dépend que du mode et du diagnostic du commentaire (§5.4).
+      page: null,
     };
     installAdapter(state, element, submit);
 
@@ -687,14 +611,9 @@ describe('revue Reefact, PR #39 — rafraîchissement en direct des éditeurs d�
     const nextConfigText = JSON.stringify({
       mode: 'enforce',
       configCacheTtlSeconds: 0,
-      activation: { activatedAt: '2019-01-01T00:00:00Z' },
     });
     state.configText = nextConfigText;
-    state.published = published({
-      state: 'failure',
-      unresolvedBlockingCount: 1,
-      configFingerprint: fingerprintFor(nextConfigText),
-    });
+    state.page = nextPage();
     document.body.appendChild(document.createElement('span'));
     await flushAll();
     expect(releaseBlockedRead).not.toBeNull(); // la reconstruction attend bien

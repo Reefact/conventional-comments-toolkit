@@ -29,6 +29,8 @@ function setup(
     /** Les touches que la plateforme fictive DÉCLARE (§5.4) — par défaut, Ctrl+Entrée au champ et
      * rien sur le bouton, la règle de GitHub. */
     keystrokes?: SubmitKeystrokes;
+    /** La PR de l'éditeur — par défaut une PR récente. */
+    pr?: PrRef;
   } = {}
 ) {
   const host = document.createElement('div');
@@ -41,7 +43,7 @@ function setup(
   const editor: EditorHandle = {
     id: 'e1',
     element: textarea,
-    context: { zone: 'thread-root', action: 'compose', pr, canCarryBlockingState: true, inScope: true },
+    context: { zone: 'thread-root', action: 'compose', pr: opts.pr ?? pr, canCarryBlockingState: true },
   };
 
   // Le CHÂSSIS que l'adaptateur déclare (§9.2.3). Ce fichier teste le contrôleur PARTAGÉ : il
@@ -63,14 +65,12 @@ function setup(
 
   const config = defaultConfig();
   config.mode = mode;
-  config.activation.activatedAt = '2026-09-01T00:00:00Z';
   config.language = opts.configLanguage ?? null;
 
   const controller = new EditorController({
     adapter: adapter as PlatformAdapter,
     editor,
-    resolved: { config, notices: [], fingerprint: 'aaaa1111', degraded: false },
-    published: null,
+    resolved: { config, notices: [], degraded: false, degradedReason: null },
     lang: opts.lang ?? 'fr',
     currentUserLogin: 'alice',
     telemetry: opts.telemetry,
@@ -214,6 +214,31 @@ describe('§5 — contrôleur d’éditeur', () => {
     controller.dispose();
   });
 
+  it('CA-01 : en enforce, un envoi non conforme est bloqué sans `activation.activatedAt`, quel que soit l’âge de la PR', async () => {
+    // §5.4 amendé (décision du propriétaire, 2026-11-10) : le blocage ne dépend que du mode et
+    // d'une configuration lue sans repli dégradé. Le périmètre d'activation d'un vérificateur
+    // retiré le désarmait jusqu'ici — et, faute de date dans la configuration par défaut, il
+    // le désarmait TOUJOURS : `enforce` ne bloquait rien.
+    const ancient: PrRef = { ...pr, createdAt: '2001-01-01T00:00:00Z', number: 1 };
+    const { controller, textarea, submit } = setup('enforce', { pr: ancient });
+    expect(controller.config.activation.activatedAt).toBeNull(); // aucune date d'activation nulle part
+    controller.attach();
+    writeToTextField(textarea, 'pas de label ici'); // E-NO-LABEL
+    await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+
+    // Par le bouton…
+    expect(submit.getAttribute('aria-disabled')).toBe('true');
+    let clicked = false;
+    submit.addEventListener('click', () => (clicked = true));
+    submit.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(clicked).toBe(false);
+    // …comme par le raccourci clavier.
+    const key = new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true });
+    textarea.dispatchEvent(key);
+    expect(key.defaultPrevented).toBe(true);
+    controller.dispose();
+  });
+
   it('§5.4 : un bouton RECRÉÉ par la page après attach() reste intercepté', async () => {
     // MESURÉ le 2026-11-09 sur la page Overview de GitHub : React remplace l'élément du bouton
     // *Comment* quand le champ se remplit. Un écouteur posé à attach() restait sur l'ancien, et
@@ -244,8 +269,7 @@ describe('§5 — contrôleur d’éditeur', () => {
     // `deps.resolved`, capturé une fois pour toutes à `attach()`, ne se relit jamais tout seul.
     const offConfig = defaultConfig();
     offConfig.mode = 'off';
-    offConfig.activation.activatedAt = '2026-09-01T00:00:00Z';
-    controller.updateResolved({ config: offConfig, notices: [], fingerprint: 'cccc3333', degraded: false }, null);
+    controller.updateResolved({ config: offConfig, notices: [], degraded: false, degradedReason: null });
 
     // Sans le correctif, ce même éditeur continuerait de bloquer sur la configuration
     // périmée jusqu'à sa fermeture/réouverture ou au rechargement de la page.

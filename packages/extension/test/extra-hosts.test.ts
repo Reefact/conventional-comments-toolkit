@@ -295,9 +295,6 @@ describe('C — bootstrap(document, testFactories()) construit LE bon adaptateur
       currentPr() {
         return null;
       },
-      readPublishedResult() {
-        return null;
-      },
     };
     fakeAdapter('github', class {
         constructor(opts: unknown) {
@@ -563,9 +560,6 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
         currentPr() {
           return null;
         }
-        readPublishedResult() {
-          return null;
-        }
       });
     fakeAdapter('azdo', class {
       });
@@ -636,9 +630,6 @@ describe('E1 — le retrait d’une permission coupe l’adaptateur DÉJÀ actif
           return [];
         }
         currentPr() {
-          return null;
-        }
-        readPublishedResult() {
           return null;
         }
       });
@@ -753,9 +744,6 @@ function mockGithubAdapterDeliveringOneEditor(disposeEditors: () => void): void 
         return [];
       }
       currentPr() {
-        return null;
-      }
-      readPublishedResult() {
         return null;
       }
     });
@@ -1029,9 +1017,6 @@ describe('G3 — un hôte reclassé redémarre l’onglet sur le bon adaptateur'
           return [];
         }
         currentPr() {
-          return null;
-        }
-        readPublishedResult() {
           return null;
         }
       };
@@ -1335,9 +1320,6 @@ describe('H4 — un contrôleur dont l’éditeur a quitté le document est lib�
           return [];
         }
         currentPr() {
-          return null;
-        }
-        readPublishedResult() {
           return null;
         }
       });

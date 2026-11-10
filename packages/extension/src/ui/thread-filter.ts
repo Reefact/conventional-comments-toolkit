@@ -3,8 +3,8 @@
 // d'information n'héberge pas un outil d'action, et le bandeau n'a plus besoin d'exister
 // sur une PR sans fil bloquant juste pour lui servir d'hôte.
 //
-// Le bandeau, lui, n'est plus filtré : il résume ce qui bloque la complétion, et son
-// décompte fait autorité (CA-03). Une liste qui rétrécit sous un filtre de lecture
+// Le bandeau, lui, n'est plus filtré : il résume les fils bloquants encore ouverts, et son
+// décompte concorde avec `isBlocking()` (CA-03). Une liste qui rétrécit sous un filtre de lecture
 // contredirait le nombre affiché juste au-dessus d'elle.
 //
 // Purement visuel : aucun appel réseau, aucun contenu stocké modifié, aucun DOM de fil

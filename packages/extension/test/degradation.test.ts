@@ -5,19 +5,22 @@ import { GithubClientAdapter } from '@cct/adapter-github';
 import { AzdoClientAdapter } from '@cct/adapter-azdo';
 
 describe('§9.4 / CA-11 — dégradation silencieuse des sélecteurs', () => {
-  it('un échec de détection est tracé localement, sans dialogue ni exception', () => {
+  it('un échec de détection est tracé localement, sans dialogue ni exception', async () => {
     const log = new SelectorLog();
-    // Page sans aucun bouton de complétion : getCompletionControl doit renvoyer null,
-    // tracer l'échec, et ne jamais lever.
+    // Page vidée de tout ce que GitHub y rend : la lecture de la configuration du dépôt reçoit
+    // un 404 et interroge la page pour savoir si le dépôt est public (adapters/github,
+    // `getRepoConfig()`) — la sonde ne trouve rien, doit le tracer, et ne jamais lever. Un 404
+    // reste lu comme « pas de fichier » : la dégradation ne coûte que le diagnostic.
     document.body.innerHTML = '<div id="empty"></div>';
     Object.defineProperty(document, 'location', {
       value: new URL('https://github.com/acme/demo/pull/42'),
       configurable: true,
     });
-    const adapter = new GithubClientAdapter({ documentRef: document, log });
-    expect(() => adapter.getCompletionControl()).not.toThrow();
-    expect(adapter.getCompletionControl()).toBeNull();
-    expect(log.failures.some((f) => f.chain === 'merge-button')).toBe(true);
+    const fetchImpl = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+    const adapter = new GithubClientAdapter({ documentRef: document, log, fetchImpl });
+    const pr = adapter.currentPr()!;
+    await expect(adapter.getRepoConfig(pr)).resolves.toEqual({ status: 'absent' });
+    expect(log.failures.some((f) => f.chain === 'repository-public-meta')).toBe(true);
   });
 
   it('la télémétrie n’est notifiée que si elle est activée (opt-in, §10)', () => {

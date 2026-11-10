@@ -3,14 +3,14 @@ import { corpus, toStoredForm } from '../src/corpus/index.js';
 import { validate } from '../src/validator.js';
 import { resolveConfig } from '../src/config/resolve.js';
 import type { ConfigRead, ValidationInput } from '../src/types.js';
-import { azdoProfile, githubProfile, user } from './helpers.js';
+import { azdoProfile, githubProfile, gitlabProfile, user } from './helpers.js';
 
 const absent: ConfigRead = { status: 'absent' };
 
 function inputFor(body: string, c: (typeof corpus)[number]): ValidationInput {
   return {
     body,
-    platform: c.platform === 'github' ? githubProfile : azdoProfile,
+    platform: c.platform === 'github' ? githubProfile : c.platform === 'gitlab' ? gitlabProfile : azdoProfile,
     isSystemGenerated: false,
     zone: c.zone,
     canCarryBlockingState: c.canCarryBlockingState,

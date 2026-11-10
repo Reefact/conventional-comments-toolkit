@@ -255,6 +255,8 @@ La ligne retenue à l'étape 3 est appelée **ligne de préfixe** dans tout le d
 
 Un corps vide, constitué uniquement de blancs, ou dont il ne reste rien après l'étape 2, ne produit **aucune** ligne de préfixe : ce cas relève de l'exemption du §4.2 (contenu non rédigé), pas d'une erreur de format.
 
+**Le corps traité ici est celui que le §3.6 a privé de son marqueur de session**, s'il en porte un. Le retrait précède l'étape 1, et c'est ce corps-là, et lui seul, que lisent la suite de cette section, le §3.5 et le §4.2.
+
 #### 3.4.2 Expression régulière de référence
 
 ```regex
@@ -387,6 +389,42 @@ Les **avertissements ne bloquent jamais** l'envoi. Seules les erreurs le font, e
 **Définition de « conforme ».** Un commentaire est **conforme** s'il ne produit, après application de `severities` (§8.2), **aucun diagnostic de sévérité `error`**. Un commentaire qui ne porte que des avertissements est donc conforme : c'est ce qui rend simultanément vraies la phrase ci-dessus et la promesse du §3.1. Les avertissements sont comptés **séparément** — ils apparaissent dans la pastille (§5.3) et dans les indicateurs du §12, jamais comme cause de blocage. C'est ce sens, et lui seul, qu'emploient le §5.4, le §12 et `CA-37`.
 
 *Calibrage :* `W-SUBJECT-TOO-SHORT` est délibérément un avertissement, et non une erreur, avec un seuil bas de 5 caractères. Un sujet trop court n'est pas un défaut de forme grave — le pénaliser en erreur bloquante pousse à contourner la règle plutôt qu'à l'appliquer (voir la lecture des indicateurs en §12).
+
+### 3.6 Marqueur de session
+
+Un relecteur peut superviser plusieurs agents qui relisent la même PR en parallèle, ou plusieurs passes d'un même compte technique. La plateforme dit **qui** a écrit un commentaire ; elle ne dit pas **quelle session de revue** l'a produit. Un commentaire peut donc se terminer par un **marqueur de session**, optionnel, qui rend cette information visible (#160) :
+
+```text
+issue (blocking): Some title
+
+Some text explaining the finding.
+
+[session:Melancholy-Coordinated-Value-Object]
+```
+
+**Syntaxe.** `[session:<valeur>]`, où `session` s'écrit en minuscules, collé au crochet ouvrant et au deux-points. La **valeur** est un texte libre, non vide une fois retirés ses blancs de bordure (jeu de l'étape 4 du §3.4.1) ; elle s'étend jusqu'au **dernier** `]` de la ligne. Aucun format n'est imposé — ni GUID, ni générateur — et une valeur en minuscules séparées par des tirets (`melancholy-coordinated-value-object`) est **recommandée** pour la lisibilité, sans qu'une autre forme soit jamais refusée.
+
+**Position.** Le marqueur occupe **à lui seul la dernière ligne non blanche** du corps, blancs de bordure tolérés ; il peut être suivi d'autant de lignes blanches qu'on veut. Il n'est **pas** reconnu :
+
+- ailleurs que sur la dernière ligne non blanche ;
+- sur une ligne qui porte aussi autre chose (`fin [session:a]`, `[session:a] fin`) ;
+- dans un bloc de code délimité, refermé ou non, ou dans une citation — les lignes que l'étape 2 du §3.4.1 écarte ;
+- avec une valeur vide, ou sous une autre forme (`[Session:a]`, `[session :a]`, `[session:a`).
+
+Un marqueur non reconnu — mal formé ou mal placé — **reste du texte ordinaire**. Il ne produit aucun diagnostic : la convention n'en exige pas, et elle ne sanctionne donc pas une tentative ratée.
+
+**Une métadonnée, pas du contenu de revue.** Le marqueur reconnu est **retiré du corps avant le prétraitement du §3.4.1**, et c'est le corps sans lui que jugent le §3.4, le §3.5 et le §4.2. Le retrait est fait par `validate()` et `analyze()` eux-mêmes, comme le prétraitement (§9.2.2) : aucun appelant ne peut l'oublier, et les deux composants le font à l'identique. Conséquences, qui sont toutes la même règle :
+
+- il n'est **jamais** la ligne de préfixe, ni le sujet, ni de la discussion : `issue: le nom est ambigu` suivi du seul marqueur produit `W-NO-DISCUSSION`, exactement comme sans lui ;
+- il n'est pas du **contenu propre** (§4.2) : un corps réduit au marqueur est un corps vide, **exempté** comme lui — une métadonnée seule ne fait pas un commentaire de revue, et ne lui impose pas non plus de label ;
+- il n'entre pas dans `allowlistPatterns`, appliquées au corps sans lui : `LGTM` suivi d'un marqueur reste exempté par `^LGTM$` ;
+- il ne change **aucun effet** : ni le label résolu, ni les décorations, ni le caractère bloquant (§3.3), ni le critère 2 (§6.2.1), ni la résolution d'un fil par `decision` (§6.1.1), ni le sens de `reviewed` (§3.2).
+
+**Le contenu stocké n'est jamais modifié.** Ni l'extension ni le vérificateur ne réécrivent le marqueur — sa casse, notamment, reste celle de l'auteur. Seul l'affichage du §5.5 le transforme, côté client, et de façon réversible.
+
+**Décalage de version de `core/`.** Un `core/` antérieur à ce paragraphe lit le marqueur comme une ligne ordinaire : la discussion n'y est pas vide, et un corps réduit au marqueur y reçoit `E-NO-LABEL`. Les verdicts peuvent donc différer d'un composant à l'autre pendant un déploiement. C'est l'écart de version que la règle 5 du §8.1.3 déclare normal, et il n'entre pas dans l'empreinte (§9.2.2), qui ne porte que sur la configuration.
+
+Hors périmètre : filtrer, regrouper ou rechercher par session, un tableau de bord, un cycle de vie de session, une attestation d'identité ou de provenance, et la génération de l'identifiant. Les consignes données aux agents pour poser le marqueur relèvent d'une suite distincte.
 
 ---
 
@@ -554,6 +592,7 @@ Le blocage d'envoi du mode `enforce` est donc un **garde-fou, pas un mur** : il 
 
   Le bandeau compte ce que la page montre : un fil est résolu tel que la plateforme l'affiche, quel que soit l'auteur de la résolution — l'extension ne tranche aucune autorisation (§10). Une rédaction antérieure affichait d'abord un décompte publié par un vérificateur et ne se rabattait sur la page qu'à défaut ; ce vérificateur est retiré (§2), et la page est désormais la seule source.
 - Filtre local par label dans la liste des fils de discussion.
+- **Marqueur de session** (§3.6). Dans un commentaire publié, la dernière ligne `[session:<valeur>]` reconnue est masquée et remplacée **à sa place**, en bas du commentaire, par une mention discrète : l'icône `sessionIcon` (§8.2, un robot par défaut), puis `session: ` et la valeur **en minuscules** — `🤖 session: melancholy-coordinated-value-object`. Ni `#`, ni badge, ni panneau : la mention est distincte des badges de label et de décoration, et ne change le sens d'aucun d'eux. Elle est affichée quel que soit le verdict du commentaire, y compris sans label résolu. C'est une **projection client** : le contenu stocké garde le marqueur tel qu'écrit, casse comprise, et l'édition le montre. Comme pour le masquage du préfixe, la projection **renonce** dès qu'elle n'est pas sûre — dernier bloc qui n'est pas l'un des paragraphes déclarés par `renderedBodyShape()`, forme non mesurée (`null`), dernière ligne qui ne se réduit pas à un nœud de texte égal au marqueur, mise en forme sur la ligne — et le marqueur reste alors lisible tel qu'écrit. Elle est **défaite** quand la dernière ligne cesse d'être un marqueur, quand la plateforme cesse de déclarer sa forme, et quand l'extension se retire (mode `off`, plus de PR).
 
 **Masquage du préfixe et mise en avant du sujet.** Les badges disent déjà ce que le préfixe structuré écrit ; les laisser côte à côte fait lire deux fois la même chose. Quand les conditions ci-dessous sont réunies, le préfixe est donc **masqué dans le corps rendu** — jamais supprimé du contenu stocké (§5.5, premier point) —, les badges prennent sa place **en tête de la ligne du sujet**, et le **sujet** — le texte qui suit le préfixe jusqu'à la première fin de ligne — est mis en avant. La ligne se lit alors comme un titre : de quoi il s'agit, précédé de ce qui le qualifie.
 
@@ -828,6 +867,7 @@ Le bloc ci-dessous est un **exemple de configuration de dépôt**, destiné à m
   "coreMinVersion": "1.0.0",
   "configCacheTtlSeconds": 3600,
   "badgeStyle": "pill",
+  "sessionIcon": "🤖",
   "shortcuts": { "abbreviations": { "?i": "issue: ", "?ib": "issue (blocking): " } },
   "language": "fr",
   "telemetry": { "enabled": false, "endpoint": null }
@@ -848,6 +888,7 @@ Clés du schéma dont le rôle demande une précision :
 | `labels[].kind` | `"remark"` ou `"reply"` (§3.2). Range le bouton dans sa zone de la barre d'outils (§5.1) et sépare les indicateurs (§12). Défaut : le type livré pour un label que le produit livre, `"remark"` pour tout autre ; la fusion du §8.1.4 ne le change que s'il est écrit. Ne change **aucun verdict**, et n'est pas plancher-able. Toute autre valeur est une erreur de type, traitée comme celle de n'importe quelle propriété de `labels[]` (§8.1.5). |
 | `shortcuts.abbreviations` | Table des abréviations extensibles par `Tab` (§5.2) : abréviation → **texte inséré, deux-points et espace compris** (`"?i": "issue: "`). Les raccourcis clavier directs relèvent, eux, des préférences locales de l'utilisateur (§8.1.2). |
 | `labels[].color` | Couleur du bouton et du badge (§5.1, §5.5). Doit satisfaire les contrastes du §10. |
+| `sessionIcon` | Icône de la mention qui remplace le marqueur de session à l'affichage (§3.6, §5.5). Une chaîne non vide ; défaut : `🤖`, la convention servant d'abord à suivre des sessions de revue d'agents. Ne change aucun verdict : hors du domaine de `fingerprint()` (§9.2.2), non plancher-able. |
 | `labels[].description` | **Signification** du label, affichée en infobulle sur le badge (§5.5), et sur le bouton à défaut de `labels[].usage`. Une chaîne, rendue telle quelle quelle que soit la langue de l'interface : c'est le texte de l'équipe, pas une traduction. Elle vaut pour un label créé comme pour un label livré, et la fusion du §8.1.4 la traite comme les autres propriétés : **écrite, elle remplace** — le texte du catalogue, ou celle d'un niveau supérieur — ; **vide (`""`), elle retire l'infobulle** ; **absente, rien ne change**, et un label livré garde le texte de son catalogue. Ne change aucun verdict. |
 | `labels[].usage` | **Consigne d'emploi** du label, affichée en infobulle sur le bouton (§5.1). Mêmes règles que `labels[].description` : écrite, elle remplace le texte du catalogue et son exemple ; vide, elle retire l'infobulle du bouton ; absente, le bouton prend `labels[].description`, puis le catalogue. Ne change aucun verdict. |
 | `labels[].aliases` | Orthographes acceptées en entrée pour ce label — voir ci-dessous. |
@@ -1319,6 +1360,9 @@ Chaque seuil est donné **au p95**, sur un **poste de référence** défini par 
 - `CA-48` **Les réponses sur leur propre ligne, sous un trait** (§5.1). Mesuré dans un vrai navigateur, à des largeurs où les remarques tiennent sur une ligne et à d'autres où elles en occupent plusieurs : chaque bouton `reply` est sous la dernière ligne des boutons `remark`, jamais à côté ; un trait horizontal court sur toute la largeur de la barre entre les deux ; les décorations restent dessous, sous un double trait fin qui court lui aussi sur toute la largeur. Sans label `reply` actif, ni rangée des réponses ni trait simple, le double trait restant ; sans aucun label actif, aucun trait ; sans label `remark` actif, pas de trait. Contre-épreuve : un label déclaré `{"id": "merci", "kind": "reply"}` rejoint la rangée des réponses, et `{"id": "done", "kind": "remark"}` la quitte.
 - `CA-49` **Le type d'un label se lit et se valide comme ses autres propriétés** (§8.2). `"kind": "reply"` sur un label déclaré par un dépôt est retenu ; un label déclaré sans `kind` est `remark` ; une entrée qui redéclare un label livré sans écrire `kind` garde le type livré ; toute autre valeur que `"remark"` ou `"reply"` rend la configuration invalide (§8.1.5), comme une valeur mal typée de n'importe quelle propriété de `labels[]`.
 - `CA-50` **Ordre des boutons** (§5.1, §5.2). Sans préférence, la barre et la liste de complétion suivent l'ordre de la configuration : celui du §5.1 pour les labels livrés, puis les labels créés, dans l'ordre d'écriture. Avec la préférence `suggestion,nitpick,disagree,praise,ack`, le groupe `remark` commence par `suggestion`, `nitpick`, `praise` et poursuit dans l'ordre par défaut, le groupe `reply` par `disagree`, `ack`, puis `thanks`, `done`, `decision`. La saisie `Disagree , praise` donne `disagree,praise` ; `disagree praise` donne le seul nom `disagreepraise`, qui ne place rien ; un doublon ne compte qu'une fois ; un jeton hors identifiant est écarté ; un label inconnu ou désactivé sur le dépôt ne place rien et ne lève aucune erreur. Contre-épreuve : un label qu'un dépôt déclare `reply` et que la liste nomme se place en tête de le groupe `reply`, jamais dans le groupe `remark`.
+- `CA-51` **Reconnaissance du marqueur de session** (§3.6). `[session:<valeur>]` est reconnu sur la dernière ligne non blanche, suivie de zéro, une ou plusieurs lignes blanches, `LF` comme `CRLF` ; toute valeur libre non vide l'est, un GUID comme `run 42`, avec sa casse. Il n'est **pas** reconnu au milieu du corps, en ligne avec du texte, dans un bloc de code délimité (refermé ou non) ni dans une citation, avec une valeur vide ou sous une autre forme — et il reste alors du texte ordinaire, sans aucun diagnostic nouveau.
+- `CA-52` **Une métadonnée seule ne satisfait aucune exigence, et ne change aucun effet** (§3.6). `issue: le nom est ambigu` suivi du seul marqueur produit `W-NO-DISCUSSION`, comme sans lui ; `issue:` suivi du marqueur produit `E-EMPTY-SUBJECT`, le marqueur n'étant jamais la ligne de préfixe ; un corps réduit au marqueur est exempté comme un corps vide (§4.2) ; `LGTM` suivi du marqueur reste exempté par `^LGTM$`. Label résolu, décorations, caractère bloquant, critère 2 et résolution par `decision` sont identiques avec et sans marqueur. `sessionIcon` n'entre pas dans l'empreinte.
+- `CA-53` **Affichage du marqueur de session** (§5.5). Le marqueur reconnu d'un commentaire publié — dans son propre paragraphe, ou après un saut de ligne — est remplacé à sa place par `🤖 session: <valeur en minuscules>`, l'icône suivant `sessionIcon` ; le corps relu garde le marqueur tel qu'écrit, casse comprise ; un second passage ne change rien au DOM ; un affichage emporté par la plateforme est reposé. Un commentaire sans marqueur ne reçoit rien. Défaire — extension inactive, forme du corps rendu non déclarée, dernière ligne qui n'est plus un marqueur — rend le corps d'avant. Repli : marqueur mis en forme, dans une liste, un bloc de code, une citation, ou précédé sur sa ligne d'un texte mis en forme — rien n'est projeté, et il reste lisible tel qu'écrit.
 
 ---
 

@@ -557,6 +557,11 @@ export function queryChainAll(root: ParentNode, chain: SelectorChain): Element[]
  * retirer amputerait le corps relu. */
 export const OWN_BADGES = ':scope > .cct-badge, :scope > .cct-badge-host > .cct-badge';
 
+/** Ce que l'extension AFFICHE à la place du marqueur de session (§3.6, §5.5) : du texte ajouté,
+ * en bas du corps, jamais écrit par l'auteur. Le marqueur tel qu'écrit reste, lui, dans le corps
+ * (masqué) : retirer l'affichage suffit à relire le corps tel qu'il est stocké. */
+export const OWN_SESSION = '.cct-session';
+
 /** Texte d'un corps de commentaire, badges de l'extension EXCLUS (§5.5) : `decorateComment`
  * (extension/src/ui/badges.ts) insère un badge de label, suivi d'un badge par décoration
  * résolue (§3.3), dans l'élément que `getThreads()`/`getRenderedComments()` lisent ensuite.
@@ -578,9 +583,12 @@ export const OWN_BADGES = ':scope > .cct-badge, :scope > .cct-badge-host > .cct-
  * code INDENTÉ (quatre espaces) se rend aussi en `<pre>`, et se trouve donc écarté comme un bloc
  * délimité — la source, elle, le distingue. */
 export function commentBodyText(element: Element): string {
-  if (!element.querySelector(`${OWN_BADGES}, pre, blockquote`)) return element.textContent ?? '';
+  if (!element.querySelector(`${OWN_BADGES}, ${OWN_SESSION}, pre, blockquote`)) return element.textContent ?? '';
   const clone = element.cloneNode(true) as Element;
   clone.querySelectorAll(OWN_BADGES).forEach((badge) => badge.remove());
+  // Sans ce retrait, le passage suivant lirait « [session:X]🤖 session: x » en dernière ligne,
+  // ne reconnaîtrait plus le marqueur, et défairait l'affichage qu'il vient de poser.
+  clone.querySelectorAll(OWN_SESSION).forEach((shown) => shown.remove());
   const text = (s: string) => clone.ownerDocument.createTextNode(s);
   for (const pre of clone.querySelectorAll('pre')) {
     const code = (pre.textContent ?? '').replace(/^\n+|\n+$/g, '');

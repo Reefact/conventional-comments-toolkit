@@ -40,6 +40,7 @@ const KNOWN_KEYS = new Set([
   'coreMinVersion',
   'configCacheTtlSeconds',
   'badgeStyle',
+  'sessionIcon',
   'shortcuts',
   'docUrl',
   'language',
@@ -281,6 +282,7 @@ export function parseConfigDocument(
       }
       case 'overrideLabel':
       case 'badgeStyle':
+      case 'sessionIcon':
       case 'docUrl': {
         if (typeof value !== 'string' || value === '') bad(key, 'must be a non-empty string');
         else out[key] = value;

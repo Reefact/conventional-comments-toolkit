@@ -9,7 +9,6 @@ export {
 } from './config-resolver.js';
 export {
   decideGuard,
-  resolveInScope,
   feedbackState,
   type GuardDecision,
   type GuardInput,
@@ -29,5 +28,5 @@ export {
 } from './ui/banner.js';
 export { renderThreadFilter, applyLabelFilter, clearLabelFilter } from './ui/thread-filter.js';
 export { clearCommentDecorations, decorateComment } from './ui/badges.js';
-export { bootstrap, applyCompletionState, writeDegradedState, mergeDirectShortcuts } from './content-internal.js';
+export { bootstrap, writeDegradedState, mergeDirectShortcuts } from './content-internal.js';
 export { ui } from './ui/strings.js';

@@ -1,21 +1,19 @@
-// Bandeau de tête de PR (§5.5) : le DÉCOMPTE vient du résumé publié, qui fait autorité ;
-// les ANCRES viennent du DOM, qui porte les fils. Les deux divergent, et c'est assumé —
-// l'écart devient une ligne à part entière plutôt qu'une soustraction laissée au lecteur.
-// Sans résumé publié, vue locale explicitement marquée, `unknown` compté non résolu.
+// Bandeau de tête de PR (§5.5) : sa source est UNIQUE, les fils lus dans le DOM de la page
+// (`getThreads()`). Décompte et ancres viennent donc de la même liste et ne peuvent pas
+// diverger. `unknown` est compté non résolu, comme au §B.5. Une rédaction antérieure
+// préférait le décompte publié par un vérificateur ; ce vérificateur est retiré (§2).
 //
-// Ce n'est PAS un panneau d'alerte. Le verdict de conformité appartient au check de la
-// plateforme, qui est déjà rouge et bloque déjà la complétion ; le redire ici dévaluerait
-// les deux. Ce que la plateforme ne sait pas dire, c'est LESQUELS — la notion de fil
-// bloquant vit dans le texte de nos commentaires, pas dans son modèle de données. D'où un
-// sommaire : la liste courte de ce qui sépare l'auteur du merge, chaque entrée nommée par
-// ce qu'elle dit et par qui l'a écrite, jamais par son rang dans le DOM.
+// Ce n'est PAS un panneau d'alerte : le produit SIGNALE les fils bloquants non résolus, il
+// n'empêche pas de fusionner (O3, §2). Ce que la plateforme ne sait pas dire, c'est LESQUELS
+// — la notion de fil bloquant vit dans le texte de nos commentaires, pas dans son modèle de
+// données. D'où un sommaire : la liste courte des points encore ouverts, chaque entrée nommée
+// par ce qu'elle dit et par qui l'a écrite, jamais par son rang dans le DOM.
 
 import {
   analyze,
   matchPrefix,
   type CommentAnalysis,
   type EffectiveConfig,
-  type PublishedSummary,
   type ThreadInfo,
 } from '@cct/core';
 import { ui } from './strings.js';
@@ -34,14 +32,10 @@ export interface BannerAnchor {
 }
 
 export interface BannerModel {
-  /** Décompte affiché en titre : publié si présent, sinon vue locale. */
+  /** Décompte affiché en titre : les fils bloquants non résolus lus dans la page (§5.5). */
   count: number;
-  /** Ancres appariées dans le DOM. */
+  /** Une ancre par fil compté. */
   anchors: BannerAnchor[];
-  /** Vrai si le décompte vient du résumé publié (autorité), faux pour la vue locale. */
-  fromPublished: boolean;
-  /** Vrai quand `fromPublished` et que des fils comptés n'ont pas été appariés (§5.5). */
-  partial: boolean;
 }
 
 /** Sujet de la racine, lu dans la ligne de préfixe déjà normalisée par `analyze()` —
@@ -92,7 +86,6 @@ export function localBlockingUnresolved(
 }
 
 export function buildBannerModel(
-  published: PublishedSummary | null,
   threads: ThreadInfo[],
   config: EffectiveConfig,
   platformId: string,
@@ -106,28 +99,15 @@ export function buildBannerModel(
     subject: subjectOf(analysis),
     author: thread.root.author.login,
   }));
-  if (published !== null) {
-    // CA-03 : le décompte affiché est le décompte publié, jamais le nombre d'ancres.
-    const count = published.unresolvedBlockingCount;
-    return { count, anchors, fromPublished: true, partial: anchors.length < count };
-  }
-  return { count: local.length, anchors, fromPublished: false, partial: false };
+  // CA-03 : le décompte est celui des fils que `isBlocking()` tient pour bloquants, la même
+  // liste qui porte les ancres.
+  return { count: local.length, anchors };
 }
 
 /** Vrai lorsque le bandeau a quelque chose à annoncer. Décompte nul : rien, pas même une
- * barre vide — le check vert dit déjà tout, et une PR saine ne se décore pas. En vue
- * publiée, ce décompte fait autorité : des ancres locales sur un décompte à zéro sont des
- * fils que le serveur ne compte pas, les afficher contredirait la source de vérité. */
+ * barre vide — une PR sans fil bloquant ouvert ne se décore pas. */
 export function bannerHasContent(model: BannerModel): boolean {
   return model.count > 0;
-}
-
-/** Seul `state === 'failure'` bloque la complétion (§6.2.2, §6.2.4) — la même autorité que
- * `applyCompletionState` pour le grisage du bouton. Un résumé publié EXISTE en `warn`
- * (jamais en échec, décompte informatif) et sur une PR en brouillon (toujours informatif,
- * jamais en échec) : la seule présence d'un résumé ne dit donc pas si ces fils bloquent. */
-export function bannerBlocksMerge(published: PublishedSummary | null): boolean {
-  return published !== null && published.state === 'failure';
 }
 
 export interface BannerRenderOptions {
@@ -140,17 +120,14 @@ export interface BannerRenderOptions {
 
 export function renderBanner(
   model: BannerModel,
-  published: PublishedSummary | null,
   lang: string,
   options: BannerRenderOptions = {}
 ): HTMLElement {
   const doc = globalThis.document;
-  const blocksMerge = bannerBlocksMerge(published);
 
   // `<details>` natif plutôt qu'un pliage maison : rôle, état et navigation clavier sont
-  // déjà exposés par le navigateur (§10, accessibilité). Déplié par défaut quand le merge
-  // est effectivement bloqué — c'est l'instant où l'on cherche lesquels ; replié sinon,
-  // qu'il s'agisse d'un décompte informatif (`warn`, brouillon) ou d'une vue locale.
+  // déjà exposés par le navigateur (§10, accessibilité). Replié par défaut : le bandeau
+  // signale, il n'interrompt pas la lecture de la PR (O3).
   //
   // Un DÉFAUT, pas un verdict : le bandeau est reconstruit à chaque rendu — et depuis que
   // le texte des fils est surveillé, une simple réponse ou une correction en place en
@@ -159,8 +136,7 @@ export function renderBanner(
   // et nous le repasse ici, tant que la situation qui l'a motivé n'a pas changé.
   const root = doc.createElement('details');
   root.className = 'cct-banner';
-  root.dataset['view'] = model.fromPublished ? 'published' : 'local';
-  root.open = options.open ?? blocksMerge;
+  root.open = options.open ?? false;
   if (options.onToggle) {
     const notify = options.onToggle;
     listen('render', root, 'toggle', () => notify(root.open));
@@ -168,8 +144,8 @@ export function renderBanner(
 
   const head = doc.createElement('summary');
   head.className = 'cct-banner-head';
-  // Région live (§10) : le bandeau est inséré APRÈS le chargement — un résumé publié qui
-  // arrive de façon asynchrone change le décompte sans que rien ne le signale à un lecteur
+  // Région live (§10) : le bandeau est inséré APRÈS le chargement — des fils chargés de
+  // façon asynchrone changent le décompte sans que rien ne le signale à un lecteur
   // d'écran. L'ancien `role="status"` sur la racine assurait cette annonce ; il ne peut pas
   // y revenir, `<details>` y perdrait sa sémantique de pliage (revue Codex, PR #26).
   // Ici plutôt que sur la racine, pour deux raisons : le contenu d'un `<details>` replié
@@ -190,21 +166,13 @@ export function renderBanner(
 
   const count = doc.createElement('strong');
   count.className = 'cct-banner-count';
-  count.textContent = ui(lang, model.fromPublished ? 'banner.count' : 'banner.count.local', { count: model.count });
+  count.textContent = ui(lang, 'banner.count', { count: model.count });
   head.appendChild(count);
 
-  const hint = doc.createElement('span');
-  hint.className = 'cct-banner-hint';
-  // Trois lectures distinctes, jamais confondues (revue Codex, §26) :
-  // - pas de résumé publié DU TOUT : ni serveur déployé, ni première évaluation encore en
-  //   vol ne se distinguent d'ici — le texte ne tranche pas entre les deux ;
-  // - résumé publié, mais qui NE bloque PAS le merge (`warn`, brouillon) : les fils listés
-  //   sont réels mais informatifs, jamais annoncés comme un préalable à la fusion ;
-  // - résumé publié qui bloque effectivement (`enforce`, hors brouillon, `state: failure`).
-  const hintKey = !model.fromPublished ? 'banner.hint.local' : blocksMerge ? 'banner.hint' : 'banner.hint.informative';
-  hint.textContent = ui(lang, hintKey);
-  head.appendChild(hint);
-
+  // Le décompte seul, sans sous-titre : il est ce que la page montre (§5.5), et il n'y a plus
+  // d'autre source à laquelle le comparer — une réserve sans alternative ne ferait que semer le
+  // doute (décision du propriétaire, D5). Rien n'y présente ces fils comme un préalable à la
+  // fusion : le produit signale, il n'empêche pas (O3, §2).
   root.appendChild(head);
 
   const list = doc.createElement('ul');
@@ -234,28 +202,7 @@ export function renderBanner(
     list.appendChild(li);
   }
 
-  // L'écart entre décompte publié et ancres appariées est une LIGNE, pas une note de bas de
-  // bandeau : une liste dont une entrée est déclarée hors de portée se lit comme un fait,
-  // là où une liste silencieusement incomplète se lit comme un bug. Sans `data-thread-id` —
-  // elle ne désigne aucun fil de cette page, c'est tout son propos.
-  if (model.partial) {
-    const missing = doc.createElement('li');
-    missing.className = 'cct-banner-unlocated';
-    missing.textContent = ui(lang, 'banner.unlocated', { missing: model.count - model.anchors.length });
-    list.appendChild(missing);
-  }
   root.appendChild(list);
 
-  // Panneau de diagnostic : « jugée en enforce par core/ 1.4.0 » — affichage, rien de
-  // plus ; un écart de coreVersion ne déclenche rien (§6.3.1, CA-32).
-  if (published) {
-    const judged = doc.createElement('small');
-    judged.className = 'cct-banner-judged';
-    judged.textContent = ui(lang, 'banner.judged', {
-      mode: published.mode,
-      coreVersion: published.coreVersion,
-    });
-    root.appendChild(judged);
-  }
   return root;
 }

@@ -2,8 +2,8 @@
 //
 // LE JOURNAL DE DÉGRADATION DE SÉLECTEURS (§9.4, CA-11) — et pourquoi il était aveugle.
 //
-// `getCompletionControl()` journalise dès qu'il ne trouve pas le bouton de fusion, et il est
-// appelé à chaque mutation du DOM. Sur une PR FERMÉE, où l'absence de ce bouton est la norme
+// La sonde du bouton de fusion (`getCompletionControl()`, retirée depuis avec le grisage, §2)
+// journalisait dès qu'elle ne le trouvait pas, et elle était appelée à chaque mutation du DOM. Sur une PR FERMÉE, où l'absence de ce bouton est la norme
 // et non une pourriture de sélecteur, une seule visite écrivait des dizaines d'entrées
 // identiques. Le journal étant plafonné à 50 lignes, une PR fusionnée le remplissait
 // intégralement de `merge-button` et évinçait toute vraie dégradation : l'outil censé révéler

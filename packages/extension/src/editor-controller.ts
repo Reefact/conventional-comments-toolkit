@@ -1,5 +1,5 @@
 // Contrôleur d'un éditeur (§5) : barre d'outils, saisie rapide, retour visuel débattu à
-// 150 ms, blocage d'envoi sous les quatre conditions du §5.4. Un contrôleur par
+// 150 ms, blocage d'envoi sous les deux conditions du §5.4. Un contrôleur par
 // EditorHandle ; toute la logique de règle vient de core/.
 
 import {
@@ -11,7 +11,6 @@ import {
   type CommentAnalysis,
   type EffectiveConfig,
   type PrRef,
-  type PublishedSummary,
   type ValidationInput,
 } from '@cct/core';
 import type { EditorHandle, PlatformAdapter, SubmitControl } from '@cct/adapter-shared';
@@ -80,7 +79,6 @@ export interface ControllerDeps {
   adapter: PlatformAdapter;
   editor: EditorHandle;
   resolved: ResolvedClientConfig;
-  published: PublishedSummary | null;
   lang: string;
   currentUserLogin: string;
   /** Raccourcis directs (§5.2, ex. Alt+I → issue) — préférences locales de l'utilisateur
@@ -105,8 +103,7 @@ export interface ControllerDeps {
 
 /** Table par défaut des raccourcis directs (§5.2) — surchargable par les préférences. */
 /** Marque, sur l'élément lui-même, la valeur NATIVE d'`aria-disabled` juste avant que ce
- * contrôleur ne pose la sienne — même mécanisme que `NATIVE_ARIA_DISABLED_MARKER` du bouton
- * de complétion (content-internal.ts, §6.5) : un bouton de soumission peut déjà porter
+ * contrôleur ne pose la sienne : un bouton de soumission peut déjà porter
  * `aria-disabled="true"` pour une raison qui lui est PROPRE (branche protégée, permissions),
  * sans rapport avec le grisage de ce contrôleur (§5.4). Écraser puis retirer purement et
  * simplement l'attribut confondait les deux états : au dégrisage (`refresh()`) comme à
@@ -196,7 +193,7 @@ export class EditorController {
     return this.#config;
   }
 
-  /** Remplace la configuration résolue — ET le résumé publié — d'un éditeur DÉJÀ attaché
+  /** Remplace la configuration résolue d'un éditeur DÉJÀ attaché
    * (revue Codex et Reefact, PR #39) : sans cela, un éditeur ouvert avant qu'un sondage
    * périodique (§8.1.2) force un nouveau rendu de la barre continue de valider et de
    * bloquer l'envoi sur la configuration capturée à `attach()` — figée dans `deps.resolved`,
@@ -204,16 +201,8 @@ export class EditorController {
    * alors l'éditeur qu'à sa fermeture/réouverture ou au rechargement de la page, pas « en
    * direct » comme le §8.1.3 l'exige pour ce genre de changement.
    *
-   * `published` DOIT être relu au moment de l'appel, jamais gardé de l'attachement d'origine
-   * (revue Reefact, PR #39) : `deps.published`, sinon inchangé, est comparé à `deps.resolved
-   * .fingerprint` par `decideGuard()` (§8.1.3, règle 2) — un scénario de propagation où
-   * l'extension adopte une configuration B avant que le composant B ne publie lui-même
-   * l'empreinte B laisserait cet éditeur comparer la NOUVELLE configuration à l'ANCIEN
-   * résumé indéfiniment, l'écart d'empreinte ne se résorbant jamais même une fois les deux
-   * composants d'accord.
-   *
-   * `refresh()` referme la boucle : décompte, grisage, infobulle et pastille (§5.3) sont
-   * tous dérivés de `this.config`/`this.deps.resolved`/`this.deps.published`, donc tous à
+   * `refresh()` referme la boucle : décompte, blocage, infobulle et pastille (§5.3) sont
+   * tous dérivés de `this.config`/`this.deps.resolved`, donc tous à
    * jour dès ce retour. La barre d'outils, elle, N'EST PAS reconstruite ici — ses boutons de
    * label reflètent la configuration au moment où `attach()` a construit le DOM
    * (`buildToolbar`) ; un mode qui bascule à `off` ou en revient est traité par
@@ -221,10 +210,9 @@ export class EditorController {
    * jamais par cette méthode. Sur un éditeur qui RESTE actif, un label retiré entre-temps
    * continue donc de s'afficher dans la barre, mais insérer son préfixe ne validerait plus
    * (`this.config` fait foi) — un décalage cosmétique, jamais un contournement du blocage. */
-  updateResolved(resolved: ResolvedClientConfig, published: PublishedSummary | null): void {
+  updateResolved(resolved: ResolvedClientConfig): void {
     this.deps.resolved = resolved;
     this.#config = localizedConfig(resolved.config, this.deps.lang);
-    this.deps.published = published;
     this.refresh();
   }
 
@@ -431,10 +419,7 @@ export class EditorController {
     this.#lastAnalysis = analyze(input, this.config);
     this.#lastDecision = decideGuard({
       config: this.config,
-      fingerprint: this.deps.resolved.fingerprint,
-      published: this.deps.published,
       degraded: this.deps.resolved.degraded,
-      pr: this.prRef(),
       diagnostics: this.#lastAnalysis.diagnostics,
     });
     return this.#lastDecision;
@@ -449,7 +434,7 @@ export class EditorController {
     // et coche sa décoration, exactement comme s'il venait d'être cliqué.
     this.#toolbar?.sync();
     this.#feedback?.render({
-      state: feedbackState(analysis.diagnostics, decision, this.deps.resolved.degraded),
+      state: feedbackState(analysis.diagnostics, this.deps.resolved.degraded),
       diagnostics: analysis.diagnostics, // tous, dans l'ordre du §3.5.1 (§5.3)
       aliasRewrite: analysis.aliasRewrite,
       onFix: (replacement) => this.applyLineFix(replacement),

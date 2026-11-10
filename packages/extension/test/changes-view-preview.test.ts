@@ -118,8 +118,8 @@ describe('§5.5 — l’aperçu d’un champ, sur la nouvelle vue des fichiers m
   });
 
   // Sans cette sonde, le correctif de la chaîne serait resté sans effet : ouvrir l'aperçu ne
-  // change ni le résumé publié, ni les identifiants de fils, ni le nombre de corps publiés —
-  // la signature de reprise (`chromeSignatureOf`, qui compte ces éléments) resterait identique
+  // change ni les identifiants de fils, ni le nombre de corps publiés — la signature de
+  // reprise (`contentSignatureOf`, qui compte ces éléments) resterait identique
   // et `run()` ressortirait avant de rendre. La même sonde porte le cas d'une SECONDE
   // rédaction suivie d'un second aperçu : le compte n'y bouge pas, seul le digest de texte
   // (`ownOutputSignatureOf`) voit que le corps n'est plus celui que nos badges décrivaient.

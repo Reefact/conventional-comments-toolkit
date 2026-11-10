@@ -11,9 +11,9 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 
 | CA | Objet | Couvert par |
 |----|-------|-------------|
-| CA-01 | Commentaire sans label non publiable en `enforce`, bouton et clavier ; un écart de `core/` ne lève pas le blocage | `extension/test/guard.test.ts` |
+| CA-01 | Commentaire sans label non publiable en `enforce`, bouton et clavier, configuration lue sans repli dégradé — sans date d'activation, quel que soit l'âge de la PR | `extension/test/guard.test.ts`, `extension/test/editor-controller.test.ts` |
 | CA-02 | Insertion de préfixe : décoration et sujet conservés, curseur en fin de préfixe, sélection restaurée décalée | `extension/test/insertion.test.ts`, `extension/test/editor-controller.test.ts`, `extension/test/review-fixes-extension.test.ts` (§3.4.1 étapes 4-6, changedAt), `extension/test/toolbar-gestures.test.ts` (le critère PAR LE GESTE : c'est un clic sur un label qu'il décrit) |
-| CA-03 | `issue (non-blocking)` non compté au critère 2 ni au bandeau ni aux indicateurs — décomptes concordants, décompte publié au bandeau | `core/test/evaluate.test.ts`, `extension/test/banner.test.ts`, `core/test/validator.test.ts`, `extension/test/pr-chrome-navigation.test.ts` (décompte publié adopté même arrivé après un premier rendu déjà affiché) |
+| CA-03 | `issue (non-blocking)` compté ni par `isBlocking()` ni par le bandeau — les deux décomptes concordent, le bandeau ne lisant que les fils de la page | `core/test/validator.test.ts`, `extension/test/banner.test.ts`, `extension/test/pr-chrome-navigation.test.ts` (fils arrivés après un premier rendu déjà affiché, adoptés) |
 | CA-04 | `nitpick (blocking)` → `E-CONFLICT`, pas de fil bloquant ; `issue (blocking, non-blocking)` → `E-CONFLICT` + fil bloquant | `core/test/validator.test.ts`, `core/test/evaluate.test.ts` |
 | CA-05 | Complétion d'une PR à fil `issue:` non résolu refusée **par le vérificateur**, extension désinstallée | `core/test/evaluate.test.ts` |
 | CA-06 | Parité de verdict — corpus synthétique versionné, deux formes de transport, liste ordonnée (code, sévérité) | `core/test/corpus.test.ts`, `core/test/preprocess.test.ts` |
@@ -25,13 +25,12 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 | CA-12 | Parcours clavier : `aria-disabled` et non `disabled` natif — le bouton reste atteignable ; interception du raccourci | `extension/test/editor-controller.test.ts` |
 | CA-13 | Résolution par un tiers sans `decision` refusée avec sa cause ; avec `decision` conforme, acceptée | `core/test/evaluate.test.ts` |
 | CA-14 | Un dépôt ne peut pas assouplir le mode sous le plancher | `core/test/config.test.ts` |
-| CA-15 | PR antérieure à `activatedAt` : aucun statut en échec, extension ne bloque pas même en `enforce` | `core/test/evaluate.test.ts`, `extension/test/guard.test.ts` |
 | CA-16 | Décoration mal formée → `E-DECORATION-SYNTAX` ; style → un seul `W-DECORATION-STYLE` énumérant ses écarts, publiable | `core/test/validator.test.ts` |
 | CA-17 | Trois messages non interchangeables (`E-NO-LABEL` / `E-UNKNOWN-LABEL` / `W-CASE`) | `core/test/validator.test.ts` |
 | CA-18 | Parité sur les fins de ligne (`LF` vs `CRLF`), indentation, blancs de fin | `core/test/preprocess.test.ts`, `core/test/corpus.test.ts`, `extension/test/review-fixes-extension.test.ts` (chemin d'écriture : ligne indentée/BOM) |
 | CA-19 | Approbation sans texte : aucun diagnostic, check non en échec | `core/test/validator.test.ts` |
 | CA-20 | Message de plateforme exempté sans dépendre de `exemptUsers` | `core/test/validator.test.ts` |
-| CA-21 | `issue:` en zone non bloquante : validé, `W-NOT-BLOCKABLE`, ne bloque jamais ; `issue (non-blocking)` ne déclenche pas l'avertissement | `core/test/validator.test.ts` |
+| CA-21 | `issue:` en zone non bloquante : validé, `W-NOT-BLOCKABLE`, jamais compté au bandeau ; `issue (non-blocking)` ne déclenche pas l'avertissement | `core/test/validator.test.ts`, `extension/test/banner.test.ts` |
 | CA-22 | Sévérités distinctes : `formatSeverity: warn` n'échoue pas le check ; fil `issue:` non résolu le fait échouer | `core/test/evaluate.test.ts` |
 | CA-23 | Le **vérificateur** lit le mode : `warn` + check obligatoire → PR mergeable, statut vert informatif | `core/test/evaluate.test.ts` |
 | CA-24 | `{"mode": "off"}` sous plancher `enforce` ignoré, fait signalé | `core/test/config.test.ts` |
@@ -42,7 +41,6 @@ grep -rn "CA-13" packages/*/test packages/*/*/test
 | CA-29 | Activation non datée : aucun niveau ne résout `activation.activatedAt` — fichier absent, ou présent mais muet — → neutre `activation-undated`, quel que soit le mode | `core/test/config.test.ts` |
 | CA-30 | Configuration en direct : une modification mergée sur la branche par défaut s'applique **immédiatement**, aux PR déjà ouvertes comprises, dans les deux sens | `core/test/live-config.test.ts` |
 | CA-31 | Plancher en direct : durcir `mode` prend effet sur les PR ouvertes ; contre-épreuve dans l'**autre sens** — l'assouplir vaut aussi immédiatement, ce qu'un cliquet raterait | `core/test/live-config.test.ts` |
-| CA-32 | Décalage visible : deux générations de **configuration** → écart signalé, blocage désarmé ; contre-épreuve deux `core/` même config → blocage actif | `extension/test/guard.test.ts` |
 | CA-33 | Anti-cache sur rejet : le vérificateur n'a pas de cache et accepte le label à la première évaluation (contre-épreuve du §11). Le volet extension — bypass avant rejet, §8.1.3 règle 3 — reste à implémenter | *(aucun — critère du vérificateur, retiré ; #56)* |
 | CA-34 | Mesurer avant de contraindre : en `warn`, statut jamais en échec dont le corps liste ce qui échouerait sous `enforce`, avec les liens permanents | *(aucun — critère du vérificateur, retiré ; #56)* |
 | CA-35 | Brouillon : statut informatif jamais en échec ; sortie du brouillon → contraignant | `core/test/evaluate.test.ts` |

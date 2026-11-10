@@ -1,11 +1,9 @@
-// Résolution de configuration côté composant A (§8.1.2, §9.2.3) : les trois mêmes
-// niveaux que le composant B — plancher (politique d'entreprise), organisation
-// (configUrl du canal de plancher), fichier de dépôt — via resolveConfig() de core/.
-// Aucun des deux composants n'épingle : `resolveConfig()` ne prend que les trois documents
-// qu'on vient de lire (§8.1.3, règle 1).
+// Résolution de configuration de l'extension (§8.1.2, §9.2.3) : trois niveaux — plancher
+// (politique d'entreprise), organisation (configUrl du canal de plancher), fichier de dépôt —
+// via resolveConfig() de core/. Rien n'est épinglé : `resolveConfig()` ne prend que les trois
+// documents qu'on vient de lire (§8.1.3, règle 1).
 
 import {
-  fingerprint,
   resolveConfig,
   vetFloor,
   vettedConfigUrl,
@@ -20,7 +18,6 @@ import type { PlatformAdapter } from '@cct/adapter-shared';
 export interface ResolvedClientConfig {
   config: EffectiveConfig;
   notices: Notice[];
-  fingerprint: string;
   /** État dégradé au sens du §5.4, condition 4 : une lecture a rendu `unreachable`.
    * Un fichier simplement absent n'est PAS une dégradation. */
   degraded: boolean;
@@ -98,7 +95,7 @@ export class ClientConfigResolver {
       ...(org.degraded ? [unreadableReason('org', org.read)] : []),
     ];
     const degradedReason = reasons.length > 0 ? reasons.join(' | ') : null;
-    return { config, notices, fingerprint: fingerprint(config), degraded, degradedReason };
+    return { config, notices, degraded, degradedReason };
   }
 
   async #cached(
@@ -161,8 +158,7 @@ export function resolveUiLanguage(
  * avertissements » au-dessus d'un « This comment is blocking but has no discussion ». Le
  * §5.3 veut ce message « dans la langue résolue au §8.1.2 », préférence locale comprise.
  *
- * Ne peut pas faire diverger un verdict : `language` n'en gouverne aucun et reste hors du
- * domaine de `fingerprint()` (§9.2.2), donc hors de la règle 2 du §8.1.3. La substitution
+ * Ne peut pas faire diverger un verdict : `language` n'en gouverne aucun. La substitution
  * n'AJOUTE que ce que le §8.1.2 place autour de la clé — la préférence locale devant, la
  * langue de la plateforme derrière ; sans préférence ni langue de plateforme, elle rend la
  * clé elle-même. */

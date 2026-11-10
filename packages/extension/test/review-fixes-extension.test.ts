@@ -128,9 +128,7 @@ describe('écart A — §5.4 cond. 4 : une lecture unreachable n’est jamais ma
       readValue: () => '',
       writeValue: () => {},
       getThreads: async () => [],
-      getCompletionControl: () => null,
       getCurrentUser: async () => ({ id: 'u', login: 'u', isServiceAccount: false }),
-      readPublishedResult: () => null,
     };
   }
 
@@ -191,9 +189,7 @@ describe('revue Codex, PR #39 : deux résolutions concurrentes pour la même cl�
       readValue: () => '',
       writeValue: () => {},
       getThreads: async () => [],
-      getCompletionControl: () => null,
       getCurrentUser: async () => ({ id: 'u', login: 'u', isServiceAccount: false }),
-      readPublishedResult: () => null,
     };
   }
 

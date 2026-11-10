@@ -262,9 +262,6 @@ describe('C — bootstrap(document, testFactories()) met le relais entre les mai
             currentPr() {
               return null;
             },
-            readPublishedResult() {
-              return null;
-            },
           });
         }
       });
@@ -455,9 +452,6 @@ describe('E — le relais ne sert QUE les origines tierces (revue Codex, PR #30)
               return [];
             },
             currentPr() {
-              return null;
-            },
-            readPublishedResult() {
               return null;
             },
           });

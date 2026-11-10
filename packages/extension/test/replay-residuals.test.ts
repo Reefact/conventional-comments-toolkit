@@ -78,8 +78,8 @@ describe('résidu D — §5.5 : le filtre par label agit sur les fils RENDUS de 
   });
 
   it('ne touche jamais au bandeau : son décompte fait autorité, sa liste ne rétrécit pas (CA-03)', () => {
-    // Le filtre est un outil de LECTURE des fils ; le bandeau, lui, résume ce qui bloque la
-    // complétion. Une liste qui rétrécirait sous le filtre contredirait le nombre affiché
+    // Le filtre est un outil de LECTURE des fils ; le bandeau, lui, résume les fils bloquants
+    // encore ouverts. Une liste qui rétrécirait sous le filtre contredirait le nombre affiché
     // juste au-dessus d'elle — c'est pourquoi le contrôle a quitté le bandeau (§5.5).
     const banner = document.createElement('div');
     banner.innerHTML = '<ul><li data-thread-id="t1"></li></ul>';

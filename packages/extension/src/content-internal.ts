@@ -1,6 +1,6 @@
 // Logique du script de contenu (composant A) : choisit l'adaptateur par domaine, résout
 // la configuration (hors chemin critique — l'assistance démarre avec le cache), attache
-// un contrôleur par éditeur, rend bandeau et grisage du bouton de complétion (§6.5).
+// un contrôleur par éditeur, rend le bandeau des fils bloquants et les badges (§5.5).
 //
 // Séparé de content.ts (le point d'entrée bundlé) parce que les content_scripts déclarés
 // dans le manifest sont injectés par Chrome/Firefox comme des scripts CLASSIQUES, pas des
@@ -9,8 +9,8 @@
 // Ce module peut exporter librement pour les tests ; content.ts, lui, ne doit rien
 // exporter.
 
-import type { ConfigRead, EffectiveConfig, Floor, PrRef, PublishedSummary } from '@cct/core';
-import { pageSkeleton, SelectorLog, type PlatformAdapter, type SubmitControl } from '@cct/adapter-shared';
+import type { ConfigRead, EffectiveConfig, Floor, PrRef } from '@cct/core';
+import { pageSkeleton, SelectorLog, type PlatformAdapter } from '@cct/adapter-shared';
 import { captureErrors, guarded } from './error-capture.js';
 import { entryKey, markRecovered, mergeJournalEntry, skeletonsOf, type JournalEntry } from './journal-entry.js';
 import { analyze, enabledLabels } from '@cct/core';
@@ -41,10 +41,9 @@ import {
   SKELETON_KEY,
   type StoredSkeleton,
 } from './skeletons.js';
-import { bannerBlocksMerge, bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
+import { bannerHasContent, buildBannerModel, renderBanner } from './ui/banner.js';
 import { applyLabelFilter, clearLabelFilter, renderThreadFilter } from './ui/thread-filter.js';
 import { clearCommentDecorations, decorateComment } from './ui/badges.js';
-import { ui } from './ui/strings.js';
 import { LABEL_ORDER_KEY, normalizeStoredOrder } from './ui/label-order.js';
 
 declare const chrome: {
@@ -136,8 +135,8 @@ export function relayableFrom(page: URL): (url: string) => Promise<ConfigRead> |
  * script has been injected into and therefore [is] also subject to the same origin policy »
  * (doc Chrome, « Cross-origin network requests ») : la permission d'hôte accordée pour
  * l'hôte du `configUrl` ne lui sert à RIEN, et un document d'organisation hébergé hors de
- * la plateforme affichée restait illisible — état dégradé permanent, empreintes de
- * configuration durablement divergentes entre A et B (§8.1.3, règle 2). Le worker, lui,
+ * la plateforme affichée restait illisible — état dégradé permanent, et jamais la
+ * configuration que l'organisation a écrite (§8.1.2). Le worker, lui,
  * émet depuis l'origine de l'extension, où cette permission porte.
  *
  * Seul le document d'ORGANISATION passe par ici. Le fichier de dépôt vit sur l'origine de
@@ -724,8 +723,8 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
    * saisie rapide comprises).
    *
    * Sur un éditeur déjà attaché, une configuration qui n'a PAS changé pour lui (même
-   * signature qu'à sa dernière construction) ne fait que repousser le résumé publié le plus
-   * frais — sans reconstruire quoi que ce soit, ce qui perdrait focus et saisie en cours à
+   * signature qu'à sa dernière construction) ne fait que lui repousser la configuration
+   * résolue — sans reconstruire quoi que ce soit, ce qui perdrait focus et saisie en cours à
    * chaque rendu non navigué, y compris ceux qu'une simple mutation ailleurs sur la page
    * déclenche. Une configuration qui A changé pour lui (labels, décorations, langue —
    * `renderConfigSignatureOf` couvre tout ce dont dépendent la barre d'outils et la saisie
@@ -755,10 +754,9 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     }
     const signature = renderConfigSignatureOf(resolved);
     if (entry.controller && entry.builtSignature === signature) {
-      // `published` relu ICI, jamais gardé de l'attachement d'origine — sans quoi le résumé
-      // publié resterait figé pendant que la configuration, elle, avance (revue Reefact, PR
-      // #39) : le mode `enforce`/écart d'empreinte se jugerait alors sur un résumé périmé.
-      entry.controller.updateResolved(resolved, adapter.readPublishedResult());
+      // La configuration résolue repoussée ICI, jamais gardée de l'attachement d'origine —
+      // sans quoi l'état dégradé se jugerait sur une lecture périmée (revue Reefact, PR #39).
+      entry.controller.updateResolved(resolved);
       return;
     }
     // Jamais attaché (découvert en `off`, ou tout juste réactivé), OU une configuration
@@ -773,7 +771,6 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     // l'extension inactive tout de suite, pas seulement une fois un remplaçant prêt qui
     // n'existera jamais dans ce cas.
     const previousController = entry.controller;
-    const published = adapter.readPublishedResult();
     // La garde de l'ancien contrôleur passe IMMÉDIATEMENT à la NOUVELLE configuration
     // (revue Reefact, PR #39) : le laisser en place ne devait éviter qu'une fenêtre SANS
     // AUCUNE garde (revue Codex, PR #39, ci-dessus) — pas geler sa décision sur l'ANCIENNE
@@ -781,10 +778,10 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     // un passage `warn → enforce` laissait un commentaire invalide publiable jusqu'à leur
     // fin, et un passage à l'état dégradé (ou `enforce → warn`) pouvait continuer de
     // bloquer alors que le §5.4 exige déjà de désarmer. `updateResolved()` ne touche que la
-    // validation (`deps.resolved`/`deps.published`, `refresh()`) — jamais la barre d'outils
+    // validation (`deps.resolved`, `refresh()`) — jamais la barre d'outils
     // ni la saisie rapide, qui restent celles de l'ANCIENNE configuration le temps que le
     // remplaçant soit prêt, exactement comme voulu.
-    previousController?.updateResolved(resolved, published);
+    previousController?.updateResolved(resolved);
     const lang = resolveUiLanguage(await readUserLanguage(), resolved.config, doc.documentElement.lang || null);
     const directShortcuts = await readDirectShortcuts(); // §5.2 — préférence locale (§8.1.2)
     const labelOrder = await readLabelOrder(); // §5.1 — préférence locale (§8.1.2)
@@ -797,7 +794,6 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
       adapter,
       editor: entry.editor,
       resolved,
-      published,
       lang,
       currentUserLogin: currentUser.login,
       directShortcuts,
@@ -1034,7 +1030,7 @@ export function prKeyFor(pr: PrRef | null): string | null {
 /** Fenêtre de rattrapage après une navigation vers une PR : tant qu'aucun rendu n'a rien
  * montré ET que cette fenêtre n'est pas écoulée, on retente. C'est un budget de TEMPS, pas
  * un nombre de tentatives — une PR chargée sous forte charge réseau peut mettre plusieurs
- * secondes à peupler ses fils/son statut publié, quel que soit le nombre de mutations DOM
+ * secondes à peupler ses fils, quel que soit le nombre de mutations DOM
  * observées entre-temps (un compteur de tentatives s'épuiserait en quelques dizaines de
  * millisecondes dès que la configuration est en cache, bien avant que le contenu n'arrive
  * — précisément pendant l'hydratation qu'il est censé attendre). Réinitialisée à chaque PR. */
@@ -1045,8 +1041,7 @@ export const RENDER_RETRY_WINDOW_MS = 5000;
  * rafale se traduirait par une relecture DOM/réseau immédiate à chaque mutation reçue
  * pendant le rendu précédent. Choix d'ingénierie, pas une exigence du §10 — cette NFR ne
  * borne que l'appel du `cb` d'`observeEditors` (§9.2.3), jamais `renderPrChrome`. Ne
- * s'applique qu'au rattrapage, jamais au premier rendu d'une navigation ni à un changement
- * du résumé publié — les deux restent immédiats. */
+ * s'applique qu'au rattrapage, jamais au premier rendu d'une navigation. */
 export const RENDER_RETRY_THROTTLE_MS = 250;
 
 /** PLAFOND du rattrapage de la configuration EFFECTIVE (§8.1.2) sur un onglet inerte :
@@ -1080,67 +1075,23 @@ export const CONFIG_POLL_INTERVAL_MS = 5 * 60 * 1000;
  * divergence négligeable devant le reste du §8.1.3. */
 export const CONFIG_POLL_MIN_INTERVAL_MS = 5000;
 
-/** Signature légère du résumé publié (§5.5, §6.5, §8.1.3 règle 2, CA-03) : par valeur, pas
- * par identité d'objet — l'adaptateur peut renvoyer un objet neuf à chaque lecture. Les
- * quatre premiers champs sont EXACTEMENT ceux que le rendu AFFICHE — `state` pilote le
- * grisage §6.5, `unresolvedBlockingCount` le titre du bandeau, `mode` et `coreVersion` la
- * ligne « jugée par … » (`ui/banner.ts`, `banner.judged`) : un check qui se termine à
- * nouveau avec le même décompte mais un `core` ou un `mode` différent doit rester détecté.
+/** Le CONTENU que la plateforme rend et que `renderPrChrome` peut afficher pour la PR
+ * courante : l'identité des fils rendus (pas seulement leur nombre — React peut remplacer un
+ * fil par un autre sans changer le compte) et le nombre de corps de commentaire. Sans ces
+ * signaux, un premier rendu fait avant que les fils et les commentaires soient chargés
+ * suffirait à figer `showedSomething`, et ce qui arrive ensuite ne recevrait jamais ses badges.
  *
- * `configFingerprint` et `activatedAt` EN PLUS (revue Codex, PR #39) : ni l'un ni l'autre ne
- * change ce que le bandeau AFFICHE, mais tous deux entrent dans `decideGuard()` — l'écart
- * d'empreinte (§8.1.3 règle 2) et le périmètre d'activation (§6.2.3) — dont dépend le
- * blocage des éditeurs déjà ouverts, relu à chaque réconciliation (`reconcile()`,
- * `bootstrap()`). Sans eux, un check serveur qui fait avancer SEULEMENT `configFingerprint`
- * (l'extension a déjà adopté la config B, le serveur la publie enfin) laisse `chromeSig`
- * inchangé si state/count/mode/coreVersion ne bougent pas : `run()` ne re-rend jamais,
- * `onPrChange` n'appelle donc jamais `reconcile()`, et l'écart d'empreinte qui aurait dû se
- * résorber reste vrai indéfiniment — un blocage qui devrait se réarmer (ou se désarmer)
- * ne le fait jamais tant qu'aucun AUTRE champ du résumé ne change par ailleurs. */
-export function publishedSignatureOf(adapter: PlatformAdapter): string | null {
-  const p = adapter.readPublishedResult();
-  return p
-    ? `${p.state}|${p.unresolvedBlockingCount}|${p.mode}|${p.coreVersion}|${p.configFingerprint}|${p.activatedAt ?? ''}`
-    : null;
-}
-
-/** Signature de tout ce que `renderPrChrome` peut afficher pour la PR courante — le résumé
- * publié (`publishedSignatureOf`), PLUS l'identité des fils rendus (pas seulement leur
- * nombre : React peut remplacer un fil par un autre sans changer le compte) et le nombre de
- * commentaires visibles dans le DOM ; PLUS, seulement si `probeCompletionControl`, la
- * présence du bouton de complétion. Sans ces signaux, un premier rendu où le résumé publié
- * apparaît AVANT le reste de la page (bouton pas encore rendu, fils/commentaires pas encore
- * chargés) suffit à satisfaire `hasSomethingToShow` — le bandeau s'affiche, `showedSomething`
- * se fige, et le bouton de complétion comme les fils chargés ensuite ne reçoivent jamais
- * leur grisage/leurs badges.
- *
- * `probeCompletionControl` : `getCompletionControl()` journalise une dégradation de
- * sélecteur (§9.4) à CHAQUE appel où il ne trouve rien — un bouton absent est la norme sur
- * une PR fermée ou sans droit de fusion, pas une dégradation. L'inclure dans une signature
- * recalculée à chaque mutation ferait grossir `SelectorLog.failures` (et la télémétrie
- * opt-in, §10) sans borne pour toute la durée de vie de l'onglet — `observePrChromeNavigation`
- * ne sonde donc que dans la fenêtre d'hydratation (`RENDER_RETRY_WINDOW_MS`) ; au-delà, ce
- * champ se fige (`'?'`), et seuls le résumé publié et les fils/commentaires — sans effet de
- * bord, `queryChainAll` ne journalise rien — restent surveillés indéfiniment.
+ * C'est ce que compare `run()` — pour décider s'il y a du neuf à montrer, et si une page qui
+ * n'a encore RIEN montré mérite un nouveau rendu passé la fenêtre (voir là-bas). Sans effet
+ * de bord : aucune de ces lectures ne journalise de dégradation de sélecteur, si bien qu'elle
+ * peut être recalculée à chaque mutation pendant toute la vie de l'onglet.
  *
  * Ne porte QUE de l'état appartenant à la plateforme — jamais ce que notre propre rendu
- * écrit : c'est `ownOutputSignatureOf`, capturée après le rendu, qui couvre ce versant. */
-function chromeSignatureOf(adapter: PlatformAdapter, probeCompletionControl: boolean): string {
-  const completion = probeCompletionControl ? (adapter.getCompletionControl() !== null ? '1' : '0') : '?';
-  return `${completion}|${contentSignatureOf(adapter)}`;
-}
-
-/** Le CONTENU que la plateforme rend — résumé publié, fils, nombre de corps de commentaire —
- * sans le bouton de complétion, et c'est toute la raison d'être de cette séparation : ce
- * bouton n'est pas du contenu, et sa sonde change de valeur (`'?'`) au franchissement de la
- * fenêtre d'hydratation, sans que la page ait bougé d'un pixel. Une comparaison faite au
- * travers de cette bascule verrait un changement qui n'existe pas.
+ * écrit : c'est `ownOutputSignatureOf`, capturée après le rendu, qui couvre ce versant.
  *
- * C'est ce que compare `run()` pour décider si une page qui n'a encore RIEN montré mérite un
- * nouveau rendu passé la fenêtre (voir là-bas). Sans effet de bord : aucune de ces trois
- * lectures ne journalise de dégradation de sélecteur, contrairement à `getCompletionControl()`. */
+ * Elle portait aussi le résumé publié par un vérificateur et la présence du bouton de fusion,
+ * tous deux retirés avec ce vérificateur (§2). */
 function contentSignatureOf(adapter: PlatformAdapter): string {
-  const published = publishedSignatureOf(adapter) ?? '';
   const threadIds = adapter.getRenderedThreadElements()
     .map((t) => t.id)
     .join(',');
@@ -1151,7 +1102,7 @@ function contentSignatureOf(adapter: PlatformAdapter): string {
   // dernière calcule `bodyText` (clone du sous-arbre dès qu'un badge est posé) pour chaque
   // commentaire, un coût proportionnel à tout le DOM des commentaires rendus, à chaque
   // mutation, pour la durée de vie de l'onglet (§9.2.3, `getRenderedCommentElements`).
-  return `${published}|${threadIds}|${adapter.getRenderedCommentElements().length}`;
+  return `${threadIds}|${adapter.getRenderedCommentElements().length}`;
 }
 
 /** Ce que NOTRE rendu écrit dans la page, et que la plateforme peut défaire : le texte des
@@ -1168,7 +1119,7 @@ function contentSignatureOf(adapter: PlatformAdapter): string {
  *   ne le faisait revenir ;
  * - un commentaire de la CONVERSATION mis à jour par son auteur : la plateforme réécrit le
  *   corps rendu, ce qui emporte nos badges ET le masquage du préfixe, sans changer le nombre
- *   de commentaires ni rien de ce que porte `chromeSignatureOf`. Les fils RENDUS
+ *   de commentaires ni rien de ce que porte `contentSignatureOf`. Les fils RENDUS
  *   (`getRenderedThreadElements`) ne couvrent pas ce cas : sur GitHub ils ne désignent que
  *   les fils de revue (`[data-testid="review-thread"]`,
  *   `.js-resolvable-timeline-thread-container`), jamais un commentaire de premier niveau.
@@ -1187,7 +1138,7 @@ function contentSignatureOf(adapter: PlatformAdapter): string {
  * à `textContent` : c'est exactement l'objet du quatrième point ci-dessus.
  *
  * **Capturée APRÈS le rendu, jamais avant.** C'est tout l'intérêt de la séparer de
- * `chromeSignatureOf` : nos badges et nos insertions modifient précisément ce qu'elle
+ * `contentSignatureOf` : nos badges et nos insertions modifient précisément ce qu'elle
  * mesure. Comparée à une photo prise AVANT notre écriture, chaque rendu se re-déclencherait
  * lui-même — un cycle de rendu supplémentaire à chaque passage, qui déstabilise la
  * coalescence des mutations et retarde d'autant le retrait d'un bandeau périmé. Comparée à
@@ -1272,14 +1223,12 @@ function injectedSurfacesOf(doc: Document): string {
 }
 
 /** Signature de TOUT ce qu'une configuration résolue (§8.1.2) peut faire varier côté client
- * — rendu ET grisage — délibérément PLUS LARGE que `fingerprint()` (core/,
- * config/fingerprint.ts), qui ne couvre que le domaine du VERDICT partagé par les deux
- * composants (§9.2.2) et exclut à dessein `language`, `badgeStyle`, l'icône d'un label :
- * autant de clés qui ne changent aucun verdict mais que `renderPrChrome`/`decorateComment`
- * affichent bel et bien (revue Codex, PR #39). Comparer seulement `fingerprint()` dans
- * `pollConfig` (voir `observePrChromeNavigation`) aurait laissé un changement de langue ou
- * de style de badge, survenu pendant que l'onglet est inerte, ne jamais atteindre la page
- * tant qu'aucun champ du domaine de verdict n'avait lui-même changé.
+ * — rendu ET blocage —, y compris `language`, `badgeStyle`, l'icône d'un label : autant de
+ * clés qui ne changent aucun verdict mais que `renderPrChrome`/`decorateComment` affichent bel
+ * et bien. Une empreinte restreinte au domaine du VERDICT, comparée dans `pollConfig` (voir
+ * `observePrChromeNavigation`), aurait laissé un changement de langue ou de style de badge,
+ * survenu pendant que l'onglet est inerte, ne jamais atteindre la page tant qu'aucun champ du
+ * verdict n'avait lui-même changé (revue Codex, PR #39).
  *
  * `degraded` (§5.4, condition 4) EN PLUS de `config` — pas seulement `EffectiveConfig` (revue
  * Reefact, PR #39) : il vit à côté de `config` dans `ResolvedClientConfig`, jamais dedans, et
@@ -1291,25 +1240,21 @@ function injectedSurfacesOf(doc: Document): string {
  *
  * `JSON.stringify`, sans projection à la main pour la partie configuration : une liste de
  * champs choisie ici referait, pour le RENDU, exactement l'erreur que ce commentaire décrit
- * pour `fingerprint()` — une clé de rendu ajoutée plus tard resterait invisible tant que
+ * pour une empreinte de verdict — une clé de rendu ajoutée plus tard resterait invisible tant que
  * personne ne pense à l'ajouter à la liste. */
 function renderConfigSignatureOf(resolved: { config: EffectiveConfig; degraded: boolean }): string {
   return JSON.stringify({ config: resolved.config, degraded: resolved.degraded });
 }
 
-/** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5, §6.5) — navigation
- * SPA vers une PR différente (ou plus aucune) —, tant que le dernier rendu sur la MÊME PR
- * n'a rien eu à montrer (fenêtre `RENDER_RETRY_WINDOW_MS` : au premier chargement direct
- * d'une PR, `getThreads()` et le statut publié se lisent dans le DOM, que GitHub/AzDO
- * peuplent de façon asynchrone — fils chargés en différé, statut de check encore en vol),
- * et quand la signature de la « barre » (`chromeSignatureOf`) CHANGE après coup, même une
- * fois quelque chose déjà affiché : §5.5 fait du résumé publié la source qui fait autorité
- * « dès qu'il est présent sur la page », et §6.5 grise/dégrise le bouton de complétion sur
- * son seul état — un rendu figé sur le premier résultat lu contredirait CA-03 dès que le
- * check se termine après coup, ou laisserait un bouton apparu plus tard, ou des fils
- * chargés ensuite, sans grisage ni badge. Ce dernier cas ignore délibérément la fenêtre : ce
- * n'est pas un chargement encore en cours, juste une donnée qui a changé, et elle doit être
- * adoptée quel que soit l'âge de la PR.
+/** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5) — navigation SPA vers
+ * une PR différente (ou plus aucune) —, tant que le dernier rendu sur la MÊME PR n'a rien eu
+ * à montrer (fenêtre `RENDER_RETRY_WINDOW_MS` : au premier chargement direct d'une PR,
+ * `getThreads()` se lit dans le DOM, que les plateformes peuplent de façon asynchrone — fils
+ * chargés en différé), et quand le contenu rendu (`contentSignatureOf`) CHANGE après coup,
+ * même une fois quelque chose déjà affiché : un rendu figé sur la première lecture laisserait
+ * sans badge des fils chargés ensuite, et le bandeau sur un décompte périmé (CA-03). Ce
+ * dernier cas ignore délibérément la fenêtre : ce n'est pas un chargement encore en cours,
+ * juste une donnée qui a changé, et elle doit être adoptée quel que soit l'âge de la PR.
  *
  * Le déclencheur générique — MutationObserver sur le document — couvre Turbo comme les
  * vues React qui n'émettent pas d'événement Turbo (§A.3), et vaut à l'identique sur Azure
@@ -1362,9 +1307,6 @@ export function observePrChromeNavigation(
    * page modifiée sous elle. */
 ): (() => void) {
   let lastPrKey: string | null = null;
-  let lastChromeSig: string | null = null;
-  // Pendant de `lastChromeSig` pour la branche « rien montré » de `run()` — voir là-bas
-  // pourquoi les deux ne se confondent pas.
   let lastContentSig: string | null = null;
   // État de ce que NOTRE dernier rendu a laissé dans la page (`ownOutputSignatureOf`) —
   // écrit à la FIN du rendu, jamais au début, pour que nos propres écritures ne se
@@ -1384,16 +1326,12 @@ export function observePrChromeNavigation(
   // reconstruit la barre de puces à chaque appel, y compris sur la MÊME PR une fois D3 en
   // jeu) : sans cet état, chaque rendu répété repartirait sur « tous », perdant la sélection.
   let selectedLabel: string | null = null;
-  // Pliage du bandeau choisi par l'utilisateur, et situation qui l'a motivé (§5.5). Vit ICI
-  // pour la même raison que le filtre : renderPrChrome reconstruit le bandeau à chaque appel.
+  // Pliage du bandeau choisi par l'utilisateur (§5.5). Vit ICI pour la même raison que le
+  // filtre : renderPrChrome reconstruit le bandeau à chaque appel.
   let bannerOpen: boolean | null = null;
-  let bannerBlocked: boolean | null = null;
   // Signature de TOUT ce que la configuration effective (§8.1.2) peut faire varier dans le
-  // rendu — `renderConfigSignatureOf`, jamais `resolved.fingerprint` (revue Codex, PR #39) :
-  // ce dernier ne couvre que le domaine du VERDICT partagé par les deux composants (§9.2.2)
-  // et exclut à dessein `language`, `badgeStyle`, l'icône d'un label — autant de clés qui ne
-  // changent aucun verdict mais que `renderPrChrome`/`decorateComment` affichent bel et
-  // bien. Telle qu'appliquée par le DERNIER rendu réel — posée juste après lui (voir la fin
+  // rendu — `renderConfigSignatureOf`, jamais une empreinte du seul VERDICT (revue Codex, PR
+  // #39), qui laisserait de côté `language`, `badgeStyle`, l'icône d'un label. Telle qu'appliquée par le DERNIER rendu réel — posée juste après lui (voir la fin
   // de `run()`), jamais par `pollConfig` : un sondage qui se contenterait de comparer ses
   // propres lectures successives raterait tout changement survenu AVANT son premier réveil.
   // `null` tant qu'aucun rendu n'a encore eu lieu pour la PR affichée (pas de référence à
@@ -1401,8 +1339,8 @@ export function observePrChromeNavigation(
   let lastRenderConfigSignature: string | null = null;
   // Posé par `pollConfig` quand elle constate un écart : fait sauter la comparaison de
   // signatures ci-dessous pour LE PROCHAIN `run()`, sans quoi un changement de
-  // configuration qui ne modifie ni le résumé publié de la plateforme ni notre propre
-  // sortie (chromeSig/ownSig ignorent l'un comme l'autre la configuration résolue
+  // configuration qui ne modifie ni le contenu de la plateforme ni notre propre
+  // sortie (contentSig/ownSig ignorent l'un comme l'autre la configuration résolue
   // localement) resterait invisible jusqu'à la prochaine navigation.
   let forceRender = false;
   let configPollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1499,16 +1437,11 @@ export function observePrChromeNavigation(
       retryUntil = nowMs + RENDER_RETRY_WINDOW_MS;
       selectedLabel = null; // nouveau contexte de PR : le filtre repart à zéro
       bannerOpen = null; // et le pliage aussi : le choix portait sur une autre PR
-      bannerBlocked = null;
       // Nouvelle PR : la référence de config du sondage périodique portait sur l'ancienne,
       // et comparer les deux n'aurait aucun sens. Le prochain sondage établira une nouvelle
       // référence sans forcer de rendu (voir `pollConfig`).
       lastRenderConfigSignature = null;
     }
-    // Sonde le bouton de complétion (chromeSignatureOf) seulement dans la fenêtre
-    // d'hydratation de CETTE PR — jamais indéfiniment (§9.4, cf. chromeSignatureOf).
-    const probeCompletionControl = navigated || nowMs <= retryUntil;
-    const chromeSig = key === null ? null : chromeSignatureOf(adapter, probeCompletionControl);
     // Lu à CHAQUE tour, y compris quand `showedSomething` est vrai : c'est la référence que
     // la branche « rien montré » compare, et la laisser se figer sur un tour sauté ferait
     // dépendre le réveil de l'ordre des tours.
@@ -1522,7 +1455,7 @@ export function observePrChromeNavigation(
         // une page qui n'est pas une PR, et le mesurer y ferait réagir cette observation à
         // des écritures qui ne sont pas les siennes.
         const ownSig = key === null ? null : ownOutputSignatureOf(adapter, doc);
-        if (chromeSig === lastChromeSig && ownSig === lastOwnSig) return; // rien de neuf à montrer
+        if (contentSig === lastContentSig && ownSig === lastOwnSig) return; // rien de neuf à montrer
       } else if (nowMs > retryUntil && contentSig === lastContentSig) {
         // Fenêtre d'hydratation écoulée, rien montré — et la page n'a TOUJOURS pas bougé.
         // La seconde moitié de cette condition est le correctif (revue Reefact, PR #49) :
@@ -1534,11 +1467,6 @@ export function observePrChromeNavigation(
         // rendus le réveille désormais — et une page qui ne bouge pas ressort toujours ici,
         // sans rendre, ce que garde le test « une PR réellement vide n'est pas retentée
         // indéfiniment ».
-        //
-        // `contentSig`, jamais `chromeSig` : ce dernier porte la sonde du bouton de
-        // complétion, qui bascule à `'?'` au franchissement de cette même fenêtre (voir
-        // `chromeSignatureOf`) — la comparaison y verrait un changement à chaque fois, pour
-        // une page identique, et rendrait la borne inopérante.
         return;
       }
     }
@@ -1547,7 +1475,6 @@ export function observePrChromeNavigation(
     // haut) le laisse survivre jusqu'à la relance temporisée qui le consommera à son tour —
     // jamais perdu, jamais consommé deux fois pour un seul écart constaté.
     forceRender = false;
-    lastChromeSig = chromeSig;
     lastContentSig = contentSig;
     inFlight = true;
     // Une navigation peut survenir pendant les lectures asynchrones : le rendu vérifie
@@ -1562,22 +1489,14 @@ export function observePrChromeNavigation(
         selectedLabel = label;
       },
     }, {
-      // Le défaut ne s'applique qu'au premier montage sur cette PR, ou lorsque le caractère
-      // bloquant a changé — là, la situation n'est plus celle sur laquelle l'utilisateur
-      // s'était prononcé. Entre les deux, son choix tient.
-      resolve: (blocksMerge) => {
-        if (bannerBlocked !== blocksMerge) {
-          bannerBlocked = blocksMerge;
-          bannerOpen = null;
-        }
-        return bannerOpen ?? blocksMerge;
-      },
+      // Le défaut — replié — ne s'applique qu'au premier montage sur cette PR, ou après que
+      // le bandeau a disparu (`clear`). Entre les deux, le choix de l'utilisateur tient.
+      resolve: () => bannerOpen ?? false,
       set: (open) => {
         bannerOpen = open;
       },
       clear: () => {
         bannerOpen = null;
-        bannerBlocked = null;
       },
     })
       .then(({ showed, resolved }) => {
@@ -1654,11 +1573,11 @@ export function observePrChromeNavigation(
   };
 }
 
-/** Rend le bandeau et l'état de complétion pour la PR courante. `showed` vaut `true` quand
+/** Rend le bandeau, le filtre et les badges pour la PR courante. `showed` vaut `true` quand
  * l'issue est définitive — rien à retenter tant que la PR ne change pas (pas de PR, mode
  * `off`, ou bandeau effectivement affiché) — et `false` quand la PR est active mais que
  * rien n'a été trouvé à montrer : ce cas-là reste ambigu (page encore en cours
- * d'hydratation, ou PR réellement sans fil ni statut) et `observePrChromeNavigation` doit
+ * d'hydratation, ou PR réellement sans fil) et `observePrChromeNavigation` doit
  * retenter au prochain signe de vie de la page plutôt que de conclure trop tôt.
  *
  * `resolved` porte la configuration EFFECTIVEMENT appliquée par CE rendu — `null`
@@ -1685,14 +1604,13 @@ async function renderPrChrome(
     set: () => {},
   },
   // Pliage du bandeau, même raison et même portée que `filterState` (§5.5) : `resolve` rend
-  // l'ouverture à appliquer pour la situation courante, `set` enregistre un choix de
-  // l'utilisateur.
+  // l'ouverture à appliquer, `set` enregistre un choix de l'utilisateur.
   bannerState: {
-    resolve: (blocksMerge: boolean) => boolean;
+    resolve: () => boolean;
     set: (open: boolean) => void;
     clear: () => void;
   } = {
-    resolve: (blocksMerge) => blocksMerge,
+    resolve: () => false,
     set: () => {},
     clear: () => {},
   }
@@ -1734,12 +1652,6 @@ async function renderPrChrome(
     if (isCurrent()) {
       clearStaleBanner();
       clearDecorations();
-      // §7 : mode off = extension entièrement inactive. Un grisage posé par un rendu
-      // ANTÉRIEUR (mode enforce/warn encore actif à ce moment-là) ne doit pas survivre au
-      // passage à off — sinon aria-disabled/cct-merge-blocked/title restent affichés par
-      // une extension qui prétend ne plus intervenir. `lang` est sans effet ici : la
-      // branche de dégrisage de applyCompletionState ne le lit pas.
-      applyCompletionState(adapter.getCompletionControl(), null, '');
     }
     return { showed: true, resolved }; // désactivé : un état délibéré, pas un chargement encore en cours
   }
@@ -1747,17 +1659,9 @@ async function renderPrChrome(
   const profile = adapter.platformProfile();
 
   const threads = await adapter.getThreads();
-  // Lu APRÈS le dernier `await`, jamais avant : `isCurrent()` ne protège que contre un
-  // changement de PR (§ observePrChromeNavigation), pas contre un second changement du
-  // résumé publié survenant PENDANT ces résolutions asynchrones sur la MÊME PR — une
-  // lecture faite plus tôt écrirait alors un résumé déjà périmé. Aucun `await` ne sépare
-  // plus cette lecture de son utilisation : rien ne peut plus s'intercaler avant l'écriture
-  // (§5.5, CA-03).
-  const published = adapter.readPublishedResult();
   if (!isCurrent()) return { showed: true, resolved }; // supplanté entre-temps : la navigation suivante prend le relais
   clearStaleBanner(); // efface le bandeau d'un contexte précédent avant d'insérer le sien
   const model = buildBannerModel(
-    published,
     threads,
     resolved.config,
     profile.id,
@@ -1765,17 +1669,14 @@ async function renderPrChrome(
   );
   // Le rendu a une issue définitive dès qu'il y a quelque chose à montrer OU à filtrer :
   // le filtre par label du §5.5 porte sur la liste des fils, pas sur les seuls fils
-  // bloquants — une page sans fil bloquant mais avec des fils reste filtrable (composant B
-  // non déployé compris, §10). Ce que chacune des deux surfaces affiche ensuite est décidé
+  // bloquants — une page sans fil bloquant mais avec des fils reste filtrable. Ce que chacune des deux surfaces affiche ensuite est décidé
   // séparément : le bandeau se tait sur un décompte nul, le filtre n'existe pas sans fil.
   // Le bandeau disparaît (décompte retombé à zéro) : le choix de pliage s'efface avec lui.
   // Sans cela, un fil bloquant APPARU ENSUITE rouvrirait sur la décision que l'utilisateur
-  // avait prise pour la situation précédente — repliée — au lieu de son défaut déplié : le
-  // caractère bloquant n'aurait pas « changé » entre les deux rendus qui portent un bandeau
-  // (revue Codex, PR #26).
+  // avait prise pour la situation précédente, au lieu du défaut (revue Codex, PR #26).
   if (!bannerHasContent(model)) bannerState.clear();
 
-  const hasSomethingToShow = model.count > 0 || published !== null || threads.length > 0;
+  const hasSomethingToShow = model.count > 0 || threads.length > 0;
   if (hasSomethingToShow) {
     const labelOfThread = new Map<string, string | null>();
     for (const t of threads) {
@@ -1794,8 +1695,8 @@ async function renderPrChrome(
     }
 
     if (bannerHasContent(model)) {
-      const banner = renderBanner(model, published, lang, {
-        open: bannerState.resolve(bannerBlocksMerge(published)),
+      const banner = renderBanner(model, lang, {
+        open: bannerState.resolve(),
         onToggle: (open) => bannerState.set(open),
       });
       // « En tête de PR » (§5.5) : après l'en-tête que l'adaptateur désigne, donc dans le
@@ -1858,17 +1759,16 @@ async function renderPrChrome(
     decorateComment(element, bodyText, resolved.config, profile, lang, adapter.renderedBodyShape());
   }
 
-  applyCompletionState(adapter.getCompletionControl(), published, lang);
   // Des commentaires rendus valent, EUX AUSSI, une issue définitive — au même titre qu'un
   // bandeau affiché. `hasSomethingToShow` ne regardait que le bandeau et son décompte
-  // (résumé publié, fils) : sur une PR dont l'extension ne montre RIEN D'AUTRE que les
-  // badges de ses commentaires — composant B non déployé (§10), aucun fil de revue —, ce
+  // (fils) : sur une PR dont l'extension ne montre RIEN D'AUTRE que les badges de ses
+  // commentaires — aucun fil de revue —, ce
   // rendu concluait `showed: false` indéfiniment. `observePrChromeNavigation` traite ce
   // `false` comme « la page s'hydrate encore, réessaie » : passé `RENDER_RETRY_WINDOW_MS`,
   // il cesse alors de rendre TOUT COURT, et plus aucune mise à jour de commentaire ne
   // reçoit ses badges — la fenêtre d'hydratation devenait une date de péremption pour la
   // seule surface que cette PR affichait. `showed: true` ne fige rien : la reprise passe
-  // alors par les signatures (`chromeSignatureOf`/`ownOutputSignatureOf`), qui rendent dès
+  // alors par les signatures (`contentSignatureOf`/`ownOutputSignatureOf`), qui rendent dès
   // que quoi que ce soit change — strictement plus réactif que l'expiration d'une fenêtre.
   //
   // Le compte vient de la SONDE de plateforme, et non du nombre de commentaires que la
@@ -1880,47 +1780,4 @@ async function renderPrChrome(
   // portait des corps de commentaire », pas « nous avons peint quelque chose » — un
   // commentaire sans préfixe était déjà compté sans recevoir le moindre badge.
   return { showed: hasSomethingToShow || adapter.getRenderedCommentElements().length > 0, resolved };
-}
-
-/** Porte le `title`/`aria-disabled` NATIFS du bouton (branche protégée, revue requise…)
- * capturés juste avant de les écraser par notre propre grisage — jamais réappliqués tant
- * que la classe posée par nous est déjà là, sous peine d'écraser la valeur capturée par
- * notre PROPRE écriture lors d'un second cycle échec→échec. Chaîne vide = attribut natif
- * absent (absence et valeur `""` se restaurent de la même façon : retrait de l'attribut) —
- * un `aria-disabled="true"` natif préexistant serait sinon indiscernable du nôtre, qu'on
- * pose avec la MÊME valeur, et se ferait retirer avec lui au dégrisage. */
-const NATIVE_TITLE_MARKER = 'cctNativeTitle';
-const NATIVE_ARIA_DISABLED_MARKER = 'cctNativeAriaDisabled';
-
-/** §6.5 : grise le bouton de complétion si et seulement si PublishedSummary.state vaut
- * 'failure' — jamais à partir des compteurs. Visuel : le clic n'est PAS intercepté. */
-export function applyCompletionState(
-  control: SubmitControl | null,
-  published: PublishedSummary | null,
-  lang: string
-): void {
-  if (!control) return;
-  if (published?.state === 'failure') {
-    if (!control.element.classList.contains('cct-merge-blocked')) {
-      (control.element as HTMLElement).dataset[NATIVE_TITLE_MARKER] = control.element.getAttribute('title') ?? '';
-      (control.element as HTMLElement).dataset[NATIVE_ARIA_DISABLED_MARKER] =
-        control.element.getAttribute('aria-disabled') ?? '';
-    }
-    control.element.setAttribute('aria-disabled', 'true');
-    control.element.classList.add('cct-merge-blocked');
-    control.element.setAttribute('title', ui(lang, 'merge.blocked'));
-  } else if (control.element.classList.contains('cct-merge-blocked')) {
-    // aria-disabled et title sont tous deux restaurés à leur valeur NATIVE capturée plus
-    // haut, jamais simplement retirés — sinon un état natif préexistant (branche protégée,
-    // revue requise…) disparaît pour de bon après un seul cycle de grisage.
-    const nativeAriaDisabled = (control.element as HTMLElement).dataset[NATIVE_ARIA_DISABLED_MARKER];
-    if (nativeAriaDisabled) control.element.setAttribute('aria-disabled', nativeAriaDisabled);
-    else control.element.removeAttribute('aria-disabled');
-    delete (control.element as HTMLElement).dataset[NATIVE_ARIA_DISABLED_MARKER];
-    const nativeTitle = (control.element as HTMLElement).dataset[NATIVE_TITLE_MARKER];
-    if (nativeTitle) control.element.setAttribute('title', nativeTitle);
-    else control.element.removeAttribute('title');
-    delete (control.element as HTMLElement).dataset[NATIVE_TITLE_MARKER];
-    control.element.classList.remove('cct-merge-blocked');
-  }
 }

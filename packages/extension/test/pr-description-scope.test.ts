@@ -188,7 +188,7 @@ describe('§5.5 — écarter la description ne rend pas l’extension sourde', (
 
   // Le piège que l'exclusion des badges ouvrait, et qui n'est visible qu'ici : `showed`
   // décide si l'observateur continue de rendre passé `RENDER_RETRY_WINDOW_MS`. Sur une PR
-  // SANS AUCUN COMMENTAIRE, sans fil et sans résumé publié (composant B non déployé), la
+  // SANS AUCUN COMMENTAIRE et sans fil, la
   // description était le seul corps rendu — la retirer du décompte faisait tomber `showed`
   // à `false`, et l'observateur devenait muet cinq secondes plus tard : le PREMIER
   // commentaire posté n'aurait plus jamais reçu ses badges avant un rechargement complet.

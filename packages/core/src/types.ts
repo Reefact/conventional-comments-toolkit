@@ -52,8 +52,15 @@ export type NoticeKind =
   | 'config-warning' // §8.1.5 — clé inconnue ignorée ; §8.2 — entrée écartée ; §7 — `warn`
   | 'unsupported-version'; // §8.1.5, §8.1.3 — schéma, plancher ou core/ trop récent
 
+/** Paramètres d'un message d'avis, interpolés par le catalogue (`{clé}`). */
+export type NoticeParams = Record<string, string | number>;
+
 export interface Notice {
   kind: NoticeKind;
+  /** Clé de message stable : l'avis se rend par `t(lang, \`notice.${code}\`, params)` (§10). */
+  code: string;
+  params: NoticeParams;
+  /** Le même avis rendu en anglais — pour un journal ou un test, jamais pour l'interface. */
   message: string;
   actor?: UserInfo;
   at?: string;

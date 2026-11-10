@@ -2,7 +2,8 @@
 // Une clé inconnue est ignorée avec un avertissement ; une valeur hors du domaine d'une
 // clé connue invalide le document entier — on ne peut rien en conclure (§8.1.5).
 
-import type { Notice } from '../types.js';
+import type { Notice, NoticeParams } from '../types.js';
+import { makeNotice } from './notices.js';
 import { SUPPORTED_CONFIG_VERSION, CORE_MAJOR } from '../version.js';
 
 export interface ParsedDocument {
@@ -25,11 +26,7 @@ export const DEPRECATED_MODE = 'warn';
 /** L'avis qui accompagne la lecture de `"warn"` (§7) — le même pour un document de
  * configuration et pour le plancher, d'où son partage. */
 export function deprecatedModeNotice(ref: string): Notice {
-  return {
-    kind: 'config-warning',
-    message: `obsolete value "warn" for "${ref}": read as "assist" — replace it with "assist" (§7)`,
-    ref,
-  };
+  return makeNotice('config-warning', 'config.deprecated-warn', { key: ref }, ref);
 }
 export const SEVERITIES = ['off', 'warn', 'error'];
 const FORCES = ['blocking', 'non-blocking', null];
@@ -60,22 +57,21 @@ const KNOWN_KEYS = new Set([
   'telemetry',
 ]);
 
-function warning(message: string, ref?: string): Notice {
-  return { kind: 'config-warning', message, ...(ref ? { ref } : {}) };
+function warning(code: string, params: NoticeParams, ref?: string): Notice {
+  return makeNotice('config-warning', code, params, ref);
 }
 
-function invalid(message: string, ref?: string): Notice {
-  return { kind: 'invalid-config', message, ...(ref ? { ref } : {}) };
-}
+/** Le signal d'une valeur que `bad()` refuse : la clé fautive, et le message qui dit
+ * pourquoi — rendu par le catalogue, comme tout avis (§10). */
+type Bad = (key: string, code: string, params?: NoticeParams) => void;
 
 /** Ligne fautive d'une erreur JSON.parse V8 (« at position N ») — meilleur effort (§8.1.5). */
-function faultyLine(text: string, error: unknown): string | undefined {
+function faultyLine(text: string, error: unknown): number | undefined {
   const msg = error instanceof Error ? error.message : String(error);
   const m = /position (\d+)/.exec(msg);
   if (!m) return undefined;
   const pos = Number(m[1]);
-  const line = text.slice(0, pos).split('\n').length;
-  return `line ${line}`;
+  return text.slice(0, pos).split('\n').length;
 }
 
 export function parseConfigDocument(
@@ -88,25 +84,29 @@ export function parseConfigDocument(
     raw = JSON.parse(text);
   } catch (e) {
     const line = faultyLine(text, e);
-    notices.push(invalid(`unparseable JSON${line ? ` (${line})` : ''}`, line));
+    notices.push(
+      line === undefined
+        ? makeNotice('invalid-config', 'invalid.json-no-line')
+        : makeNotice('invalid-config', 'invalid.json', { line }, `line ${line}`)
+    );
     return { values: null, notices, invalid: true, unsupported: false };
   }
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    notices.push(invalid('the configuration document must be a JSON object'));
+    notices.push(makeNotice('invalid-config', 'invalid.not-object'));
     return { values: null, notices, invalid: true, unsupported: false };
   }
   const doc = raw as Record<string, unknown>;
   const out: Record<string, unknown> = {};
   let isInvalid = false;
   let unsupported = false;
-  const bad = (key: string, detail: string) => {
-    notices.push(invalid(`key "${key}": ${detail}`, key));
+  const bad: Bad = (key, code, params = {}) => {
+    notices.push(makeNotice('invalid-config', code, { key, ...params }, key));
     isInvalid = true;
   };
 
   for (const [key, value] of Object.entries(doc)) {
     if (!KNOWN_KEYS.has(key)) {
-      notices.push(warning(`unknown configuration key "${key}" ignored`, key));
+      notices.push(warning('config.unknown-key', { key }, key));
       continue;
     }
     switch (key) {
@@ -114,14 +114,12 @@ export function parseConfigDocument(
         break;
       case 'version':
         if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
-          bad(key, 'must be a positive integer');
+          bad(key, 'invalid.positive-integer');
         } else if (value > SUPPORTED_CONFIG_VERSION) {
           unsupported = true;
-          notices.push({
-            kind: 'unsupported-version',
-            message: `configuration schema version ${value} exceeds supported version ${SUPPORTED_CONFIG_VERSION}: falling back to assist mode (or the floor if stricter)`,
-            ref: key,
-          });
+          notices.push(
+            makeNotice('unsupported-version', 'unsupported.schema-version', { version: value, supported: SUPPORTED_CONFIG_VERSION }, key)
+          );
         } else {
           out[key] = value;
         }
@@ -130,18 +128,18 @@ export function parseConfigDocument(
         if (value === DEPRECATED_MODE) {
           out[key] = 'assist';
           notices.push(deprecatedModeNotice(key));
-        } else if (typeof value !== 'string' || !MODES.includes(value)) bad(key, `must be one of ${MODES.join(', ')}`);
+        } else if (typeof value !== 'string' || !MODES.includes(value)) bad(key, 'invalid.one-of', { values: MODES.join(', ') });
         else out[key] = value;
         break;
       case 'labels': {
         if (!Array.isArray(value)) {
-          bad(key, 'must be an array');
+          bad(key, 'invalid.array');
           break;
         }
         const labels: Record<string, unknown>[] = [];
         for (const entry of value) {
           if (entry === null || typeof entry !== 'object' || typeof (entry as Record<string, unknown>)['id'] !== 'string') {
-            bad(key, 'each entry must be an object with a string "id"');
+            bad(key, 'invalid.label-entry');
             continue;
           }
           const e = entry as Record<string, unknown>;
@@ -150,7 +148,7 @@ export function parseConfigDocument(
           for (const flag of ['enabled', 'blockingByDefault', 'alwaysNonBlocking'] as const) {
             if (flag in e) {
               if (typeof e[flag] !== 'boolean') {
-                bad(key, `"${flag}" of label "${e['id']}" must be a boolean`);
+                bad(key, 'invalid.label-boolean', { prop: flag, label: e['id'] as string });
                 ok = false;
               } else label[flag] = e[flag];
             }
@@ -158,26 +156,26 @@ export function parseConfigDocument(
           for (const s of ['icon', 'color', 'description', 'usage'] as const) {
             if (s in e) {
               if (typeof e[s] !== 'string') {
-                bad(key, `"${s}" of label "${e['id']}" must be a string`);
+                bad(key, 'invalid.label-string', { prop: s, label: e['id'] as string });
                 ok = false;
               } else label[s] = e[s];
             }
           }
           if ('kind' in e) {
             if (e['kind'] !== 'remark' && e['kind'] !== 'status' && e['kind'] !== 'reply') {
-              bad(key, `"kind" of label "${e['id']}" must be "remark", "status" or "reply"`);
+              bad(key, 'invalid.label-kind', { label: e['id'] as string });
               ok = false;
             } else label['kind'] = e['kind'];
           }
           if ('aliases' in e) {
             if (!Array.isArray(e['aliases']) || !(e['aliases'] as unknown[]).every((a) => typeof a === 'string')) {
-              bad(key, `"aliases" of label "${e['id']}" must be an array of strings`);
+              bad(key, 'invalid.label-aliases', { label: e['id'] as string });
               ok = false;
             } else label['aliases'] = e['aliases'];
           }
           for (const k of Object.keys(e)) {
             if (!['id', 'enabled', 'blockingByDefault', 'alwaysNonBlocking', 'kind', 'icon', 'color', 'description', 'usage', 'aliases'].includes(k)) {
-              notices.push(warning(`unknown key "labels[].${k}" ignored`, `labels[].${k}`));
+              notices.push(warning('config.unknown-key', { key: `labels[].${k}` }, `labels[].${k}`));
             }
           }
           if (ok) labels.push(label);
@@ -187,29 +185,29 @@ export function parseConfigDocument(
       }
       case 'decorations': {
         if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-          bad(key, 'must be an object');
+          bad(key, 'invalid.object');
           break;
         }
         const d = value as Record<string, unknown>;
         const decorations: Record<string, unknown> = {};
         if ('allowFree' in d) {
-          if (typeof d['allowFree'] !== 'boolean') bad(key, '"allowFree" must be a boolean');
+          if (typeof d['allowFree'] !== 'boolean') bad(key, 'invalid.prop-boolean', { prop: 'allowFree' });
           else decorations['allowFree'] = d['allowFree'];
         }
         if ('known' in d) {
           if (!Array.isArray(d['known'])) {
-            bad(key, '"known" must be an array');
+            bad(key, 'invalid.prop-array', { prop: 'known' });
           } else {
             const known: Record<string, unknown>[] = [];
             for (const entry of d['known']) {
               const e = entry as Record<string, unknown> | null;
               if (e === null || typeof e !== 'object' || typeof e['id'] !== 'string') {
-                bad(key, 'each known decoration must be an object with a string "id"');
+                bad(key, 'invalid.decoration-entry');
                 continue;
               }
               const forces = 'forces' in e ? e['forces'] : null;
               if (!FORCES.includes(forces as string | null)) {
-                bad(key, `"forces" of decoration "${e['id']}" must be "blocking", "non-blocking" or null`);
+                bad(key, 'invalid.decoration-forces', { decoration: e['id'] as string });
                 continue;
               }
               known.push({ id: e['id'], forces: forces ?? null });
@@ -218,20 +216,20 @@ export function parseConfigDocument(
           }
         }
         for (const k of Object.keys(d)) {
-          if (k !== 'allowFree' && k !== 'known') notices.push(warning(`unknown key "decorations.${k}" ignored`, `decorations.${k}`));
+          if (k !== 'allowFree' && k !== 'known') notices.push(warning('config.unknown-key', { key: `decorations.${k}` }, `decorations.${k}`));
         }
         out[key] = decorations;
         break;
       }
       case 'severities': {
         if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-          bad(key, 'must be an object');
+          bad(key, 'invalid.object');
           break;
         }
         const sev: Record<string, string> = {};
         for (const [code, s] of Object.entries(value as Record<string, unknown>)) {
           if (typeof s !== 'string' || !SEVERITIES.includes(s)) {
-            bad(key, `severity of "${code}" must be one of ${SEVERITIES.join(', ')}`);
+            bad(key, 'invalid.severity', { code, values: SEVERITIES.join(', ') });
             continue;
           }
           sev[code] = s;
@@ -246,17 +244,17 @@ export function parseConfigDocument(
       }
       case 'rules': {
         if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-          bad(key, 'must be an object');
+          bad(key, 'invalid.object');
           break;
         }
         const rules: Record<string, number> = {};
         for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
           if (!['minSubjectLength', 'maxSubjectLength', 'minDecisionSubjectLength'].includes(k)) {
-            notices.push(warning(`unknown key "rules.${k}" ignored`, `rules.${k}`));
+            notices.push(warning('config.unknown-key', { key: `rules.${k}` }, `rules.${k}`));
             continue;
           }
           if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) {
-            bad(key, `"${k}" must be a non-negative integer`);
+            bad(key, 'invalid.prop-non-negative-integer', { prop: k });
             continue;
           }
           rules[k] = v;
@@ -265,13 +263,13 @@ export function parseConfigDocument(
         break;
       }
       case 'exemptUsers': {
-        if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) bad(key, 'must be an array of strings');
+        if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) bad(key, 'invalid.string-array');
         else out[key] = value;
         break;
       }
       case 'allowlistPatterns': {
         if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
-          bad(key, 'must be an array of strings');
+          bad(key, 'invalid.string-array');
           break;
         }
         out[key] = filterAllowlistPatterns(value as string[], notices);
@@ -279,7 +277,7 @@ export function parseConfigDocument(
       }
       case 'toolCommands': {
         if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
-          bad(key, 'must be an array of strings');
+          bad(key, 'invalid.string-array');
           break;
         }
         out[key] = filterToolCommands(value as string[], notices);
@@ -287,23 +285,18 @@ export function parseConfigDocument(
       }
       case 'badgeStyle':
       case 'sessionIcon': {
-        if (typeof value !== 'string' || value === '') bad(key, 'must be a non-empty string');
+        if (typeof value !== 'string' || value === '') bad(key, 'invalid.non-empty-string');
         else out[key] = value;
         break;
       }
       case 'configUrl': {
         if (value !== null && typeof value !== 'string') {
-          bad(key, 'must be a string or null');
+          bad(key, 'invalid.string-or-null');
           break;
         }
         if (opts.level === 'repo' && value !== null) {
           // §8.1.2 — un configUrl posé dans le fichier de dépôt est ignoré et signalé.
-          notices.push(
-            warning(
-              'configUrl set in the repository file is ignored: the organization configuration URL comes exclusively from the floor channel (§8.1.2)',
-              'configUrl'
-            )
-          );
+          notices.push(warning('config.repo-config-url', {}, 'configUrl'));
         } else {
           out[key] = value;
         }
@@ -311,30 +304,28 @@ export function parseConfigDocument(
       }
       case 'coreMinVersion': {
         if (typeof value !== 'string' || !/^\d+\.\d+\.\d+$/.test(value)) {
-          bad(key, 'must be a semver string');
+          bad(key, 'invalid.semver');
           break;
         }
         const major = Number(value.split('.')[0]);
         if (major > CORE_MAJOR) {
           unsupported = true;
-          notices.push({
-            kind: 'unsupported-version',
-            message: `coreMinVersion ${value} requires core/ major ${major}, this component runs ${CORE_MAJOR}: falling back to assist mode (or the floor if stricter)`,
-            ref: key,
-          });
+          notices.push(
+            makeNotice('unsupported-version', 'unsupported.core-version', { required: value, major, current: CORE_MAJOR }, key)
+          );
         } else {
           out[key] = value;
         }
         break;
       }
       case 'configCacheTtlSeconds': {
-        if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) bad(key, 'must be a non-negative integer');
+        if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) bad(key, 'invalid.non-negative-integer');
         else out[key] = value;
         break;
       }
       case 'shortcuts': {
         if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-          bad(key, 'must be an object');
+          bad(key, 'invalid.object');
           break;
         }
         const s = value as Record<string, unknown>;
@@ -342,37 +333,37 @@ export function parseConfigDocument(
         if ('abbreviations' in s) {
           const a = s['abbreviations'];
           if (a === null || typeof a !== 'object' || Array.isArray(a) || !Object.values(a).every((v) => typeof v === 'string')) {
-            bad(key, '"abbreviations" must be an object mapping abbreviation to inserted text');
+            bad(key, 'invalid.abbreviations');
           } else shortcuts['abbreviations'] = a;
         }
         for (const k of Object.keys(s)) {
-          if (k !== 'abbreviations') notices.push(warning(`unknown key "shortcuts.${k}" ignored`, `shortcuts.${k}`));
+          if (k !== 'abbreviations') notices.push(warning('config.unknown-key', { key: `shortcuts.${k}` }, `shortcuts.${k}`));
         }
         out[key] = shortcuts;
         break;
       }
       case 'language': {
-        if (value !== null && typeof value !== 'string') bad(key, 'must be a string or null');
+        if (value !== null && typeof value !== 'string') bad(key, 'invalid.string-or-null');
         else out[key] = value;
         break;
       }
       case 'telemetry': {
         if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-          bad(key, 'must be an object');
+          bad(key, 'invalid.object');
           break;
         }
         const tel = value as Record<string, unknown>;
         const telemetry: Record<string, unknown> = {};
         if ('enabled' in tel) {
-          if (typeof tel['enabled'] !== 'boolean') bad(key, '"enabled" must be a boolean');
+          if (typeof tel['enabled'] !== 'boolean') bad(key, 'invalid.prop-boolean', { prop: 'enabled' });
           else telemetry['enabled'] = tel['enabled'];
         }
         if ('endpoint' in tel) {
-          if (tel['endpoint'] !== null && typeof tel['endpoint'] !== 'string') bad(key, '"endpoint" must be a string or null');
+          if (tel['endpoint'] !== null && typeof tel['endpoint'] !== 'string') bad(key, 'invalid.prop-string-or-null', { prop: 'endpoint' });
           else telemetry['endpoint'] = tel['endpoint'];
         }
         for (const k of Object.keys(tel)) {
-          if (k !== 'enabled' && k !== 'endpoint') notices.push(warning(`unknown key "telemetry.${k}" ignored`, `telemetry.${k}`));
+          if (k !== 'enabled' && k !== 'endpoint') notices.push(warning('config.unknown-key', { key: `telemetry.${k}` }, `telemetry.${k}`));
         }
         out[key] = telemetry;
         break;
@@ -388,21 +379,21 @@ function readBooleanObject(
   key: string,
   value: unknown,
   fields: string[],
-  bad: (key: string, detail: string) => void,
+  bad: Bad,
   notices: Notice[]
 ): Record<string, boolean> | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    bad(key, 'must be an object');
+    bad(key, 'invalid.object');
     return null;
   }
   const out: Record<string, boolean> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
     if (!fields.includes(k)) {
-      notices.push(warning(`unknown key "${key}.${k}" ignored`, `${key}.${k}`));
+      notices.push(warning('config.unknown-key', { key: `${key}.${k}` }, `${key}.${k}`));
       continue;
     }
     if (typeof v !== 'boolean') {
-      bad(key, `"${k}" must be a boolean`);
+      bad(key, 'invalid.prop-boolean', { prop: k });
       continue;
     }
     out[k] = v;
@@ -417,11 +408,11 @@ const TOOL_COMMAND_MENTION = /^@[A-Za-z0-9_-]+$/;
 /** Chaque entrée est comparée telle quelle, jamais interprétée comme un motif : `/*`
  * (sentinel générique) ou un handle exact `@notre-bot`. Aucune autre forme n'est admise —
  * l'entrée qui n'y correspond pas est ignorée et signalée (§4.2). */
-export function filterToolCommands(entries: string[], notices: Notice[]): string[] {
+export function filterToolCommands(entries: string[], notices: Notice[], source: NoticeSource = 'config'): string[] {
   const out: string[] = [];
   for (const e of entries) {
     if (e === '/*' || TOOL_COMMAND_MENTION.test(e)) out.push(e);
-    else notices.push(warning('toolCommands entry ignored: must be "/*" or an exact "@handle"', e));
+    else notices.push(warning(`${source}.tool-command-invalid`, { entry: e }, e));
   }
   return out;
 }
@@ -431,25 +422,31 @@ export function filterToolCommands(entries: string[], notices: Notice[]): string
 export const ALLOWLIST_MAX_PATTERNS = 50;
 export const ALLOWLIST_MAX_LENGTH = 256;
 
-export function filterAllowlistPatterns(patterns: string[], notices: Notice[]): string[] {
+/** D'où vient l'entrée écartée : un document de configuration, ou le plancher. Le message
+ * le dit — sans cela, une administration qui débogue sa politique lirait un avertissement
+ * identique à celui d'un fichier de dépôt et chercherait au mauvais endroit. Les deux familles
+ * de clés (`config.*`, `floor.*`) sont écrites en toutes lettres dans les catalogues. */
+export type NoticeSource = 'config' | 'floor';
+
+export function filterAllowlistPatterns(patterns: string[], notices: Notice[], source: NoticeSource = 'config'): string[] {
   const out: string[] = [];
   for (const p of patterns) {
     if (out.length >= ALLOWLIST_MAX_PATTERNS) {
-      notices.push(warning(`allowlist pattern ignored: more than ${ALLOWLIST_MAX_PATTERNS} patterns`, p));
+      notices.push(warning(`${source}.allowlist-too-many`, { max: ALLOWLIST_MAX_PATTERNS }, p));
       continue;
     }
     if (p.length > ALLOWLIST_MAX_LENGTH) {
-      notices.push(warning(`allowlist pattern ignored: longer than ${ALLOWLIST_MAX_LENGTH} characters`, p.slice(0, 40)));
+      notices.push(warning(`${source}.allowlist-too-long`, { max: ALLOWLIST_MAX_LENGTH }, p.slice(0, 40)));
       continue;
     }
     if (hasNestedQuantifier(p)) {
-      notices.push(warning('allowlist pattern ignored: nested quantifiers are not allowed', p));
+      notices.push(warning(`${source}.allowlist-nested`, {}, p));
       continue;
     }
     try {
       new RegExp(p);
     } catch {
-      notices.push(warning('allowlist pattern ignored: invalid regular expression', p));
+      notices.push(warning(`${source}.allowlist-invalid`, {}, p));
       continue;
     }
     out.push(p);

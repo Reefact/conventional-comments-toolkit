@@ -2,7 +2,7 @@
 // diagnostics dans l'ordre du §3.5.1 avec leur correction, zone aria-live polite,
 // bordure colorée, aucun layout shift (hauteur réservée en CSS).
 
-import type { CommentAnalysis, Diagnostic } from '@cct/core';
+import { noticeText, type CommentAnalysis, type Diagnostic, type Notice } from '@cct/core';
 import type { FeedbackState } from '../guard.js';
 import { ui } from './strings.js';
 import { listen } from '../error-capture.js';
@@ -19,6 +19,10 @@ export interface FeedbackRender {
   diagnostics: Diagnostic[];
   aliasRewrite: CommentAnalysis['aliasRewrite'];
   onFix: (replacement: string) => void;
+  /** Les avis que la résolution de la configuration a produits (§5.3, §9.2.1). Affichés APRÈS
+   * les diagnostics, sur des lignes à eux : ils ne disent rien du commentaire, ne changent aucun
+   * verdict, et ne doivent ni masquer un diagnostic ni passer pour l'un d'eux. */
+  notices?: readonly Notice[];
 }
 
 export class FeedbackView {
@@ -104,6 +108,17 @@ export class FeedbackView {
       const replacement = r.aliasRewrite.replacement;
       listen('editor', button, 'click', () => r.onFix(replacement));
       li.appendChild(button);
+      this.#list.appendChild(li);
+    }
+    // Avis de configuration (§5.3) : la phrase du catalogue de core/ que l'avis désigne
+    // (`notice.<code>`, §9.2.1), dans la langue de l'interface (§10), avec les paramètres que
+    // core/ y a mis — jamais réinterprétés. Pas de `data-code` : ce ne sont pas des
+    // diagnostics, et rien de ce qui lit les diagnostics ne doit les compter.
+    for (const n of r.notices ?? []) {
+      const li = doc.createElement('li');
+      li.className = 'cct-config-notice';
+      li.dataset['noticeKind'] = n.kind;
+      li.textContent = noticeText(this.#lang, n);
       this.#list.appendChild(li);
     }
   }

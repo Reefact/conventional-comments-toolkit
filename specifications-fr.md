@@ -568,7 +568,7 @@ L'expansion étant déclenchée par `Tab` et non au fil de la frappe, `?i` et `?
 
 - **Pastille de validation** permanente sous la zone de saisie : ✅ conforme / ⚠️ conforme, avec avertissements / ❌ non conforme. Les deux premiers états sont **conformes** au sens du §3.5.2 — la distinction est informative, pas normative.
 - Une situation fait que la pastille **ne peut pas affirmer** « conforme », et elle prime alors sur ✅ : l'**état dégradé** au sens du §5.4 — une configuration que l'extension n'a pas pu lire. Afficher « conforme » sans avoir pu lire les règles serait une affirmation que rien ne soutient.
-- **Avis de configuration.** Les faits que la résolution de la configuration signale — `floor-override`, `config-warning`, `invalid-config`, `unsupported-version` (§9.2.1) — s'affichent là où l'extension montre son état dégradé : dans la pastille et dans la page d'options (décision du propriétaire, 2026-11-10). Ils ne changent aucun verdict.
+- **Avis de configuration.** Les faits que la résolution de la configuration signale — `floor-override`, `config-warning`, `invalid-config`, `unsupported-version` (§9.2.1) — s'affichent là où l'extension montre son état dégradé : dans la pastille et dans la page d'options (décision du propriétaire, 2026-11-10). Ils ne changent aucun verdict. Chacun s'affiche **dans la langue de l'interface** (§10) : sa phrase vient du catalogue de `core/` (`Notice.code`, §9.2.1), nomme sa sorte, et cite le niveau de configuration en cause — un `floor-override` dit si la clé ignorée vient du fichier du dépôt ou du document d'organisation (décision du propriétaire, 2026-11-11).
 - En cas d'erreur : message explicite dans la langue résolue au §8.1.2, avec le code (§3.5) et une proposition de correction actionnable en un clic.
 - **Quand plusieurs diagnostics s'appliquent** — les contrôles de contenu sont cumulatifs (§3.5.1) : l'indicateur d'état porte la **sévérité la plus élevée**, et le message les énumère **tous**, dans l'ordre de restitution du §3.5.1, chacun avec sa correction quand elle est calculable. N'en afficher qu'un ferait réapparaître le suivant après chaque correction, autant de fois qu'il reste d'écarts.
 - Bordure de la zone de saisie colorée selon l'état.
@@ -1047,7 +1047,11 @@ type NoticeKind =                    // avis de configuration, affichés dans la
 
 interface Notice {
   kind: NoticeKind;
-  message: string;
+  code: string;                        // clé de message stable : l'avis se rend par le catalogue
+                                       // `notice.<code>` de core/, dans la langue de l'interface (§10)
+  params: Record<string, string | number>;  // ce que la phrase cite : clé, valeur, version, ligne…
+  message: string;                     // le même avis rendu en anglais — journal et tests, jamais
+                                       // l'interface (décision du propriétaire, 2026-11-11)
   actor?: UserInfo;                    // renseigné dès que le fait a un auteur
   at?: string;                         // ISO 8601
   ref?: string;                        // lien permanent, clé de configuration, ou numéro de ligne selon `kind`

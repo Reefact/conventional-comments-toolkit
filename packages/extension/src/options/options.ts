@@ -23,11 +23,12 @@ import { displayVersion } from './version.js';
 import { diagnosticArchive, entryReport, type ReportEnvironment } from './diagnostic-report.js';
 import { SKELETON_KEY, type StoredSkeleton } from '../skeletons.js';
 import { REGISTRATION_LOG_KEY, type RegistrationEvent } from '../registration-log.js';
+import { CONFIG_NOTICES_KEY, type StoredConfigNotices } from '../storage.js';
 import { entryLevel, type JournalEntry } from '../journal-entry.js';
 import { maybeStartTour, startTour } from './tour.js';
 import { copySnippet, responseLabelsSnippet } from './response-labels.js';
 import { LABEL_ORDER_KEY, normalizeStoredOrder, parseLabelOrder } from '../ui/label-order.js';
-import { defaultConfig } from '@cct/core';
+import { defaultConfig, noticeText } from '@cct/core';
 import {
   CLOUD_PLATFORMS,
   HOST_PLATFORMS_KEY,
@@ -695,9 +696,56 @@ telemetryOptIn?.addEventListener('change', () => {
 // recharge (revue Reefact, PR #70).
 chrome?.storage?.onChanged?.addListener((changes, area) => {
   if (area === 'managed' || (area === 'local' && TELEMETRY_CONSENT_KEY in changes)) refreshTelemetry();
-  if (area === 'local' && ('selectorFailures' in changes || 'degradedState' in changes || REGISTRATION_LOG_KEY in changes))
+  if (
+    area === 'local' &&
+    ('selectorFailures' in changes || 'degradedState' in changes || CONFIG_NOTICES_KEY in changes || REGISTRATION_LOG_KEY in changes)
+  )
     refreshStatus();
 });
+
+/** Avis de configuration de la dernière résolution (§5.3) : le dépôt dont ils viennent, puis
+ * chaque avis — la phrase du catalogue de core/ qu'il désigne (`notice.<code>`), avec ses
+ * paramètres, dans la langue de cette page, comme dans la pastille. La valeur vient du stockage,
+ * donc de l'extérieur de cette page : toute forme inattendue vaut « aucune lecture », jamais une
+ * exception — et un avis sans clé ou aux paramètres malformés (écrit par une version antérieure)
+ * se rend par son message anglais, plutôt que par une phrase aux trous visibles. */
+function renderConfigNotices(stored: unknown): void {
+  const value = stored as Partial<StoredConfigNotices> | undefined;
+  const repo = typeof value?.repo === 'string' ? value.repo : null;
+  const notices = Array.isArray(value?.notices)
+    ? value!.notices.filter((n) => n && typeof n.kind === 'string' && typeof n.message === 'string')
+    : [];
+  renderStatus(
+    document.getElementById('config-notices'),
+    repo === null
+      ? ui(lang, 'options.status.notices.unread')
+      : notices.length === 0
+        ? ui(lang, 'options.status.notices.none', { repo })
+        : ui(lang, 'options.status.notices.some', { repo, count: notices.length }),
+    notices.length > 0
+  );
+  const list = document.getElementById('config-notices-list');
+  if (!list) return;
+  // Remplacée, jamais complétée : un rendu qui ajoute laisserait les avis d'une lecture
+  // précédente sous la ligne qui annonce la suivante.
+  while (list.firstChild) list.removeChild(list.firstChild);
+  for (const n of notices) {
+    const li = document.createElement('li');
+    li.dataset['noticeKind'] = n.kind;
+    const renderable = typeof n.code === 'string' && wellFormedParams(n.params);
+    li.textContent = noticeText(lang, renderable ? n : { message: n.message });
+    list.appendChild(li);
+  }
+}
+
+function wellFormedParams(params: unknown): params is Record<string, string | number> {
+  return (
+    params !== null &&
+    typeof params === 'object' &&
+    !Array.isArray(params) &&
+    Object.values(params).every((v) => typeof v === 'string' || typeof v === 'number')
+  );
+}
 
 /** Une ligne d'état : la pastille porte le niveau, le texte porte le fait. */
 function renderStatus(row: HTMLElement | null, text: string, degraded: boolean): void {
@@ -709,7 +757,7 @@ function renderStatus(row: HTMLElement | null, text: string, degraded: boolean):
 
 // État dégradé (§5.4, §9.2.3) et journal de dégradation de sélecteurs (§9.4).
 function refreshStatus(): void {
-    chrome?.storage?.local?.get(['degradedState', 'selectorFailures', REGISTRATION_LOG_KEY], (items) => {
+    chrome?.storage?.local?.get(['degradedState', 'selectorFailures', CONFIG_NOTICES_KEY, REGISTRATION_LOG_KEY], (items) => {
     const degradedState = items['degradedState'];
     renderStatus(
       document.getElementById('degraded-state'),
@@ -718,6 +766,7 @@ function refreshStatus(): void {
         : ui(lang, 'options.status.ok'),
       Boolean(degradedState)
     );
+    renderConfigNotices(items[CONFIG_NOTICES_KEY]);
 
     const failures =
       (items['selectorFailures'] as JournalEntry[] | undefined) ?? [];

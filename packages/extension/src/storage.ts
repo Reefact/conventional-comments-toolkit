@@ -40,6 +40,18 @@ function localArea(): NonNullable<NonNullable<NonNullable<typeof chrome>['storag
  * de l'onglet au premier plan (§9.2.3). Le dernier écrivain gagne, et c'est le comportement
  * voulu : ces clés décrivent « ce que l'extension constate maintenant », pas un historique.
  * Le dire ici évite qu'on le redécouvre comme un bug. */
+/** Clé des avis de configuration de la dernière résolution (§5.3), écrite par l'onglet et lue
+ * par la page d'options. */
+export const CONFIG_NOTICES_KEY = 'configNotices';
+
+/** Ce que la clé porte : le dépôt de la dernière résolution, et ses avis tels que core/ les a
+ * écrits — la clé de message et ses paramètres, que la page d'options rend dans SA langue
+ * (§10), et le message anglais de core/ en repli. */
+export interface StoredConfigNotices {
+  repo: string;
+  notices: { kind: string; code: string; params: Record<string, string | number>; message: string; ref?: string }[];
+}
+
 export function writeCurrentState(items: Record<string, unknown>): void {
   // L'APPEL dans le `try`, pas seulement la résolution de `chrome.storage.local` : une mise
   // à jour, un rechargement ou une désactivation de l'extension invalide le contexte du

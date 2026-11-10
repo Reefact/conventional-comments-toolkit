@@ -54,11 +54,120 @@ export const fr: Record<string, string> = {
   'diag.W-NOT-BLOCKABLE':
     'Ce label est bloquant, mais cette zone ne permet pas de résoudre un fil — il ne sera pas compté parmi les fils bloquants.',
   // Avis de configuration (§5.3, §9.2.1)
-  'notice.floor-override':
-    'Clé de configuration de dépôt « {ref} » ignorée : elle assouplirait le plancher d’entreprise.',
-  'notice.invalid-config': 'Configuration invalide : {detail}',
-  'notice.config-warning': '{detail}',
-  'notice.unsupported-version': '{detail}',
+  'notice.floor-override.repo':
+    'Plancher d’entreprise : clé « {key} » du fichier de configuration du dépôt ignorée : elle assouplirait le plancher d’entreprise (§8.1.1).',
+  'notice.floor-override.org':
+    'Plancher d’entreprise : clé « {key} » de la configuration d’organisation ignorée : elle assouplirait le plancher d’entreprise (§8.1.1).',
+  'notice.invalid.json':
+    'Configuration invalide : JSON illisible (ligne {line}).',
+  'notice.invalid.json-no-line':
+    'Configuration invalide : JSON illisible.',
+  'notice.invalid.not-object':
+    'Configuration invalide : le document de configuration doit être un objet JSON.',
+  'notice.invalid.positive-integer':
+    'Configuration invalide : la clé « {key} » doit être un entier positif.',
+  'notice.invalid.non-negative-integer':
+    'Configuration invalide : la clé « {key} » doit être un entier positif ou nul.',
+  'notice.invalid.one-of':
+    'Configuration invalide : la clé « {key} » doit valoir l’une de ces valeurs : {values}.',
+  'notice.invalid.array':
+    'Configuration invalide : la clé « {key} » doit être un tableau.',
+  'notice.invalid.object':
+    'Configuration invalide : la clé « {key} » doit être un objet.',
+  'notice.invalid.string-array':
+    'Configuration invalide : la clé « {key} » doit être un tableau de chaînes.',
+  'notice.invalid.non-empty-string':
+    'Configuration invalide : la clé « {key} » doit être une chaîne non vide.',
+  'notice.invalid.string-or-null':
+    'Configuration invalide : la clé « {key} » doit être une chaîne ou null.',
+  'notice.invalid.semver':
+    'Configuration invalide : la clé « {key} » doit être une version semver.',
+  'notice.invalid.label-entry':
+    'Configuration invalide : clé « {key} » : chaque entrée doit être un objet portant un « id » textuel.',
+  'notice.invalid.label-boolean':
+    'Configuration invalide : clé « {key} » : « {prop} » du label « {label} » doit être un booléen.',
+  'notice.invalid.label-string':
+    'Configuration invalide : clé « {key} » : « {prop} » du label « {label} » doit être une chaîne.',
+  'notice.invalid.label-kind':
+    'Configuration invalide : clé « {key} » : « kind » du label « {label} » doit valoir « remark » ou « reply ».',
+  'notice.invalid.label-aliases':
+    'Configuration invalide : clé « {key} » : « aliases » du label « {label} » doit être un tableau de chaînes.',
+  'notice.invalid.prop-boolean':
+    'Configuration invalide : clé « {key} » : « {prop} » doit être un booléen.',
+  'notice.invalid.prop-array':
+    'Configuration invalide : clé « {key} » : « {prop} » doit être un tableau.',
+  'notice.invalid.prop-non-negative-integer':
+    'Configuration invalide : clé « {key} » : « {prop} » doit être un entier positif ou nul.',
+  'notice.invalid.prop-string-or-null':
+    'Configuration invalide : clé « {key} » : « {prop} » doit être une chaîne ou null.',
+  'notice.invalid.decoration-entry':
+    'Configuration invalide : clé « {key} » : chaque décoration connue doit être un objet portant un « id » textuel.',
+  'notice.invalid.decoration-forces':
+    'Configuration invalide : clé « {key} » : « forces » de la décoration « {decoration} » doit valoir « blocking », « non-blocking » ou null.',
+  'notice.invalid.severity':
+    'Configuration invalide : clé « {key} » : la sévérité de « {code} » doit valoir l’une de ces valeurs : {values}.',
+  'notice.invalid.abbreviations':
+    'Configuration invalide : clé « {key} » : « abbreviations » doit être un objet qui associe une abréviation au texte inséré.',
+  'notice.config.unknown-key':
+    'Avertissement de configuration : clé de configuration inconnue « {key} » ignorée.',
+  'notice.config.deprecated-warn':
+    'Avertissement de configuration : valeur obsolète « warn » pour « {key} », lue comme « assist » — remplacez-la par « assist » (§7).',
+  'notice.config.repo-config-url':
+    'Avertissement de configuration : « configUrl » posée dans le fichier du dépôt est ignorée : l’URL de la configuration d’organisation vient exclusivement du canal de plancher (§8.1.2).',
+  'notice.config.tool-command-invalid':
+    'Avertissement de configuration : entrée « {entry} » de toolCommands ignorée : elle doit être « /* » ou un « @handle » exact.',
+  'notice.config.allowlist-too-many':
+    'Avertissement de configuration : motif d’allowlist ignoré : plus de {max} motifs.',
+  'notice.config.allowlist-too-long':
+    'Avertissement de configuration : motif d’allowlist ignoré : plus de {max} caractères.',
+  'notice.config.allowlist-nested':
+    'Avertissement de configuration : motif d’allowlist ignoré : les quantificateurs imbriqués sont interdits.',
+  'notice.config.allowlist-invalid':
+    'Avertissement de configuration : motif d’allowlist ignoré : expression régulière invalide.',
+  'notice.config.severity-raised':
+    'Avertissement de configuration : la sévérité de « {code} » ne peut pas descendre sous « warn » (§8.2) : la valeur « off » est relevée à « warn ».',
+  'notice.config.session-severity-capped':
+    'Avertissement de configuration : la sévérité de « {code} » ne peut pas dépasser « warn » (§3.6) : la valeur « error » est ramenée à « warn ».',
+  'notice.config.label-case-duplicate':
+    'Avertissement de configuration : label « {label} » ignoré : son identifiant ne diffère de celui du label « {prior} » que par la casse (§8.2).',
+  'notice.config.alias-is-id':
+    'Avertissement de configuration : alias « {alias} » retiré du label « {label} » : c’est l’identifiant du label « {other} » (§8.2).',
+  'notice.config.alias-shared':
+    'Avertissement de configuration : alias « {alias} » retiré du label « {label} » : c’est aussi un alias de {others} (§8.2).',
+  'notice.floor.unknown-key':
+    'Avertissement de configuration : clé de plancher inconnue « {key} » ignorée.',
+  'notice.floor.string-array':
+    'Avertissement de configuration : clé de plancher « {key} » ignorée : un tableau de chaînes est attendu.',
+  'notice.floor.non-string-entries':
+    'Avertissement de configuration : clé de plancher « {key} » : {count} entrée(s) non textuelle(s) ignorée(s).',
+  'notice.floor.closed-not-boolean':
+    'Avertissement de configuration : la règle de plancher « {key} » n’est pas un booléen : la liste reste fermée.',
+  'notice.floor.non-negative-integer':
+    'Avertissement de configuration : clé de plancher « {key} » ignorée : elle doit être un entier positif ou nul.',
+  'notice.floor.one-of':
+    'Avertissement de configuration : clé de plancher « {key} » ignorée : elle doit valoir l’une de ces valeurs : {values}.',
+  'notice.floor.object':
+    'Avertissement de configuration : clé de plancher « {key} » ignorée : elle doit être un objet.',
+  'notice.floor.string-or-null':
+    'Avertissement de configuration : clé de plancher « {key} » ignorée : elle doit être une chaîne ou null.',
+  'notice.floor.severity':
+    'Avertissement de configuration : sévérité de plancher de « {code} » ignorée : elle doit valoir l’une de ces valeurs : {values}.',
+  'notice.floor.tool-command-invalid':
+    'Avertissement de configuration : plancher : entrée « {entry} » de toolCommands ignorée : elle doit être « /* » ou un « @handle » exact.',
+  'notice.floor.allowlist-too-many':
+    'Avertissement de configuration : plancher : motif d’allowlist ignoré : plus de {max} motifs.',
+  'notice.floor.allowlist-too-long':
+    'Avertissement de configuration : plancher : motif d’allowlist ignoré : plus de {max} caractères.',
+  'notice.floor.allowlist-nested':
+    'Avertissement de configuration : plancher : motif d’allowlist ignoré : les quantificateurs imbriqués sont interdits.',
+  'notice.floor.allowlist-invalid':
+    'Avertissement de configuration : plancher : motif d’allowlist ignoré : expression régulière invalide.',
+  'notice.unsupported.schema-version':
+    'Version non prise en charge : la version de schéma {version} dépasse la version prise en charge, {supported} : repli en mode assist (ou sur le plancher s’il est plus strict).',
+  'notice.unsupported.core-version':
+    'Version non prise en charge : coreMinVersion {required} exige la version majeure {major} de core/, ce composant exécute la {current} : repli en mode assist (ou sur le plancher s’il est plus strict).',
+  'notice.unsupported.floor-version':
+    'Version non prise en charge : la version de plancher {version} dépasse la version prise en charge, {supported} : le plancher n’est pas appliqué et le composant se replie en mode assist (§8.1.1).',
   // Divers
   'and': 'et',
 };

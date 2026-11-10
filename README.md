@@ -208,7 +208,9 @@ instructions:
 Both read the repository's `.conventional-comments.json` first, so they only use the labels it
 enables. The reviewer ends each of its comments with a `[session:<identifier>]` line, the same for
 the whole review session, and the author copies it into the reply to that comment, so a reader can
-tell parallel review sessions apart.
+tell parallel review sessions apart. The identifier is a readable name drawn by
+[Slugger](https://github.com/Reefact/slugger), or a GUID: the reviewer skill asks once, then
+records the answer in a committed `session-id.md` beside it.
 
 ## Modes and adoption (§7)
 

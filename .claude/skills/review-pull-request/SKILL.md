@@ -11,3 +11,6 @@ what is applied to its own pull requests never drift apart.
 
 **Read `skills/review-pull-request/SKILL.md` at the repository root now, and follow it
 entirely.** Do not work from this summary.
+
+This directory also holds this repository's own choice of review session identifiers,
+`session-id.md`: the skill reads it from here, beside this file.

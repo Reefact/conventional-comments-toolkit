@@ -24,8 +24,10 @@ export interface CorpusCase {
   expected: [string, 'warn' | 'error'][];
 }
 
-/** Forme de transport côté serveur : le corps stocké, fins de ligne normalisées en CRLF
- * par la soumission du <textarea> (§3.4.1). */
+/** Forme CRLF d'un corps, entrée de `CA-18` au niveau de `core/` : la normalisation du §3.4.1
+ * doit rendre le même verdict sous les deux formes. Aucun chemin réel de l'extension n'amène
+ * aujourd'hui un corps CRLF — un `<textarea>` le ramène à LF (`CA-06`) —, mais `core/` ne
+ * dépend pas de la forme sous laquelle un corps lui parvient. */
 export function toStoredForm(body: string): string {
   return body.replace(/\r?\n/g, '\r\n');
 }

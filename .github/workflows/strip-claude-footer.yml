@@ -13,7 +13,8 @@
 #
 # Limite : sur une PR venue d'un fork, les événements de revue ne reçoivent qu'un jeton en
 # lecture seule. Le pied d'une revue ou d'un commentaire de revue y reste ; le workflow le
-# signale par un avertissement au lieu d'échouer.
+# signale par un avertissement au lieu d'échouer. Partout ailleurs, un refus fait échouer
+# le passage.
 #
 # Les événements de revue (`pull_request_review`, `pull_request_review_comment`) exécutent la
 # version de CE FICHIER portée par la PR, pas celle de la branche par défaut — mesuré sur la
@@ -134,6 +135,13 @@ jobs:
               await target.write(cleaned);
               core.info(`${target.what} : pied Claude Code retiré.`);
             } catch (error) {
-              if (error.status !== 403) throw error;
-              core.warning(`${target.what} : pied laissé en place, jeton en lecture seule (PR venue d'un fork ?).`);
+              // Seul cas toléré : un événement de revue sur une PR venue d'un fork, dont le jeton
+              // est en lecture seule. Tout autre refus — jeton privé d'un droit, revue soumise
+              // qu'on ne peut pas modifier — échoue visiblement (revue de la PR #167).
+              const head = payload.pull_request?.head?.repo?.full_name;
+              const forkReview =
+                context.eventName.startsWith('pull_request_review') &&
+                head !== undefined && head !== payload.repository.full_name;
+              if (error.status !== 403 || !forkReview) throw error;
+              core.warning(`${target.what} : pied laissé en place, PR venue du fork ${head} (jeton en lecture seule).`);
             }

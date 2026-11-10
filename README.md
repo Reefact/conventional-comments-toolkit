@@ -206,7 +206,9 @@ instructions:
   posts `reviewed` or `decision`.
 
 Both read the repository's `.conventional-comments.json` first, so they only use the labels it
-enables.
+enables. The reviewer ends each of its comments with a `[session:<identifier>]` line, the same for
+the whole review session, and the author copies it into the reply to that comment, so a reader can
+tell parallel review sessions apart.
 
 ## Modes and adoption (§7)
 

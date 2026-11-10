@@ -149,9 +149,16 @@ directement (l'utilisateur l'a demandé ; donner le lien ensuite) :
 - **Titre** : `<chain>: <symptôme, état de la page> (v<version>)`.
 - **Report** : date, version, navigateur, langue, URL de la page, vue (GitHub : §2, « Sur quelle
   vue »), `release`, résumé de la ligne
-  du journal ; le nom de la branche, et des liens vers le `.zip` et chacun de ses fichiers en
-  **permalien sur le SHA du commit**. Écrire ces liens en texte simple : un lien dont le
-  libellé est entre accents graves est arrivé abîmé sur #113 ;
+  du journal ; le nom de la branche, et des liens en **permalien sur le SHA du commit** :
+  `blob/<sha>/…/report.json` et `blob/<sha>/…/README.txt`, puis, pour le `.zip` et les
+  squelettes, le **dossier** — `tree/<sha>/diagnostics/<dossier>` et `tree/<sha>/…/skeletons` —
+  en nommant dans le texte quel squelette va avec quel relevé. Ne pas écrire de lien vers un
+  fichier dont le nom porte un identifiant (`cct-diagnostic-<horodatage>.zip`,
+  `skeletons/<id>.txt`) : entre l'outil et GitHub, ces adresses-là arrivent entourées
+  d'accents graves, donc non cliquables, et chaque nouvel envoi en ajoute. Observé sur #113,
+  puis sur #158 : en texte simple, puis en lien markdown à libellé simple, toujours abîmées ;
+  `report.json` et `README.txt`, au même SHA, jamais. Où la modification se produit n'est pas
+  mesuré. Après création ou mise à jour, relire le corps de l'issue et vérifier les liens ;
   `report.json` complet dans un `<details>`.
 - **What the skeleton shows** : l'extrait utile du squelette avec ses numéros de ligne, et la
   comparaison avec la capture — un tableau quand une seule chose diffère.

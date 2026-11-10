@@ -53,7 +53,7 @@ const FIXTURE = join(
 );
 const PAGE_URL = 'https://github.com/Reefact/just-dummies/pull/331';
 const EXECUTABLE =
-  process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome';
+  process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 const SHOTS = process.env.CCT_SHOTS_DIR ?? null;
 
 for (const [what, path] of [['Chromium', EXECUTABLE], ['Bundle (npm run build:extension)', DIST], ['Capture', FIXTURE]]) {

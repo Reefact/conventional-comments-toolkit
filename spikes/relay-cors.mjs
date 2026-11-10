@@ -73,7 +73,7 @@ const plainServer = createServer((_q, res) => { res.writeHead(200); res.end('{}'
 console.log("\nCORS d'un service worker MV3 — permission d'hôte sur l'origine de DÉPART seulement\n");
 
 const ctx = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'cct-relay-')), {
-  executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath(),
   headless: true,
   args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`, '--no-sandbox'],
 });

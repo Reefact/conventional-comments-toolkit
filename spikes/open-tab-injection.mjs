@@ -45,7 +45,7 @@ const PORT = 8741;
  * pourrait pas montrer que la sonde distingue — seulement qu'elle s'exécute. */
 const PORT_HORS = 8744;
 const EXECUTABLE =
-  process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 
 const results = [];
 function assert(name, ok, detail) {

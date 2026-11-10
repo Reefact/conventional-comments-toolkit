@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const EXTENSION = resolve(here, '..', 'packages', 'extension', 'dist-ext');
 const EXECUTABLE =
-  process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  process.env.PLAYWRIGHT_CHROMIUM ?? chromium.executablePath();
 
 if (!existsSync(EXTENSION)) {
   console.error(`Bundle absent : ${EXTENSION}\nLancez d'abord :  npm run build:extension`);

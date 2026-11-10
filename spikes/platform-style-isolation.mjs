@@ -150,6 +150,8 @@ const FIXTURE = `
   <span class="cct-badge cct-badge-deco cct-badge-deco-blocking" id="badgeBlocking">blocking</span>
   <span class="cct-badge cct-badge-deco cct-badge-deco-nonblocking" id="badgeNonBlocking">non-blocking</span>
   <span class="cct-badge cct-badge-deco cct-badge-deco-custom" id="badgeCustom">ux</span>
+  <p id="subjectLine"><span class="cct-subject">sujet</span><br><span class="cct-subject-break" id="subjectBreak"></span>corps</p>
+  <p id="sessionLine"><span class="cct-hidden-session">[session:Run-7]</span><span class="cct-session" id="session">\u{1F916} session: run-7</span></p>
   <button class="cct-filter-chip" id="chip">filtre</button>
   <button class="cct-filter-chip" id="chipActive" aria-pressed="true">filtre actif</button>
   <!-- quickinput.ts n'écrit AUCUNE classe sur les items : seul \`aria-selected\` les distingue,
@@ -185,7 +187,7 @@ const IDS = [
   'ringOk', 'ringWarn', 'ringError', 'ringInset',
   'host', 'banner', 'bannerHead', 'glyph', 'bannerLabel', 'bannerHint', 'bannerLi',
   'bannerAuthor', 'bannerJudged', 'bannerUnlocated',
-  'badge', 'badgeFlat', 'badgePill', 'badgeBlocking', 'badgeNonBlocking', 'badgeCustom',
+  'badge', 'badgeFlat', 'badgePill', 'badgeBlocking', 'badgeNonBlocking', 'badgeCustom', 'session', 'subjectBreak',
   'chip', 'chipActive', 'quickList', 'quickItemActive',
 ];
 

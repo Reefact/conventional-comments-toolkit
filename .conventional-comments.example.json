@@ -32,6 +32,7 @@
   "coreMinVersion": "1.0.0",
   "configCacheTtlSeconds": 3600,
   "badgeStyle": "pill",
+  "sessionIcon": "🤖",
   "shortcuts": { "abbreviations": { "?i": "issue: ", "?ib": "issue (blocking): " } },
   "docUrl": "https://conventionalcomments.org/",
   "language": "fr",

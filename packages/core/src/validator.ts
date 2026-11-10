@@ -10,6 +10,7 @@ import {
   type BodyLines,
 } from './preprocess.js';
 import { matchPrefix, type PrefixMatch } from './regex.js';
+import { extractSessionMarker, type SessionMarker } from './session.js';
 import {
   parseDecorations,
   resolveLabel,
@@ -104,6 +105,10 @@ export interface CommentAnalysis {
   aliasRewrite: { from: string; to: string; replacement: string } | null;
   /** Ligne de préfixe normalisée (§3.4.1), pour l'affichage et les corrections. */
   prefixLine: string | null;
+  /** Marqueur de session reconnu en dernière ligne (§3.6), ou null. Rendu quelle que soit
+   * l'issue — exempté, zone éteinte, préfixe non reconnu : c'est une métadonnée, que
+   * l'affichage du §5.5 montre indépendamment du verdict. */
+  session: SessionMarker | null;
 }
 
 interface PrefixOutcome {
@@ -128,8 +133,14 @@ export function isBlocking(input: ValidationInput, config: EffectiveConfig): boo
 }
 
 /** Analyse complète — la brique commune de validate(), isBlocking() et du composant A. */
-export function analyze(input: ValidationInput, config: EffectiveConfig): CommentAnalysis {
+export function analyze(rawInput: ValidationInput, config: EffectiveConfig): CommentAnalysis {
   const lang = config.language;
+  // Le marqueur de session est une métadonnée, pas du contenu de revue (§3.6) : il est retiré
+  // AVANT tout le reste, et c'est le corps sans lui que jugent le prétraitement (§3.4.1), les
+  // exemptions (§4.2) et la validation (§3.5). Un seul point de retrait : aucun contrôle ne
+  // peut le compter comme sujet, discussion ou contenu propre par oubli.
+  const session = extractSessionMarker(rawInput.body);
+  const input: ValidationInput = session ? { ...rawInput, body: session.contentBody } : rawInput;
   const split = splitBody(input.body);
   const suggestion = containsSuggestionBlock(input.body, input.platform.suggestionInfoString);
 
@@ -143,6 +154,7 @@ export function analyze(input: ValidationInput, config: EffectiveConfig): Commen
     decorations: [],
     aliasRewrite: null,
     prefixLine: split.prefixLine,
+    session,
   };
 
   // ————— Étage −2 : zone éteinte par configuration (§3.5.1) —————
@@ -208,6 +220,7 @@ export function analyze(input: ValidationInput, config: EffectiveConfig): Commen
     decorations,
     aliasRewrite,
     prefixLine: split.prefixLine,
+    session,
   };
 }
 

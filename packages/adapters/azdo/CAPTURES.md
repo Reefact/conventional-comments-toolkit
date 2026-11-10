@@ -274,7 +274,9 @@ same comment count per thread afterwards):
 
 A test file `{"version": 1, "mode": "enforce"}` was pushed to `main` of `cct-test`, then an
 `activation.activatedAt` before the test pull requests was added (without it, §6.2.3 keeps every
-pull request out of scope, and nothing blocks — by design).
+pull request out of scope, and nothing blocks — by design). That was the rule on the day of the
+measurement; the activation scope and its key are retired since, with the verifier (§2, §8.2):
+`enforce` now blocks without any date, and an `activation` key is ignored and reported.
 
 Measured from a signed-in pull request page, on
 `/{org}/{project}/_apis/git/repositories/{repo}/items?path=/.conventional-comments.json&api-version=7.1`:

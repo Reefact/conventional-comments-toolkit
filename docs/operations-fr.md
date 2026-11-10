@@ -1,133 +1,105 @@
-# Exploitation — activation, retour arrière, prérequis `enforce`
+# Exploitation — trajectoire, prérequis `enforce`, retour arrière
 
-Ce document rassemble les procédures d'exploitation dispersées dans la spécification et
-que le §14 désigne comme prérequis à `P6`. Il est le livrable attendu **avant** tout
-passage en `enforce` sur un dépôt pilote (§6.3.3, §14).
+Ce document rassemble les procédures d'exploitation que le §14 désigne comme prérequis à
+`P6` : le passage en `enforce` sur un dépôt pilote, puis sa généralisation.
 
-**Préalable à tout ce qui suit : aucun vérificateur n'est livré.** Le compagnon serveur est
-retiré, et son remplacement — un vérificateur qui s'exécute dans la plateforme et ne retient
-rien (§6.4, §A.8) — est suivi par
-[l'issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56). Les
-procédures ci-dessous sont donc la cible, pas l'état : elles décrivent ce qui se décidera le
-jour où un vérificateur publiera un statut. Ce qui vaut dès aujourd'hui, c'est l'extension,
-qui n'a jamais bloqué quoi que ce soit (§2).
+**Ce que `enforce` contrôle, et ce qu'il ne contrôle pas.** Le produit est l'extension, et
+elle seule (§2). En `enforce`, elle bloque l'**envoi** d'un commentaire non conforme dans le
+navigateur où elle est installée (§5.4) ; elle ne contrôle **pas** la complétion d'une PR. Les
+fils bloquants non résolus sont signalés par le bandeau du §5.5, jamais empêchés de fusionner
+(décision du propriétaire, 2026-11-10). Aucun statut n'est publié, aucune protection de branche
+n'est à configurer pour l'extension, et `enforce` reste contournable par construction : l'API,
+une CLI, un autre navigateur ou un poste sans l'extension y suffisent (§2).
+
+*Sans valeur normative : une équipe qui veut empêcher la fusion d'une PR dont des
+conversations restent ouvertes s'appuie sur les options natives de sa plateforme, par exemple
+la résolution obligatoire des conversations.*
 
 ## Trajectoire d'adoption (§7)
 
 À partir du mode `assist` livré par défaut :
 
 ```
-assist (2 semaines) → warn (2 à 4 semaines, suivi du taux de conformité)
-                    → enforce sur un dépôt pilote → généralisation
+assist (suivi du taux de conformité si la télémétrie est activée, §12)
+      → enforce sur un dépôt pilote → généralisation
 ```
 
-`assist` et `warn` sont identiques côté extension (assistance + diagnostics, jamais de
-blocage). Ce qui les distingue est côté vérificateur : `assist` ne publie aucun statut,
-`warn` publie un statut vert dont le résumé rend la non-conformité visible. `warn` est
-l'étape de mesure, et c'est aussi le rapport à blanc : le corps du check liste exactement
-ce qui échouerait sous `enforce`, avec un lien permanent par commentaire.
+L'échelle a trois modes : `off`, `assist`, `enforce`. **`warn` est retiré** : il était
+identique à `assist` côté extension. Une configuration ou un plancher qui écrit encore
+`"warn"` est lu comme `"assist"`, et la lecture produit un avis `config-warning` (valeur
+obsolète) — le remplacer par `"assist"`.
+
+Durcir la configuration (labels, sévérités, `blockingByDefault`) vaut **en direct** pour les
+PR déjà ouvertes (§8.1.3, règle 1) : le faire en `assist`, observer ce que la pastille et le
+bandeau signalent, puis passer en `enforce`.
 
 ## Prérequis au passage en `enforce` (§14)
 
-1. **`resolverOverrideGroup` est désigné** (§8.2). Sans groupe habilité, les deux soupapes
-   du §6.3 sont inertes simultanément — ni `decision`, ni exemption de PR — et un fil dont
-   l'auteur est indisponible bloque la PR sans recours. Sur GitHub, c'est une **liste de
-   comptes**, des logins séparés par des virgules : un slug d'équipe n'y habilite personne
-   (§A.7).
-2. **La procédure de retour arrière est écrite et son exécutant désigné** (§6.3.3, ci-dessous).
-3. **`activation.activatedAt` est posée** (§6.2.3). Sans elle, le vérificateur publie un
-   `neutral` quel que soit le mode — et `neutral` **satisfait** une vérification
-   obligatoire : la barrière serait verte et les règles ne s'appliqueraient plus.
-4. **Le check est déclaré obligatoire, et l'option interdisant le contournement des règles
-   est activée** (§6.2.2, annexes) — sans quoi O3 n'est pas satisfait pour les
-   administrateurs : *Require status checks to pass* sur `conventional-comments`, et
-   *Do not allow bypassing the above settings*.
-5. **Les PR de forks et de Dependabot sont couvertes**, ou l'autre branche de l'alternative
-   est écrite : *elles ne sont pas soumises au contrôle*. Sans l'un ni l'autre, ces PR
-   portent un statut vert qui cesse d'être rafraîchi dès qu'un relecteur écrit — le §A.8
-   décrit ce que le vérificateur devra prévoir pour les atteindre.
-6. **Le dépôt n'emploie pas de merge queue.** Une file de merge crée un SHA de *merge
-   group*, sur lequel le §A.8 ne fait se déclencher aucun vérificateur : le check n'y
-   arriverait jamais, et la file ne se viderait plus.
+**La procédure de retour arrière est écrite et son exécutant désigné** (ci-dessous), y compris
+l'ordre des opérations et la **liste des dépôts** qui écrivent eux-mêmes `"mode": "enforce"`
+dans leur fichier `.conventional-comments.json` : la configuration d'organisation ne
+l'emporte pas sur eux (§8.1.2). Cette liste se dresse avant la bascule, pas pendant l'incident.
 
-**Azure DevOps n'a pas de vérificateur** (§B.7) : rien de ce qui précède ne s'y applique, et
-l'extension y reste un composant d'assistance, contournable par construction (§2).
+C'est le seul prérequis que le §14 retient. Ceux qu'une rédaction antérieure énumérait — un
+groupe habilité à résoudre ou à exempter, une date d'activation, un check déclaré obligatoire,
+la couverture des forks, l'absence de merge queue — n'existaient que pour le vérificateur,
+retiré (§2).
 
-## Procédure de retour arrière (§6.3.3)
+## Procédure de retour arrière (§8.1.3, règle 3)
 
-Le passage de `enforce` à un mode inférieur doit être réalisable **en quelques minutes sur
-l'ensemble des dépôts**, sans intervention par dépôt.
-
-**`warn` est le mode de repli, pas `off`.** En `warn`, le vérificateur continue de publier
-un statut jamais en échec, ce qui débloque immédiatement les PR **sans exiger le retrait de
-la protection de branche**. `assist` et `off` ne publient aucun statut : y revenir depuis
-`enforce` exige de retirer d'abord la protection, sans quoi l'absence de statut bloque
-toutes les PR.
+Le passage de `enforce` à un mode inférieur doit être réalisable **en quelques minutes**, sans
+intervention sur les dépôts qui n'écrivent pas eux-mêmes leur `mode`.
 
 **Exécutant désigné :** l'administrateur de l'organisation qui détient l'accès à la
-configuration d'organisation (canal du plancher / `configUrl`).
+configuration d'organisation (`configUrl` du plancher) et, le cas échéant, à la stratégie
+d'entreprise qui porte le plancher.
 
-Ordre des opérations pour un retour arrière d'urgence :
+Ordre des opérations :
 
-1. Passer le `mode` à `warn` dans la **configuration d'organisation** (point de bascule,
-   §8.1). Un assouplissement du `mode` est une modification élargissante : il s'applique
-   aux PR déjà ouvertes sans attendre leur fermeture (§8.1.3, règle 1).
-2. **Rien à invalider côté vérificateur.** Il ne met aucune lecture en cache et relit les
-   trois niveaux à chaque exécution : le prochain événement sur une PR applique déjà le
-   nouveau mode. Seule l'**extension** cache la configuration, pour
-   `configCacheTtlSeconds` (une heure par défaut) — et elle ne bloque jamais rien.
-   Précédemment, cette étape décrivait une sonde du document d'organisation et un point
-   d'entrée d'invalidation : tous deux appartenaient au service compagnon, et il n'y a plus
-   de cache à invalider là où le blocage se décide.
-3. Vérifier qu'un statut vert `warn` réapparaît sur une PR témoin. Si rien ne se publie,
-   c'est qu'aucun événement n'est survenu depuis : le §6.4 demande au vérificateur une
-   réévaluation périodique, qui borne cette attente, et un rejeu manuel pour ne pas avoir à
-   l'attendre.
+1. **Le plancher**, s'il impose `minimumMode: "enforce"` (§8.1.1) : l'assouplir dans la
+   stratégie d'entreprise. Aucun des deux niveaux suivants ne peut le faire à sa place.
+2. **La configuration d'organisation** (point de bascule, §8.1) : passer son `mode` à
+   `assist`. Cela vaut pour tous les dépôts qui n'écrivent pas leur propre `mode`.
+3. **Chaque dépôt de la liste préparée** qui écrit `"mode": "enforce"` : modifier son fichier.
 
-Pour revenir plus bas que `warn` (`assist`/`off`), retirer **d'abord** la protection de
-branche, **puis** changer le mode.
+**Rien à attendre ni à invalider.** Avant de bloquer un envoi, l'extension relit sa
+configuration en contournant son cache (§8.1.3, règle 3) : un assouplissement lève donc tout
+blocage dès la tentative d'envoi suivante. Cette tentative est retenue le temps de la
+relecture, puis le contrôle d'envoi est libéré et un message invite à renvoyer — l'extension
+ne rejoue pas l'envoi. L'affichage (pastille, diagnostics) peut garder l'ancien mode jusqu'à
+l'expiration de `configCacheTtlSeconds` (une heure par défaut), ce qui ne bloque rien.
 
-## Soupapes d'urgence par PR (§6.3)
+**Vérification :** sur une PR témoin, envoyer un commentaire sans label ; il doit partir.
 
-- **Fil précis qu'on décide de ne pas traiter** → réponse `decision` dans le fil, par un
-  membre de `resolverOverrideGroup`, motif ≥ `minDecisionSubjectLength` (défaut 20). C'est
-  une décision de revue, tracée dans la PR (§6.1.1).
-- **PR entière en urgence** → exemption au niveau PR (§6.3.2) : poser l'étiquette
-  `cc-override`. Le droit de la poser est restreint aux membres de
-  `resolverOverrideGroup`, et il est vérifié **a posteriori** — GitHub ne sait pas
-  restreindre qui ajoute une étiquette. Une étiquette posée par quelqu'un d'autre est
-  refusée et le fait signalé (`exemption-refused`).
+## Clore un fil bloquant sans faire le changement demandé (§6.1.1)
 
-  L'exemption **se remet à zéro** dès qu'un commentaire bloquant postérieur à sa pose
-  apparaît : le vérificateur retire alors l'étiquette (`exemption-reset`), ce qui exige
-  `pull-requests: write` sur le jeton. Ce n'est pas un cas de repli, c'est le
-  fonctionnement normal.
+La réponse qui acte ce choix porte le label `decision`, dans le fil qu'elle clôt, avec un
+motif d'au moins `rules.minDecisionSubjectLength` caractères (20 par défaut) — en deçà,
+`E-DECISION-SUBJECT`. C'est une **convention de revue outillée**, rien de plus : `decision`
+ne résout pas le fil, et la résolution reste un geste de la plateforme, fait par qui elle y
+autorise. Aucun groupe habilité n'est requis, et aucune étiquette n'exempte une PR.
 
-Le chemin d'administration qu'une rédaction antérieure décrivait ici — octroi et révocation
-d'exemption par un point d'entrée HTTP, pour une plateforme n'exposant pas la provenance des
-étiquettes — appartenait au service compagnon. Sur GitHub, la provenance est exposée par
-l'API de timeline, et le mécanisme d'étiquette suffit.
+Un fil est compté résolu **tel que la page l'affiche, quel que soit l'auteur de la
+résolution** (§6.1).
 
-## Phases sans dépendance de code, mais qui conditionnent le calendrier (§14)
+## Clés de configuration retirées (§8.2)
 
-- **P0 (irrattrapable).** Le « délai total de revue avant » (§12) ne peut être collecté
-  qu'avant l'arrivée de l'outil. À lancer en tout premier, indépendamment du code.
-- **Revue des stores.** Toute livraison du composant A y passe (§10). Amorcer une
-  soumission « coquille » dès `P2` pour découvrir le processus sur un enjeu faible.
-- **Déclarer le check obligatoire** est une tâche d'administration d'organisation, à
-  coordonner avec les propriétaires des dépôts et à planifier avec `P6`.
+`formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` et `docUrl` ne
+servaient qu'au vérificateur et ont quitté le schéma. Une configuration — de dépôt,
+d'organisation ou de plancher — qui les porte encore reste lisible : chacune y est une clé
+inconnue, ignorée et signalée (`config-warning`, §8.1.5), sans repli. Les retirer fait
+disparaître l'avis.
+
+## Revue des stores (§14)
+
+Toute livraison de l'extension y passe (§10), avec un résultat incertain sur les permissions
+d'hôte : un délai subi, à intégrer au calendrier de `P6`.
 
 ## Indicateurs (§12)
 
-**Il n'existe aujourd'hui aucun code qui les produise**, et c'est un choix assumé plutôt
-qu'un oubli : ils étaient un point d'entrée du service compagnon, et le §12 pose qu'aucun
-d'eux n'exige d'être collecté au fil de l'eau. Chacun est une fonction de ce que la
-plateforme conserve — corps et auteurs des commentaires, état de résolution des fils,
-horodatages — et se recalcule par lot, rétroactivement, sans rien persister.
-
-Ce qui reste à faire le jour où on les voudra : un script qui lit l'API de la plateforme et
-rejoue `validate()` sur l'historique. Les règles à appliquer, elles, sont déjà écrites :
-taux de conformité par **commentaire** (comptes de service exclus), taux d'avertissement
-suivi séparément, répartition par label, part des comptes de service, nombre de fils clos
-par `decision`. Les motifs de `decision` ne sont **jamais** extraits — ils restent lisibles
-un par un dans la PR (§10, §12).
+Ils se limitent à ce que la télémétrie de l'extension compte — désactivée par défaut, opt-in
+explicite, compteurs agrégés sans texte libre (§10) : taux de conformité à la saisie, taux
+d'avertissement suivi séparément, répartition par label (labels de réponse comptés à part).
+Sans télémétrie activée, aucun indicateur n'est produit. L'extension ne relit pas l'historique
+des PR : délais de résolution ou de revue, fils clos par une `decision` et part des comptes de
+service ne font pas partie des indicateurs.

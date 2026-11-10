@@ -58,10 +58,6 @@ export function platformIds(...listings) {
  */
 export function classifyPath(path, ids) {
   if (path.endsWith('.md') || path.startsWith('docs/')) return 'docs';
-  // `packages/action/` n'est PAS une plateforme ici, bien qu'il ne serve que GitHub : c'est
-  // le classement prudent. L'y rattacher autoriserait « vérificateur GitHub + adaptateur
-  // GitHub » dans une même PR, et interdirait « core/ + vérificateur » — deux effets qu'il
-  // faut vouloir. Tant que GitHub est le seul vérificateur livré (§B.7), partagé suffit.
   const own = /^packages\/adapters\/([^/]+)\//.exec(path);
   if (own && ids.includes(own[1])) return `platform:${own[1]}`;
   // Un test ou un outil reste neutre MÊME s'il porte le nom d'une plateforme. L'y rattacher

@@ -2,10 +2,20 @@
 
 Browser extension enforcing [Conventional Comments](https://conventionalcomments.org/) in code reviews, for GitHub (github.com, Enterprise Cloud/EMU, Enterprise Server) and Azure DevOps (Services, Server).
 
-GitLab (gitlab.com) gets the authoring assistance and real-time validation, but not the merge guard: the extension cannot read a repository's configuration there yet, so it never blocks on GitLab (specification, annex C). GitLab Self-Managed and Dedicated are not measured yet.
+GitLab (gitlab.com) gets the authoring assistance and real-time validation, but not the send guard: the extension cannot read a repository's configuration there yet, so it never blocks on GitLab (specification, annex C). GitLab Self-Managed and Dedicated are not measured yet.
 
-- **Browser extension (component A)** — authoring assistance and real-time validation while writing review comments. Convenience and prevention; bypassable by construction.
-- **Verifier (component B)** — the source of truth the specification describes: it verifies every comment after the fact, computes "blocking threads resolved", and publishes a required status check, so a PR can't be completed with an unresolved blocking comment even without the extension installed. **No verifier ships today.** The companion server that used to fill this role is removed: the specification now requires a verifier that runs *inside* the platform and keeps no state (§6.4), and [issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56) tracks building one for GitHub. Until then, objective O3 is not enforced anywhere.
+The product is the browser extension, and only the extension (§2): authoring assistance and
+real-time validation while writing review comments, an optional send guard (`enforce`, §5.4),
+and a banner counting the pull request's unresolved blocking threads (§5.5). Convenience and
+prevention; bypassable by construction.
+
+**The toolkit does not control pull request completion** (owner's decision, 2026-11-10).
+Unresolved blocking threads are *reported*, never prevented from merging. An earlier version of
+the specification described a second component, a verifier running in the platform's CI and
+publishing a required status check; it is removed, together with what existed only for it —
+the resolution governance, the per-PR exemption, the activation date and the configuration
+fingerprint. A team that wants merges gated on resolved conversations uses its platform's own
+settings, such as required conversation resolution.
 
 No comment, code, or diff content ever leaves the browser. The full specification (the normative source) is [`specifications-fr.md`](./specifications-fr.md) (in French).
 
@@ -14,17 +24,16 @@ No comment, code, or diff content ever leaves the browser. The full specificatio
 A TypeScript monorepo (npm workspaces). The full breakdown is in [`docs/architecture-fr.md`](./docs/architecture-fr.md).
 
 ```
-packages/core           @cct/core            parser, validator, config, evaluation — shared verbatim by A and B
-packages/adapters/*     @cct/adapter-*        client (component A) platform adapters + shared editor plumbing
+packages/core           @cct/core            parser, validator, config — every validation rule
+packages/adapters/*     @cct/adapter-*        platform adapters + shared editor plumbing
 packages/extension      @cct/extension        Manifest V3 extension — toolbar, quick input, feedback, guard
 spikes/p1-prime         P1' spike             programmatic-write assumption, validated in Chromium
 skills/*                agent skills          review a pull request, or answer its review, in Conventional Comments
 ```
 
-`packages/core/` holds every validation rule; it is consumed identically by both
-components so that a comment judged compliant by the extension is always judged compliant
-by the verifier, and conversely (§2). See [`docs/architecture-fr.md`](./docs/architecture-fr.md)
-for how the A/B parity holds by construction.
+`packages/core/` holds every validation rule and has no dependency on the browser or on any
+platform; the adapters and the extension consume it. See
+[`docs/architecture-fr.md`](./docs/architecture-fr.md).
 
 ## Getting started
 
@@ -47,7 +56,7 @@ zip — one for Chromium, one for Firefox. Download it from the
 unzip it, and load the folder (`chrome://extensions` → Developer mode → Load unpacked).
 No Node, no npm, no Git. That path is for **trying the extension** and for machines where
 the build chain can't be installed — it is not a deployment channel: an extension loaded
-from a zip never auto-updates, and §10 routes every delivery of component A through the
+from a zip never auto-updates, and §10 routes every delivery of the extension through the
 public stores. How a release is cut: [`docs/release-fr.md`](./docs/release-fr.md).
 
 ## Configuration
@@ -56,7 +65,7 @@ A repository is configured by a `.conventional-comments.json` file on its defaul
 see [`.conventional-comments.example.json`](./.conventional-comments.example.json) for the
 shape of every key (it is **not** the product defaults, which live in
 `packages/core/src/config/defaults.ts`). Resolution, floor bounds, merge semantics and
-pinning are specified in §8 and implemented in `packages/core/src/config/`.
+when a change takes effect are specified in §8 and implemented in `packages/core/src/config/`.
 
 **Upgrading from a version without `toolCommands`.** Slash commands used to be exempted
 through a list built into the GitHub adapter (`/azp`, `/rebase`). That list is gone, and
@@ -66,11 +75,15 @@ where it previously passed. A repository that relied on the built-in exemption r
 and widens it to every slash command, by adding `"/*"` to `toolCommands`. The example file
 above carries the full recommended GitHub list, mentions included.
 
-Note that this behaviour lives in `core/`, not in the configuration, so `fingerprint()`
-(§9.2.2) cannot see it: while the extension and the verifier run different `core/` versions,
-they apply different rules on GitHub while still reporting that they agree. The lever for
-requiring a `core/` version across an organization is `coreMinVersion` (§8.2), not the
-fingerprint.
+Note that this behaviour lives in `core/`, not in the configuration: two extensions running
+different `core/` versions apply different rules to the same file. The lever for requiring a
+`core/` version across an organization is `coreMinVersion` (§8.1.3, rule 5).
+
+**Retired keys.** `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` and
+`docUrl` served only the removed verifier and have left the schema (§8.2). A configuration that
+still carries them stays readable: each is an unknown key, ignored and reported as a
+configuration warning, with no fallback. `"mode": "warn"` is read as `"assist"`, with an
+"obsolete value" warning (§7). Remove them to clear the warnings.
 
 ### Response labels and `reviewed` (on by default, not part of Conventional Comments)
 
@@ -165,12 +178,6 @@ thread blocking. `decision` is unchanged: it is the reply with which those who c
 request — its author, its maintainers — record, with a reason, that a point will not be addressed
 (§6.1.1). `disagree` is an opinion. Neither resolves a thread.
 
-The check links to the toolkit's labels page by default (`docUrl`:
-https://conventionalcomments.io/docs/labels/). That page is the place for every label the
-toolkit ships, saying which ones are not part of Conventional Comments; its update for the added
-labels is tracked in Reefact/conventionalcomments.io#42. If your team documents its own variant,
-point `docUrl` there.
-
 **Upgrading with a label already called `thanks`, `done`, `ack`, `disagree` or `reviewed`.** Your entry
 now merges into the shipped one (§8.1.4) and inherits `alwaysNonBlocking: true`, so
 `done (blocking):` becomes `E-CONFLICT`. Restore your label with:
@@ -184,12 +191,6 @@ not share a name: an alias that repeats another active label's id is removed fro
 Since `done` is enabled by default, it is the shipped alias `fixed` that goes and your label
 that stays. An alias carried by two labels is removed from both. Each removal is reported as a
 configuration warning (§8.2).
-
-**Upgrading the extension and the verifier.** Because these labels are enabled by default, the
-configuration fingerprint changes even for a repository with no custom configuration (§9.2.2).
-While the two
-run different versions, the extension reports the mismatch and stops blocking the send. Update
-them together.
 
 ## Review skills for AI agents
 
@@ -220,13 +221,14 @@ the reviewer skill offers it once, and records the answer — Slugger, or a GUID
 
 ## Modes and adoption (§7)
 
-`assist` (default) → `warn` → `enforce`. Operational procedures — rollback, the
-prerequisites for `enforce`, activation and the dry-run report — are in
+`off`, `assist` (default), `enforce`; the recommended path is `assist` → `enforce` on a pilot
+repository → rollout. `warn` is retired and read as `assist`. Operational procedures — the
+prerequisite for `enforce` and the rollback order — are in
 [`docs/operations-fr.md`](./docs/operations-fr.md).
 
 ## Acceptance criteria
 
-Every acceptance criterion `CA-01`…`CA-39` (§11) is covered by at least one automated test.
+Every acceptance criterion of §11 is covered by at least one automated test.
 The mapping from each criterion to its test files is in
 [`docs/ca-matrix-fr.md`](./docs/ca-matrix-fr.md); the `CA-NN` identifiers appear literally in the
 tests, and CI fails if that stops being true.
@@ -255,13 +257,14 @@ need a signed-in session and are not checked live.
 
 | Phase | Content | State |
 |-------|---------|-------|
-| P0 | Baseline measurement (review time, compliance) | Operational task, not code — see `docs/operations-fr.md` |
 | P1 | `core/` (parser, validator, config) + unit tests | Implemented |
 | P1' | Programmatic-write spike (GitHub React + Azure DevOps) | Assumption validated in Chromium; remaining platform assumptions documented with their fallbacks (`spikes/p1-prime/README-fr.md`) |
 | P2 | Extension `assist` on GitHub | Implemented |
 | P3 | Azure DevOps adapter | Implemented, with the P1' fallbacks in place |
-| P4 | `warn` mode + indicators (§12) | `warn` implemented. The §12 indicators are not: they were an endpoint of the removed server, and the section now states that none of them needs collecting as it happens — each recomputes in batch from what the platform keeps |
-| P5 | Verifier + status checks | **Not delivered.** The companion server is removed (it was never deployed); its replacement is designed in §6.4 and §A.8 and tracked by [#56](https://github.com/Reefact/conventional-comments-toolkit/issues/56). Azure DevOps has no verifier either, and §B.7 says why |
-| P6 | `enforce` on a pilot repo, then rollout | Blocked on P5: `enforce` means nothing without a verifier. Prerequisites and rollback are documented (`docs/operations-fr.md`) |
+| P4 | Opt-in telemetry and the §12 indicators | Opt-in counters implemented (labels used, diagnostic codes, mode, repository — never free text), sent only to a collection point declared by enterprise policy and accepted by the person |
+| P6 | `enforce` (send guard, §5.4) on a pilot repo, then rollout | The send guard is implemented; the pilot is an operational step. Prerequisite and rollback order: [`docs/operations-fr.md`](./docs/operations-fr.md) |
+
+P5 (the verifier) and P0 (the baseline measurement, which only served an indicator that needed
+the platform's API) are removed from the specification; their identifiers are not reused.
 
 License: Apache-2.0.

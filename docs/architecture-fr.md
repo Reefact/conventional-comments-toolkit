@@ -1,16 +1,17 @@
 # Architecture
 
-Découpage conforme au §9.1. `packages/core/` est publié comme paquet et consommé **à
-l'identique** par l'extension (composant A) et par le vérificateur (composant B) — aucune
-règle de validation n'est dupliquée hors de ce paquet.
+Découpage conforme au §9.1. **Le produit est l'extension, et elle seule** (§2).
+`packages/core/` porte toutes les règles de validation, sans dépendance au DOM ni à une
+plateforme ; les adaptateurs et l'extension le consomment, et aucune règle n'est dupliquée
+hors de ce paquet.
 
-**Le composant B n'existe pas dans l'arbre.** Le compagnon serveur a été retiré : il
-demandait un hébergement, un stockage et des webhooks que le §6.4 ne veut plus, et personne
-ne l'avait jamais déployé. Ce qui le remplace sur GitHub — un vérificateur qui s'exécute
-dans la plateforme et ne retient rien — est conçu au §6.4 et au §A.8, et suivi par
-[l'issue #56](https://github.com/Reefact/conventional-comments-toolkit/issues/56). Tout ce
-que ce document dit de la frontière A/B décrit donc un contrat que `core/` tient déjà, et
-qu'un futur B consommera tel quel.
+Une rédaction antérieure de la spécification décrivait un second composant, un vérificateur
+exécuté dans l'intégration continue de la plateforme, avec lequel `core/` était partagé à
+l'identique. Il est retiré (décision du propriétaire, 2026-11-10), et avec lui ce qui
+n'existait que pour lui : l'évaluation de conformité d'une PR (`evaluate()`), la gouvernance
+des résolutions, l'exemption de PR, le périmètre d'activation, l'empreinte de configuration et
+l'encodeur de la ligne machine `cc/1`. Seul son **décodeur** (`decodeSummary()`) reste dans
+`core/`, le temps que l'adaptateur GitHub cesse de lire cette ligne.
 
 ```
 packages/
@@ -19,61 +20,29 @@ packages/
 │   ├── regex.ts              #   §3.4.2 expression régulière de référence
 │   ├── parser.ts             #   §3.2/§3.3 labels, décorations, alias
 │   ├── validator.ts          #   §3.5 validation en étages, codes, précédence bloquante
-│   ├── evaluate.ts           #   §6 deux critères, gouvernance, exemption
-│   ├── summary.ts            #   §6.3.1 ligne machine cc/1 (encode/decode)
-│   ├── config/               #   §8 défauts, schéma, fusion, plancher, empreinte
-│   ├── corpus/               #   CA-06 corpus de parité synthétique versionné
+│   ├── session.ts            #   §3.6 marqueur de session, retiré du corps avant analyse
+│   ├── summary.ts            #   décodeur seul d'une ligne cc/1 héritée, lue par GitHub
+│   ├── config/               #   §8 défauts, schéma, fusion, plancher, résolution
+│   ├── corpus/               #   CA-06 corpus synthétique versionné (non-régression)
 │   └── i18n/                 #   fr / en
 ├── adapters/
 │   ├── shared/               # @cct/adapter-shared — contrat §9.2.3, écriture §9.3, sélecteurs §9.4
 │   ├── github/               # @cct/adapter-github — sélecteurs, générations DOM, Turbo (§A)
-│   └── azdo/                 # @cct/adapter-azdo — MutationObserver, replis P1' (§B)
+│   ├── azdo/                 # @cct/adapter-azdo — MutationObserver, replis P1' (§B)
+│   └── gitlab/               # @cct/adapter-gitlab — gitlab.com (§C)
 └── extension/                # @cct/extension — MV3, content/background, barre, pastille, garde
 ```
 
-## Frontière A/B et parité (§2, §8.1.3)
+## Ce que `core/` garantit (§8.1.3, §9.2.4)
 
-La règle de conception du §2 — « un commentaire jugé conforme par l'extension doit
-toujours être jugé conforme par le vérificateur, et réciproquement » — tient par
-construction :
-
-1. **Même parseur.** `validate()`, `isBlocking()`, `evaluate()`, `fingerprint()`,
-   `resolveConfig()`, `encodeSummary()`/`decodeSummary()` vivent tous dans `core/` et sont
-   appelés à l'identique des deux côtés (`packages/core/src/index.ts`).
-2. **Même configuration.** Les deux composants résolvent les **trois** mêmes niveaux
-   (plancher, organisation, dépôt) via `resolveConfig()`, qui est pure et ne prend que ces
-   trois documents : il n'existe plus de configuration épinglée (§8.1.3, règle 1).
-3. **Empreinte comparée.** Le composant B publie `configFingerprint` dans la ligne `cc/1` ;
-   l'extension la relit dans le DOM et la compare à la sienne. En cas d'écart, elle cesse
-   de bloquer l'envoi et le signale (§8.1.3, règle 2) — jamais un rejet que la source de
-   vérité n'aurait pas prononcé.
-4. **Exception bornée.** Le temps qu'une modification restrictive se propage, l'extension
-   peut être momentanément plus stricte que le vérificateur ; elle le signale et cesse de
-   bloquer (§2, §8.1.3).
-
-`core/` ne fait **aucune** entrée-sortie : tout ce qu'il ne peut pas lire lui-même
-(brouillon, exemption, appartenances déjà résolues) entre par
-`EvaluationInput`/`EvaluationContext`, et les effets à exécuter sortent par
-`ComplianceResult.actions`. Un adaptateur traduit et transporte ; il ne juge
-jamais (§9.2.4).
-
-## Ce que `core/` attend d'un vérificateur (§6.4, §9.2.4)
-
-Le composant B n'est plus dans l'arbre, mais `packages/core/` expose déjà le contrat que le
-futur vérificateur devra respecter : **le verdict est une fonction pure de l'état courant de
-la PR**.
-
-- `resolveConfig(plancher, organisation, dépôt)` est pure et relit tout à chaque appel. Un
-  seul des deux composants met ces lectures en cache, et c'est l'extension.
-- `evaluate()` est pure elle aussi : brouillon, exemption et appartenances lui arrivent
-  déjà résolus par `EvaluationContext`, et les effets sortent par `ComplianceResult.actions`.
-- **Aucun stockage.** Ni séquence par PR, ni fenêtre de coalescence, ni délai de grâce, ni
-  réconciliation, ni épinglage, ni monotonie : chacune de ces règles supposait une mémoire
-  d'une évaluation à la suivante. Elles ont disparu du §6.4 avec le service qui les portait,
-  et `core/` n'en expose plus aucune trace.
-
-Ce que la mémoire rendait — empêcher un vert périmé de décider du merge — devra être rendu
-par la plateforme qui héberge le futur vérificateur, et non par lui (§A.8).
+- **Pureté.** `validate()`, `isBlocking()` et `resolveConfig()` ne font aucune
+  entrée-sortie : `resolveConfig(plancher, organisation, dépôt)` ne prend que ces trois
+  documents et relit tout à chaque appel. Il n'existe pas de configuration épinglée (§8.1.3,
+  règle 1) ; le seul cache est celui de l'extension (§8.1.3, règle 4).
+- **Un adaptateur traduit et transporte ; il ne juge jamais** (§9.2.4). Ce qu'il lit de la
+  page — fils, résolution, auteur — entre dans `core/` déjà normalisé.
+- **Compatibilité de version.** Une configuration qui exige un `coreMinVersion` supérieur à
+  celui de l'extension déclenche le repli du §8.1.5 (§8.1.3, règle 5).
 
 ## Points de plateforme et replis (spike P1')
 

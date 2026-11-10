@@ -148,7 +148,7 @@ const fr: Record<string, string> = {
   'options.order.rejected': 'Ignorés, ce ne sont pas des noms de label : {rejected}.',
   'options.responses.heading': "Labels ajoutés",
   'options.responses.sub':
-    "Cinq labels propres à cette extension, absents de Conventional Comments : thanks, done, ack et disagree pour répondre à une remarque, reviewed pour clore sa revue. Ils sont activés par défaut. Ils se désactivent dans le fichier .conventional-comments.json du dépôt, partagé par l'équipe et utilisé par le vérificateur, et non depuis cette page. Le bloc ci-dessous les désactive : sans fichier existant, il peut servir de fichier complet ; sinon, ajoutez ses cinq entrées au tableau labels existant, ou créez cette propriété, sans remplacer les autres clés.",
+    "Cinq labels propres à cette extension, absents de Conventional Comments : thanks, done, ack et disagree pour répondre à une remarque, reviewed pour clore sa revue. Ils sont activés par défaut. Ils se désactivent dans le fichier .conventional-comments.json du dépôt, partagé par l'équipe, et non depuis cette page. Le bloc ci-dessous les désactive : sans fichier existant, il peut servir de fichier complet ; sinon, ajoutez ses cinq entrées au tableau labels existant, ou créez cette propriété, sans remplacer les autres clés.",
   'options.responses.snippet': "Configuration qui désactive les labels ajoutés",
   'options.responses.copy': 'Copier la configuration',
   'options.responses.copied':
@@ -405,7 +405,7 @@ const en: Record<string, string> = {
   'options.order.rejected': 'Ignored, not label names: {rejected}.',
   'options.responses.heading': "Added labels",
   'options.responses.sub':
-    "Five labels of this extension's own, not part of Conventional Comments: thanks, done, ack and disagree for replying to a review comment, reviewed for closing your review. They are enabled by default. They are disabled in the repository's .conventional-comments.json file, shared by the team and used by the verifier, not from this page. The block below disables them: with no existing file, it can serve as the whole file; otherwise, add its five entries to the existing labels array, or create that property, without replacing the other keys.",
+    "Five labels of this extension's own, not part of Conventional Comments: thanks, done, ack and disagree for replying to a review comment, reviewed for closing your review. They are enabled by default. They are disabled in the repository's .conventional-comments.json file, shared by the team, not from this page. The block below disables them: with no existing file, it can serve as the whole file; otherwise, add its five entries to the existing labels array, or create that property, without replacing the other keys.",
   'options.responses.snippet': "Configuration that disables the added labels",
   'options.responses.copy': 'Copy the configuration',
   'options.responses.copied':

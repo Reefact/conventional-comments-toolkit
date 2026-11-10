@@ -515,8 +515,9 @@
    réduit au marqueur, masqué EN ENTIER : un paragraphe vide garderait ses marges (#169). */
 .cct-hidden-session,
 .cct-hidden-session-block { display: none; }
-/* Texte « atténué » (muted, au sens de Primer : `fgColor-muted`, le texte secondaire), en italique :
-   une métadonnée, que l'œil peut sauter. Un BLOC, à un écart de paragraphe du texte au-dessus —
+/* Texte « atténué » (muted, au sens de Primer : `fgColor-muted`, le texte secondaire), en romain
+   — l'italique est retiré (décision du propriétaire, 2026-11-10) : une métadonnée, que l'œil peut
+   sauter, et que la couleur et la taille suffisent à distinguer. Un BLOC, à un écart de paragraphe du texte au-dessus —
    la même séparation que l'en-tête, quelle que soit l'écriture : `--cct-session-gap`, calculé et
    posé par badges.ts (sessionGap) parce que l'écart normal se lit sur la page. Un `padding`,
    jamais une `margin` : une marge fusionnerait avec celle du paragraphe précédent au lieu de s'y
@@ -526,7 +527,6 @@
   padding-top: var(--cct-session-gap, 1em);
   color: var(--cct-fg-muted);
   font-size: 12px;
-  font-style: italic;
 }
 
 .cct-quick-list {

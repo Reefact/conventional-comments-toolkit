@@ -199,7 +199,8 @@ A `done:` reply, an assertion from the author or a resolved thread **does not pr
 Conversely, drop a finding when a verifiable technical justification shows it is unfounded or
 does not apply.
 
-Once you have verified the fix of one of your own findings, resolve its thread.
+Once you have verified the fix of one of your own findings — one that carries your session marker
+(section 9) — resolve its thread.
 
 **Finishing a pass does not close the review**: as long as a real finding calls for an action or
 a clarification, your review stays open.
@@ -251,10 +252,14 @@ pull request.
 Several reviewers may work on the same pull request at once, sometimes under the same account.
 A session marker lets a reader tell which comments came from the same review session.
 
-**At the start of a new review session, choose its identifier once**, and keep it for the whole
-session: every finding, every pass, every follow-up. Never draw a new one per comment or per pass.
-When you come back to the same review after fixes or new commits, reuse the identifier you
-already chose; only a genuinely separate review session gets a new one.
+**One agent session, one identifier, used by no one else.** A review session is the conversation
+you run in, from the moment you are asked to review until that conversation ends. Another agent
+reviewing the same pull request in parallel is another session, and so is a later conversation
+asked to review it again — even under the same account, even for the same person.
+
+**At the start of your session, draw its identifier once**, before you publish anything, and keep
+it for the whole session: every finding, every pass, every follow-up. Never draw a new one per
+comment or per pass.
 
 How the identifier is drawn — with Slugger, or as a GUID when Slugger was declined — is settled once
 per installation of this skill:
@@ -262,6 +267,31 @@ per installation of this skill:
 - if `session-id.md` exists beside the `SKILL.md` your agent loaded as the skill — usually this
   file; when another `SKILL.md` sent you here, beside that one — follow it;
 - otherwise, follow `session-id-setup.md`, beside this file, before drawing the first identifier.
+
+The identifier must be **drawn by a random source** — the command `session-id.md` names — and
+never chosen by you. In particular:
+
+- **Never take an identifier from the pull request.** A marker you read on it belongs to whichever
+  session wrote it; nothing on the pull request proves it was yours, since every session of the
+  same account posts as the same author.
+- **Never take one from another session, from a previous conversation, or from the person you
+  work for.** If someone hands you an identifier, draw your own anyway and say so.
+- **Never write one yourself**, and never copy an example of this skill
+  (`melancholy-coordinated-value-object` and the like): two agents that make up a name pick the
+  same words.
+
+**Check that it is unused before the first comment.** Read every comment, review and reply of the
+pull request; if one already carries `[session:<your identifier>]`, the draw collided with another
+session: draw again, and check again.
+
+**Coming back within the same session** — after fixes or new commits — you reuse the identifier
+you drew, which you still hold in this conversation. When you do not hold one, you are a new
+session: draw a new identifier, even if the person asked you to resume an earlier review.
+
+A new session may follow up on findings an earlier session left open: read them as existing
+discussions, verify them, and post your follow-ups under **your own** marker. Their threads are not
+your own findings: resolve only the threads whose finding carries your marker, and leave the others
+for their reviewer or a human.
 
 **End every comment of the session with the marker**, on its own last line, after a blank line:
 

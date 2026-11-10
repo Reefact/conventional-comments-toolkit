@@ -332,7 +332,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     const floor: Floor = { allowlistPatterns: { minimum: ['^(a+)+$', '^ok$'] } };
     const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.allowlistPatterns).toEqual(['^ok$']);
-    expect(notices.some((n) => n.kind === 'config-warning' && n.message.startsWith('floor: '))).toBe(true);
+    expect(notices.some((n) => n.kind === 'config-warning' && n.code === 'floor.allowlist-nested')).toBe(true);
   });
 
   it('une entrée toolCommands hors grammaire est écartée et signalée', () => {
@@ -350,8 +350,9 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     const { notices } = resolveConfig(floor, absent, repo);
     const warnings = notices.filter((n) => n.kind === 'config-warning' && n.ref === 'LGTM');
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]!.message.startsWith('floor: ')).toBe(true);
-    expect(notices.some((n) => n.ref === 'NOPE' && !n.message.startsWith('floor: '))).toBe(true);
+    expect(warnings[0]!.code).toBe('floor.tool-command-invalid');
+    expect(warnings[0]!.message).toContain('floor: ');
+    expect(notices.some((n) => n.ref === 'NOPE' && n.code === 'config.tool-command-invalid' && !n.message.includes('floor'))).toBe(true);
   });
 
   it('`{ closed: true }` sans `minimum` ne fait plus lever la résolution', () => {

@@ -487,6 +487,7 @@ export class EditorController {
       diagnostics: analysis.diagnostics, // tous, dans l'ordre du §3.5.1 (§5.3)
       aliasRewrite: analysis.aliasRewrite,
       onFix: (replacement) => this.applyLineFix(replacement),
+      notices: this.deps.resolved.notices, // §5.3 — avis de configuration, sans effet sur le verdict
     });
     for (const control of this.#submitControls()) {
       // aria-disabled, jamais l'attribut natif disabled : il retirerait le bouton de

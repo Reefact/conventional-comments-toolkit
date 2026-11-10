@@ -10,7 +10,8 @@ import type { ConfigRead, EffectiveConfig, Floor, LabelConfig, Notice } from '..
 import { defaultConfig } from './defaults.js';
 import { parseConfigDocument } from './schema.js';
 import { mergeLevel } from './merge.js';
-import { applyFloor, maxMode, vetFloor, vettedConfigUrl } from './floor.js';
+import { applyFloor, emptyWrittenKeys, maxMode, vetFloor, vettedConfigUrl, type ConfigLevel, type WrittenKeys } from './floor.js';
+import { makeNotice } from './notices.js';
 import { SESSION_DIAGNOSTIC } from '../session.js';
 
 export interface ResolvedConfig {
@@ -27,7 +28,7 @@ export function resolveConfig(
   const vetted = vetFloor(floor);
   notices.push(...vetted.notices);
 
-  const written = new Set<string>();
+  const written = emptyWrittenKeys();
   let config = defaultConfig();
   let unsupportedDocument = false;
 
@@ -39,7 +40,7 @@ export function resolveConfig(
       unsupportedDocument = true; // repli §8.1.5 : le document n'est pas appliqué
     } else if (!parsed.invalid && parsed.values) {
       config = mergeLevel(config, parsed.values);
-      recordWrites(parsed.values, written);
+      recordWrites(parsed.values, 'org', written);
     }
     // invalide → repli sur le dernier niveau valide : les défauts (§8.1.5)
   }
@@ -52,7 +53,7 @@ export function resolveConfig(
       unsupportedDocument = true;
     } else if (!parsed.invalid && parsed.values) {
       config = mergeLevel(config, parsed.values);
-      recordWrites(parsed.values, written);
+      recordWrites(parsed.values, 'repo', written);
     }
     // invalide → repli sur le dernier niveau valide : organisation, puis défauts (§8.1.5)
   }
@@ -88,11 +89,9 @@ export function resolveConfig(
   // plancher compris : une erreur de métadonnée ne bloque jamais l'envoi.
   if (config.severities[SESSION_DIAGNOSTIC] === 'error') {
     config.severities[SESSION_DIAGNOSTIC] = 'warn';
-    notices.push({
-      kind: 'config-warning',
-      message: `severity of "${SESSION_DIAGNOSTIC}" cannot go above "warn" (§3.6): value "error" lowered to "warn"`,
-      ref: `severities.${SESSION_DIAGNOSTIC}`,
-    });
+    notices.push(
+      makeNotice('config-warning', 'config.session-severity-capped', { code: SESSION_DIAGNOSTIC }, `severities.${SESSION_DIAGNOSTIC}`)
+    );
   }
 
   // Limite basse de sévérité (§8.2), appliquée quel que soit le chemin — y compris quand
@@ -101,11 +100,7 @@ export function resolveConfig(
     if (code.startsWith('E-') && sev === 'off') {
       config.severities[code] = 'warn';
       if (!notices.some((n) => n.kind === 'config-warning' && n.ref === `severities.${code}`)) {
-        notices.push({
-          kind: 'config-warning',
-          message: `severity of "${code}" cannot go below "warn" (§8.2): value "off" raised to "warn"`,
-          ref: `severities.${code}`,
-        });
+        notices.push(makeNotice('config-warning', 'config.severity-raised', { code }, `severities.${code}`));
       }
     }
   }
@@ -142,8 +137,8 @@ export function resolveConfig(
  */
 function withoutShadowing(labels: LabelConfig[], notices: Notice[]): LabelConfig[] {
   const lower = (n: string) => n.toLowerCase();
-  const warn = (ref: string, message: string) =>
-    notices.push({ kind: 'config-warning', message: `${message} (§8.2)`, ref });
+  const warn = (ref: string, code: string, params: Record<string, string>) =>
+    notices.push(makeNotice('config-warning', code, params, ref));
 
   // Deux `id` égaux à la casse près : le second cède.
   const out: LabelConfig[] = [];
@@ -151,7 +146,7 @@ function withoutShadowing(labels: LabelConfig[], notices: Notice[]): LabelConfig
   for (const l of labels) {
     const prior = l.enabled ? seenIds.get(lower(l.id)) : undefined;
     if (prior !== undefined) {
-      warn(`labels.${l.id}`, `label "${l.id}" ignored: its id differs from label "${prior}" only by case`);
+      warn(`labels.${l.id}`, 'config.label-case-duplicate', { label: l.id, prior });
       continue;
     }
     if (l.enabled) seenIds.set(lower(l.id), l.id);
@@ -170,24 +165,31 @@ function withoutShadowing(labels: LabelConfig[], notices: Notice[]): LabelConfig
     const losers = asId !== undefined ? owners.filter((o) => lower(o.id) !== alias) : owners.length > 1 ? owners : [];
     for (const o of losers) {
       o.aliases = o.aliases.filter((a) => lower(a) !== alias);
-      warn(
-        `labels.${o.id}.aliases`,
-        asId !== undefined
-          ? `alias "${alias}" removed from label "${o.id}": it is the id of label "${asId}"`
-          : `alias "${alias}" removed from label "${o.id}": it is also an alias of ${owners
-              .filter((x) => x !== o)
-              .map((x) => `"${x.id}"`)
-              .join(', ')}`
-      );
+      if (asId !== undefined) {
+        warn(`labels.${o.id}.aliases`, 'config.alias-is-id', { alias, label: o.id, other: asId });
+      } else {
+        // Les noms des autres porteurs sont des identifiants, cités tels quels — le guillemet
+        // qui les entoure appartient à la liste, pas à une langue.
+        const others = owners.filter((x) => x !== o).map((x) => `"${x.id}"`).join(', ');
+        warn(`labels.${o.id}.aliases`, 'config.alias-shared', { alias, label: o.id, others });
+      }
     }
   }
   return out;
 }
 
-function recordWrites(values: Record<string, unknown>, written: Set<string>): void {
+/** Relève les clés qu'un niveau écrit. Appelée dans l'ordre de la fusion — organisation, puis
+ * dépôt —, si bien qu'une clé écrite par les deux est attribuée au dépôt : c'est sa valeur qui
+ * l'emporte (§8.1.4). Les listes, que la fusion unit, gardent les niveaux de CHAQUE entrée. */
+function recordWrites(values: Record<string, unknown>, level: ConfigLevel, out: WrittenKeys): void {
+  const written = { add: (key: string) => out.keys.set(key, level) };
   for (const [key, value] of Object.entries(values)) {
     written.add(key);
-    if (key === 'severities') {
+    if (key === 'exemptUsers' || key === 'allowlistPatterns' || key === 'toolCommands') {
+      const entries = out.entries.get(key) ?? new Map<string, Set<ConfigLevel>>();
+      for (const v of value as string[]) entries.set(v, new Set([...(entries.get(v) ?? []), level]));
+      out.entries.set(key, entries);
+    } else if (key === 'severities') {
       for (const code of Object.keys(value as Record<string, unknown>)) written.add(`severities.${code}`);
     } else if (key === 'labels') {
       for (const entry of value as {

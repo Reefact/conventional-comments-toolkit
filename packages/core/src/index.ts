@@ -82,6 +82,7 @@ export {
   MODE_SCALE,
 } from './config/floor.js';
 export { resolveConfig, type ResolvedConfig } from './config/resolve.js';
+export { makeNotice, noticeText } from './config/notices.js';
 
 // i18n
 export { t, resolveLang, availableLanguages } from './i18n/index.js';

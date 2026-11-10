@@ -9,7 +9,7 @@
 // Ce module peut exporter librement pour les tests ; content.ts, lui, ne doit rien
 // exporter.
 
-import type { ConfigRead, EffectiveConfig, Floor, PrRef } from '@cct/core';
+import type { ConfigRead, EffectiveConfig, Floor, Notice, PrRef } from '@cct/core';
 import { pageSkeleton, SelectorLog, type PlatformAdapter } from '@cct/adapter-shared';
 import { captureErrors, guarded } from './error-capture.js';
 import { entryKey, markRecovered, mergeJournalEntry, skeletonsOf, type JournalEntry } from './journal-entry.js';
@@ -32,7 +32,14 @@ import {
   type TelemetryConsent,
   type TelemetryEvent,
 } from './telemetry.js';
-import { appendToJournal, storeBounded, updateJournalEntry, writeCurrentState } from './storage.js';
+import {
+  appendToJournal,
+  CONFIG_NOTICES_KEY,
+  storeBounded,
+  updateJournalEntry,
+  writeCurrentState,
+  type StoredConfigNotices,
+} from './storage.js';
 import {
   compressSkeleton,
   fitSkeletons,
@@ -189,6 +196,33 @@ export function relayOrgConfigRead(url: string, bypassCache = false): Promise<Co
  * reste le repli, pour qu'une dégradation sans motif se signale quand même. */
 export function writeDegradedState(degraded: boolean, reason: string | null = null): void {
   writeCurrentState({ degradedState: degraded ? (reason?.trim() || 'unreachable') : false });
+}
+
+/** Les avis de configuration de la DERNIÈRE résolution (§5.3), pour la page d'options — même
+ * modèle que `degradedState` : écrits par l'onglet à chaque résolution, remplacés par la
+ * suivante, quel que soit le dépôt. Le dépôt dont ils viennent les accompagne, sans quoi la page
+ * d'options afficherait les avis d'un dépôt sous les yeux de qui regarde un autre. Une liste vide
+ * est écrite aussi : « aucun avis » est un fait de la dernière lecture, pas une absence de
+ * lecture. Les avis sont ceux de core/, recopiés tels quels — clé de message et paramètres
+ * compris, pour que la page d'options les rende dans sa langue. */
+export function writeConfigNotices(pr: PrRef, notices: readonly Notice[]): void {
+  const stored: StoredConfigNotices = {
+    repo: `${pr.host}/${pr.scope.join('/')}`,
+    notices: notices.map((n) => ({
+      kind: n.kind,
+      code: n.code,
+      params: n.params,
+      message: n.message,
+      ...(n.ref ? { ref: n.ref } : {}),
+    })),
+  };
+  writeCurrentState({ [CONFIG_NOTICES_KEY]: stored });
+}
+
+/** Ce qu'une résolution laisse à la page d'options : l'état dégradé et les avis. */
+export function recordResolution(pr: PrRef, resolved: ResolvedClientConfig): void {
+  writeDegradedState(resolved.degraded, resolved.degradedReason); // §9.2.3 — visible dans les options
+  writeConfigNotices(pr, resolved.notices); // §5.3 — visible dans les options
 }
 
 /** Plancher côté A : politique d'entreprise poussée par le navigateur —
@@ -815,7 +849,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
       // page et les autres éditeurs en profitent sans relire à leur tour.
       rereadConfig: async () => {
         const fresh = await resolver.resolve(adapter, entry.editor.context.pr, { bypassCache: true });
-        writeDegradedState(fresh.degraded, fresh.degradedReason); // §9.2.3 — visible dans les options
+        recordResolution(entry.editor.context.pr, fresh);
         return fresh;
       },
     });
@@ -830,7 +864,7 @@ export async function bootstrap(doc: Document, factories: AdapterFactories): Pro
     if (disposed) return;
     // Résolution hors chemin critique : la NFR d'injection porte sur l'appel du cb (§10).
     const resolved = await resolver.resolve(adapter, editor.context.pr);
-    writeDegradedState(resolved.degraded, resolved.degradedReason); // §9.2.3 — visible dans les options
+    recordResolution(editor.context.pr, resolved);
     if (disposed) return;
     const entry: EditorEntry = { editor, element: editor.element, controller: null, builtSignature: null, generation: 0 };
     releaseDetached();
@@ -1665,7 +1699,7 @@ async function renderPrChrome(
     return { showed: true, resolved: null }; // pas de PR : rien à retenter tant que la navigation ne change pas
   }
   const resolved = await resolver.resolve(adapter, pr);
-  writeDegradedState(resolved.degraded, resolved.degradedReason); // §9.2.3 — visible dans les options
+  recordResolution(pr, resolved);
   if (resolved.config.mode === 'off') {
     if (isCurrent()) {
       clearStaleBanner();

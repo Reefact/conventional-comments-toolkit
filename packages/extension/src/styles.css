@@ -269,6 +269,9 @@
 
 .cct-diagnostics li[data-severity='error'] { color: var(--cct-danger-strong); }
 .cct-diagnostics li[data-severity='warn'] { color: var(--cct-attention-text); }
+/* Avis de configuration (§5.3) : sur leurs propres lignes, en retrait de couleur — ils ne disent
+   rien du commentaire et ne doivent pas se lire comme l'un de ses diagnostics. */
+.cct-diagnostics li.cct-config-notice { color: var(--cct-fg-muted); }
 
 .cct-fix,
 .cct-alias button {

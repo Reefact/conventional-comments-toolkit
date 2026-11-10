@@ -124,6 +124,7 @@ const FIXTURE = `
     <ul class="cct-diagnostics">
       <li data-severity="error" id="diagError">erreur</li>
       <li data-severity="warn" id="diagWarn">avertissement</li>
+      <li class="cct-config-notice" data-notice-kind="config-warning" id="configNotice">avis</li>
     </ul>
   </div>
   <textarea class="cct-border-ok" id="ringOk"></textarea>
@@ -183,7 +184,7 @@ const PROPS = [
 const IDS = [
   'editor', 'toolbar', 'btn', 'btnActive', 'replyRow', 'btnReply', 'decoRow', 'decoGroup', 'seg',
   'segActive', 'freeDeco',
-  'feedback', 'diagError', 'diagWarn',
+  'feedback', 'diagError', 'diagWarn', 'configNotice',
   'ringOk', 'ringWarn', 'ringError', 'ringInset',
   'host', 'banner', 'bannerHead', 'glyph', 'bannerLabel', 'bannerHint', 'bannerLi',
   'bannerAuthor', 'bannerJudged', 'bannerUnlocated',

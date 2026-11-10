@@ -3,7 +3,8 @@
 // règle générale (l'erreur type : max() sur configCacheTtlSeconds, borné en MAXIMUM, produit
 // l'inverse du but).
 
-import type { EffectiveConfig, Floor, Mode, Notice, Severity } from '../types.js';
+import type { EffectiveConfig, Floor, Mode, Notice, NoticeParams, Severity } from '../types.js';
+import { makeNotice } from './notices.js';
 import { SUPPORTED_FLOOR_VERSION } from '../version.js';
 import { defaultConfig } from './defaults.js';
 import { DEPRECATED_MODE, deprecatedModeNotice, filterAllowlistPatterns, filterToolCommands, MODES, SEVERITIES } from './schema.js';
@@ -44,8 +45,8 @@ export interface VettedFloor {
  * diverger, et le trou se rouvrirait en silence sur la clé oubliée par l'une des deux. */
 export const FLOOR_LIST_KEYS = ['exemptUsers', 'allowlistPatterns', 'toolCommands'] as const;
 
-function floorWarning(message: string, ref: string): Notice {
-  return { kind: 'config-warning', message, ref };
+function floorWarning(code: string, params: NoticeParams, ref: string): Notice {
+  return makeNotice('config-warning', code, params, ref);
 }
 
 /** Ce que le plancher prétend être un tableau de chaînes, réduit à ce qu'il en est
@@ -59,7 +60,7 @@ function floorWarning(message: string, ref: string): Notice {
  * rendrait invisible à qui a écrit la politique. */
 function asStringArray(value: unknown, ref: string, notices: Notice[]): string[] {
   if (!Array.isArray(value)) {
-    notices.push(floorWarning('floor key ignored: expected an array of strings', ref));
+    notices.push(floorWarning('floor.string-array', { key: ref }, ref));
     return [];
   }
   const kept = value.filter((e): e is string => typeof e === 'string');
@@ -68,9 +69,7 @@ function asStringArray(value: unknown, ref: string, notices: Notice[]): string[]
   // contrat annoncé est « écartée ET signalée ». Une politique d'entreprise à moitié
   // appliquée en silence est précisément ce que cette passe existe pour empêcher.
   if (kept.length !== value.length) {
-    notices.push(
-      floorWarning(`floor: ${value.length - kept.length} non-string entr${value.length - kept.length > 1 ? 'ies' : 'y'} ignored`, ref)
-    );
+    notices.push(floorWarning('floor.non-string-entries', { key: ref, count: value.length - kept.length }, ref));
   }
   return kept;
 }
@@ -87,7 +86,7 @@ function asStringArray(value: unknown, ref: string, notices: Notice[]): string[]
 function asClosed(value: unknown, ref: string, notices: Notice[]): boolean {
   if (value === undefined) return false;
   if (typeof value === 'boolean') return value;
-  notices.push(floorWarning('floor rule "closed" is not a boolean: the list is kept closed', ref));
+  notices.push(floorWarning('floor.closed-not-boolean', { key: ref }, ref));
   return true;
 }
 
@@ -108,13 +107,13 @@ const FLOOR_KEYS = new Set([
  * de dépôt sur `configCacheTtlSeconds` et sur les seuils de `rules`. */
 function asNonNegativeInt(value: unknown, ref: string, notices: Notice[]): number | undefined {
   if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return value;
-  notices.push(floorWarning('floor key ignored: must be a non-negative integer', ref));
+  notices.push(floorWarning('floor.non-negative-integer', { key: ref }, ref));
   return undefined;
 }
 
 function asOneOf(value: unknown, allowed: string[], ref: string, notices: Notice[]): string | undefined {
   if (typeof value === 'string' && allowed.includes(value)) return value;
-  notices.push(floorWarning(`floor key ignored: must be one of ${allowed.join(', ')}`, ref));
+  notices.push(floorWarning('floor.one-of', { key: ref, values: allowed.join(', ') }, ref));
   return undefined;
 }
 
@@ -123,7 +122,7 @@ function asObject(value: unknown, ref: string, notices: Notice[]): Record<string
   if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
     return value as Record<string, unknown>;
   }
-  notices.push(floorWarning('floor key ignored: must be an object', ref));
+  notices.push(floorWarning('floor.object', { key: ref }, ref));
   return undefined;
 }
 
@@ -144,11 +143,7 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
     return {
       floor: defaultFloor(),
       notices: [
-        {
-          kind: 'unsupported-version',
-          message: `floor version ${version} exceeds supported version ${SUPPORTED_FLOOR_VERSION}: the floor is not applied and the component falls back to assist mode (§8.1.1)`,
-          ref: 'floorVersion',
-        },
+        makeNotice('unsupported-version', 'unsupported.floor-version', { version, supported: SUPPORTED_FLOOR_VERSION }, 'floorVersion'),
       ],
       unsupported: true,
     };
@@ -181,22 +176,20 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
     if (rule !== null && typeof rule === 'object') {
       for (const k of Object.keys(rule)) {
         if (k !== 'minimum' && k !== 'closed') {
-          notices.push(floorWarning(`unknown floor key "${key}.${k}" ignored`, `${key}.${k}`));
+          notices.push(floorWarning('floor.unknown-key', { key: `${key}.${k}` }, `${key}.${k}`));
         }
       }
     }
     const raw = asStringArray(rule?.minimum, `${key}.minimum`, notices);
-    const filtered: Notice[] = [];
+    // Le message dit d'OÙ vient l'entrée écartée — `floor.*` plutôt que `config.*` : sans
+    // cela, une administration qui débogue sa politique lirait un avertissement identique à
+    // celui d'un fichier de dépôt et chercherait au mauvais endroit.
     const kept =
       key === 'allowlistPatterns'
-        ? filterAllowlistPatterns(raw, filtered)
+        ? filterAllowlistPatterns(raw, notices, 'floor')
         : key === 'toolCommands'
-          ? filterToolCommands(raw, filtered)
+          ? filterToolCommands(raw, notices, 'floor')
           : raw; // `exemptUsers` n'a pas de filtre d'entrée : un login est libre (§8.2).
-    // Le message dit d'OÙ vient l'entrée écartée : sans cela, une administration qui
-    // débogue sa politique lirait un avertissement identique à celui d'un fichier de
-    // dépôt et chercherait au mauvais endroit.
-    for (const n of filtered) notices.push({ ...n, message: `floor: ${n.message}` });
     out[key] = { minimum: kept, closed: asClosed(rule?.closed, `${key}.closed`, notices) };
   }
 
@@ -208,7 +201,7 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
       // `issue` seul, sans un mot sur `todo` : un niveau inférieur pouvait le désactiver
       // alors que l'administration croyait l'avoir planché.
       for (const k of Object.keys(obj)) {
-        if (k !== 'minimum') notices.push(floorWarning(`unknown floor key "labels.${k}" ignored`, `labels.${k}`));
+        if (k !== 'minimum') notices.push(floorWarning('floor.unknown-key', { key: `labels.${k}` }, `labels.${k}`));
       }
       out.labels = { minimum: asStringArray(obj['minimum'], 'labels.minimum', notices) };
     }
@@ -226,14 +219,14 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   // fautive durcit toujours. Ici, non — d'où l'avertissement, qui n'est pas décoratif.
   for (const key of Object.keys(out)) {
     if (!FLOOR_KEYS.has(key)) {
-      notices.push(floorWarning(`unknown floor key "${key}" ignored`, key));
+      notices.push(floorWarning('floor.unknown-key', { key }, key));
       delete (out as Record<string, unknown>)[key];
     }
   }
   const drop = (k: keyof Floor) => { delete out[k]; };
 
   if (out.configUrl !== undefined && out.configUrl !== null && typeof out.configUrl !== 'string') {
-    notices.push(floorWarning('floor key ignored: must be a string or null', 'configUrl'));
+    notices.push(floorWarning('floor.string-or-null', { key: 'configUrl' }, 'configUrl'));
     drop('configUrl');
   }
   if (out.minimumMode !== undefined) {
@@ -255,7 +248,7 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
       const kept: Record<string, Severity> = {};
       for (const [code, sev] of Object.entries(obj)) {
         if (typeof sev === 'string' && SEVERITIES.includes(sev)) kept[code] = sev as Severity;
-        else notices.push(floorWarning(`floor severity of "${code}" ignored: must be one of ${SEVERITIES.join(', ')}`, `severities.${code}`));
+        else notices.push(floorWarning('floor.severity', { code, values: SEVERITIES.join(', ') }, `severities.${code}`));
       }
       out.severities = kept;
     }
@@ -267,7 +260,7 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
       const rules: { minDecisionSubjectLength?: number } = {};
       for (const [k, v] of Object.entries(obj)) {
         if (k !== 'minDecisionSubjectLength') {
-          notices.push(floorWarning(`unknown floor key "rules.${k}" ignored`, `rules.${k}`));
+          notices.push(floorWarning('floor.unknown-key', { key: `rules.${k}` }, `rules.${k}`));
           continue;
         }
         const n = asNonNegativeInt(v, 'rules.minDecisionSubjectLength', notices);
@@ -300,6 +293,25 @@ export function vettedConfigUrl(vetted: VettedFloor): string | null {
   return vetted.unsupported ? null : (vetted.floor.configUrl ?? null);
 }
 
+/** Le niveau inférieur qui a écrit une clé : le document d'organisation, ou le fichier du
+ * dépôt (§8.1.2). */
+export type ConfigLevel = 'org' | 'repo';
+
+/** Les écritures des niveaux inférieurs, telles que `resolveConfig()` les relève.
+ *
+ * `keys` — pour chaque clé écrite, le niveau dont la valeur l'EMPORTE : le dépôt, s'il l'écrit
+ * après l'organisation, la remplace (§8.1.4). `entries` — pour une clé de liste, que la fusion
+ * UNIT au lieu de remplacer, les niveaux qui ont écrit chaque entrée : une entrée qu'une règle
+ * `closed` écarte peut venir de l'un, de l'autre, ou des deux. */
+export interface WrittenKeys {
+  keys: Map<string, ConfigLevel>;
+  entries: Map<string, Map<string, Set<ConfigLevel>>>;
+}
+
+export function emptyWrittenKeys(): WrittenKeys {
+  return { keys: new Map(), entries: new Map() };
+}
+
 export interface FloorApplication {
   config: EffectiveConfig;
   notices: Notice[];
@@ -317,17 +329,16 @@ export interface FloorApplication {
  * `written` — les clés effectivement écrites par un niveau inférieur (org/repo), pour
  * n'émettre `floor-override` que lorsqu'une valeur écrite est ignorée.
  */
-export function applyFloor(config: EffectiveConfig, floor: Floor, written: Set<string>): FloorApplication {
+export function applyFloor(config: EffectiveConfig, floor: Floor, written: WrittenKeys): FloorApplication {
   const out = structuredClone(config);
   const notices: Notice[] = [];
+  // L'avis nomme le niveau qui a écrit la clé ignorée : un « fichier du dépôt » pour une clé
+  // venue du document d'organisation enverrait chercher au mauvais endroit.
+  const override = (key: string, level: ConfigLevel) =>
+    notices.push(makeNotice('floor-override', `floor-override.${level}`, { key }, key));
   const overridden = (key: string) => {
-    if (written.has(key)) {
-      notices.push({
-        kind: 'floor-override',
-        message: `repository/organization key "${key}" ignored: it would relax the enterprise floor (§8.1.1)`,
-        ref: key,
-      });
-    }
+    const level = written.keys.get(key);
+    if (level !== undefined) override(key, level);
   };
 
   // mode — minimum sur l'échelle des modes ; durcir est permis.
@@ -402,7 +413,10 @@ export function applyFloor(config: EffectiveConfig, floor: Floor, written: Set<s
     if (!rule) continue;
     if (rule.closed) {
       const dropped = out[key].filter((v) => !rule.minimum.includes(v));
-      if (dropped.length > 0) overridden(key);
+      // Un avis par niveau dont une entrée est écartée — la fusion des listes les unit.
+      const levels = new Set<ConfigLevel>();
+      for (const v of dropped) for (const l of written.entries.get(key)?.get(v) ?? []) levels.add(l);
+      for (const l of ['org', 'repo'] as const) if (levels.has(l)) override(key, l);
       out[key] = [...rule.minimum];
     } else {
       for (const v of rule.minimum) if (!out[key].includes(v)) out[key].push(v);
@@ -411,7 +425,7 @@ export function applyFloor(config: EffectiveConfig, floor: Floor, written: Set<s
 
   // configCacheTtlSeconds — valeur imposée, ni minimum ni maximum (§8.1.1, règle 4 du §8.1.3).
   if (floor.configCacheTtlSeconds !== undefined && out.configCacheTtlSeconds !== floor.configCacheTtlSeconds) {
-    if (written.has('configCacheTtlSeconds')) overridden('configCacheTtlSeconds');
+    overridden('configCacheTtlSeconds');
     out.configCacheTtlSeconds = floor.configCacheTtlSeconds;
   }
 
@@ -419,11 +433,7 @@ export function applyFloor(config: EffectiveConfig, floor: Floor, written: Set<s
   for (const [code, sev] of Object.entries(out.severities)) {
     if (code.startsWith('E-') && sev === 'off') {
       out.severities[code] = 'warn';
-      notices.push({
-        kind: 'config-warning',
-        message: `severity of "${code}" cannot go below "warn" (§8.2): value "off" raised to "warn"`,
-        ref: `severities.${code}`,
-      });
+      notices.push(makeNotice('config-warning', 'config.severity-raised', { code }, `severities.${code}`));
     }
   }
 

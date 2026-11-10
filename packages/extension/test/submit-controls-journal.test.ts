@@ -112,6 +112,36 @@ describe('CA-11, §9.4 — le contrôleur partagé journalise un éditeur sans c
     expect(broken.recovered).toEqual([FAKE_SUBMIT_CHAIN.name]);
   });
 
+  it('une nouvelle visite oublie les champs de la précédente : la PR suivante peut être rattrapée (revue Reefact, PR #172)', () => {
+    // PR A : un champ sans bouton, puis retiré de la page sans jamais avoir trouvé les siens.
+    const a = setup();
+    a.controller.refresh();
+    a.textarea.remove();
+    // Navigation vers la PR B, MÊME journal : un champ sans bouton, qui finit par trouver les siens.
+    a.log.newVisit();
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    let controls: SubmitControl[] = [];
+    const adapterB: Partial<PlatformAdapter> = {
+      platformProfile: () => ({ id: 'github', suggestionInfoString: 'suggestion' }),
+      getEditorChrome: () => NEUTRAL_EDITOR_CHROME,
+      getSubmitControls: () => submitLookup(controls),
+      submitKeystrokes: () => ({ field: [], control: [] }),
+      readValue: () => textarea.value,
+      writeValue: () => {},
+    };
+    const b = controllerFor(
+      adapterB as PlatformAdapter,
+      { id: 'e2', element: textarea, context: a.controller.deps.editor.context },
+      a.log
+    );
+    b.refresh();
+    controls = [{ element: document.createElement('button'), kind: 'submit' }];
+    b.refresh();
+    expect(a.lines).toHaveLength(2);
+    expect(a.recovered).toEqual([FAKE_SUBMIT_CHAIN.name]);
+  });
+
   it('un champ retiré de la page n’écrit rien : `dispose()` ne trouve rien autour d’un élément détaché', () => {
     const { controller, lines, textarea } = setup();
     textarea.remove();

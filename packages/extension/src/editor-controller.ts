@@ -124,8 +124,12 @@ const SUBMIT_NATIVE_ARIA_DISABLED_MARKER = 'cctSubmitNativeAriaDisabled';
  * qui n'ont pas trouvé les leurs depuis (`EditorController.#submitControls`). Au niveau du module :
  * chaque éditeur a son contrôleur, et c'est entre contrôleurs qu'il faut savoir si une chaîne est
  * rattrapée partout. Un champ retiré de la page sans avoir trouvé ses boutons y reste : rien ne
- * dit qu'il les aurait trouvés, et la ligne ne se déclare pas rattrapée à sa place. */
-const MISSING_SUBMIT = new WeakMap<SelectorLog, Map<string, Set<Element>>>();
+ * dit qu'il les aurait trouvés, et la ligne ne se déclare pas rattrapée à sa place.
+ *
+ * Pour la VISITE en cours seulement (`SelectorLog.visit`), comme le journal lui-même : il survit à
+ * la navigation d'une PR à l'autre, et un champ resté sans bouton sur la précédente empêchait tout
+ * rattrapage sur la suivante — tout en restant retenu en mémoire (revue Reefact, PR #172). */
+const MISSING_SUBMIT = new WeakMap<SelectorLog, { visit: number; byChain: Map<string, Set<Element>> }>();
 
 /** Pose le grisage de ce contrôleur sur un bouton de soumission (§5.4), en capturant sa
  * valeur native d'`aria-disabled` la toute première fois — jamais aux passages suivants,
@@ -508,10 +512,13 @@ export class EditorController {
     const log = this.deps.log;
     if (!log) return lookup.controls;
     const field = this.deps.editor.element;
-    let byChain = MISSING_SUBMIT.get(log);
-    if (!byChain) MISSING_SUBMIT.set(log, (byChain = new Map()));
-    let missing = byChain.get(lookup.searched.name);
-    if (!missing) byChain.set(lookup.searched.name, (missing = new Set()));
+    let state = MISSING_SUBMIT.get(log);
+    if (!state || state.visit !== log.visit) {
+      state = { visit: log.visit, byChain: new Map() };
+      MISSING_SUBMIT.set(log, state);
+    }
+    let missing = state.byChain.get(lookup.searched.name);
+    if (!missing) state.byChain.set(lookup.searched.name, (missing = new Set()));
     if (lookup.controls.length > 0) {
       if (missing.delete(field) && missing.size === 0) log.recovered(lookup.searched);
     } else if (field.isConnected) {

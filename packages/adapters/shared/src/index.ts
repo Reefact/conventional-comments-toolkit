@@ -754,6 +754,18 @@ export class SelectorLog {
   newVisit(): void {
     this.forgetSeen();
     this.#visitStart = Date.now();
+    this.#visit++;
+  }
+
+  #visit = 0;
+
+  /** L'identité de la visite en cours : change à chaque `newVisit()`. Pour l'appelant qui tient,
+   * hors de ce journal, un état qui ne vaut que pour une visite — les champs restés sans contrôle
+   * d'envoi (`EditorController`) : le journal survit à la navigation d'une PR à l'autre, et un
+   * état gardé d'une PR précédente empêcherait la suivante d'être marquée rattrapée (revue
+   * Reefact, PR #172). */
+  get visit(): number {
+    return this.#visit;
   }
 
   // Profondeur des appels `quietly()` en cours : une sonde n'y journalise rien, n'y rattrape rien.

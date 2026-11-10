@@ -251,6 +251,20 @@ pull request.
 Several reviewers may work on the same pull request at once, sometimes under the same account.
 A session marker lets a reader tell which comments came from the same review session.
 
+**Never claim a marker just because it appears on the pull request.** Existing GitHub
+comments, reviews, a matching author account, and even a previous `reviewed:` cannot prove
+that their session is yours. Multiple independent reviewers may use the same GitHub account.
+Only reuse a marker when your own conversation or another trusted record of **your review
+session** establishes that you generated and retained that exact identifier for this PR.
+If you cannot establish that provenance, you are starting a **new** session: draw a fresh
+identifier using the setup below. Do not import someone else's marker from the PR timeline.
+
+Before publishing the first comment of a new session, scan the existing PR comments for
+session markers. If your freshly drawn identifier already appears, draw another: matching
+an existing marker is a collision, not permission to reuse it. Distinguish your own
+findings from other sessions' findings when following up; never resolve another reviewer's
+threads or treat their `reviewed:` as the closure of your review.
+
 **At the start of a new review session, choose its identifier once**, and keep it for the whole
 session: every finding, every pass, every follow-up. Never draw a new one per comment or per pass.
 When you come back to the same review after fixes or new commits, reuse the identifier you

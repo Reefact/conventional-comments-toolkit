@@ -1,7 +1,10 @@
 # Exploitation — trajectoire, prérequis `enforce`, retour arrière
 
 Ce document rassemble les procédures d'exploitation que le §14 désigne comme prérequis à
-`P6` : le passage en `enforce` sur un dépôt pilote, puis sa généralisation.
+`P6` : le passage en `enforce` sur un dépôt pilote, puis sa généralisation. **`P6` dépend de
+`P4`** (§14), et `P4` n'est pas terminée : les indicateurs du §12 ne sont pas encore
+calculables (voir « Indicateurs » ci-dessous). Choisir le pilote et écrire la procédure de
+retour arrière peuvent se faire dès maintenant ; le passage en `enforce`, non.
 
 **Ce que `enforce` contrôle, et ce qu'il ne contrôle pas.** Le produit est l'extension, et
 elle seule (§2). En `enforce`, elle bloque l'**envoi** d'un commentaire non conforme dans le
@@ -39,7 +42,8 @@ l'ordre des opérations et la **liste des dépôts** qui écrivent eux-mêmes `"
 dans leur fichier `.conventional-comments.json` : la configuration d'organisation ne
 l'emporte pas sur eux (§8.1.2). Cette liste se dresse avant la bascule, pas pendant l'incident.
 
-C'est le seul prérequis que le §14 retient. Ceux qu'une rédaction antérieure énumérait — un
+C'est le seul prérequis d'exploitation que le §14 retient, en plus de la dépendance de `P6`
+à `P4`. Ceux qu'une rédaction antérieure énumérait — un
 groupe habilité à résoudre ou à exempter, une date d'activation, un check déclaré obligatoire,
 la couverture des forks, l'absence de merge queue — n'existaient que pour le vérificateur,
 retiré (§2).

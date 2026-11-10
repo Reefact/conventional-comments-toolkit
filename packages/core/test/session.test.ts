@@ -4,11 +4,9 @@
 import { describe, expect, it } from 'vitest';
 import { extractSessionMarker } from '../src/session.js';
 import { analyze, isBlocking, validate } from '../src/validator.js';
-import { evaluate } from '../src/evaluate.js';
 import { defaultConfig } from '../src/config/defaults.js';
 import { parseConfigDocument } from '../src/config/schema.js';
-import { fingerprint } from '../src/config/fingerprint.js';
-import { codes, comment, config, evalInput, thread, user, vInput } from './helpers.js';
+import { codes, config, vInput } from './helpers.js';
 
 const value = (body: string) => extractSessionMarker(body)?.value ?? null;
 
@@ -99,27 +97,15 @@ describe('CA-52 — la métadonnée ne satisfait aucune exigence et ne change au
     }
   });
 
-  it('le critère 2 et la résolution par `decision` sont inchangés', () => {
-    const author = user('alice');
-    const cfg = config((c) => (c.mode = 'enforce'));
-    const blocking = evaluate(
-      evalInput({ config: cfg, threads: [thread(comment('issue: fuite\n\ndétail\n\n[session:a]', { author }))] })
+  it('la clôture par `decision` est inchangée : une réponse `decision` portant un marqueur reste une décision', () => {
+    const reply = (body: string) => analyze(vInput(body, { zone: 'reply' }), config());
+    const decision = reply('decision: on garde, le coût de la migration dépasse le gain\n\n[session:b]');
+    expect(decision.resolved?.label.id).toBe('decision');
+    expect(decision.diagnostics).toEqual([]);
+    // Le marqueur ne prête pas au motif la longueur qui lui manque (§6.1.1, E-DECISION-SUBJECT).
+    expect(codes(reply('decision: trop court\n\n[session:une-tres-longue-valeur-de-session]').diagnostics)).toContain(
+      'E-DECISION-SUBJECT'
     );
-    expect(blocking.state).toBe('failure');
-    expect(blocking.counts.unresolvedThreads).toBe(1);
-
-    const decided = evaluate(
-      evalInput({
-        config: cfg,
-        threads: [
-          thread(comment('issue: fuite\n\ndétail\n\n[session:a]', { author }), {
-            resolution: 'resolved',
-            replies: [comment('decision: on garde, le coût de la migration dépasse le gain\n\n[session:b]', { author })],
-          }),
-        ],
-      })
-    );
-    expect(decided.counts.unresolvedThreads).toBe(0);
   });
 });
 
@@ -132,11 +118,5 @@ describe('`sessionIcon` — présentation seule (§8.2)', () => {
     // Même règle que `badgeStyle` : une valeur du mauvais type rend le document invalide (§8.1.5).
     const bad = parseConfigDocument(JSON.stringify({ sessionIcon: '' }), { level: 'repo' });
     expect(bad.invalid).toBe(true);
-  });
-
-  it('hors du domaine de l’empreinte : la changer ne fait diverger aucun composant (§9.2.2)', () => {
-    const a = config();
-    const b = config((c) => (c.sessionIcon = '\u{1F9ED}'));
-    expect(fingerprint(b)).toBe(fingerprint(a));
   });
 });

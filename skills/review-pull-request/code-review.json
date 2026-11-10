@@ -1,0 +1,4593 @@
+{
+  "meta": {
+    "title": "Code Review",
+    "description": "What code under review does to whoever is reading it - a thankless strategy, a baffling domain policy, an all too familiar smell",
+    "version": "1.0.1",
+    "author": "Reefact",
+    "source": "https://github.com/Reefact/slugger/blob/main/themes/code-review.json",
+    "createdAt": "2026-09-21",
+    "publishedAt": "2026-10-24"
+  },
+  "adjectives": {
+    "common": [
+      "amazing",
+      "astonishing",
+      "awesome",
+      "beautiful",
+      "brilliant",
+      "charming",
+      "clever",
+      "delightful",
+      "elegant",
+      "excellent",
+      "exceptional",
+      "fantastic",
+      "gorgeous",
+      "graceful",
+      "impressive",
+      "inspired",
+      "lovely",
+      "magnificent",
+      "marvelous",
+      "remarkable",
+      "ingenious",
+      "deft",
+      "astute",
+      "satisfying",
+      "splendid",
+      "stunning",
+      "superb",
+      "tasteful",
+      "thoughtful",
+      "wonderful",
+      "adorable",
+      "glorious",
+      "heroic",
+      "miraculous",
+      "legendary",
+      "majestic",
+      "pristine",
+      "lovable",
+      "endearing",
+      "pleasing",
+      "refreshing",
+      "smart",
+      "sharp",
+      "delicious",
+      "joyful",
+      "radiant",
+      "surprising",
+      "unexpected",
+      "curious",
+      "bizarre",
+      "odd",
+      "peculiar",
+      "uncanny",
+      "unlikely",
+      "improbable",
+      "quirky",
+      "unusual",
+      "unconventional",
+      "brave",
+      "cheeky",
+      "daring",
+      "eccentric",
+      "playful",
+      "wild",
+      "strange",
+      "sly",
+      "whimsical",
+      "funky",
+      "spicy",
+      "dramatic",
+      "theatrical",
+      "memorable",
+      "notorious",
+      "famous",
+      "suspicious",
+      "awkward",
+      "dubious",
+      "questionable",
+      "unfortunate",
+      "weird",
+      "risky",
+      "alarming",
+      "concerning",
+      "cursed",
+      "dreadful",
+      "ghastly",
+      "grim",
+      "horrific",
+      "horrendous",
+      "painful",
+      "terrifying",
+      "tragic",
+      "atrocious",
+      "awful",
+      "execrable",
+      "hideous",
+      "nasty",
+      "ugly",
+      "dire",
+      "ominous",
+      "sinister",
+      "sketchy",
+      "dodgy",
+      "scary",
+      "reckless",
+      "suspect",
+      "troublesome",
+      "vexing",
+      "annoying",
+      "infuriating",
+      "disappointing",
+      "embarrassing",
+      "shameful",
+      "absurd",
+      "ridiculous",
+      "laughable",
+      "comical",
+      "confusing",
+      "puzzling",
+      "sneaky",
+      "tricky",
+      "subtle",
+      "tangled",
+      "cryptic",
+      "enigmatic",
+      "mysterious",
+      "tedious",
+      "dull",
+      "tiresome",
+      "monotonous",
+      "dreary",
+      "soporific",
+      "numbing",
+      "plodding",
+      "exhausting",
+      "draining",
+      "demoralizing",
+      "disheartening",
+      "wearying",
+      "thankless",
+      "grinding",
+      "punishing",
+      "long suffering",
+      "weary",
+      "reassuring",
+      "comforting",
+      "merciful",
+      "welcome",
+      "soothing",
+      "serene",
+      "cathartic",
+      "promising",
+      "encouraging",
+      "hopeful",
+      "auspicious",
+      "heartening",
+      "uplifting",
+      "salvageable",
+      "tractable",
+      "redeeming",
+      "hopeless",
+      "doomed",
+      "forlorn",
+      "irredeemable",
+      "unsalvageable",
+      "bleak",
+      "futile",
+      "desperate",
+      "godforsaken",
+      "ill fated",
+      "forgettable",
+      "unremarkable",
+      "underwhelming",
+      "unexceptional",
+      "quaint",
+      "nostalgic",
+      "archaic",
+      "venerable",
+      "timeworn",
+      "antique",
+      "bygone",
+      "ancestral",
+      "old fashioned",
+      "time honored",
+      "enviable",
+      "humbling",
+      "intimidating",
+      "daunting",
+      "formidable",
+      "awe inspiring",
+      "baffling",
+      "bewildering",
+      "perplexing",
+      "inscrutable",
+      "unfathomable",
+      "impenetrable",
+      "maddening",
+      "exasperating",
+      "galling",
+      "aggravating",
+      "irksome",
+      "grating",
+      "sobering",
+      "solemn",
+      "poignant",
+      "haunting",
+      "portentous",
+      "pitiful",
+      "touching",
+      "beloved",
+      "darling",
+      "cozy",
+      "heartbreaking",
+      "hapless",
+      "woeful",
+      "lamentable",
+      "sorry",
+      "damning",
+      "incriminating",
+      "indefensible",
+      "inexcusable",
+      "perilous",
+      "treacherous",
+      "forbidding",
+      "menacing",
+      "harrowing",
+      "hazardous",
+      "precarious",
+      "staggering",
+      "dumbfounding",
+      "unbelievable",
+      "inconceivable",
+      "incredible",
+      "hilarious",
+      "farcical",
+      "preposterous",
+      "ludicrous",
+      "droll",
+      "goofy",
+      "zany",
+      "uproarious",
+      "masterful",
+      "virtuosic",
+      "sublime",
+      "exquisite",
+      "luminous",
+      "dazzling",
+      "immaculate",
+      "flawless",
+      "handsome",
+      "harmonious",
+      "repellent",
+      "revolting",
+      "vile",
+      "noxious",
+      "foul",
+      "grotesque",
+      "monstrous",
+      "repugnant",
+      "contemptible",
+      "pathetic",
+      "deplorable",
+      "shabby",
+      "tawdry",
+      "paltry",
+      "cringeworthy",
+      "unsettling",
+      "disquieting",
+      "unnerving",
+      "uncomfortable",
+      "creepy",
+      "eerie",
+      "shady",
+      "fishy",
+      "shifty",
+      "furtive",
+      "fascinating",
+      "mesmerizing",
+      "hypnotic",
+      "captivating",
+      "compelling",
+      "engrossing",
+      "spellbinding",
+      "riveting",
+      "absorbing",
+      "gripping",
+      "enthralling",
+      "beguiling",
+      "gutsy",
+      "shameless",
+      "brazen",
+      "impudent",
+      "insolent",
+      "heartwarming",
+      "wholesome",
+      "tender",
+      "affectionate",
+      "sweet",
+      "melancholy",
+      "wistful",
+      "bittersweet",
+      "mournful",
+      "plaintive",
+      "inevitable",
+      "unsurprising",
+      "all too familiar",
+      "unavoidable",
+      "intractable",
+      "perennial",
+      "immortal",
+      "obligatory",
+      "ever present",
+      "load bearing"
+    ],
+    "sourceTraits": [
+      "readable",
+      "maintainable",
+      "testable",
+      "untestable",
+      "idiomatic",
+      "nonidiomatic",
+      "portable",
+      "platform specific",
+      "language agnostic",
+      "framework free",
+      "magic",
+      "declarative",
+      "metaprogrammed"
+    ],
+    "sizeTraits": [
+      "minimal",
+      "verbose",
+      "concise",
+      "dense",
+      "sprawling",
+      "tiny",
+      "massive",
+      "boilerplate heavy",
+      "legacy",
+      "modern"
+    ],
+    "craftTraits": [
+      "polished",
+      "neat",
+      "nifty",
+      "tidy",
+      "crisp",
+      "slick",
+      "brittle",
+      "fragile",
+      "messy",
+      "convoluted",
+      "unwieldy",
+      "hairy",
+      "gnarly",
+      "clumsy",
+      "shaky",
+      "wobbly",
+      "chaotic"
+    ],
+    "runtimeTraits": [
+      "allocation heavy",
+      "branch heavy",
+      "reflection heavy",
+      "cpu heavy",
+      "memory heavy",
+      "io heavy"
+    ],
+    "callableTraits": [
+      "pure",
+      "impure",
+      "recursive",
+      "tail recursive",
+      "higher order",
+      "first class",
+      "generic",
+      "overloaded",
+      "asynchronous",
+      "synchronous",
+      "lazy",
+      "eager",
+      "variadic",
+      "partial",
+      "total",
+      "idempotent",
+      "reentrant",
+      "anonymous",
+      "nested",
+      "virtual",
+      "overridden"
+    ],
+    "valueTraits": [
+      "nullable",
+      "non nullable",
+      "immutable",
+      "mutable",
+      "readonly",
+      "writable",
+      "local",
+      "global",
+      "shared",
+      "transient",
+      "persistent",
+      "optional",
+      "required",
+      "calculated",
+      "atomic",
+      "scalar",
+      "structured",
+      "empty",
+      "populated",
+      "typed",
+      "untyped"
+    ],
+    "collectionTraits": [
+      "ordered",
+      "unordered",
+      "sorted",
+      "unsorted",
+      "unique",
+      "duplicated",
+      "finite",
+      "infinite",
+      "lazily evaluated",
+      "eagerly evaluated",
+      "indexed",
+      "keyed",
+      "flat",
+      "hierarchical",
+      "homogeneous",
+      "heterogeneous"
+    ],
+    "controlTraits": [
+      "compound",
+      "exhaustive",
+      "non exhaustive",
+      "guarded",
+      "unconditional",
+      "unreachable",
+      "binary",
+      "multi branch",
+      "boolean",
+      "ternary",
+      "complex",
+      "simple",
+      "short circuit",
+      "nested logic",
+      "flat logic"
+    ],
+    "typeTraits": [
+      "abstract",
+      "concrete",
+      "sealed",
+      "open",
+      "polymorphic",
+      "stateful",
+      "stateless",
+      "anemic",
+      "rich",
+      "extensible",
+      "reusable",
+      "opaque",
+      "transparent",
+      "public",
+      "internal",
+      "private"
+    ],
+    "designTraits": [
+      "cohesive",
+      "coupled",
+      "decoupled",
+      "modular",
+      "layered",
+      "leaky",
+      "architecturally stable",
+      "architecturally unstable",
+      "orthogonal",
+      "cyclic",
+      "acyclic",
+      "balanced",
+      "lopsided",
+      "solid"
+    ],
+    "intentTraits": [
+      "overengineered",
+      "underdesigned",
+      "tactical",
+      "strategic",
+      "accidental",
+      "intentional",
+      "explicit",
+      "implicit",
+      "canonical",
+      "textbook",
+      "homegrown",
+      "ambitious",
+      "bold",
+      "audacious",
+      "inventive",
+      "creative"
+    ],
+    "apiTraits": [
+      "external",
+      "backward compatible",
+      "breaking",
+      "resource oriented",
+      "coarse grained",
+      "fine grained",
+      "strict",
+      "permissive",
+      "discoverable",
+      "predictable",
+      "undocumented",
+      "experimental",
+      "mature",
+      "contract first",
+      "code first",
+      "consumer driven",
+      "producer driven",
+      "public facing",
+      "client facing",
+      "strongly typed",
+      "loosely typed",
+      "stable",
+      "unstable"
+    ],
+    "testTraits": [
+      "isolated",
+      "deterministic",
+      "flaky",
+      "focused",
+      "broad",
+      "fast",
+      "slow",
+      "repeatable",
+      "data driven",
+      "state based",
+      "interaction based",
+      "black box",
+      "white box",
+      "targeted",
+      "redundant",
+      "valuable",
+      "useless",
+      "meaningful",
+      "noisy",
+      "silent",
+      "trustworthy",
+      "deceptive",
+      "hermetic",
+      "integration heavy"
+    ],
+    "smellTraits": [
+      "chronic",
+      "recurring",
+      "rampant",
+      "localized",
+      "systemic",
+      "obvious",
+      "entrenched",
+      "creeping",
+      "handed down",
+      "latent",
+      "classic",
+      "familiar",
+      "endemic",
+      "pervasive",
+      "symptomatic",
+      "longstanding",
+      "fresh",
+      "hidden",
+      "visible",
+      "blatant",
+      "mild",
+      "severe"
+    ],
+    "namingTraits": [
+      "wordy",
+      "terse",
+      "pronounceable",
+      "searchable"
+    ],
+    "clarityTraits": [
+      "descriptive",
+      "precise",
+      "vague",
+      "misleading",
+      "ambiguous",
+      "consistent",
+      "inconsistent",
+      "domain specific",
+      "intention revealing",
+      "conventional",
+      "semantic",
+      "meaningless"
+    ],
+    "refactoringTraits": [
+      "mechanical",
+      "safe",
+      "behavior preserving",
+      "incremental",
+      "staged",
+      "preparatory",
+      "structural",
+      "semantics preserving",
+      "automated",
+      "manual",
+      "surgical",
+      "disciplined",
+      "opportunistic",
+      "continuous",
+      "reversible",
+      "irreversible"
+    ]
+  },
+  "participles": {
+    "common": [
+      "reviewed",
+      "discussed",
+      "questioned",
+      "praised",
+      "criticized",
+      "flagged",
+      "noted",
+      "spotted",
+      "examined",
+      "inspected",
+      "scrutinized",
+      "highlighted",
+      "documented",
+      "explained",
+      "challenged",
+      "revisited",
+      "reconsidered",
+      "approved",
+      "rejected",
+      "accepted",
+      "debated",
+      "mentioned",
+      "reported",
+      "acknowledged",
+      "observed",
+      "assessed",
+      "considered",
+      "recorded"
+    ],
+    "implementationHistory": [
+      "copy pasted",
+      "hand written",
+      "machine generated",
+      "hastily written",
+      "carefully crafted",
+      "long forgotten",
+      "recently added",
+      "repeatedly patched",
+      "heavily commented",
+      "commented out",
+      "partially implemented",
+      "fully implemented",
+      "half implemented",
+      "hard coded",
+      "duct taped",
+      "shoehorned",
+      "bolted on",
+      "hot fixed",
+      "ported",
+      "backported",
+      "obfuscated",
+      "transpiled",
+      "linted",
+      "compiled",
+      "interpreted",
+      "profiled",
+      "instrumented",
+      "optimized",
+      "debugged",
+      "traced"
+    ],
+    "runtimeState": [
+      "barely working",
+      "still running",
+      "somehow working",
+      "accidentally working",
+      "technically working",
+      "mostly working",
+      "unexpectedly working",
+      "mysteriously working"
+    ],
+    "callableActions": [
+      "called",
+      "invoked",
+      "inlined",
+      "extracted",
+      "composed",
+      "curried",
+      "partially applied",
+      "memoized",
+      "wrapped",
+      "delegated",
+      "awaited",
+      "retried",
+      "recursively called",
+      "tail called",
+      "dynamically dispatched",
+      "statically dispatched",
+      "bound",
+      "specialized",
+      "forwarded",
+      "intercepted",
+      "adapted",
+      "throttled",
+      "short circuited",
+      "reentered",
+      "chained"
+    ],
+    "valueActions": [
+      "initialized",
+      "assigned",
+      "reassigned",
+      "captured",
+      "boxed",
+      "unboxed",
+      "copied",
+      "cloned",
+      "serialized",
+      "deserialized",
+      "validated",
+      "normalized",
+      "converted",
+      "parsed",
+      "defaulted",
+      "coalesced",
+      "resolved",
+      "loaded",
+      "stored",
+      "persisted",
+      "mutated",
+      "frozen",
+      "compared",
+      "hashed",
+      "passed",
+      "returned",
+      "computed",
+      "derived",
+      "read",
+      "written",
+      "aliased",
+      "sanitized",
+      "discarded",
+      "reused"
+    ],
+    "collectionActions": [
+      "mapped",
+      "filtered",
+      "rearranged",
+      "grouped",
+      "flattened",
+      "folded",
+      "reduced",
+      "aggregated",
+      "partitioned",
+      "chunked",
+      "paged",
+      "materialized",
+      "enumerated",
+      "iterated",
+      "zipped",
+      "concatenated",
+      "deduplicated",
+      "reversed",
+      "shuffled",
+      "sliced",
+      "internally indexed",
+      "projected",
+      "joined",
+      "intersected",
+      "unioned",
+      "buffered",
+      "batched",
+      "traversed",
+      "searched",
+      "sampled"
+    ],
+    "controlActions": [
+      "evaluated",
+      "deeply nested",
+      "flattened out",
+      "inverted",
+      "decomposed",
+      "rewritten",
+      "hoisted",
+      "reordered",
+      "collapsed",
+      "expanded",
+      "removed",
+      "inserted",
+      "combined",
+      "bypassed",
+      "triggered",
+      "restructured",
+      "simplified",
+      "factored",
+      "logically normalized",
+      "negated",
+      "logically grouped",
+      "logically split"
+    ],
+    "typeActions": [
+      "instantiated",
+      "extended",
+      "implemented",
+      "inherited",
+      "constructed",
+      "created",
+      "registered",
+      "injected",
+      "encapsulated",
+      "renamed",
+      "substituted",
+      "replaced",
+      "generated",
+      "discovered",
+      "mock substituted",
+      "runtime resolved",
+      "statically resolved",
+      "dynamically loaded",
+      "reflected",
+      "subclassed",
+      "factored out",
+      "carefully hidden",
+      "exposed"
+    ],
+    "patternActions": [
+      "well applied",
+      "badly applied",
+      "misapplied",
+      "overused",
+      "underused",
+      "newly introduced",
+      "carefully implemented",
+      "awkwardly implemented",
+      "faithfully implemented",
+      "poorly implemented",
+      "creatively combined",
+      "carefully adapted",
+      "widely recognized",
+      "deliberately selected",
+      "deliberately avoided",
+      "carefully reused",
+      "heavily customized",
+      "lightly customized",
+      "recently retired",
+      "aggressively simplified",
+      "locally embedded",
+      "prematurely introduced",
+      "repeatedly reused",
+      "carefully refactored",
+      "accidentally duplicated",
+      "deliberately specialized",
+      "unnecessarily generalized"
+    ],
+    "apiActions": [
+      "versioned",
+      "deprecated",
+      "published",
+      "publicly exposed",
+      "consumed",
+      "routed",
+      "served",
+      "evolved",
+      "stabilized",
+      "sunset",
+      "externally documented",
+      "contract tested",
+      "smoke tested",
+      "load tested",
+      "manually exercised",
+      "mocked out",
+      "stubbed out",
+      "carefully wrapped",
+      "deliberately adapted",
+      "heavily used",
+      "lightly used",
+      "newly exposed",
+      "quietly deprecated",
+      "actively maintained",
+      "recently split"
+    ],
+    "testActions": [
+      "arranged",
+      "executed",
+      "verified",
+      "parameterized",
+      "randomized",
+      "seeded",
+      "carefully isolated",
+      "replayed",
+      "mutation tested",
+      "snapshotted",
+      "deliberately skipped",
+      "quarantined",
+      "repeated",
+      "timed",
+      "exercised",
+      "well covered",
+      "poorly covered",
+      "diagnosed",
+      "reproduced",
+      "carefully stabilized",
+      "repeatedly debugged",
+      "fixture driven",
+      "table driven",
+      "property checked",
+      "carefully checked",
+      "repeatedly run",
+      "intermittently failing",
+      "consistently passing"
+    ],
+    "doubleActions": [
+      "configured",
+      "dependency injected",
+      "subbed in",
+      "programmed",
+      "primed",
+      "explicitly verified",
+      "reset",
+      "widely reused",
+      "overconfigured",
+      "underconfigured",
+      "hand rolled",
+      "auto generated",
+      "strictly verified",
+      "loosely configured",
+      "carefully scoped",
+      "accidentally shared",
+      "deeply stubbed",
+      "behavior verified",
+      "state verified",
+      "call recording",
+      "preprogrammed"
+    ],
+    "smellActions": [
+      "detected",
+      "recently introduced",
+      "overlooked",
+      "tolerated",
+      "disguised",
+      "amplified",
+      "compounded",
+      "spreading",
+      "lingering",
+      "lurking",
+      "resurfacing",
+      "encroaching",
+      "ignored",
+      "rediscovered",
+      "accumulated",
+      "concealed",
+      "uncovered",
+      "eliminated",
+      "suppressed",
+      "tracked",
+      "cataloged",
+      "triaged",
+      "historically inherited",
+      "dismissed",
+      "waived",
+      "justified",
+      "argued over",
+      "left behind",
+      "carried forward",
+      "papered over"
+    ],
+    "namingActions": [
+      "well named",
+      "poorly named",
+      "carefully chosen",
+      "hastily chosen",
+      "recently renamed",
+      "consistently named",
+      "misleadingly named",
+      "awkwardly named",
+      "cleverly named",
+      "literally named",
+      "abbreviated",
+      "shortened",
+      "standardized",
+      "pluralized",
+      "singularized",
+      "prefixed",
+      "suffixed",
+      "reworded",
+      "clarified",
+      "camel cased",
+      "snake cased",
+      "kebab cased",
+      "title cased",
+      "misspelled"
+    ],
+    "refactoringActions": [
+      "suggested",
+      "called for",
+      "completed",
+      "attempted",
+      "proposed",
+      "performed",
+      "reverted",
+      "deferred",
+      "planned",
+      "prepared",
+      "sequenced",
+      "scoped",
+      "rehearsed",
+      "scripted",
+      "rolled back",
+      "pair programmed",
+      "followed up",
+      "abandoned",
+      "resumed",
+      "recommended",
+      "prioritized",
+      "postponed",
+      "landed",
+      "committed"
+    ],
+    "modelingActions": [
+      "modeled",
+      "refined",
+      "aligned",
+      "contextualized",
+      "newly discovered",
+      "expressed",
+      "defined",
+      "carefully mapped",
+      "translated",
+      "distilled",
+      "split",
+      "merged",
+      "contextually isolated",
+      "gradually evolved",
+      "deeply rooted",
+      "explicitly named",
+      "reconciled",
+      "coordinated",
+      "protected",
+      "clearly owned",
+      "explicitly shared",
+      "segregated",
+      "integrated",
+      "clearly bounded"
+    ]
+  },
+  "nouns": [
+    {
+      "value": "function",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "method",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "closure",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "lambda",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "callback",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "predicate",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "mapper",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "reducer",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "comparator",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "validator",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "parser",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "formatter",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "converter",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "serializer",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "deserializer",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "iterator",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "generator",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "callableTraits",
+        "callableActions",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "handler",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "listener",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "dispatcher",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "constructor",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "factory",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "hook",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "middleware",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "class",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "interface",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ],
+      "except": [
+        "constructed",
+        "created",
+        "instantiated",
+        "subclassed"
+      ]
+    },
+    {
+      "value": "component",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState",
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "service",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState",
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "helper",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "utility",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "wrapper",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "client",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState",
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "module",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "package",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "script",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "template",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "snippet",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "boilerplate",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "extension",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "plugin",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState",
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "implementation",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState",
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "request handler",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "response mapper",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "variable",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "parameter",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "argument",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "return value",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "field",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "property",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "constant",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ],
+      "except": [
+        "mutated",
+        "reassigned"
+      ]
+    },
+    {
+      "value": "value",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "reference",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "option",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "result",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "state",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "context",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "token",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "identifier",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "key",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "flag",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "counter",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "index",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "buffer",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "default value",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "magic value",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "collection",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "list",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "set",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "map",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "dictionary",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "sequence",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "array",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "tuple",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "queue",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "stack",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "lookup",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "table",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "range",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "stream",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "batch",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "dependency graph",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "object graph",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "data flow",
+      "categories": [
+        "collectionTraits",
+        "collectionActions",
+        "valueTraits"
+      ],
+      "except": [
+        "scalar"
+      ]
+    },
+    {
+      "value": "expression",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "statement",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "condition",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "conditional",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "guard clause",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "switch",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "case",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "match expression",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "decision",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "branch table",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "control flow",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "state machine",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "decision table",
+      "categories": [
+        "controlTraits",
+        "controlActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "branch",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "loop",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "exception",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "error path",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "return",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "break",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "continue",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "fallback",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "error handler",
+      "categories": [
+        "callableTraits",
+        "callableActions"
+      ]
+    },
+    {
+      "value": "side effect",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "failure mode",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "error model",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "type",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "abstraction",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "model",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "view model",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "data model",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "base class",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "subclass",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "superclass",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "extension point",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "discriminator",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "object",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "instance",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "record",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "enum",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "namespace",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "dependency",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "boundary",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "layer",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "coordinator",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "transformer",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState"
+      ]
+    },
+    {
+      "value": "entry point",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "public surface",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "internal api",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "port",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "public contract",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "protocol",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "apiTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "orchestrator",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "runtimeTraits",
+        "runtimeState",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "dependency direction",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "call chain",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "annotation",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "attribute",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "comment",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "namingTraits",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "todo",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "namingTraits",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "regex",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "namingTraits",
+        "clarityTraits"
+      ],
+      "except": [
+        "pronounceable"
+      ]
+    },
+    {
+      "value": "configuration",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "namingTraits",
+        "clarityTraits"
+      ],
+      "except": [
+        "pronounceable"
+      ]
+    },
+    {
+      "value": "feature flag",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "namingTraits",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "error message",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "log message",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "doc comment",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "call site",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "callableActions"
+      ]
+    },
+    {
+      "value": "code path",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "responsibility",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "coupling",
+      "categories": [
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "cohesion",
+      "categories": [
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "encapsulation",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "polymorphism",
+      "categories": [
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "inheritance",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "composition",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "delegation",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "abstraction level",
+      "categories": [
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "testability",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "api",
+      "categories": [
+        "apiTraits",
+        "apiActions",
+        "runtimeState",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "endpoint",
+      "categories": [
+        "apiTraits",
+        "apiActions",
+        "runtimeState",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "route",
+      "categories": [
+        "apiTraits",
+        "apiActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "contract",
+      "categories": [
+        "apiTraits",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "schema",
+      "categories": [
+        "apiTraits",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "resource",
+      "categories": [
+        "apiTraits",
+        "apiActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "operation",
+      "categories": [
+        "apiTraits",
+        "apiActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "api surface",
+      "categories": [
+        "apiTraits",
+        "apiActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "api client",
+      "categories": [
+        "apiTraits",
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "request",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "response",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "payload",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "request body",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "response body",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "query parameter",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "path parameter",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "header",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "status code",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "dto",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "typeTraits",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "request model",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "response model",
+      "categories": [
+        "typeTraits",
+        "typeActions",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "error response",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "media type",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "factory method",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "abstract factory",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "builder",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "prototype",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "singleton",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "adapter",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "bridge",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "composite",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "decorator",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "facade",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "flyweight",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "proxy",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "command",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "iterator pattern",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "mediator",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "memento",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "observer",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "state pattern",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "strategy",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "template method",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "visitor",
+      "categories": [
+        "patternActions",
+        "typeTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "pipeline",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "patternActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "extract function",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "inline function",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "extract variable",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "inline variable",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "extract class",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "inline class",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "extract superclass",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "move field",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "move function",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "encapsulate variable",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "encapsulate collection",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "introduce assertion",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "hide delegate",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "remove subclass",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "remove parameter",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "rename field",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "rename variable",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "parameterize function",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "decompose conditional",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "collapse hierarchy",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "split phase",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "split loop",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "split variable",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "substitute algorithm",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "slide statements",
+      "categories": [
+        "refactoringTraits",
+        "refactoringActions",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "feature envy",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "long method",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "large class",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "primitive obsession",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "data clumps",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "refused bequest",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "switch statements",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "temporary field",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "divergent change",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "shotgun surgery",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "comments",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "duplicate code",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "data class",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "dead code",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "lazy class",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "speculative generality",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "inappropriate intimacy",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "message chains",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "middle man",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "kludge",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "cruft",
+      "categories": [
+        "smellTraits",
+        "smellActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "signature",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "namingTraits",
+        "clarityTraits"
+      ],
+      "except": [
+        "pronounceable"
+      ]
+    },
+    {
+      "value": "hierarchy",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "shim",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "designTraits",
+        "intentTraits"
+      ]
+    },
+    {
+      "value": "test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "unit test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "integration test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "acceptance test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "regression test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "characterization test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "property test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "contract test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "mutation test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "snapshot test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "smoke test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "approval test",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "scenario",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "spec",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "test suite",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "test case",
+      "categories": [
+        "testTraits",
+        "testActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "test double",
+      "categories": [
+        "doubleActions",
+        "testTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "dummy",
+      "categories": [
+        "doubleActions",
+        "testTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ],
+      "except": [
+        "behavior verified",
+        "configured",
+        "deeply stubbed",
+        "explicitly verified",
+        "loosely configured",
+        "overconfigured",
+        "preprogrammed",
+        "primed",
+        "programmed",
+        "call recording",
+        "reset",
+        "state verified",
+        "strictly verified",
+        "underconfigured"
+      ]
+    },
+    {
+      "value": "stub",
+      "categories": [
+        "doubleActions",
+        "testTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ],
+      "except": [
+        "behavior verified",
+        "call recording",
+        "explicitly verified",
+        "strictly verified"
+      ]
+    },
+    {
+      "value": "fake",
+      "categories": [
+        "doubleActions",
+        "testTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ],
+      "except": [
+        "behavior verified",
+        "call recording",
+        "explicitly verified",
+        "strictly verified"
+      ]
+    },
+    {
+      "value": "mock",
+      "categories": [
+        "doubleActions",
+        "testTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ],
+      "except": [
+        "state verified"
+      ]
+    },
+    {
+      "value": "spy",
+      "categories": [
+        "doubleActions",
+        "testTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ],
+      "except": [
+        "deeply stubbed"
+      ]
+    },
+    {
+      "value": "fixture",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "testTraits"
+      ]
+    },
+    {
+      "value": "assertion",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "testTraits"
+      ]
+    },
+    {
+      "value": "matcher",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "testTraits"
+      ]
+    },
+    {
+      "value": "expectation",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "testTraits"
+      ]
+    },
+    {
+      "value": "test data",
+      "categories": [
+        "valueActions",
+        "valueTraits",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "test harness",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "testTraits"
+      ]
+    },
+    {
+      "value": "test seam",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "testTraits"
+      ]
+    },
+    {
+      "value": "setup",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "testTraits"
+      ]
+    },
+    {
+      "value": "teardown",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "testTraits"
+      ]
+    },
+    {
+      "value": "test helper",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "test builder",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "object mother",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory",
+        "testTraits"
+      ]
+    },
+    {
+      "value": "test factory",
+      "categories": [
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits",
+        "implementationHistory"
+      ]
+    },
+    {
+      "value": "golden master",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "test oracle",
+      "categories": [
+        "testTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "test subject",
+      "categories": [
+        "testTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "test input",
+      "categories": [
+        "valueActions",
+        "valueTraits",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "expected value",
+      "categories": [
+        "valueActions",
+        "valueTraits",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "actual value",
+      "categories": [
+        "valueActions",
+        "valueTraits",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "entity",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "value object",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "aggregate",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "aggregate root",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "domain event",
+      "categories": [
+        "valueTraits",
+        "valueActions",
+        "modelingActions",
+        "clarityTraits"
+      ]
+    },
+    {
+      "value": "domain service",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "domain model",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "bounded context",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "ubiquitous language",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "modelingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "subdomain",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "context map",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "repository",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "specification",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "invariant",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "domain rule",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "business rule",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "policy",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "domain logic",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "domain behavior",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "application service",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ],
+      "except": [
+        "contextually isolated"
+      ]
+    },
+    {
+      "value": "domain factory",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "domain policy",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "domain primitive",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "context boundary",
+      "categories": [
+        "modelingActions",
+        "designTraits",
+        "intentTraits",
+        "typeTraits"
+      ]
+    },
+    {
+      "value": "class name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "interface name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "type name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "method name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "function name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "variable name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "parameter name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "argument name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "field name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "property name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "constant name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "event name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "test name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "endpoint name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "route name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "aggregate name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "repository name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "namespace name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "module name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "command name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "query name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "handler name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "fixture name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "service name",
+      "categories": [
+        "namingTraits",
+        "clarityTraits",
+        "namingActions",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "domain boundary",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "dependency rule",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "constraint",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "error contract",
+      "categories": [
+        "designTraits",
+        "intentTraits",
+        "modelingActions",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ]
+    },
+    {
+      "value": "success path",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "happy path",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "sad path",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "null check",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "guard",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "precondition",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "postcondition",
+      "categories": [
+        "controlTraits",
+        "controlActions"
+      ]
+    },
+    {
+      "value": "null object",
+      "categories": [
+        "doubleActions",
+        "testTraits",
+        "sourceTraits",
+        "sizeTraits",
+        "craftTraits"
+      ],
+      "except": [
+        "behavior verified",
+        "configured",
+        "deeply stubbed",
+        "explicitly verified",
+        "loosely configured",
+        "overconfigured",
+        "preprogrammed",
+        "primed",
+        "programmed",
+        "call recording",
+        "reset",
+        "state verified",
+        "strictly verified",
+        "underconfigured"
+      ]
+    }
+  ],
+  "incompatible": {
+    "immutable": [
+      "mutated",
+      "reassigned"
+    ],
+    "readonly": [
+      "reassigned"
+    ],
+    "synchronous": [
+      "awaited"
+    ],
+    "abstract": [
+      "instantiated",
+      "constructed",
+      "created"
+    ],
+    "sealed": [
+      "subclassed",
+      "extended",
+      "inherited"
+    ],
+    "unreachable": [
+      "triggered",
+      "evaluated"
+    ],
+    "undocumented": [
+      "documented",
+      "externally documented"
+    ],
+    "misleading": [
+      "well named",
+      "consistently named"
+    ],
+    "descriptive": [
+      "misleadingly named"
+    ],
+    "precise": [
+      "misleadingly named"
+    ],
+    "flaky": [
+      "consistently passing"
+    ],
+    "deterministic": [
+      "intermittently failing"
+    ]
+  },
+  "defaults": {
+    "segmentMode": "threeOrTwo"
+  },
+  "maxLength": {
+    "twoWords": 63,
+    "threeWords": 63
+  }
+}

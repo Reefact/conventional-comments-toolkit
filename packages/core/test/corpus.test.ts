@@ -64,7 +64,7 @@ describe('CA-06 — corpus de parité (verdicts de référence et invariance de 
 
       // Forme de saisie (LF), telle que lue par le composant A.
       const lf = validate(inputFor(c.body, c), config).map((d) => [d.code, d.severity]);
-      // Forme stockée (CRLF), telle que relue par le composant B.
+      // Forme CRLF, entrée de `CA-18` au niveau de `core/` (§3.4.1).
       const crlf = validate(inputFor(toStoredForm(c.body), c), config).map((d) => [d.code, d.severity]);
 
       expect(lf, 'verdict LF').toEqual(c.expected);

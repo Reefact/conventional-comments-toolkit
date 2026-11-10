@@ -75,3 +75,22 @@
   --cct-inner-gutter: 8px;
   --cct-pastille-gap: 4px;
 }
+
+/* LE BOUTON D'ENVOI BLOQUÉ par l'extension (§5.4), dessiné comme Azure DevOps dessine un bouton
+   désactivé. Le blocage pose `aria-disabled="true"` ; Azure DevOps, lui, ne grise un bouton que
+   par sa classe `disabled`, si bien qu'un *Comment* bloqué restait bleu et semblait actif
+   (validation du 2026-11-10). MESURÉ le 2026-11-10 sur le *Comment* qu'Azure DevOps désactive
+   lui-même (champ vide) : sa règle `.bolt-button.disabled` prend le fond dans
+   `--palette-black-alpha-6`, le texte dans `--text-disabled-color` (un blanc à 50 % en thème
+   sombre), et le curseur par défaut. La règle ne vise QUE les boutons que l'extension a bloqués —
+   ceux qui portent sa marque `data-cct-submit-native-aria-disabled` (editor-controller.ts) —,
+   jamais un bouton que la plateforme désactive elle-même. Le survol est couvert : la règle
+   `:hover` du bouton primaire d'Azure DevOps le rebleuirait sinon.
+
+   AUCUNE ÉTOILE SUIVIE D'UNE BARRE OBLIQUE dans ce commentaire (scripts/check-extension-css.mjs). */
+:root[data-cct-platform='azdo'] .bolt-button[data-cct-submit-native-aria-disabled][aria-disabled='true'],
+:root[data-cct-platform='azdo'] .bolt-button[data-cct-submit-native-aria-disabled][aria-disabled='true']:hover {
+  background-color: var(--palette-black-alpha-6, ButtonFace);
+  color: var(--text-disabled-color, GrayText);
+  cursor: default;
+}

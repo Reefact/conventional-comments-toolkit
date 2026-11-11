@@ -211,7 +211,28 @@ the adapter's `renderedBodyShape()`):
 - `commentBodyText()` returns every marker as written.
 - For H, the mention sits below the footer.
 
-The spacing on the live page, with the extension loaded, is measured separately.
+### Spacing on the live page
+
+Measured on PR 557 with the packaged extension loaded, on github.com's real CSS. Offsets are taken
+from the top of the body's content box. GitHub pads `.comment-body` by 16 px in the classic view;
+`.markdown-body` has no padding on the Overview. Both views give the same gaps:
+
+| What | Measured |
+|---|---|
+| A and B | identical: subject at 2 px, paragraph at 35.7 px, mention at 71.7 px, body 89.7 px high (Overview) |
+| subject → body (A, B, H) | 10.7 px, i.e. ⅔ of the 16 px paragraph gap |
+| subject → mention (C, E, G, I) | 16 px |
+| last block → mention (A, B, H) | 16 px; for H, below the footer |
+| mention alone (D) | 0 px above it |
+| H, paragraph → `<hr>` where the marker was | 24 px, the `<hr>`'s own margin (the 16 px of a `<p>` collapse into it): no blank line, no doubled gap |
+| I | `🤖 session: #ERROR`, with the `W-SESSION-MULTIPLE` message as `title` |
+| F | unchanged; both markers stay visible |
+
+The mention is rendered in roman (`font-style: normal`), in the secondary text color.
+
+Screenshots at `deviceScaleFactor: 2` cover the classic view only. GitHub serves the Overview to
+signed-in users only, and an anonymous Chromium gets the classic view even with `?overview=true`.
+The Overview figures above come from the signed-in browser, at a device pixel ratio of 1.
 
 ## Not measured
 

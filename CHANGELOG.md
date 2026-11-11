@@ -12,6 +12,34 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [1.0.0-rc.1] - 2026-11-11
+
+### Added
+
+- **A shipped `summary` label, and a third label kind, `status`.** `summary` (📋, abbreviation `?sum`) recaps a review pass: what was checked, what is still open. It raises no point, answers none and closes nothing. It joins `reviewed` under the new kind `status`, which says where a review stands; `remark` raises a point and `reply` answers one. The kind gives a label's primary role and changes no verdict. The upper row of the toolbar lists the `remark` labels, then the `status` labels, which close it; a `status` label alone keeps that row and the separator under it (§3.2, §5.1, CA-48, CA-49, CA-50, CA-55). A repository can declare its own label with `"kind": "status"`.
+
+- **Configuration notices are shown, in the interface's language.** The notices about the configuration — a key the enterprise floor overrides, an unknown or retired key, an invalid configuration, an unsupported version — were computed and dropped. They now appear in the status pill, after the diagnostics and without changing any verdict, and in the status group of the settings page, which names the repository of the last configuration read (§5.3). Each notice names the level at fault (enterprise floor, organization document, repository file, or their merge for label and alias conflicts). A rejected allowlist pattern is cited by its position and an excerpt of at most 40 characters, with control and bidirectional characters replaced. The notices are written in English and French, with real singular and plural forms. A change that alters only the notices, such as an unknown key added or fixed, now reaches the pill and the settings page on the next configuration read. A notice stored by an earlier version is still shown, in its original wording. `PRIVACY.md` lists the notices stored on the device, including the full rejected values they keep as references.
+
+- **A session marker can carry a description, shown on hover.** `[session:<id> — *<sentence>*]`: the mention shows the identifier, and the sentence after the em dash becomes its tooltip, with the `*…*`, `_…_` or `<em>…</em>` italics removed. The italic description is the one formatting the extension accepts on a marker's line on GitHub, GitLab and Azure DevOps; any other formatting still makes it leave the line alone. Markers without a description render as before, and duplicate markers still yield `#ERROR`. The tooltip and the arrow cursor cover the mention's text only, not the blank space above it (§3.6, §5.5, CA-51, CA-53).
+
+- **A comment field the extension places by default, without recognising it, is now recorded in the journal.** Each platform gives an unrecognised field a default zone. That default is also the normal path for one kind of field per platform — a new diff line comment on GitHub, a new general comment on Azure DevOps, a new diff line thread on GitLab — so a field nobody recognised was classified silently: GitHub's review panel was once read as a line comment that way (#168). Those normal cases are now recognised explicitly, and any other field that reaches the default writes a journal line naming the field. The zone given to the field does not change (§9.4).
+
+### Removed
+
+- **The verifier (component B) is retired from the specification, and what only it used leaves the extension.** The product never blocks a merge; it reports the unresolved blocking threads of a pull request. The configuration keys `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` and `docUrl` are no longer read: in a repository file or an organization document they are reported as unknown keys, with no fallback (§8.2), and the enterprise floor drops `formatSeverity`, `activation` and `resolverOverrideGroup` the same way. The managed-policy schema no longer declares those three floor keys: measured in Chrome, an undeclared nested key is dropped and the rest of the floor arrives intact. The mode `warn` is read as `assist`, with an "obsolete value" notice, in a configuration and in the floor's `minimumMode`, which still accepts it: removing it from the schema would make Chrome drop the whole floor (§7). The journal no longer looks for a merge button or a pull request creation date on any platform.
+
+### Changed
+
+- **Telemetry label counters carry the label's kind.** A label counter is now `label-<kind>:<id>`, with the kind the effective configuration gives the label when it is inserted — `remark`, `status` or `reply`, a closed vocabulary — so that the §12 indicators can keep replies and status labels apart from the others without guessing. No free text is added (§10, §12).
+
+- **`W-NOT-BLOCKABLE` now says that the comment will not be counted among the blocking threads** (§4.1), instead of referring to the retired verifier.
+
+### Fixed
+
+- **A repository can shorten the configuration cache below the enterprise floor's `configCacheTtlSeconds`.** The floor's value was imposed as a fixed value, so a repository asking for a shorter cache was raised back to it, with a notice claiming it would relax the floor. The floor's value is now a maximum: a shorter value is kept without notice, a longer one is capped with a notice naming its level (§8.1.1, §8.1.3).
+
+- **On Azure DevOps, editing a comment is no longer taken for a new general comment.** The new-comment area matched the whole activity feed, edit and reply fields included; an edited comment whose markup was not recognised was classified as a new general comment, silently. Only the new general comment field now matches it.
+
 ## [1.0.0-beta.21] - 2026-11-02
 
 ### Fixed
@@ -749,6 +777,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[1.0.0-rc.1]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.21...v1.0.0-rc.1
 [1.0.0-beta.21]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.20...v1.0.0-beta.21
 [1.0.0-beta.20]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.19...v1.0.0-beta.20
 [1.0.0-beta.19]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.18...v1.0.0-beta.19

@@ -207,12 +207,40 @@ describe('§8.1.1 — plancher', () => {
     expect(closed.config.exemptUsers).toEqual(['svc-bot']); // un dépôt ne s'ajoute pas lui-même
   });
 
-  it('configCacheTtlSeconds : valeur imposée, ni minimum ni maximum (§8.1.3 règle 4)', () => {
-    const { config } = resolveConfig(
-      { minimumMode: 'off', configCacheTtlSeconds: 600 },
-      absent,
-      found({ configCacheTtlSeconds: 60 }));
-    expect(config.configCacheTtlSeconds).toBe(600);
+  describe('configCacheTtlSeconds : MAXIMUM (§8.1.1, §8.1.3 règle 4)', () => {
+    const floor = { minimumMode: 'off', configCacheTtlSeconds: 600 } as const;
+    const ttlOverrides = (notices: readonly { kind: string; ref?: string }[]) =>
+      notices.filter((n) => n.kind === 'floor-override' && n.ref === 'configCacheTtlSeconds');
+
+    it('un dépôt qui RACCOURCIT le cache est suivi, sans avis', () => {
+      const { config, notices } = resolveConfig(floor, absent, found({ configCacheTtlSeconds: 60 }));
+      expect(config.configCacheTtlSeconds).toBe(60);
+      expect(ttlOverrides(notices)).toEqual([]);
+    });
+
+    it('un dépôt qui l\'ALLONGE au-delà du plancher est ramené au plancher, avec avis', () => {
+      const { config, notices } = resolveConfig(floor, absent, found({ configCacheTtlSeconds: 7200 }));
+      expect(config.configCacheTtlSeconds).toBe(600);
+      expect(ttlOverrides(notices)).toHaveLength(1);
+    });
+
+    it('une organisation qui l\'allonge est ramenée de même, l\'avis nommant l\'organisation', () => {
+      const { config, notices } = resolveConfig(floor, found({ configCacheTtlSeconds: 7200 }), absent);
+      expect(config.configCacheTtlSeconds).toBe(600);
+      expect(ttlOverrides(notices).map((n) => (n as { params?: { level?: string } }).params?.level)).toEqual(['org']);
+    });
+
+    it('rien d\'écrit : le défaut (3600) est borné par le plancher, sans avis (aucune clé ignorée)', () => {
+      const { config, notices } = resolveConfig(floor, absent, absent);
+      expect(config.configCacheTtlSeconds).toBe(600);
+      expect(ttlOverrides(notices)).toEqual([]);
+    });
+
+    it('égal au plancher : gardé, sans avis', () => {
+      const { config, notices } = resolveConfig(floor, absent, found({ configCacheTtlSeconds: 600 }));
+      expect(config.configCacheTtlSeconds).toBe(600);
+      expect(ttlOverrides(notices)).toEqual([]);
+    });
   });
 
   it('plancher absent = {minimumMode: off}, aucune règle imposée', () => {

@@ -436,8 +436,11 @@ export function applyFloor(config: EffectiveConfig, floor: Floor, written: Writt
     }
   }
 
-  // configCacheTtlSeconds — valeur imposée, ni minimum ni maximum (§8.1.1, règle 4 du §8.1.3).
-  if (floor.configCacheTtlSeconds !== undefined && out.configCacheTtlSeconds !== floor.configCacheTtlSeconds) {
+  // configCacheTtlSeconds — MAXIMUM (§8.1.1) : un niveau inférieur peut raccourcir le cache,
+  // jamais l'allonger au-delà du plancher (règle 4 du §8.1.3 : « borner de combien un poste peut
+  // être en retard »). L'appliquer comme valeur imposée ramenait un cache plus court au plancher
+  // et signalait à tort qu'il « assouplissait » ce dernier.
+  if (floor.configCacheTtlSeconds !== undefined && out.configCacheTtlSeconds > floor.configCacheTtlSeconds) {
     overridden('configCacheTtlSeconds');
     out.configCacheTtlSeconds = floor.configCacheTtlSeconds;
   }

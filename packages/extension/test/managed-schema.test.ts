@@ -30,7 +30,15 @@ const everyFloorKey: Required<Floor> = {
 /** Les clés retirées du plancher avec le vérificateur (§2), et LEUR SEULE raison d'être encore
  * déclarées : qu'un plancher qui les porte arrive jusqu'à l'extension, qui les ignore et le
  * signale. Les retirer du schéma supposerait de savoir ce que Chrome fait d'une clé imbriquée
- * non déclarée — l'écarter, ou rejeter tout le plancher —, ce qui n'a pas été mesuré. */
+ * non déclarée — l'écarter, ou rejeter tout le plancher —, ce qui n'a pas été mesuré.
+ *
+ * Tentative du 2026-11-11, à ne pas refaire sous cette forme : une politique `3rdparty` posée
+ * dans `/etc/chromium/policies/managed/` pour l'identifiant d'une extension chargée par
+ * `--load-extension` n'arrive pas. `chrome://policy` liste bien le schéma de l'extension
+ * (`allowedHosts`, `floor`, `telemetry`), mais chaque clé y reste « Not set », et
+ * `chrome.storage.managed` rend `{}`, avec le schéma actuel comme sans les clés retirées. La
+ * mesure demande donc une extension INSTALLÉE (empaquetée, ou forcée par
+ * `ExtensionInstallForcelist`), pas une extension chargée depuis un dossier. */
 const RETIRED_FLOOR_KEYS = ['activation', 'formatSeverity', 'resolverOverrideGroup'];
 
 const schema = JSON.parse(

@@ -18,9 +18,10 @@ slugger --theme-dir <skill-dir> --theme code-review --oneshot
 
 When neither runs — no .NET SDK, as in most agent containers — and the machine is Linux x64,
 download the command compiled natively instead. It needs nothing installed, only `curl` and
-access to `github.com` and `release-assets.githubusercontent.com`, or to `api.github.com` when the
-direct download fails: the block retries it once, then asks the GitHub Releases API for the same
-asset. Run the block as it is, as one command: the version, the asset ID and the SHA-256 are pinned
+access to four hosts: `github.com` and `api.github.com`, which the block asks, and
+`objects.githubusercontent.com` and `release-assets.githubusercontent.com`, where GitHub redirects
+the download — GitHub picks the host, so a network allowlist names both. The block retries the
+direct download once, then asks the GitHub Releases API for the same asset. Run the block as it is, as one command: the version, the asset ID and the SHA-256 are pinned
 together, and each step runs only if the one before it succeeded, so a download that fails or does
 not match is never run — whatever the shell, `set -e` or not, and even when the block is the
 condition of an `if` or the left side of `||`. A non-zero exit means no identifier was drawn.

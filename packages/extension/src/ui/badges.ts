@@ -667,6 +667,10 @@ const HIDDEN_SESSION_CLASS = 'cct-hidden-session';
 const HIDDEN_SESSION_BLOCK_CLASS = 'cct-hidden-session-block';
 /** Ce que l'extension AFFICHE, en bas du corps. Il ajoute du texte : `commentBodyText()` l'exclut. */
 const SESSION_CLASS = 'cct-session';
+/** Le texte de la mention, dans son propre `<span>` EN LIGNE : c'est lui, et lui seul, qui porte
+ * l'infobulle et le curseur. Posés sur le bloc, ils valaient aussi pour l'écart au-dessus de la
+ * mention (`--cct-session-gap`, un `padding`) : l'infobulle s'ouvrait sur une bande vide. */
+const SESSION_TEXT_CLASS = 'cct-session-text';
 
 /** Le texte de la mention : l'identifiant — jamais sa description, montrée au survol —, ou
  * `#ERROR` quand le corps porte plusieurs marqueurs — aucune session n'est alors désignée
@@ -941,8 +945,14 @@ function applySessionProjection(
     body.appendChild(created);
   }
   const shown = body.querySelector(`:scope > .${SESSION_CLASS}`) as HTMLElement;
+  let text = shown.firstElementChild as HTMLElement | null;
+  if (shown.childNodes.length !== 1 || text === null || !text.classList.contains(SESSION_TEXT_CLASS)) {
+    text = globalThis.document.createElement('span');
+    text.className = SESSION_TEXT_CLASS;
+    shown.replaceChildren(text);
+  }
   const expected = sessionText(marker, config);
-  if (shown.textContent !== expected) shown.textContent = expected; // icône changée
+  if (text.textContent !== expected) text.textContent = expected; // icône changée
   // Au survol : le doublon dit pourquoi aucune session n'est affichée — le diagnostic lui-même
   // n'est montré qu'à la saisie, avec les autres (§5.3) —, un marqueur seul montre sa
   // description, telle qu'écrite (§3.6).
@@ -950,8 +960,8 @@ function applySessionProjection(
     marker.value === null
       ? t(lang, 'diag.W-SESSION-MULTIPLE', { count: marker.lines.length })
       : (marker.description ?? '');
-  if (title === '') shown.removeAttribute('title');
-  else if (shown.title !== title) shown.title = title;
+  if (title === '') text.removeAttribute('title');
+  else if (text.title !== title) text.title = title;
 }
 
 /** Règle l'écart au-dessus de la mention, une fois les marges du corps fixées. */

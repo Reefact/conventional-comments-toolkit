@@ -136,28 +136,39 @@ describe('CA-53 — le marqueur reconnu est masqué là où il est, et la mentio
     const before = commentBodyText(el);
     decorate(el);
     expect(shown(el)).toBe('\u{1F916} session: disheartening-reviewed-implementation');
-    expect((el.querySelector('.cct-session') as HTMLElement).title).toBe("On a passé l'implémentation en revue !");
+    expect((el.querySelector('.cct-session-text') as HTMLElement).title).toBe("On a passé l'implémentation en revue !");
     expect(commentBodyText(el)).toBe(before);
   });
 
   it('sans description, rien au survol ; une description retirée emporte son infobulle', () => {
     const el = body('<p>note: x</p>\n<p>[session:run-1(Texte)]</p>');
     decorate(el);
-    expect((el.querySelector('.cct-session') as HTMLElement).title).toBe('Texte');
+    expect((el.querySelector('.cct-session-text') as HTMLElement).title).toBe('Texte');
     el.querySelectorAll('p')[1]!.textContent = '[session:run-1]';
     decorate(el);
     expect(shown(el)).toBe('\u{1F916} session: run-1');
-    expect(el.querySelector('.cct-session')!.hasAttribute('title')).toBe(false);
+    expect(el.querySelector('.cct-session-text')!.hasAttribute('title')).toBe(false);
   });
 
-  it('la mention garde la flèche au survol, sur tout le bloc : `cursor: default` sur `.cct-session`', () => {
+  it('l’infobulle est sur le texte seul, pas sur le bloc et son écart au-dessus', () => {
+    const el = body('<p>note: x</p>\n<p>[session:run-1(Texte)]</p>');
+    decorate(el);
+    const block = el.querySelector('.cct-session') as HTMLElement;
+    expect(block.hasAttribute('title')).toBe(false);
+    expect(block.children).toHaveLength(1);
+    expect(block.firstElementChild!.className).toBe('cct-session-text');
+    expect((block.firstElementChild as HTMLElement).title).toBe('Texte');
+  });
+
+  it('la mention garde la flèche au survol de son texte : `cursor: default` sur `.cct-session-text`', () => {
     const css = readFileSync(resolve(process.cwd(), 'packages/extension/src/styles.css'), 'utf8').replace(
       /\/\*[\s\S]*?\*\//g,
       ' '
     );
-    const rule = /\.cct-session\s*\{([^}]*)\}/.exec(css);
+    const rule = /\.cct-session-text\s*\{([^}]*)\}/.exec(css);
     expect(rule).not.toBeNull();
     expect(rule![1]).toMatch(/cursor\s*:\s*default\s*;/);
+    expect(/\.cct-session\s*\{([^}]*)\}/.exec(css)![1]).not.toMatch(/cursor/);
   });
 
   it('l’icône se configure, et un changement d’icône se reporte au passage suivant', () => {
@@ -248,7 +259,7 @@ describe('CA-54 — plusieurs marqueurs : aucune session affichée, `#ERROR` (§
     expect(el.querySelectorAll(HIDDEN)).toHaveLength(2);
     expect(el.querySelectorAll('.cct-session')).toHaveLength(1);
     expect(shown(el)).toBe('\u{1F916} session: #ERROR');
-    expect((el.querySelector('.cct-session') as HTMLElement).title).toContain('2 session markers');
+    expect((el.querySelector('.cct-session-text') as HTMLElement).title).toContain('2 session markers');
     expect(visible(el)).toBe('x Detail. more\u{1F916} session: #ERROR');
     expect(mentionIsLast(el)).toBe(true);
   });
@@ -267,7 +278,7 @@ describe('CA-54 — plusieurs marqueurs : aucune session affichée, `#ERROR` (§
     el.querySelectorAll('p')[2]!.remove();
     decorate(el);
     expect(shown(el)).toBe('\u{1F916} session: a');
-    expect(el.querySelector('.cct-session')!.hasAttribute('title')).toBe(false);
+    expect(el.querySelector('.cct-session-text')!.hasAttribute('title')).toBe(false);
     expect(el.querySelectorAll(HIDDEN)).toHaveLength(1);
   });
 

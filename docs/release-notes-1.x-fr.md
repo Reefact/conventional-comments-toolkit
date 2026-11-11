@@ -10,25 +10,35 @@ ne bloque jamais une fusion.
 
 ## 1.0.0-rc.1 — 11 novembre 2026
 
-_La version candidate de la 1.0.0 : un label `summary` pour récapituler une revue, les problèmes de configuration affichés là où vous les voyez, et des descriptions sur les marqueurs de session ; le vérificateur est retiré pour de bon._
+_La version candidate de la 1.0.0 : la prise en charge de GitLab et de la nouvelle page Overview de GitHub, un Azure DevOps qui fonctionne, les marqueurs de session de revue et un label `summary` ; `enforce` bloque désormais vraiment, après avoir relu la configuration, et le vérificateur est retiré pour de bon._
 
 ### ✨ Nouveautés
 
+- **GitLab (gitlab.com) est pris en charge, sans blocage.** Les merge requests de gitlab.com reçoivent la barre d'outils, les badges, le filtre des fils et le bandeau. Activez gitlab.com depuis la page des réglages, comme tout autre site. L'extension ne sait pas encore lire la configuration d'un dépôt sur GitLab : elle n'y bloque donc jamais un commentaire. GitLab Self-Managed et Dedicated ne sont pas encore pris en charge.
+- **La nouvelle page Overview de GitHub est prise en charge.** Sur l'Overview, l'extension ne reconnaissait pas le nouveau champ de commentaire : rien n'était bloqué en mode `enforce`, et beaucoup de commentaires n'avaient pas de badge. L'Overview et la page Conversation classique fonctionnent désormais toutes deux. Le bandeau se place sous l'en-tête de la pull request, et le filtre des fils au-dessus de leur liste.
+- **Les marqueurs de session de revue.** Une ligne `[session:<id>]` dans un commentaire indique quelle session de revue l'a écrit, pour distinguer les commentaires de plusieurs agents ou de plusieurs passages. L'extension masque la ligne et affiche un discret `🤖 session: <id>` au bas du commentaire ; le marqueur n'a aucun effet sur la validation. Ajoutez une description après un tiret cadratin, `[session:<id> — *<phrase>*]`, et elle apparaît au survol de la mention. Deux marqueurs dans un même commentaire affichent `#ERROR` et un avertissement qui ne bloque jamais.
 - **Un label `summary` pour récapituler une passe de revue.** `summary` (📋, saisi avec `?sum`) dit ce qui a été vérifié et ce qui reste ouvert ; il ne soulève aucun point et n'en clôt aucun. Il rejoint `reviewed` dans un nouveau groupe de labels qui disent où en est une revue, au bout de la première rangée de la barre d'outils. Un dépôt peut ajouter son propre label à ce groupe avec `"kind": "status"`.
 - **Les problèmes de votre configuration sont affichés, dans votre langue.** Quand une clé est inconnue ou retirée, quand la configuration est invalide, ou quand la politique de votre organisation l'emporte sur un réglage, l'extension ne disait rien. Elle liste désormais ces avis dans la pastille d'état et sur la page des réglages, en français ou en anglais, en nommant d'où vient le problème : la politique de votre organisation, le document de l'organisation ou le fichier du dépôt. Ils informent ; ils ne changent jamais l'acceptation d'un commentaire.
-- **Un marqueur de session peut porter une description, affichée au survol.** Écrivez `[session:<id> — *<phrase>*]` : la page montre l'identifiant, et la phrase apparaît au survol. Le marqueur reste lisible sans l'extension. Un marqueur sans description s'affiche comme avant.
-- **Un champ de commentaire que l'extension ne sait pas situer est désormais consigné au journal.** Un tel champ recevait jusqu'ici une place par défaut, en silence. Il est toujours traité de la même façon, mais une ligne du journal de la page des réglages le nomme, si bien qu'une page mal lue peut être signalée.
+- **Le journal consigne les champs de commentaire que l'extension n'a pas su comprendre entièrement.** Un champ dont les boutons d'envoi n'ont pas été trouvés, ou que l'extension a situé par défaut sans le reconnaître, laisse désormais une ligne dans le journal de la page des réglages, si bien qu'une page mal lue peut être signalée.
 
 ### 🔧 Changements
 
+- **En mode `enforce`, les commentaires non conformes sont désormais bloqués sur toutes les pull requests.** Jusqu'ici, `enforce` ne bloquait que les pull requests créées après une date d'activation que rien ne fixait par défaut : la plupart des installations en `enforce` ne bloquaient donc rien. Cette condition disparaît : si vos dépôts sont en `enforce`, attendez-vous à des blocages après cette mise à jour. Avant de bloquer, l'extension relit la configuration : un dépôt que l'on vient de repasser en `assist` n'est pas bloqué, le bouton est libéré et l'on vous demande d'envoyer à nouveau.
+- **Le vérificateur est retiré, et ses réglages avec lui.** Le produit signale les fils bloquants non résolus d'une pull request ; il ne bloque jamais une fusion, et ne grise plus le bouton de fusion. Les clés `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` et `docUrl` ne sont plus lues, et sont signalées comme clés inconnues. Le mode `warn` fonctionne comme `assist`, avec un avis qui signale la valeur comme obsolète. Si votre configuration en contient, vous pouvez les retirer.
+- **Le bandeau est replié par défaut et n'affiche que le nombre de fils bloquants non résolus.**
+- **Azure DevOps est pris en charge sur `dev.azure.com` seulement.** Les organisations sur `{org}.visualstudio.com` ou sur Azure DevOps Server ne sont pas couvertes.
 - **Si votre configuration définit déjà un label `summary`, il lui faut une propriété pour continuer à fonctionner comme avant.** Votre label fusionne désormais avec celui que livre le produit et devient toujours non bloquant, si bien que `summary (blocking):` est refusé. Ajoutez `"alwaysNonBlocking": false` pour le rétablir.
-- **Le vérificateur est retiré, et ses réglages avec lui.** Le produit signale les fils bloquants non résolus d'une pull request ; il ne bloque jamais une fusion. Les clés `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` et `docUrl` ne sont plus lues, et sont signalées comme clés inconnues. Le mode `warn` fonctionne comme `assist`, avec un avis qui signale la valeur comme obsolète. Si votre configuration en contient, vous pouvez les retirer.
 - **Les décomptes de labels de la télémétrie disent de quel type de label il s'agit.** Si votre organisation collecte la télémétrie, chaque décompte de label porte désormais son type — `remark`, `status` ou `reply` — pour que réponses et récapitulatifs se comptent à part. Rien d'autre n'est ajouté.
 
 ### 🐛 Corrections
 
+- **Azure DevOps fonctionne.** L'extension n'avait jamais fonctionné sur Azure DevOps ; elle est reconstruite à partir de pages réelles. Champs de commentaire, boutons d'envoi et fils sont reconnus, l'aperçu en direct reçoit ses badges, la barre d'outils suit le thème d'Azure DevOps, un bouton bloqué a l'air désactivé, et la configuration du dépôt est lue : `enforce` s'y applique.
+- **Les raccourcis clavier ne contournent plus `enforce`.** Sur Azure DevOps, Entrée, Ctrl+Entrée ou Espace sur le bouton Comment publiaient un commentaire non conforme. Ces touches sont désormais bloquées comme un clic.
+- **Sur GitHub, « Close with comment » et le bouton Comment de l'Overview ne contournent plus `enforce`.**
+- **Un commentaire qui cite du code ou du texte avant son label reçoit son badge.**
 - **Un dépôt peut demander un cache de configuration plus court que la politique de votre organisation.** La durée fixée par la politique était imposée telle quelle, si bien qu'un dépôt voulant des réglages plus frais y était ramené. C'est désormais un maximum, comme prévu.
 - **Sur Azure DevOps, modifier un commentaire n'est plus pris pour un nouveau commentaire.**
+- **Le journal de diagnostic garde la trace d'un problème qui n'a jamais disparu,** au lieu de la remplacer par une observation plus tardive.
 
 ## 1.0.0-beta.21 — 2 novembre 2026
 

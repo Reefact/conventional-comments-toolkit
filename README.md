@@ -228,10 +228,11 @@ tell parallel review sessions apart. Each agent session draws its own identifier
 source, checks that the pull request does not carry it yet, and never takes one from the pull
 request, from another session or from an earlier conversation. The identifier is a readable name drawn by
 [Slugger](https://github.com/Reefact/slugger), used without asking when it already runs — or, on
-Linux x64 without .NET, through its native build, downloaded and checked against a pinned SHA-256;
-otherwise
-the reviewer skill offers it once, and records the answer — Slugger, or a GUID — in a committed
-`session-id.md` beside it.
+Linux x64 without .NET, through its native build, downloaded and checked against a pinned SHA-256.
+The choice is made once per installation and recorded in a committed `session-id.md` beside the
+skill: where none is recorded yet, the reviewer skill offers Slugger once and records the answer —
+Slugger, or a GUID. Once a choice is recorded it is never asked again; where a recorded Slugger
+cannot run on a machine, that session draws a GUID by a command instead, and its report says why.
 
 ## Modes and adoption (§7)
 

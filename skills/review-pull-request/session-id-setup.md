@@ -50,10 +50,14 @@ repository's local tool manifest, from the repository root:
 
 ```bash
 dotnet new tool-manifest
-dotnet tool install Slugger.Cli
+dotnet tool install Slugger
 ```
 
-Skip the first command when the repository already has a manifest. Without the SDK, record the
+Skip the first command when the repository already has a manifest. Until version `1.1.0` the
+command was published as `Slugger.Cli`: a manifest that still lists `slugger.cli` keeps working,
+and moves to the new id with `dotnet tool uninstall Slugger.Cli` then
+`dotnet tool install Slugger`. Renaming its key alone asks for a version of `Slugger` that was
+never published as a tool. Without the SDK, record the
 choice all the same and leave the manifest alone: the option's native command draws the names on
 Linux x64, and a machine with the SDK can add the manifest later. Do not install the SDK to get
 there.

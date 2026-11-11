@@ -21,7 +21,8 @@ une pull request.
    **sujet** que le changement touche, pas sur les mots du diff.
 3. Lire celles-là, et seulement celles-là. N'élargir que si l'une en cite une autre.
 4. Une décision dont le statut dit « Remplacé par DECxxxx » est de l'histoire : lire son
-   remplaçant.
+   remplaçant. Un remplaçant seulement **Proposé** ne remplace encore rien : la décision en
+   vigueur reste l'ancienne.
 
 ## 2. Décider de l'issue
 
@@ -81,8 +82,13 @@ l'IDR qu'une fois validé par le propriétaire.
   **Alternatives envisagées** : chacune avec la raison de son rejet. **Conséquences** :
   Positives, Négatives, Risques, Actions de suivi.
 - Ajouter la ligne de l'IDR à l'index des **deux** README.
-- Pour un **remplacement** : le nouvel IDR dit lequel il remplace ; l'ancien ne gagne qu'une
-  ligne de statut, `Remplacé par DECnnnn` — c'est la seule modification permise d'un IDR accepté.
+- Pour un **remplacement**, pendant la rédaction : le nouvel IDR, **Proposé**, dit lequel il
+  propose de remplacer ; l'ancien ne change pas, et reste la décision en vigueur. Si le
+  propriétaire rejette la proposition, rien n'est à défaire.
+- **Quand le propriétaire accepte** le remplaçant, et seulement alors, les deux transitions se
+  font ensemble : une ligne `Accepté` au statut du nouvel IDR, une ligne `Remplacé par DECnnnn`
+  au statut de l'ancien — la seule modification permise d'un IDR accepté —, et les deux index
+  mis à jour dans le même changement.
 - Citer l'IDR là où la règle qu'il produit est écrite (`CLAUDE.md`, la spécification, un skill),
   plutôt que d'y recopier son *pourquoi*.
 

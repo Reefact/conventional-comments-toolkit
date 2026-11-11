@@ -12,13 +12,13 @@
 
 The repository's code is formatted by hand, and no setting makes Prettier idempotent on it: it restructures rather than wraps. A `prettier --write` run on seven files in progress produced about 580 lines of noise in an already-pushed commit, which had to be undone by hand.
 
-A `.prettierrc` file had been added to pin the style. The Prettier extension for VS Code has a `prettier.requireConfig` setting, widely enabled, that refuses to format while no local configuration exists: adding the file switched those machines from "does not format" to "formats on every save" (review of pull request #63).
+A `.prettierrc` file had been added to pin the style. The Prettier extension for VS Code has a `prettier.requireConfig` setting, widely enabled, that refuses to format while no local configuration exists: adding the file switched developers who also had `editor.formatOnSave` enabled from "does not format" to "formats" (review of pull request #63).
 
 Measured across all sources: with `requirePragma: true`, no file is rewritten; without it but with the rest of the configuration, 106 files (+3,611 / −1,122 lines); with no configuration at all, 140 files (+17,850 / −10,662).
 
 ## Decision
 
-The repository's Prettier configuration carries `requirePragma: true`, so that Prettier formats no file that does not ask for it with an `@format` pragma.
+The repository's Prettier configuration carries `requirePragma: true`, so that Prettier formats no file that does not ask for it with a Prettier pragma (`@format` or `@prettier`).
 
 ## Rationale
 
@@ -28,7 +28,9 @@ The other keys only bound the damage on the day someone removes `requirePragma`,
 
 ## Alternatives considered
 
-No alternative was documented when the decision was made.
+### Alternative 1 — A `.prettierignore` covering the sources
+
+The other option offered in the review of pull request #63. Rejected by the author: an ignore file that really covered the sources would amount to listing the whole repository; the list would age with the first directory added, and a new file would be formatted without anyone noticing. The pragma reverses the burden: it is the file that has to ask to be formatted.
 
 ## Consequences
 

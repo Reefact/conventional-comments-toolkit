@@ -9,7 +9,7 @@ An **Important Decision Record (IDR)** keeps one important decision of this repo
 ## Rules
 
 - **One decision, one IDR.** Only real choices are recorded: a decision a future maintainer would ask *"why did they do it this way?"* about. If the implementation changed but the decision stood, the IDR should not need editing.
-- **An accepted IDR is never rewritten.** A decision that changes gets a new IDR, and the old one's status gains a line naming its replacement.
+- **An accepted IDR is never rewritten.** A decision that changes gets a new IDR; when that replacement is accepted, and only then, the old one's status gains a line naming it.
 - **The status is append-only**: one row per change, `Date | Status | Note | Linked minutes`, no row ever edited or removed. Statuses: Proposed, Accepted, Rejected, Deprecated, Superseded by DECxxxx.
 - **Context holds facts, Rationale holds arguments** drawn from those facts. **Decision is exactly one sentence**, with no justification in it.
 - **Nothing is invented.** An alternative, a consequence or a risk enters an IDR only once the person carrying the decision has validated it; an alternative that was never documented is not reconstructed.

@@ -174,6 +174,45 @@ inside the first thread's box (Overview). It now goes before the timeline item h
 thread — `[data-testid="timeline-item"]` (Overview), `.js-timeline-item` (classic) — checked in
 Chromium in both views.
 
+## Session markers (#164, 2026-11-11)
+
+Captured in both views, extension disabled:
+
+- `03-*-marqueur-session-pr165.html`, PR #165 of this repository. These are real comments written
+  by the review skills. Shape A is 6774156687: the marker is the last line, after a blank line.
+  Shape H is 6772990866: the marker, then `---` and a signed footer.
+- `03-*-marqueur-session-cas-limites.html`, PR 557 of `Reefact/just-dummies`. It holds nine
+  conversation comments, one per case A to I of #164. They were posted through the page's form,
+  so their line endings are CRLF, like any comment typed in GitHub.
+
+Rendered body, identical in the classic view and the Overview:
+
+| Case | Written | Rendered |
+|---|---|---|
+| A | subject, blank, paragraph, lines of spaces, marker, trailing blanks | three `<p>`. The marker is its own `<p>`. The lines of spaces and the trailing blanks leave nothing. |
+| B | single newlines only | one `<p>`: `subject<br>⏎paragraph<br>⏎marker`. Each `<br>` is followed by a newline. |
+| C | subject, blank, marker | two `<p>`. |
+| D | marker alone | one `<p>`. |
+| E | spaces around the marker | `<p>[session:…]</p>`, with the spaces stripped. |
+| F | marker in a fenced block, and in a `>` quote | `pre > code` inside GitHub's `snippet-clipboard-content` wrapper, then `blockquote > p`. |
+| G | `[session:Mixed-Case-Value]` | its own `<p>`, with the casing kept. |
+| H | paragraph, marker, `---`, footer | `<p>`, `<p>`, `<p>marker</p>`, `<hr>`, `<p>footer</p>`. |
+| I | two marker lines | each in its own `<p>`. |
+
+The marker value is never turned into a link, in either view. The real comments of #165 have the
+same shapes as A and H.
+
+Projection on these captures (`extension/test/session-marker-real-pages-github.test.ts`, with
+the adapter's `renderedBodyShape()`):
+
+- A–E, G and H are projected, as are both real comments.
+- F is not projected.
+- I shows `🤖 session: #ERROR`.
+- `commentBodyText()` returns every marker as written.
+- For H, the mention sits below the footer.
+
+The spacing on the live page, with the extension loaded, is measured separately.
+
 ## Not measured
 
 - ~~Resolution state of an Overview thread~~ — **measured 2026-11-09.** An open thread's group

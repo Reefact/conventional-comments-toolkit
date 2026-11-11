@@ -47,6 +47,7 @@ import { AzdoClientAdapter } from '@cct/adapter-azdo';
 import { commentBodyText, SelectorLog, type PlatformAdapter, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { defaultConfig, splitBody, type PrRef, type ThreadInfo } from '@cct/core';
 import { ClientConfigResolver, type ResolvedClientConfig } from '../src/config-resolver.js';
+import { CONFIG_NOTICES_KEY } from '../src/storage.js';
 import { decorateWithHtmlShape, HTML_SHAPE } from './helpers/decorate.js';
 import { applyLabelFilter, clearLabelFilter } from '../src/ui/thread-filter.js';
 import {
@@ -1970,6 +1971,47 @@ describe('Codex #38 — sondage périodique de la configuration effective sur un
     // le §5.4 exige de désarmer le blocage dès qu'une lecture est dégradée.
     expect(refreshes).toHaveLength(1);
     expect(refreshes[0]?.degraded).toBe(true);
+  });
+
+  it('CA-24 : des avis de configuration qui changent SEULS — réglages effectifs identiques — sont sondés quand même (§5.3, revue Codex, PR #181)', async () => {
+    const doc = document;
+    const current = pr(35);
+    const adapter = makeAdapter(() => current, () => blocking(1));
+    // `{}` puis `{"banana": 1}` puis `{}` : une clé inconnue ajoutée puis retirée. Ignorée, elle
+    // ne change aucun réglage effectif — seul l'avis `config.unknown-key` apparaît et disparaît.
+    let configText = '{}';
+    adapter.getRepoConfig = async () => ({ status: 'found', text: configText });
+    let resolverNow = 0;
+    const resolver = new ClientConfigResolver(async () => null, () => resolverNow);
+    const POLL_MS = 30;
+    // Ce que la page d'options lira : la clé `configNotices` que chaque rendu écrit.
+    const stored: Record<string, unknown> = {};
+    (globalThis as { chrome: { storage: { local: Record<string, unknown> } } }).chrome.storage.local.set = (
+      items: Record<string, unknown>
+    ) => Object.assign(stored, items);
+    // Ce que `bootstrap()` repousse aux éditeurs déjà ouverts (`updateResolved()`, donc la pastille).
+    const refreshes: ResolvedClientConfig[] = [];
+    observe(adapter, resolver, doc, undefined, (_pr, changed, resolved) => {
+      if (!changed && resolved) refreshes.push(resolved);
+    }, POLL_MS);
+    await flushAll();
+    const codesStored = () =>
+      (stored[CONFIG_NOTICES_KEY] as { notices: { code: string }[] } | undefined)?.notices.map((n) => n.code);
+    expect(codesStored()).toEqual([]);
+
+    configText = JSON.stringify({ banana: 1 });
+    resolverNow += 3601 * 1000; // dépasse le TTL du cache de configuration (§8.1.2)
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS * 3));
+    await flushAll();
+    expect(refreshes.map((r) => r.notices.map((n) => n.code))).toEqual([['config.unknown-key']]);
+    expect(codesStored()).toEqual(['config.unknown-key']);
+
+    configText = '{}';
+    resolverNow += 3601 * 1000;
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS * 3));
+    await flushAll();
+    expect(refreshes.map((r) => r.notices.map((n) => n.code))).toEqual([['config.unknown-key'], []]);
+    expect(codesStored()).toEqual([]);
   });
 
   it('la cadence du sondage se borne au TTL effectif une fois connu, pas seulement à configPollIntervalMs (revue Reefact, PR #39)', async () => {

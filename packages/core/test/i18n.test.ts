@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { en } from '../src/i18n/en.js';
 import { fr } from '../src/i18n/fr.js';
 import { availableLanguages, resolveLang, t } from '../src/i18n/index.js';
+import { NOTICE_LEVELS } from '../src/config/notices.js';
 
 describe('§10 — catalogues de messages', () => {
   it('les deux catalogues portent EXACTEMENT les mêmes clés', () => {
@@ -61,25 +62,24 @@ describe('§5.3, §10 — chaque clé d’avis écrite par core a son entrée da
     readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
       e.isDirectory() ? sources(join(dir, e.name)) : e.name.endsWith('.ts') ? [readFileSync(join(dir, e.name), 'utf8')] : []
     );
-  const FAMILIES = '(?:floor-override|invalid|config|floor|unsupported)';
-  // Les clés composées à l'exécution, et les valeurs que prend leur variable : la provenance
-  // d'une entrée filtrée (`filterAllowlistPatterns()`, `filterToolCommands()`) et le niveau
-  // d'un `floor-override`. Une variable qui n'est pas listée ici ne fait pas d'une chaîne une
-  // clé — `${key}.${k}` est une référence de configuration.
-  const VARS: Record<string, string[]> = { source: ['config', 'floor'], level: ['org', 'repo'] };
+  // Une clé d'avis est écrite EN TOUTES LETTRES dans les sources : `'floor-override'`, ou une
+  // famille suivie d'un nom (`'config.unknown-key'`). Le niveau, seul paramètre que le catalogue
+  // rend lui-même (`notice.level.<niveau>`, voir `noticeText()`), vient de `NOTICE_LEVELS`.
+  const CODE = /'(floor-override|(?:invalid|config|floor|unsupported)\.[a-z-]+)'/g;
 
   const used = (): Set<string> => {
-    const out = new Set<string>();
-    for (const text of sources(SRC)) {
-      for (const m of text.matchAll(new RegExp(`'(${FAMILIES}\\.[a-z-]+)'`, 'g'))) out.add(m[1]!);
-      for (const m of text.matchAll(/`((?:\$\{\w+\}|[a-z-]+)\.(?:\$\{\w+\}|[a-z-]+))`/g)) {
-        const vars = [...m[1]!.matchAll(/\$\{(\w+)\}/g)].map((v) => v[1]!);
-        if (vars.length !== 1 || !(vars[0]! in VARS)) continue;
-        for (const value of VARS[vars[0]!]!) out.add(m[1]!.replace(`\${${vars[0]}}`, value));
-      }
-    }
+    const out = new Set<string>(NOTICE_LEVELS.map((l) => `level.${l}`));
+    for (const text of sources(SRC)) for (const m of text.matchAll(CODE)) out.add(m[1]!);
     return out;
   };
+
+  it('aucune clé d’avis n’est composée à l’exécution — le relevé ci-dessous la manquerait', () => {
+    // `makeNotice(kind, \`…${x}\`)`, `warning(\`…\`)`, `floorWarning(\`…\`)` : une clé en
+    // gabarit échappe à la lecture des sources. Le pluriel, comme le niveau, se choisit entre
+    // deux clés écrites en toutes lettres.
+    const composed = /(?:makeNotice\([^,]+,|\b(?:warning|floorWarning|bad)\((?:key, )?)\s*`/;
+    for (const text of sources(SRC)) expect(text).not.toMatch(composed);
+  });
 
   it('chaque clé écrite par core est traduite en anglais ET en français', () => {
     const codes = used();

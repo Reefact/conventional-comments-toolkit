@@ -332,14 +332,14 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     const floor: Floor = { allowlistPatterns: { minimum: ['^(a+)+$', '^ok$'] } };
     const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.allowlistPatterns).toEqual(['^ok$']);
-    expect(notices.some((n) => n.kind === 'config-warning' && n.code === 'floor.allowlist-nested')).toBe(true);
+    expect(notices.some((n) => n.code === 'config.allowlist-nested' && n.params['level'] === 'floor')).toBe(true);
   });
 
   it('une entrée toolCommands hors grammaire est écartée et signalée', () => {
     const floor: Floor = { toolCommands: { minimum: ['LGTM', '@bot'] } };
     const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.toolCommands).toEqual(['@bot']);
-    expect(notices.some((n) => n.kind === 'config-warning' && n.message.includes('floor: toolCommands'))).toBe(true);
+    expect(notices.some((n) => n.code === 'config.tool-command-invalid' && n.message.startsWith('Configuration warning (enterprise floor): toolCommands'))).toBe(true);
   });
 
   it('l’avertissement dit que l’entrée vient du PLANCHER, pas d’un dépôt', () => {
@@ -350,9 +350,9 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     const { notices } = resolveConfig(floor, absent, repo);
     const warnings = notices.filter((n) => n.kind === 'config-warning' && n.ref === 'LGTM');
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]!.code).toBe('floor.tool-command-invalid');
-    expect(warnings[0]!.message).toContain('floor: ');
-    expect(notices.some((n) => n.ref === 'NOPE' && n.code === 'config.tool-command-invalid' && !n.message.includes('floor'))).toBe(true);
+    expect(warnings[0]!.params['level']).toBe('floor');
+    expect(warnings[0]!.message).toContain('(enterprise floor)');
+    expect(notices.some((n) => n.ref === 'NOPE' && n.params['level'] === 'repo' && n.message.includes('(repository file)'))).toBe(true);
   });
 
   it('`{ closed: true }` sans `minimum` ne fait plus lever la résolution', () => {
@@ -404,7 +404,7 @@ describe('§8.1.1 — le document de plancher est vérifié comme celui d’un d
     const floor = { minimumMood: 'enforce' } as unknown as Floor;
     const { config, notices } = resolveConfig(floor, absent, absent);
     expect(config.mode).toBe('assist'); // le défaut produit : aucun plancher appliqué
-    expect(notices.some((n) => n.ref === 'minimumMood' && n.message.includes('unknown floor key'))).toBe(true);
+    expect(notices.some((n) => n.ref === 'minimumMood' && n.code === 'config.unknown-key' && n.params['level'] === 'floor')).toBe(true);
   });
 
   it('un configCacheTtlSeconds négatif est écarté, pas installé', () => {

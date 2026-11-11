@@ -1297,6 +1297,17 @@ function renderConfigSignatureOf(resolved: { config: EffectiveConfig; degraded: 
   return JSON.stringify({ config: resolved.config, degraded: resolved.degraded });
 }
 
+/** Ce que compare le sondage périodique : la signature de rendu, PLUS les avis de configuration
+ * (§5.3). Une lecture peut changer ses avis sans changer un seul réglage effectif — une clé
+ * inconnue ajoutée ou retirée — et la pastille comme la page d'options doivent quand même le
+ * montrer. Les avis par leur forme stable (sorte, clé de message, paramètres, référence), jamais
+ * par leur `message` rendu. Séparée de `renderConfigSignatureOf`, qui décide aussi de
+ * RECONSTRUIRE un éditeur : un avis qui change n'en demande pas tant, `updateResolved()` suffit. */
+function pollSignatureOf(resolved: ResolvedClientConfig): string {
+  const notices = resolved.notices.map((n) => [n.kind, n.code, n.params, n.ref ?? null]);
+  return JSON.stringify({ render: renderConfigSignatureOf(resolved), notices });
+}
+
 /** Ré-invoque `renderPrChrome` quand le contexte de PR change (§5.5) — navigation SPA vers
  * une PR différente (ou plus aucune) —, tant que le dernier rendu sur la MÊME PR n'a rien eu
  * à montrer (fenêtre `RENDER_RETRY_WINDOW_MS` : au premier chargement direct d'une PR,
@@ -1382,7 +1393,8 @@ export function observePrChromeNavigation(
   let bannerOpen: boolean | null = null;
   // Signature de TOUT ce que la configuration effective (§8.1.2) peut faire varier dans le
   // rendu — `renderConfigSignatureOf`, jamais une empreinte du seul VERDICT (revue Codex, PR
-  // #39), qui laisserait de côté `language`, `badgeStyle`, l'icône d'un label. Telle qu'appliquée par le DERNIER rendu réel — posée juste après lui (voir la fin
+  // #39), qui laisserait de côté `language`, `badgeStyle`, l'icône d'un label —, avis de configuration
+  // compris (`pollSignatureOf`, §5.3). Telle qu'appliquée par le DERNIER rendu réel — posée juste après lui (voir la fin
   // de `run()`), jamais par `pollConfig` : un sondage qui se contenterait de comparer ses
   // propres lectures successives raterait tout changement survenu AVANT son premier réveil.
   // `null` tant qu'aucun rendu n'a encore eu lieu pour la PR affichée (pas de référence à
@@ -1438,7 +1450,7 @@ export function observePrChromeNavigation(
     return resolver.resolve(adapter, pr).then((resolved) => {
       if (disposed) return;
       knownConfigTtlMs = resolved.config.configCacheTtlSeconds * 1000;
-      if (renderConfigSignatureOf(resolved) === lastRenderConfigSignature) return;
+      if (pollSignatureOf(resolved) === lastRenderConfigSignature) return;
       forceRender = true;
       run();
     });
@@ -1579,7 +1591,7 @@ export function observePrChromeNavigation(
         // rendu vient d'appliquer — jamais sur une relecture séparée, qui ouvrirait une
         // fenêtre où `configCacheTtlSeconds: 0` (valeur légale) la ferait déjà diverger de
         // ce que la page affiche réellement (revue Codex, PR #39).
-        lastRenderConfigSignature = resolved ? renderConfigSignatureOf(resolved) : null;
+        lastRenderConfigSignature = resolved ? pollSignatureOf(resolved) : null;
         // TTL appris ICI aussi, pas seulement par `pollConfig` (revue Reefact, PR #39) :
         // une navigation ou une mutation peuvent résoudre une config plus fraîche — donc un
         // TTL plus fraîchement connu — bien avant le prochain réveil périodique.

@@ -4,7 +4,7 @@
 // l'inverse du but).
 
 import type { EffectiveConfig, Floor, Mode, Notice, NoticeParams, Severity } from '../types.js';
-import { makeNotice } from './notices.js';
+import { makeNotice, withLevel } from './notices.js';
 import { SUPPORTED_FLOOR_VERSION } from '../version.js';
 import { defaultConfig } from './defaults.js';
 import { DEPRECATED_MODE, deprecatedModeNotice, filterAllowlistPatterns, filterToolCommands, MODES, SEVERITIES } from './schema.js';
@@ -69,7 +69,8 @@ function asStringArray(value: unknown, ref: string, notices: Notice[]): string[]
   // contrat annoncé est « écartée ET signalée ». Une politique d'entreprise à moitié
   // appliquée en silence est précisément ce que cette passe existe pour empêcher.
   if (kept.length !== value.length) {
-    notices.push(floorWarning('floor.non-string-entries', { key: ref, count: value.length - kept.length }, ref));
+    const count = value.length - kept.length;
+    notices.push(floorWarning(count === 1 ? 'floor.non-string-entry' : 'floor.non-string-entries', { key: ref, count }, ref));
   }
   return kept;
 }
@@ -126,7 +127,14 @@ function asObject(value: unknown, ref: string, notices: Notice[]): Record<string
   return undefined;
 }
 
+/** Chaque avis du plancher porte son niveau, `floor` (§5.3) — attribué à la sortie, comme
+ * `parseConfigDocument()` le fait pour un document. */
 export function vetFloor(floor: Floor | null | undefined): VettedFloor {
+  const vetted = vetFloorDocument(floor);
+  return { ...vetted, notices: vetted.notices.map((n) => withLevel(n, 'floor')) };
+}
+
+function vetFloorDocument(floor: Floor | null | undefined): VettedFloor {
   if (!floor) return { floor: defaultFloor(), notices: [], unsupported: false };
 
   // Le TYPE de `floorVersion` se vérifie avant sa VALEUR : `"99" > 1` est vrai en
@@ -176,19 +184,19 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
     if (rule !== null && typeof rule === 'object') {
       for (const k of Object.keys(rule)) {
         if (k !== 'minimum' && k !== 'closed') {
-          notices.push(floorWarning('floor.unknown-key', { key: `${key}.${k}` }, `${key}.${k}`));
+          notices.push(floorWarning('config.unknown-key', { key: `${key}.${k}` }, `${key}.${k}`));
         }
       }
     }
     const raw = asStringArray(rule?.minimum, `${key}.minimum`, notices);
-    // Le message dit d'OÙ vient l'entrée écartée — `floor.*` plutôt que `config.*` : sans
-    // cela, une administration qui débogue sa politique lirait un avertissement identique à
-    // celui d'un fichier de dépôt et chercherait au mauvais endroit.
+    // L'avis dit d'OÙ vient l'entrée écartée — le niveau `floor`, que `vetFloor()` attribue à
+    // tout ce qu'il signale : sans cela, une administration qui débogue sa politique lirait un
+    // avertissement identique à celui d'un fichier de dépôt et chercherait au mauvais endroit.
     const kept =
       key === 'allowlistPatterns'
-        ? filterAllowlistPatterns(raw, notices, 'floor')
+        ? filterAllowlistPatterns(raw, notices)
         : key === 'toolCommands'
-          ? filterToolCommands(raw, notices, 'floor')
+          ? filterToolCommands(raw, notices)
           : raw; // `exemptUsers` n'a pas de filtre d'entrée : un login est libre (§8.2).
     out[key] = { minimum: kept, closed: asClosed(rule?.closed, `${key}.closed`, notices) };
   }
@@ -201,7 +209,7 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
       // `issue` seul, sans un mot sur `todo` : un niveau inférieur pouvait le désactiver
       // alors que l'administration croyait l'avoir planché.
       for (const k of Object.keys(obj)) {
-        if (k !== 'minimum') notices.push(floorWarning('floor.unknown-key', { key: `labels.${k}` }, `labels.${k}`));
+        if (k !== 'minimum') notices.push(floorWarning('config.unknown-key', { key: `labels.${k}` }, `labels.${k}`));
       }
       out.labels = { minimum: asStringArray(obj['minimum'], 'labels.minimum', notices) };
     }
@@ -219,7 +227,7 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
   // fautive durcit toujours. Ici, non — d'où l'avertissement, qui n'est pas décoratif.
   for (const key of Object.keys(out)) {
     if (!FLOOR_KEYS.has(key)) {
-      notices.push(floorWarning('floor.unknown-key', { key }, key));
+      notices.push(floorWarning('config.unknown-key', { key }, key));
       delete (out as Record<string, unknown>)[key];
     }
   }
@@ -260,7 +268,7 @@ export function vetFloor(floor: Floor | null | undefined): VettedFloor {
       const rules: { minDecisionSubjectLength?: number } = {};
       for (const [k, v] of Object.entries(obj)) {
         if (k !== 'minDecisionSubjectLength') {
-          notices.push(floorWarning('floor.unknown-key', { key: `rules.${k}` }, `rules.${k}`));
+          notices.push(floorWarning('config.unknown-key', { key: `rules.${k}` }, `rules.${k}`));
           continue;
         }
         const n = asNonNegativeInt(v, 'rules.minDecisionSubjectLength', notices);
@@ -335,7 +343,7 @@ export function applyFloor(config: EffectiveConfig, floor: Floor, written: Writt
   // L'avis nomme le niveau qui a écrit la clé ignorée : un « fichier du dépôt » pour une clé
   // venue du document d'organisation enverrait chercher au mauvais endroit.
   const override = (key: string, level: ConfigLevel) =>
-    notices.push(makeNotice('floor-override', `floor-override.${level}`, { key }, key));
+    notices.push(makeNotice('floor-override', 'floor-override', { key, level }, key));
   const overridden = (key: string) => {
     const level = written.keys.get(key);
     if (level !== undefined) override(key, level);
@@ -433,7 +441,9 @@ export function applyFloor(config: EffectiveConfig, floor: Floor, written: Writt
   for (const [code, sev] of Object.entries(out.severities)) {
     if (code.startsWith('E-') && sev === 'off') {
       out.severities[code] = 'warn';
-      notices.push(makeNotice('config-warning', 'config.severity-raised', { code }, `severities.${code}`));
+      // `off` ne vient que d'un document : le plancher ne fait que relever.
+      const level = written.keys.get(`severities.${code}`) ?? 'merged';
+      notices.push(makeNotice('config-warning', 'config.severity-raised', { code, level }, `severities.${code}`));
     }
   }
 

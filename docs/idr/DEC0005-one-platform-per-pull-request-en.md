@@ -14,13 +14,13 @@ The GitHub interface is finished; an Azure DevOps fix or the creation of the Git
 
 ## Decision
 
-A pull request touches a single platform, or shared code, never both, except a contract pull request that touches shared code and every platform.
+A pull request touches a single platform, or shared code, never both, except a pull request that touches every platform: a contract if it also touches shared code, otherwise an all-platforms pull request.
 
 ## Rationale
 
 Separating the shared change from the platform change makes visible what touches every platform, and protects the platforms a pull request does not target.
 
-A contract pull request is accepted because a contract change has to apply everywhere at once. Documentation, shared tests and tooling outside `packages/` are neutral; a platform's registration files are neutral only in the pull request that creates it. The same day, following the review of pull request #78 (commit `2dd4a7f`), the exception extends to the pull request that removes a platform: removing an adapter requires removing its registration, and no split stays green — the adapter first leaves dead imports, the registration first fails `platform-registry.test.ts`.
+A contract pull request is accepted because a contract change has to apply everywhere at once. Documentation, shared tests and tooling outside `packages/` are neutral; a platform's registration files are neutral only in the pull request that creates it. The same day, following the review of pull request #78 (commit `2dd4a7f`), the exception extends to the pull request that removes a platform: removing an adapter requires removing its registration, and no split stays green — the adapter first leaves dead imports, the registration first fails `platform-registry.test.ts`. The same commit sets apart the pull request that touches every platform and no shared code: calling it a contract claimed shared code it does not contain; it stays accepted, under its own name.
 
 The rule is checked by `npm run check:pr-scope`, which CI runs on every pull request.
 

@@ -34,7 +34,7 @@ No alternative was documented when the decision was made.
 
 ### Negative
 
-- The toolkit itself no longer prevents the merge of a pull request that carries unresolved blocking threads; a platform can still require it through its own options.
+- The toolkit itself no longer prevents the merge of a pull request that carries unresolved blocking threads; a platform can still require conversation resolution before merging, through its own options.
 
 ### Risks
 

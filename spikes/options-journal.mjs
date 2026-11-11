@@ -51,8 +51,8 @@ const PR = 'https://github.com/acme/demo/pull/48';
 // Des phrases réelles du vocabulaire, assez longues pour se replier à la largeur mesurée, plus
 // une exception et une ligne écrite avant les clés de description.
 const JOURNAL = [
-  { chain: 'merge-button', problem: 'completion-control', at: '2026-10-30T08:35:55.958Z', url: `${PR}/files`, skeleton: 'k1' },
-  { chain: 'pr-created-at', problem: 'pr-creation-date', at: '2026-10-30T08:13:33.647Z', url: `${PR}/changes` },
+  { chain: 'submit-buttons', problem: 'submit-control', at: '2026-10-30T08:35:55.958Z', url: `${PR}/files`, skeleton: 'k1' },
+  { chain: 'repository-public-meta', problem: 'repo-visibility-signal', at: '2026-10-30T08:13:33.647Z', url: `${PR}/changes` },
   { chain: 'comment-author', problem: 'comment-writer', at: '2026-10-30T07:56:08.497Z', url: `${PR}/files?diff=split` },
   { chain: 'comment-body', problem: 'comment-text', at: '2026-10-30T07:56:08.497Z', url: `${PR}/files?diff=split` },
   { kind: 'error', context: 'editor', message: "TypeError: Cannot read properties of undefined (reading 'closest')", at: '2026-10-30T09:02:11.100Z', url: `${PR}/files` },

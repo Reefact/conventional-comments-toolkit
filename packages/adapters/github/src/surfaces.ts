@@ -18,9 +18,9 @@
 // mécanisme : la dérive reste une chaîne, la coexistence devient une LISTE de surfaces dont on
 // prend l'union.
 //
-// Ce que ce découpage n'est PAS : une reclassification de tout `selectors.ts`. Vingt et une des
-// vingt-quatre chaînes y répondent à une question qui n'a qu'une bonne réponse par page — quel
-// conteneur de fil, quel corps de commentaire rendu, quel bouton de fusion — et pour celles-là
+// Ce que ce découpage n'est PAS : une reclassification de tout `selectors.ts`. La plupart des
+// chaînes y répondent à une question qui n'a qu'une bonne réponse par page — quel conteneur de
+// fil, quel corps de commentaire rendu — et pour celles-là
 // le premier candidat qui matche est la sémantique voulue. Seules les chaînes du COMPOSEUR se
 // scindent, parce que seules elles ont montré le défaut.
 //

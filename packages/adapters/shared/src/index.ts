@@ -38,9 +38,6 @@ export interface EditorContext {
   threadId?: string;
   commentId?: string;
   canCarryBlockingState: boolean;
-  /** Périmètre d'activation d'un vérificateur retiré (§2) : plus rien ne le lit. Optionnel le
-   * temps que les adaptateurs cessent de l'écrire, chacun dans sa PR ; retiré ensuite. */
-  inScope?: boolean;
 }
 
 export interface EditorHandle {
@@ -51,10 +48,7 @@ export interface EditorHandle {
 
 export interface SubmitControl {
   element: Element;
-  // `'complete-pr'` ne sert plus à rien (le grisage du bouton de fusion est retiré, §2), mais
-  // les trois adaptateurs l'écrivent encore : le retirer ici ne compilerait pas. Il part avec
-  // la dernière plateforme nettoyée.
-  kind: 'submit' | 'submit-and-resolve' | 'complete-pr';
+  kind: 'submit' | 'submit-and-resolve';
 }
 
 /** Ce que `getSubmitControls()` a trouvé, et ce qu'il a CHERCHÉ pour le trouver (§4.3, §5.4, §9.4).
@@ -538,8 +532,8 @@ export function shiftSelection(
 // chaînes : la génération la plus récente d'abord, puis les précédentes.
 
 /** Ce qu'une chaîne SERT À FAIRE, pour le journal de dégradation (§9.4) : un vocabulaire FERMÉ et
- * NEUTRE, qui ne nomme aucune plateforme — `completion-control` est le bouton de fusion de GitHub
- * comme le bouton d'achèvement d'Azure DevOps. La page d'options en tire la phrase que la personne
+ * NEUTRE, qui ne nomme aucune plateforme — `submit-control` est le bouton d'envoi d'un commentaire
+ * sur GitHub comme sur Azure DevOps. La page d'options en tire la phrase que la personne
  * lit, dans sa langue (`options.journal.problem.<id>`) : le nom de la chaîne, lui, est un mot de
  * plateforme que le code partagé n'a pas le droit de connaître.
  *
@@ -550,12 +544,10 @@ export const SELECTOR_PROBLEMS = [
   'editor-field',
   'editor-frame',
   'repo-visibility-signal',
-  'completion-control',
   'thread-permalink',
   'rendered-comment-ancestor',
   'comment-text',
   'comment-writer',
-  'pr-creation-date',
   'submit-control',
   'editor-zone',
 ] as const;

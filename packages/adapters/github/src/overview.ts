@@ -28,7 +28,6 @@ export function overviewContext(el: Element, pr: PrRef): EditorContext | null {
       threadId: review.id,
       commentId: review.id,
       canCarryBlockingState: false,
-      inScope: true,
     };
   }
   // Édition d'un commentaire GÉNÉRAL : le champ est dans l'`article` du commentaire (capture 06).
@@ -41,7 +40,6 @@ export function overviewContext(el: Element, pr: PrRef): EditorContext | null {
       threadId: general.id,
       commentId: general.id,
       canCarryBlockingState: false,
-      inScope: true,
     };
   }
   // Réponse dans un fil : le champ est dans le GROUPE du fil, mais hors du fil lui-même (capture
@@ -57,11 +55,10 @@ export function overviewContext(el: Element, pr: PrRef): EditorContext | null {
       pr,
       threadId: root?.id || undefined,
       canCarryBlockingState: false,
-      inScope: true,
     };
   }
   if (closestChain(el, selectors.overviewConversationForm).element) {
-    return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: false, inScope: true };
+    return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: false };
   }
   return null;
 }
@@ -79,15 +76,4 @@ export function overviewResolution(thread: Element): 'resolved' | 'unresolved' |
 /** Le champ est-il celui de la DESCRIPTION de la PR — hors périmètre (§4.1) ? */
 export function inOverviewPrDescription(el: Element): boolean {
   return closestChain(el, selectors.overviewPrDescription).element !== null;
-}
-
-/** Le bouton de fusion de la rangée « action recommandée », et si son absence est NOMINALE : la
- * rangée dit que la PR ne peut pas être fusionnée maintenant (`overviewNotMergeable`, #127), ou
- * n'est pas encore rendue (`overviewLoadingRow`, #158). */
-export function overviewCompletion(doc: Document): { element: Element | null; nominalAbsence: boolean } {
-  const element = queryChain(doc, selectors.overviewMergeButton).element;
-  const nominalAbsence =
-    queryChain(doc, selectors.overviewNotMergeable).element !== null ||
-    queryChain(doc, selectors.overviewLoadingRow).element !== null;
-  return { element, nominalAbsence };
 }

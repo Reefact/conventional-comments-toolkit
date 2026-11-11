@@ -114,7 +114,7 @@ matche — l'autre composeur devenait invisible, sans barre d'outils ni garde d'
 zone où un `issue:` bloque réellement (§4.1). Le commit 81e07bb avait vu le cas et n'en avait
 corrigé que le silence.
 
-Vingt et une des vingt-quatre chaînes de `selectors.ts` restent des chaînes, et c'est délibéré :
-elles répondent à une question qui n'a qu'une bonne réponse par page — quel conteneur de fil, quel
-corps rendu, quel bouton de fusion. Seul le composeur se scinde, parce que seul il a montré le
+La plupart des chaînes de `selectors.ts` restent des chaînes, et c'est délibéré : elles répondent
+à une question qui n'a qu'une bonne réponse par page — quel conteneur de fil, quel corps rendu.
+Seul le composeur se scinde, parce que seul il a montré le
 défaut.

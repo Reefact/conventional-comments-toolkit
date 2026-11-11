@@ -172,8 +172,6 @@ const fr: Record<string, string> = {
     'Cadre du champ de saisie introuvable : mise en page approchée',
   'options.journal.problem.repo-visibility-signal':
     'Visibilité du dépôt illisible : la configuration du dépôt, introuvable, est tenue pour absente',
-  'options.journal.problem.completion-control':
-    'Bouton de fusion introuvable : impossible de le griser',
   'options.journal.problem.thread-permalink':
     'Ancre d’un fil introuvable : le lien du bandeau ne mène nulle part de précis',
   'options.journal.problem.rendered-comment-ancestor':
@@ -182,8 +180,6 @@ const fr: Record<string, string> = {
     'Corps d’un commentaire illisible : fil écarté du décompte local du bandeau',
   'options.journal.problem.comment-writer':
     'Auteur d’un commentaire illisible : nom absent du bandeau, exemption par auteur impossible',
-  'options.journal.problem.pr-creation-date':
-    'Date de création de la PR introuvable : PR tenue hors périmètre, rien n’est bloqué',
   'options.journal.problem.submit-control':
     'Bouton d’envoi introuvable : impossible de le griser ou d’en arrêter le clic',
   'options.journal.problem.editor-zone':
@@ -429,8 +425,6 @@ const en: Record<string, string> = {
     'Input field frame not found: layout approximated',
   'options.journal.problem.repo-visibility-signal':
     'Repository visibility unreadable: the missing repository configuration is treated as absent',
-  'options.journal.problem.completion-control':
-    'Merge button not found: it cannot be greyed out',
   'options.journal.problem.thread-permalink':
     'Thread anchor not found: the banner link points to no precise spot on the page',
   'options.journal.problem.rendered-comment-ancestor':
@@ -439,8 +433,6 @@ const en: Record<string, string> = {
     'Comment body unreadable: thread left out of the banner’s local count',
   'options.journal.problem.comment-writer':
     'Comment author unreadable: name missing from the banner, per-author exemption cannot apply',
-  'options.journal.problem.pr-creation-date':
-    'PR creation date not found: PR treated as out of scope, nothing is blocked',
   'options.journal.problem.submit-control':
     'Submit button not found: it cannot be greyed out, nor its click stopped',
   'options.journal.problem.editor-zone':

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// L'ADAPTATEUR AZURE DEVOPS SUR DE VRAIES PAGES (§4.1, §4.3, §5.5, §6.5, §9.2.3, §9.4, annexe B).
+// L'ADAPTATEUR AZURE DEVOPS SUR DE VRAIES PAGES (§4.1, §4.3, §5.5, §9.2.3, §9.4, annexe B).
 //
 // Chaque test charge une page capturée sur dev.azure.com le 2026-11-09 (organisation de test
 // personnelle, extension Conventional Comments désactivée, page réduite dans le navigateur —
@@ -15,9 +15,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SelectorLog, type EditorHandle, type SelectorEvidence } from '@cct/adapter-shared';
+import { SelectorLog, type EditorHandle } from '@cct/adapter-shared';
 import { AzdoClientAdapter } from '../src/index.js';
-import { selectors } from '../src/selectors.js';
 
 const PAGES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'pages');
 const PR = (n: number, view?: 'files') =>
@@ -49,8 +48,6 @@ const loggedChains = (page: LoadedPage) => page.adapter.log.failures.map((f) => 
 const firstLine = (text: string) => text.split('\n').find((l) => l.trim() !== '')?.trim();
 
 const T = 30_000;
-const PR1_CREATED = '2026-11-09T20:49:08.770Z';
-const PR2_CREATED = '2026-11-09T20:49:09.564Z';
 
 describe('§4.3, skill plateforme — aucune page ne fait d’un bouton qui annule un bouton d’envoi', () => {
   it.each(readdirSync(PAGES).filter((f) => f.endsWith('.html')))('%s', (file) => {
@@ -72,7 +69,7 @@ describe('§4.1, §9.2.3 — Overview : nouveau commentaire général (capture 0
     const page = load('01-overview-nouveau-commentaire.html', PR(1));
     const editor = only(page);
     expect(editor.element.classList.contains('bolt-textfield-auto-adjust-hidden')).toBe(false);
-    expect(editor.context).toMatchObject({ zone: 'conversation', action: 'compose', canCarryBlockingState: true, inScope: true });
+    expect(editor.context).toMatchObject({ zone: 'conversation', action: 'compose', canCarryBlockingState: true });
     expect(submits(page, editor)).toEqual([['Comment', 'submit']]);
   }, T);
 
@@ -89,7 +86,7 @@ describe('§4.1, §9.2.3 — Overview : nouveau commentaire général (capture 0
       scope: ['sylva-cct-test', 'cct-test', 'cct-test'],
       number: 1,
     });
-    expect(await page.adapter.getCurrentUser()).toEqual({ id: 'display:sylvain aurat', login: 'Sylvain Aurat', isServiceAccount: false });
+    expect(await page.adapter.getCurrentUser()).toEqual({ id: 'display:sylvain aurat', login: 'Sylvain Aurat' });
   }, T);
 });
 
@@ -162,9 +159,8 @@ describe('§5.5, §9.2.3 — Overview : commentaires publiés (capture 03)', () 
     expect(bodies.some((b) => b.includes('Test pull request for Conventional Comments'))).toBe(false);
   });
 
-  it('bandeau sous l’en-tête, bouton Complete', () => {
+  it('bandeau sous l’en-tête', () => {
     expect(page.adapter.getBannerMount()?.classList.contains('repos-pr-header')).toBe(true);
-    expect(page.adapter.getCompletionControl()?.element.textContent?.trim()).toBe('Complete');
   });
 
   it('filtre AVANT le fil d’activité, jamais dans la carte d’un fil (validation du propriétaire, 2026-11-09)', () => {
@@ -178,27 +174,6 @@ describe('§5.5, §9.2.3 — Overview : commentaires publiés (capture 03)', () 
     const rows = page.adapter.getRenderedThreadElements();
     expect(rows.map((r) => r.element.tagName)).toEqual(['TR', 'TR', 'TR', 'TR', 'TR']);
     expect(rows.every((r) => r.element.querySelectorAll('.repos-discussion-thread').length === 1)).toBe(true);
-  });
-
-  it('la date de création est celle de la dernière ligne du fil d’activité', () => {
-    expect(page.adapter.currentPr()?.createdAt).toBe(PR1_CREATED);
-    expect(loggedChains(page)).toEqual([]);
-  });
-
-  it('une dernière ligne qui serait un FIL ne prête pas sa date à la PR — une date inconnue, jamais une fausse', () => {
-    // Cas FABRIQUÉ sur le vrai balisage de la capture, que nulle capture ne montre : la ligne de
-    // création absente (filtre du fil d'activité, ou non encore rendue), et un fil de LIGNE en
-    // dernière position — son en-tête de fichier porte lui aussi un `time.activity-card-time`
-    // (21:02:35.377Z, le fil 5).
-    const fabricated = load('03-overview-commentaires-prefixes.html', PR(1));
-    const rows = [...fabricated.doc.querySelectorAll('tr.bolt-timeline-row')];
-    const creation = rows[rows.length - 1]!;
-    const lineThread = rows.find((r) => r.querySelector('.comment-file-header'))!;
-    expect(lineThread.querySelector('time.activity-card-time')?.getAttribute('datetime')).toBe('2026-11-09T21:02:35.377Z');
-    creation.parentElement!.appendChild(lineThread);
-    creation.remove();
-    lineThread.classList.add('bolt-timeline-last-row');
-    expect(fabricated.adapter.currentPr()?.createdAt).toBe('');
   });
 
   it('forme du corps rendu MESURÉE : <p> et <br> (§5.5)', () => {
@@ -217,16 +192,14 @@ describe('§5.5, §B.5 — état des fils (03-overview-fils-resolus, 03-…-pr2)
     const page = load('03-overview-commentaires-prefixes-pr2.html', PR(2));
     const states = Object.fromEntries((await page.adapter.getThreads()).map((t) => [t.id, t.resolution]));
     expect(states).toEqual({ '7': 'unresolved', '6': 'resolved' });
-    expect(page.adapter.currentPr()?.createdAt).toBe(PR2_CREATED);
   }, T);
 });
 
 describe('§5.5 — Files : fils de ligne (03-files)', () => {
-  it('rend le fil de ligne, sans filtre dans le diff, et sans journaliser l’absence de date', async () => {
+  it('rend le fil de ligne, sans filtre dans le diff, et sans rien journaliser', async () => {
     const page = load('03-files-commentaires-prefixes.html', PR(1, 'files'));
     expect((await page.adapter.getThreads()).map((t) => [t.id, t.replies.length])).toEqual([['5', 1]]);
     expect(page.adapter.getThreadFilterMount()).toBeNull();
-    expect(page.adapter.currentPr()?.createdAt).toBe('');
     expect(loggedChains(page)).toEqual([]);
   }, T);
 
@@ -347,36 +320,11 @@ describe('§4.1 — la description de la PR, en modification, n’est pas une zo
   }, T);
 });
 
-describe('§6.5, §9.4 — le bouton de complétion là où son absence est la norme', () => {
-  it('PR abandonnée (08) : pas de contrôle — jamais Reactivate —, et rien de journalisé', () => {
+describe('§9.4 — PR abandonnée (capture 08)', () => {
+  it('rien de journalisé : la page d’une PR arrêtée n’est pas une rupture', async () => {
     const page = load('08-overview-pr-abandonnee.html', PR(2));
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(page.adapter.currentPr()?.createdAt).toBe(PR2_CREATED);
+    await page.adapter.getThreads();
     expect(loggedChains(page)).toEqual([]);
-  }, T);
-
-  it('plein écran : pas de contrôle, et rien de journalisé', () => {
-    const page = load('03-files-commentaires-prefixes-plein-ecran.html', PR(1, 'files'));
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(loggedChains(page)).toEqual([]);
-  }, T);
-
-  it('ailleurs, une absence est une rupture, journalisée (§9.4, CA-11)', () => {
-    const page = load('03-overview-commentaires-prefixes.html', PR(1));
-    page.adapter.getBannerMount()!.querySelector('.repos-pr-header-complete-button')!.remove();
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(loggedChains(page)).toContain('complete-button');
-  }, T);
-
-  it('la ligne porte le relevé de la page — la trace de ses candidats (§9.4, #168)', () => {
-    const evidence = new Map<string, SelectorEvidence>();
-    const log = new SelectorLog(null, (chain, e) => evidence.set(chain.name, e));
-    const page = load('03-overview-commentaires-prefixes.html', PR(1), log);
-    page.adapter.getBannerMount()!.querySelector('.repos-pr-header-complete-button')!.remove();
-    page.adapter.getCompletionControl();
-    expect(evidence.get('complete-button')?.trace?.map((t) => t.candidate)).toEqual(
-      selectors.completeButton.candidates
-    );
   }, T);
 });
 

@@ -143,15 +143,6 @@ export const selectors = {
     candidates: ['[data-discussion-resolvable="true"]:not([data-discussion-resolved="true"])'],
   } satisfies SelectorChain,
 
-  /** Auteur de la RÉSOLUTION d'un fil résolu (§6.1, `resolvedBy`). MESURÉ : dans l'en-tête replié,
-   * « Resolved just now by Sylvain AURAT », suivi d'un lien `a.js-user-link[href="/<username>"]` —
-   * SANS `data-username`, le nom se lit sur le chemin (03-overview-fil-resolu). Absent de tout fil
-   * non résolu de la même capture. */
-  threadResolver: {
-    name: 'thread-resolver',
-    candidates: ['.discussion-headline-light a.js-user-link'],
-  } satisfies SelectorChain,
-
   /** Corps RENDU d'un commentaire publié, cherché DANS son `noteContainer`. MESURÉ : `.note-text.md`
    * dans l'Overview et la vue classique (03, 05-, 06-changes-classique), `.md` seul en Rapid Diffs
    * (03-changes) ; un commentaire portant un bloc de suggestion a `.md.suggestions` SANS
@@ -289,41 +280,5 @@ export const selectors = {
   currentUser: {
     name: 'current-user',
     candidates: ['a[data-testid="user-menu-toggle"][href]'],
-  } satisfies SelectorChain,
-
-  /** Date de CRÉATION de la merge request (§6.2.3) — c'est elle qui la range avant ou après
-   * `activatedAt`. MESURÉ : la ligne « … requested to merge … » de l'en-tête porte un
-   * `time[datetime]`, ENFANT DIRECT de `.detail-page-description` à côté du bloc de l'auteur — et
-   * unique dans ce bloc, sur toutes les captures (une première écriture le cherchait DANS le bloc de
-   * l'auteur et ne trouvait rien). Valeur : 18:24:04Z pour !1, 18:24:06Z pour !2, égale au
-   * `created_at` de l'API à la seconde près — alors que !1 avait été modifiée à 20:44, et que !2,
-   * fermée (08), garde la même date. Présent dans les trois vues. UN SEUL candidat : aucun repli
-   * générique sur la première `time` du document, qui porterait une autre date sans le dire
-   * (même leçon que GitHub). */
-  prCreatedAt: {
-    name: 'pr-created-at',
-    problem: 'pr-creation-date',
-    candidates: ['.detail-page-description > time[datetime]'],
-  } satisfies SelectorChain,
-
-  /** Merge request ARRÊTÉE — l'absence du bouton de fusion y est la norme (§9.4). MESURÉ :
-   * `[data-testid="reopen-merge-request"]` sur la merge request fermée (08), absent de toutes les
-   * captures d'une merge request ouverte. Une merge request FUSIONNÉE n'est pas capturée (§C.6) :
-   * aucun candidat ne la décrit, et sur elle l'absence du bouton sera journalisée — une ligne de
-   * trop, jamais un blocage de trop. Aucun candidat sur le libellé localisé de l'état. */
-  prSettledState: {
-    name: 'pr-settled-state',
-    candidates: ['[data-testid="reopen-merge-request"]'],
-  } satisfies SelectorChain,
-
-  /** Contrôle de complétion — le bouton de fusion (§6.5, §9.4). MESURÉ : présent dans l'Overview
-   * d'une merge request ouverte (01, 01-…-mr2) ; absent sur une merge request fermée (08) ; et
-   * absent de TOUTES les captures de l'onglet Changes (`…/diffs`), dans les deux vues (03- à
-   * 06-changes) — le widget de fusion n'y est pas rendu. Dans ces deux cas, son absence est la
-   * NORME, pas une rupture de sélecteur. */
-  mergeButton: {
-    name: 'merge-button',
-    problem: 'completion-control',
-    candidates: ['button[data-testid="merge-button"]'],
   } satisfies SelectorChain,
 };

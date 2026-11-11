@@ -7,13 +7,6 @@
 import { closestChain, matchesChain, queryChain } from '@cct/adapter-shared';
 import { selectors } from './selectors.js';
 
-/** Le bouton de fusion de la zone `mergebox-partial`, et si son absence est NOMINALE : PR ouverte
- * dont la page dit qu'elle ne peut pas être fusionnée maintenant (#113, `classicNotMergeable`). */
-export function classicCompletion(doc: Document): { element: Element | null; nominalAbsence: boolean } {
-  const element = queryChain(doc, selectors.mergeButton).element;
-  return { element, nominalAbsence: queryChain(doc, selectors.classicNotMergeable).element !== null };
-}
-
 /** Le champ est-il celui de la DESCRIPTION de la PR — hors périmètre (§4.1) ? */
 export function inClassicPrDescription(el: Element): boolean {
   return closestChain(el, selectors.prDescription).element !== null;

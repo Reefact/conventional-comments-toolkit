@@ -229,41 +229,10 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
-  /** Sonde « cette PR ne peut PAS être fusionnée d'ici » — elle ne sert qu'à DÉCIDER si
-   * l'absence de `mergeButton` est une dégradation (§9.4) ou le cas nominal, comme
-   * `editingSurfaces` pour `editors`. Sur une PR fusionnée, fermée ou en brouillon, GitHub ne
-   * rend aucun bouton de fusion : journaliser son absence remplissait le journal d'une entrée
-   * par PR visitée, si bien que la vraie rupture — le bouton d'une PR OUVERTE devenu
-   * introuvable — y passait pour du bruit.
-   *
-   * MESURÉ le 2026-10-29 : `[data-component="StateLabel"]` porte l'état de la PR dans
-   * `data-status`, sur les deux vues — `pullOpened` sur la capture 01, `pullMerged` sur les
-   * captures 02 à 07, Conversation comme Files changed. Les valeurs `pullClosed` et `draft` ne
-   * figurent sur aucune capture : elles sont lues dans le source de `@primer/react` 38.43.0
-   * (`StateLabel.js`, `octiconMap`), qui les définit à côté des deux mesurées. Un brouillon ne
-   * se fusionne pas (§6.2.4) ; une PR fermée non plus.
-   *
-   * Restreinte à l'EN-TÊTE de la page (`prc-PageHeader-PageHeader`, où se trouve, mesuré, le
-   * `StateLabel` de la PR sur chaque capture) : un `StateLabel` « Merged » ailleurs — une PR
-   * citée dans la timeline — ferait sinon taire le journal sur une PR ouverte.
-   *
-   * Le sens de l'erreur est choisi : si cette sonde pourrit, elle ne matche plus, et
-   * l'absence du bouton est journalisée comme avant — du bruit, jamais du silence.
-   * `pullQueued` (file de fusion) n'y figure pas : ce que la page rend alors n'est pas
-   * mesuré. */
-  prSettledState: {
-    name: 'pr-settled-state',
-    candidates: [
-      '[class*="prc-PageHeader-PageHeader"] [data-component="StateLabel"][data-status="pullMerged"]', // MESURÉ
-      '[class*="prc-PageHeader-PageHeader"] [data-component="StateLabel"][data-status="pullClosed"]',
-      '[class*="prc-PageHeader-PageHeader"] [data-component="StateLabel"][data-status="draft"]',
-    ],
-  } satisfies SelectorChain,
-
-  /** L'état de la PR, QUEL QU'IL SOIT — même étiquette que `prSettledState`, sans filtre sur
+  /** L'état de la PR, QUEL QU'IL SOIT — l'étiquette d'état de l'en-tête, sans filtre sur
    * `data-status`. Ne décide rien : sa valeur est un FAIT recopié dans le relevé d'une ligne du
-   * journal (`SelectorEvidence.facts.prState`), pour qu'un `merge-button` journalisé dise sur
-   * quelle sorte de PR il l'a été — `pullQueued`, par exemple, que rien ici ne mesure.
+   * journal (`SelectorEvidence.facts.prState`), pour qu'une chaîne journalisée dise sur quelle
+   * sorte de PR elle l'a été — `pullQueued`, par exemple, que rien ici ne mesure.
    * MESURÉ le 2026-10-30 : présente dans l'en-tête des huit captures (`test/fixtures/pages`). */
   prStateLabel: {
     name: 'pr-state-label',
@@ -560,21 +529,6 @@ export const selectors = {
     candidates: ['meta[name="user-login"]'],
   } satisfies SelectorChain,
 
-  /** Les données que la vue React embarque dans la page, en JSON — la seule source de la date
-   * de création sur la vue des fichiers modifiés (`payload.pullRequestsLayoutRoute.pullRequest
-   * .createdTime`, MESURÉ le 2026-10-28, captures 02 et 04 à 07). C'est du DOM, pas une API
-   * (§10) : un `<script>` de la page, lu tel quel.
-   *
-   * Ces données peuvent appartenir à une AUTRE page : sur la capture 03 (PR #294), elles
-   * décrivent la liste des PR du dépôt, restées d'une navigation précédente. Elles ne sont donc
-   * lues que si elles désignent la PR de l'URL — son NUMÉRO et son DÉPÔT
-   * (`pullRequestsLayoutRoute.repository.ownerLogin` et `.name`, présents sur toutes les
-   * captures) : deux dépôts ont chacun leur PR #331 (revue Reefact, PR #86). */
-  prEmbeddedData: {
-    name: 'pr-embedded-data',
-    candidates: ['script[type="application/json"][data-target="react-app.embeddedData"]'],
-  } satisfies SelectorChain,
-
   /** Élément après lequel insérer le bandeau du §5.5 : « en tête de PR » — dans le flux de
    * la page, sous le titre, et non au-dessus du chrome de la plateforme. Rien n'apparie sur
    * une page hors PR : l'appelant se replie alors sur le haut du document. */
@@ -610,34 +564,6 @@ export const selectors = {
       '[data-testid="timeline-item"]',
       '.js-timeline-item', // CLASSIQUE
     ],
-  } satisfies SelectorChain,
-
-  /** Le TITRE du check run du vérificateur — c'est là que vit la ligne cc/1 (§6.3.1, §A.8).
-   *
-   * MESURÉ le 2026-11-09 sur un vrai check `conventional-comments` (PR 552 de `just-dummies`,
-   * publié par un workflow temporaire comme le ferait le vérificateur ;
-   * `03-conversation-cc1-en-echec.html`) et sur celui de CodeQL (PR 551 ;
-   * `03-conversation-checks-deplies.html`, `03-overview-checks-deplies.html`). Dans les deux vues,
-   * chaque check de la liste est un `li` dont le nom accessible porte le NOM du check, et dont un
-   * `span.titleDescription__…` rend l'état PUIS le titre — `— cc/1 state=failure …`, ligne entière.
-   *
-   * La lecture est LIMITÉE au check `conventional-comments` (§A.8) : n'importe quel autre check
-   * pouvait publier un titre de la forme `cc/1 …`, et le premier rencontré l'emportait (revue
-   * Reefact, PR #143). Le nom n'est pas en tête : GitHub rattache le check publié par le jeton
-   * d'un workflow à la suite d'un AUTRE workflow du dépôt, et le rend
-   * `Contributor agreement / conventional-comments (pull_request_target)` — d'où la recherche de
-   * `/ conventional-comments `, barre et espaces compris, qu'un `conventional-comments-lint` ne
-   * satisfait pas. Les quatre candidats d'avant ne trouvaient rien sur aucune capture, et ne
-   * regardaient pas de quel check venait le titre : retirés.
-   *
-   * LIMITE, mesurée dans Chromium sur la même PR : la liste est REPLIÉE — et le titre absent du
-   * DOM — quand tous les checks sont verts, dans les deux vues ; la Conversation classique la DÉPLIE
-   * d'elle-même quand un check échoue ou tourne encore, l'Overview jamais. Le résumé publié ne se
-   * lit donc qu'en vue classique, et seulement dans ces cas ; ailleurs, l'extension garde son repli
-   * local (décision du propriétaire, 2026-11-09). */
-  checkRunTitles: {
-    name: 'check-run-titles',
-    candidates: ['li[aria-label*="/ conventional-comments "] [class*="titleDescription__"]'],
   } satisfies SelectorChain,
 
   /** Brouillon — décide de rien côté A, affiché seulement. */
@@ -747,37 +673,6 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
-  /** Bouton de complétion/merge (§6.5) — jamais intercepté, grisé visuellement seulement.
-   *
-   * MESURÉ le 2026-10-29 sur `test/fixtures/pages/01` — la seule capture d'une PR OUVERTE : le
-   * bouton est un bouton Primer React, `button.prc-Button-ButtonBase-… [data-variant="primary"]`
-   * libellé « Rebase and merge », premier item d'un `[data-component="ButtonGroup"]` (le second,
-   * vide sur ce dépôt, porte le choix de la méthode quand il y en a plusieurs). Aucun `.btn-primary`
-   * nulle part : aucun des candidats suivants ne matchait, et le §6.5 ne grisait plus rien sur
-   * github.com. Le journal le disait — `merge-button`, sur chaque page —, noyé dans les entrées
-   * des PR fusionnées où l'absence est la norme (cf. `prSettledState`).
-   *
-   * La VARIANTE ne désigne pas le bouton, elle dit seulement si GitHub recommande de fusionner.
-   * MESURÉ le 2026-11-10 sur `03-conversation-cc1-en-echec.html` (PR 552, un check NON requis en
-   * échec, icône « Able to merge ») : le même « Rebase and merge », au même endroit, porte
-   * `data-variant="default"`. Le premier candidat exigeait `primary` : la PR restait fusionnable,
-   * le §6.5 ne la grisait pas, et `merge-button` était journalisé (#103). Ce qui désigne le
-   * bouton, c'est sa place : le PREMIER item du groupe — le second est le choix de la méthode.
-   *
-   * Non mesuré : l'étape de confirmation qui suit le clic, si GitHub en rend une. Le grisage ne
-   * porte que sur le bouton affiché à l'arrivée sur la page. */
-  mergeButton: {
-    name: 'merge-button',
-    problem: 'completion-control',
-    candidates: [
-      '[data-testid="mergebox-partial"] [data-component="ButtonGroup"] > :first-child > button[data-component="Button"]', // MESURÉ (01, 03 -pr-ouverte, 03 -cc1-en-echec)
-      '[data-testid="mergebox-partial"] button.btn-primary',
-      'button[data-testid*="merge-button"]',
-      '.merge-message button.btn-group-merge',
-      'button.js-merge-commit-button',
-    ],
-  } satisfies SelectorChain,
-
   /** Sonde « ce fil est REPLIÉ, son contenu n'est pas dans la page » — elle ne sert qu'à
    * DÉCIDER si un fil sans corps ni auteur lisibles est une dégradation (§9.4) ou le cas
    * nominal, comme `editingSurfaces` pour `editors`.
@@ -817,55 +712,6 @@ export const selectors = {
   threadUnresolvedFlag: {
     name: 'thread-unresolved-flag',
     candidates: ['review-thread-collapsible[data-resolved="false"]'], // MESURÉ
-  } satisfies SelectorChain,
-
-  /** Date de création de la PR — lisible dans la page (§6.2.3), et décisive : c'est elle qui
-   * range une PR avant ou après `activatedAt`, donc hors ou dans le périmètre où l'extension
-   * bloque.
-   *
-   * MESURÉ le 2026-10-28 (`test/fixtures/pages/`, #84) : la chaîne d'avant finissait par
-   * `relative-time` tout court, et c'est lui seul qui répondait, partout — la PREMIÈRE date du
-   * document. L'en-tête de la page n'en porte pas sur une PR ouverte (capture 01), et sur une PR
-   * fusionnée il porte la date de FUSION (« Reefact merged 9 commits… », captures 02 à 07) : la
-   * même PR #331 se lisait 07:18 sur une page, 09:17 sur les autres. Le repli générique est
-   * retiré : il trouvait toujours quelque chose, si bien qu'aucune rupture ne pouvait atteindre
-   * le journal (§9.4). Mieux vaut une date inconnue — l'extension ne bloque alors jamais
-   * (`resolveInScope`) — qu'une date fausse.
-   *
-   * L'horodatage de la DESCRIPTION de la PR est sa date de création : elle est publiée à
-   * l'ouverture, et une modification ne le change pas. Mesuré sur deux PR où une seconde source
-   * permettait de le vérifier (`pullRequestsLayoutRoute.pullRequest.createdTime`, voir
-   * `prEmbeddedData`) : 07:18:01Z pour #331, 12:15:37Z pour #292, identiques. Sur la vue des
-   * fichiers modifiés, aucun élément de la page ne porte cette date : c'est `prEmbeddedData`
-   * qui prend le relais.
-   *
-   * UN SEUL candidat, et c'est voulu. Les deux d'en-tête qui suivaient
-   * (`.gh-header-meta relative-time`, `[data-testid="pr-header"] relative-time`) ne matchent rien
-   * sur les captures ; mais sur une page où ils matcheraient, rien ne dit qu'ils portent la
-   * création plutôt que la FUSION — c'est précisément ce que porte l'en-tête mesuré —, et ils
-   * passaient avant les données embarquées sans rien journaliser (revue Reefact, PR #86). Un
-   * candidat n'entre ici que s'il désigne une date identifiable comme celle de la création. */
-  prCreatedAt: {
-    name: 'pr-created-at',
-    problem: 'pr-creation-date',
-    candidates: ['[id^="pullrequest-"] relative-time'],
-  } satisfies SelectorChain,
-
-  /** Sonde « cette PR ouverte ne peut PAS être fusionnée maintenant » — elle ne sert qu'à DÉCIDER
-   * si l'absence de `mergeButton` est le cas nominal, comme `prSettledState` (#113).
-   *
-   * MESURÉ sur le squelette du rapport de diagnostic du 2026-10-31 (branche
-   * `diagnostic/2026-10-31-merge-button`, `skeletons/mvw7201i-4sm6c7.txt`), PR ouverte dont un
-   * check requis échoue : la zone de fusion ne contient AUCUN bouton de fusion, et l'icône de
-   * mergeabilité porte `aria-label="Checks failing"`. Sur la capture
-   * `03-conversation-commentaires-prefixes-pr-ouverte.html`, où la fusion est possible, la même
-   * icône porte `aria-label="Ready to merge"` et le bouton est là.
-   *
-   * Une liste POSITIVE des états mesurés, jamais « tout sauf Ready to merge » : un état non mesuré
-   * (conflits, revue requise, file de fusion) reste journalisé — du bruit, jamais du silence. */
-  classicNotMergeable: {
-    name: 'classic-not-mergeable',
-    candidates: ['[data-testid="mergebox-partial"] [data-testid="mergeability-icon-wrapper"] svg[aria-label="Checks failing"]'],
   } satisfies SelectorChain,
 
   /** Sonde « le contenu de ce fil n'est pas dans la page » (#117) — cherchée DANS le fil, qui est
@@ -1042,45 +888,6 @@ export const selectors = {
         'article[id^="pullrequestreview-"] .markdown-body[class*="safe-html-box__"], ' +
         '[data-testid="review-thread"] [class*="SafeHTMLBox__"]',
     ],
-  } satisfies SelectorChain,
-
-  /** Bouton de fusion de l'Overview (§6.5) — jamais intercepté, grisé visuellement seulement.
-   *
-   * MESURÉ sur la capture 03 (PR 548 ouverte, fusion possible) : il n'y a pas de
-   * `mergebox-partial`. Le bouton « Rebase and merge » est dans une rangée « action recommandée »,
-   * `li[data-testid="for-you-item-row"][data-item-id="ready-to-merge"]`, `data-variant="primary"`
-   * (#127). La rangée se nomme elle-même : `data-item-id` est l'état de mergeabilité. */
-  overviewMergeButton: {
-    name: 'merge-button',
-    problem: 'completion-control',
-    candidates: ['[data-testid="for-you-item-row"][data-item-id="ready-to-merge"] button[data-variant="primary"]'],
-  } satisfies SelectorChain,
-
-  /** Sonde « pas fusionnable maintenant » de l'Overview, comme `classicNotMergeable`. MESURÉ sur
-   * la capture 01 (checks en cours) : la rangée porte `data-item-id="pending-checks"` et n'offre
-   * qu'« Enable auto-merge », `data-variant="default"` — que le §6.5 ne vise pas. Liste POSITIVE
-   * des états mesurés : un autre état (checks en échec, conflits) reste journalisé. */
-  overviewNotMergeable: {
-    name: 'overview-not-mergeable',
-    candidates: ['[data-testid="for-you-item-row"][data-item-id="pending-checks"]'],
-  } satisfies SelectorChain,
-
-  /** Sonde « la rangée n'est pas encore rendue » de l'Overview : son absence de bouton n'est pas
-   * une rupture, la page n'a encore rien dit de la mergeabilité (#158).
-   *
-   * MESURÉ sur les deux squelettes de l'archive de #158 (PR 155, `msSinceVisit` 0 et 1) : la
-   * rangée existe, SANS `data-item-id`, et ne contient que des emplacements de chargement Primer —
-   * `SkeletonAvatar` à la place de l'icône, `SkeletonBox` à la place du bouton. Les 15 captures
-   * Overview, toutes chargées, portent un `data-item-id` et aucun `SkeletonBox`. Sans cette
-   * sonde, la chaîne était journalisée à la première milliseconde ; quand la rangée devenait
-   * ensuite `pending-checks`, rien ne rattrapait la ligne, qui restait présentée comme une rupture.
-   *
-   * L'emplacement de chargement est exigé, pas seulement l'absence de `data-item-id` : une rangée
-   * qui perdrait cet attribut pour de bon, sans squelette, reste journalisée — du bruit, jamais du
-   * silence. Non mesuré : une page qui resterait indéfiniment dans cet état. */
-  overviewLoadingRow: {
-    name: 'overview-loading-row',
-    candidates: ['[data-testid="for-you-item-row"]:not([data-item-id]) [data-component="SkeletonBox"]'],
   } satisfies SelectorChain,
 
   /** Élément après lequel insérer le bandeau du §5.5 sur l'Overview.

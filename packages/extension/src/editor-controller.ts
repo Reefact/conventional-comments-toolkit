@@ -454,7 +454,6 @@ export class EditorController {
       author: {
         id: `login:${this.deps.currentUserLogin.toLowerCase()}`,
         login: this.deps.currentUserLogin,
-        isServiceAccount: false,
       },
     };
     this.#lastAnalysis = analyze(input, this.config);

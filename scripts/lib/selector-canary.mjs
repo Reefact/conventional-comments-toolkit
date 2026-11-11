@@ -17,8 +17,7 @@
 
 /** Les pages chargées et les chaînes qu'on attend d'y voir trouver quelque chose — mesurées
  * sans session le 2026-10-28, chaque chaîne ayant au moins un candidat non nul. Une chaîne
- * absente d'une liste n'y est pas attendue : `merge-button` ne s'affiche pas à un visiteur,
- * et #294 n'a aucun fil de revue. */
+ * absente d'une liste n'y est pas attendue : #294 n'a aucun fil de revue. */
 export const GITHUB_CANARY_PAGES = [
   {
     // Fusionnée, commentaires conventionnels publiés, aucun fil de revue.
@@ -29,7 +28,6 @@ export const GITHUB_CANARY_PAGES = [
       'commentBody',
       'commentAuthor',
       'threadAnchor',
-      'prCreatedAt',
       'repositoryPublicMeta',
     ],
   },
@@ -42,7 +40,6 @@ export const GITHUB_CANARY_PAGES = [
       'commentBody',
       'commentAuthor',
       'threadAnchor',
-      'prCreatedAt',
       'repositoryPublicMeta',
       'renderedThreads',
       'threadContainer',

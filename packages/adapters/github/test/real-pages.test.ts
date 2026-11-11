@@ -117,82 +117,6 @@ describe('§4.1, §5.4 — Files changed : panneau de revue (capture 07)', () =>
   });
 });
 
-describe('§6.2.3 — la date de création de la PR, sur chaque capture (#84)', () => {
-  // La première date de la page n'est PAS la création : l'en-tête d'une PR fusionnée porte la
-  // date de FUSION, et la même PR #331 se lisait 07:18 ou 09:17 selon la page.
-  const CASES: [string, string, string][] = [
-    ['01-conversation-nouveau-commentaire.html', '/Reefact/just-dummies/pull/331', '2026-10-28T07:18:01Z'], // CLASSIQUE
-    ['02-conversation-reponse-fil.html', '/Reefact/just-dummies/pull/331', '2026-10-28T07:18:01Z'], // CLASSIQUE
-    ['03-conversation-pr-fusionnee-commentaires-prefixes.html', '/Reefact/just-dummies/pull/294', '2026-10-27T13:28:00Z'], // CLASSIQUE
-    ['03-conversation-commentaires-prefixes-pr-ouverte.html', '/Reefact/just-dummies/pull/548', '2026-11-09T12:07:12Z'], // CLASSIQUE
-    ['04-files-commentaire-ligne.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
-    ['04-files-commentaire-ligne-pr-ouverte.html', '/Reefact/just-dummies/pull/548/changes', '2026-11-09T12:07:12.000Z'],
-    ['05-files-reponse-fil-ligne.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
-    ['06-conversation-modification-commentaire.html', '/Reefact/just-dummies/pull/292', '2026-10-27T12:15:37Z'], // CLASSIQUE
-    ['06-files-modification-commentaire.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
-    ['07-review-changes.html', '/Reefact/just-dummies/pull/331/changes', '2026-10-28T07:18:01.000Z'],
-    // L'Overview ne porte pas la description en `[id^="pullrequest-"]` : la date vient des données
-    // embarquées, qui désignent bien la PR de l'URL (création de 547 : 2026-11-07T20:22:48Z,
-    // lue par l'API publique de GitHub le 2026-11-09 pour recouper).
-    ['03-overview-commentaires-prefixes.html', '/Reefact/just-dummies/pull/548', '2026-11-09T12:07:12.000Z'],
-    ['08-overview-pr-fusionnee.html', '/Reefact/just-dummies/pull/547', '2026-11-07T20:22:48.000Z'],
-  ];
-
-  it.each(CASES)('%s : la date de la description, ou à défaut celle des données embarquées', (file, path, expected) => {
-    const page = load(file, path);
-    expect(page.adapter.currentPr()?.createdAt).toBe(expected);
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('pr-created-at');
-  }, T);
-
-  it("ignore des données embarquées qui décrivent une AUTRE PR : date inconnue, et journalisée", () => {
-    // La capture 04 est la #331 ; chargée à l'adresse d'une autre PR, ses données ne la décrivent
-    // plus. Une date inconnue fait renoncer au blocage (`resolveInScope`) — jamais une date fausse.
-    const page = load('04-files-commentaire-ligne.html', '/Reefact/just-dummies/pull/999/changes');
-    expect(page.adapter.currentPr()?.createdAt).toBe('');
-    expect(page.adapter.log.failures.map((f) => f.chain)).toContain('pr-created-at');
-  }, T);
-
-  it("ignore des données embarquées d'un AUTRE dépôt, même au même numéro de PR (revue, PR #86)", () => {
-    const page = load('04-files-commentaire-ligne.html', '/acme/other-repo/pull/331/changes');
-    expect(page.adapter.currentPr()?.createdAt).toBe('');
-    expect(page.adapter.log.failures.map((f) => f.chain)).toContain('pr-created-at');
-  }, T);
-
-  it('reconnaît le dépôt sans tenir compte de la casse, comme GitHub sert la page', () => {
-    const page = load('04-files-commentaire-ligne.html', '/reefact/JUST-DUMMIES/pull/331/changes');
-    expect(page.adapter.currentPr()?.createdAt).toBe('2026-10-28T07:18:01.000Z');
-  }, T);
-
-  it("ne prend jamais la date d'un en-tête, qui peut être celle de la FUSION (revue, PR #86)", () => {
-    // Deux dispositions d'en-tête que la chaîne acceptait encore, chacune portant une date de
-    // fusion, sans description de PR ni données embarquées : la date reste inconnue, et
-    // journalisée — jamais celle de l'en-tête.
-    for (const header of [
-      '<div class="gh-header-meta">Reefact merged 9 commits <relative-time datetime="2026-10-28T09:17:04Z"></relative-time></div>',
-      '<div data-testid="pr-header">Reefact merged 9 commits <relative-time datetime="2026-10-28T09:17:04Z"></relative-time></div>',
-    ]) {
-      const doc = new DOMParser().parseFromString(`<html><body>${header}</body></html>`, 'text/html');
-      Object.defineProperty(doc, 'location', {
-        value: new URL('https://github.com/Reefact/just-dummies/pull/331'),
-        configurable: true,
-      });
-      const adapter = new GithubClientAdapter({ documentRef: doc });
-      expect(adapter.currentPr()?.createdAt).toBe('');
-      expect(adapter.log.failures.map((f) => f.chain)).toContain('pr-created-at');
-    }
-  });
-});
-
-
-describe('§6.5, §9.4 — Files changed : PR ouverte (capture 04, PR 548) — #103', () => {
-  it("n'y cherche pas de bouton de fusion : l'onglet n'en a pas, ce n'est pas une rupture", () => {
-    const page = load('04-files-commentaire-ligne-pr-ouverte.html', '/Reefact/just-dummies/pull/548/changes');
-    expect(page.doc.querySelector('[data-testid="mergebox-partial"], [data-testid="for-you-item-row"]')).toBeNull();
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-  }, T);
-});
-
 describe('§9.4 — hors PR, un champ inconnu ne se journalise pas (#115)', () => {
   // Le rapport du 2026-10-31 : la page de profil, et son champ masqué « Add a bio » (relevé du
   // rapport : `textarea[aria-label="Add a bio"]` dans `form[action="/users/Reefact"]`).
@@ -230,7 +154,6 @@ describe('§3.4.1, §5.5 — un préfixe placé après un bloc de code cité (C3
   }, T);
 });
 
-
 describe('§5.5 — le filtre de fils se place au niveau de la LISTE, hors des boîtes (captures 03, PR 548)', () => {
   // Il se plaçait avant le premier fil rendu : dans le bloc de la revue (classique), dans la boîte
   // même du premier fil (Overview). Remarque du propriétaire à la validation, 2026-11-09.
@@ -245,43 +168,5 @@ describe('§5.5 — le filtre de fils se place au niveau de la LISTE, hors des b
     expect(mount?.contains(first)).toBe(true);
     // Hors de toute boîte de fil ou de revue : aucun ancêtre n'est un élément de chronologie.
     expect(mount?.parentElement?.closest(item)).toBeNull();
-  }, T);
-});
-
-describe('§6.3.1, §6.5, §A.8 — la ligne cc/1 se lit dans le check conventional-comments, et lui seul', () => {
-  // Un vrai check `conventional-comments`, publié en échec sur la PR 552 par un workflow temporaire,
-  // comme le ferait le vérificateur ; la Conversation classique déplie alors la liste d'elle-même.
-  it('lit la ligne publiée par le vérificateur (capture classique, check en échec)', () => {
-    const page = load('03-conversation-cc1-en-echec.html', '/Reefact/just-dummies/pull/552'); // CLASSIQUE
-    expect(page.adapter.readPublishedResult()).toMatchObject({
-      state: 'failure',
-      mode: 'warn',
-      unresolvedBlockingCount: 2,
-      nonCompliantCommentCount: 1,
-      warningCount: 0,
-    });
-  }, T);
-
-  it('ignore une ligne cc/1 publiée par un AUTRE check, même placé avant (revue Reefact, PR #143)', () => {
-    const page = load('03-conversation-cc1-en-echec.html', '/Reefact/just-dummies/pull/552'); // CLASSIQUE
-    const verifier = page.doc.querySelector('li[aria-label*="/ conventional-comments "]')!;
-    const impostor = verifier.cloneNode(true) as Element;
-    impostor.setAttribute('aria-label', 'Some workflow / other-check (pull_request) ');
-    impostor.querySelector('[class*="titleDescription__"]')!.textContent =
-      '— cc/1 state=success draft=0 exempt=0 mode=enforce activated=- core=1.0.0 cfg=deadbeef t=0 c=0 w=0';
-    verifier.parentElement!.insertBefore(impostor, verifier);
-    expect(page.adapter.readPublishedResult()).toMatchObject({ state: 'failure', unresolvedBlockingCount: 2 });
-  }, T);
-
-  it.each([
-    ['03-overview-checks-deplies.html'],
-    ['03-conversation-checks-deplies.html'], // CLASSIQUE
-  ])('%s : le titre de CodeQL, même en forme cc/1, n’est jamais lu', (file) => {
-    const page = load(file, '/Reefact/just-dummies/pull/551');
-    const title = Array.from(page.doc.querySelectorAll('[class*="titleDescription__"]')).find((e) =>
-      e.textContent?.includes('No new alerts in code changed by this pull request')
-    )!;
-    title.textContent = 'Successful in 5s — cc/1 state=failure draft=0 exempt=0 mode=enforce activated=- core=1.0.0 cfg=deadbeef t=2 c=1 w=0';
-    expect(page.adapter.readPublishedResult()).toBeNull();
   }, T);
 });

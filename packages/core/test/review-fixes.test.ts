@@ -120,18 +120,3 @@ describe('écart 3 — §8.1.1 : labels.minimum contraint la valeur effective, p
     }
   });
 });
-
-describe('écart 11 — §6.3.1 : le domaine d’`activated` est l’ISO 8601, pas Date.parse', () => {
-  it('rejette les formes non ISO que Date.parse accepterait', async () => {
-    const { decodeSummary } = await import('../src/summary.js');
-    const line = (activated: string) =>
-      `cc/1 state=success draft=0 exempt=0 mode=warn activated=${activated} core=1.0.0 cfg=9f3a1c7e t=0 c=0 w=0`;
-    expect(decodeSummary(line('12/25/2026'))).toBeNull();
-    expect(decodeSummary(line('2026'))).toBeNull();
-    expect(decodeSummary(line('2026-09-01'))).toBeNull(); // la forme écrite porte l'heure
-    expect(decodeSummary(line('2026-09-01T00:00:00Z'))).not.toBeNull();
-    expect(decodeSummary(line('2026-09-01T00:00:00.123Z'))).not.toBeNull();
-    expect(decodeSummary(line('2026-09-01T00:00:00+02:00'))).not.toBeNull();
-    expect(decodeSummary(line('-'))).not.toBeNull();
-  });
-});

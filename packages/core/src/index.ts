@@ -7,7 +7,6 @@ export {
   CORE_MAJOR,
   SUPPORTED_CONFIG_VERSION,
   SUPPORTED_FLOOR_VERSION,
-  SUMMARY_PREFIX,
 } from './version.js';
 
 // §3.4.1 — prétraitement
@@ -83,9 +82,6 @@ export {
   MODE_SCALE,
 } from './config/floor.js';
 export { resolveConfig, type ResolvedConfig } from './config/resolve.js';
-// Ligne cc/1 d'un vérificateur retiré (§2) : son décodage seul, tant que l'adaptateur GitHub la
-// lit.
-export { decodeSummary } from './summary.js';
 
 // i18n
 export { t, resolveLang, availableLanguages } from './i18n/index.js';

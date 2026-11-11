@@ -536,7 +536,7 @@ describe('§9.4 — copier pour le débogage', () => {
 // et le détail restant dans le rapport copié.
 describe('§9.4 — une ligne dit le problème, avec son niveau', () => {
   const MIXED = [
-    { chain: 'merge-button', problem: 'completion-control', at: '2026-10-30T08:35:55.958Z', url: `${PR}/files` },
+    { chain: 'submit-buttons', problem: 'submit-control', at: '2026-10-30T08:35:55.958Z', url: `${PR}/files` },
     // Écrite avant les clés de description : le nom reste ce que la ligne dit.
     { chain: 'legacy-chain', at: '2026-10-30T07:56:08.497Z', url: `${PR}/files` },
     // Une clé que CETTE version ne connaît pas : jamais affichée telle quelle.
@@ -551,17 +551,17 @@ describe('§9.4 — une ligne dit le problème, avec son niveau', () => {
     installPage({ selectorFailures: MIXED });
     await loadOptions();
 
-    expect(rows()[0]).toContain(ui('fr', 'options.journal.problem.completion-control'));
+    expect(rows()[0]).toContain(ui('fr', 'options.journal.problem.submit-control'));
     // Le nom de la chaîne est un mot de plateforme : il vit dans le rapport copié.
-    expect(rows()[0]).not.toContain('merge-button');
+    expect(rows()[0]).not.toContain('submit-buttons');
   });
 
   it('la phrase suit la langue de la page', async () => {
     installPage({ selectorFailures: MIXED }, 'en');
     await loadOptions();
 
-    expect(rows()[0]).toContain(ui('en', 'options.journal.problem.completion-control'));
-    expect(rows()[0]).not.toContain(ui('fr', 'options.journal.problem.completion-control'));
+    expect(rows()[0]).toContain(ui('en', 'options.journal.problem.submit-control'));
+    expect(rows()[0]).not.toContain(ui('fr', 'options.journal.problem.submit-control'));
   });
 
   it('sans clé, ou avec une clé inconnue, la ligne garde le nom de la chaîne', async () => {
@@ -645,4 +645,3 @@ describe('§9.4 — une ligne dit le problème, avec son niveau', () => {
     expect(written[0]).toContain('at f (content.js:1:1)');
   });
 });
-

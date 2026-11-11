@@ -16,7 +16,9 @@ describe('§9.4 — Azure DevOps : chaque chaîne journalisée dit à quoi elle 
   const calls = [...SOURCE.matchAll(/\.log\.degraded\(\s*([A-Za-z_.]+)\s*[,)]/g)].map((m) => m[1]!);
 
   it('l’adaptateur appelle bien `degraded()` — sinon ce test ne vérifierait rien', () => {
-    expect(calls.length).toBeGreaterThanOrEqual(2);
+    // Un seul appel depuis le retrait de la sonde du bouton *Complete* et de la date de création
+    // (§2) : celui du repli de zone (`generalComposer`).
+    expect(calls.length).toBeGreaterThanOrEqual(1);
   });
 
   it.each([...new Set(calls)])('%s déclare sa fonction', (expression) => {

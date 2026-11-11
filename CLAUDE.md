@@ -156,8 +156,8 @@ revues pour deux couches du même geste : d'abord le SENS de la causalité, qui 
 l'extension d'avoir déplacé la page, puis la causalité elle-même.
 
 Le contre-exemple vivait à trois lignes de la classe qui écrit la donnée :
-`getCompletionControl()` journalise dès qu'il ne trouve pas le bouton de fusion, et sur une PR
-fermée son absence est la NORME — c'est même la raison pour laquelle ce journal est dédupliqué.
+`getCompletionControl()` — retirée depuis avec le grisage du bouton de fusion (§2) —
+journalisait dès qu'il ne trouvait pas ce bouton, et sur une PR fermée son absence est la NORME — c'est même la raison pour laquelle ce journal est dédupliqué.
 Un sélecteur qui échoue n'est donc pas la preuve qu'une page a bougé ; c'est une chose qu'on a
 cherchée sans la trouver, ce qui est exactement ce qu'il fallait écrire.
 

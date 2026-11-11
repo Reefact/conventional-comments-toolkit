@@ -57,11 +57,6 @@ describe('§4.1, §5.4 — Overview : nouveau commentaire général (capture 01)
     expect(submitLabels(page, editor)).toEqual(['Close with comment', 'Comment']);
   }, T);
 
-  it("checks en cours : pas de bouton de fusion, et ce n'est pas une rupture (§6.5, §9.4)", () => {
-    const page = load('01-overview-nouveau-commentaire.html', PR548);
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-  }, T);
 });
 
 describe('§4.1, §5.4 — Overview : réponse dans un fil (capture 02)', () => {
@@ -83,7 +78,7 @@ describe('§4.1, §5.4 — Overview : réponse dans un fil (capture 02)', () => 
   }, T);
 });
 
-describe('§5.5, §6.5 — Overview : commentaires publiés (capture 03)', () => {
+describe('§5.5 — Overview : commentaires publiés (capture 03)', () => {
   it('rend les commentaires GÉNÉRAUX comme ceux des fils, et jamais la description', () => {
     const page = load('03-overview-commentaires-prefixes.html', PR548);
     const bodies = page.adapter.getRenderedComments().map((c) => c.bodyText);
@@ -121,13 +116,6 @@ describe('§5.5, §6.5 — Overview : commentaires publiés (capture 03)', () =>
     expect(chains).not.toContain('thread-anchor');
   }, T);
 
-  it('trouve « Rebase and merge » dans la rangée « ready-to-merge » (#127)', () => {
-    const page = load('03-overview-commentaires-prefixes.html', PR548);
-    const control = page.adapter.getCompletionControl();
-    expect(control?.kind).toBe('complete-pr');
-    expect(control?.element.textContent?.trim()).toBe('Rebase and merge');
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-  }, T);
 });
 
 describe('§4.3 — Overview : modifications (captures 06)', () => {
@@ -176,42 +164,13 @@ describe('§4.1, §5.4 — Overview : panneau de revue (capture 07)', () => {
   }, T);
 });
 
-describe('§6.5, §9.4 — Overview : PR fusionnée (capture 08)', () => {
+describe('§5.4 — Overview : PR fusionnée (capture 08)', () => {
   it("le seul bouton du nouveau commentaire, « Comment », est intercepté — premier, mais primary", () => {
     const page = load('08-overview-pr-fusionnee.html', PR547);
     const editor = editorWhere(page, isNewComment);
     expect(submitLabels(page, editor)).toEqual(['Comment']);
   }, T);
 
-  it("pas de bouton de fusion, et ce n'est pas une rupture", () => {
-    const page = load('08-overview-pr-fusionnee.html', PR547);
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-  }, T);
-});
-
-describe('§6.5, §9.4 — Overview : un check NON requis en échec, la PR reste fusionnable (PR 552) — #103', () => {
-  // Capturée le 2026-11-10, PR 552 rouverte le temps de la capture, sa CI terminée, seul le check
-  // `conventional-comments` en échec. La vue classique rend alors le bouton en `default` (capture
-  // 03-conversation-cc1-en-echec) ; l'Overview, MESURÉ, garde la rangée « ready-to-merge » et un
-  // bouton `primary` — ce test fige qu'elle n'a pas le défaut de la vue classique.
-  const page = () => load('03-overview-cc1-en-echec.html', '/Reefact/just-dummies/pull/552');
-
-  it('la capture montre bien ce cas : Overview, PR ouverte, une seule rangée « ready-to-merge »', () => {
-    const p = page();
-    expect(githubView(p.doc)).toBe('overview');
-    expect(p.doc.querySelector('[class*="prc-PageHeader-PageHeader"] [data-component="StateLabel"]')?.getAttribute('data-status')).toBe('pullOpened');
-    const rows = [...p.doc.querySelectorAll('[data-testid="for-you-item-row"]')].map((r) => r.getAttribute('data-item-id'));
-    expect(rows).toEqual(['ready-to-merge']);
-  }, T);
-
-  it('trouve « Rebase and merge », et ne journalise rien', () => {
-    const p = page();
-    const control = p.adapter.getCompletionControl();
-    expect(control?.kind).toBe('complete-pr');
-    expect(control?.element.textContent?.trim()).toBe('Rebase and merge');
-    expect(p.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-  }, T);
 });
 
 describe('§5.5 — Overview : aperçu d’une modification (capture 09)', () => {

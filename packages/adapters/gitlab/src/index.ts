@@ -15,7 +15,6 @@ import type {
   Disposable,
   PlatformProfile,
   PrRef,
-  PublishedSummary,
   ThreadInfo,
   UserInfo,
 } from '@cct/core';
@@ -39,7 +38,6 @@ import {
   type EntryGuard,
   type PlatformAdapter,
   type RenderedBodyShape,
-  type SubmitControl,
   type SubmitControlsLookup,
   type SubmitKeystrokes,
 } from '@cct/adapter-shared';
@@ -195,7 +193,6 @@ export class GitlabClientAdapter implements PlatformAdapter {
       // au corps vide et aucune réponse, ce qui n'est pas une rupture — la page ne les a pas
       // rendues.
       const [root, ...replies] = queryChainAll(el, selectors.noteContainer);
-      const resolver = this.#resolver(el);
       const resolution = this.#resolution(el);
       // Un fil ne porte un état bloquant que s'il est RÉSOLUBLE (§4.1) : la page le dit par
       // `data-discussion-resolvable`, que portent tous les fils capturés, résolus ou ouverts
@@ -209,10 +206,6 @@ export class GitlabClientAdapter implements PlatformAdapter {
         root: { ...this.#comment(root), id, permalink: `#${id}`, canCarryBlockingState: resolvable },
         replies: replies.map((note) => this.#comment(note)),
         resolution,
-        // Le résolveur est rendu dans l'en-tête d'un fil résolu replié (selectors.ts,
-        // `threadResolver`). Absent ailleurs, et alors non renseigné (§6.1) : le cas d'un fil
-        // résolu DÉPLIÉ n'est pas capturé.
-        ...(resolver ? { resolvedBy: resolver } : {}),
         canCarryBlockingState: resolvable,
       };
     });
@@ -225,21 +218,13 @@ export class GitlabClientAdapter implements PlatformAdapter {
     const id = note?.id ?? '';
     return {
       id,
-      author: { id: `login:${login.toLowerCase()}`, login, isServiceAccount: false },
+      author: { id: `login:${login.toLowerCase()}`, login },
       body: bodyEl ? commentBodyText(bodyEl) : '',
       createdAt: '',
       permalink: `#${id}`,
       isSystemGenerated: false,
       canCarryBlockingState: false,
     };
-  }
-
-  /** Le résolveur se lit sur le chemin de son lien (`href="/<username>"`) : il n'a pas de
-   * `data-username` (selectors.ts, `threadResolver`). */
-  #resolver(thread: Element): UserInfo | undefined {
-    const href = queryChain(thread, selectors.threadResolver).element?.getAttribute('href') ?? '';
-    const login = href.replace(/^\//, '').split('/')[0] ?? '';
-    return login ? { id: `login:${login.toLowerCase()}`, login, isServiceAccount: false } : undefined;
   }
 
   #resolution(thread: Element): ThreadInfo['resolution'] {
@@ -258,31 +243,11 @@ export class GitlabClientAdapter implements PlatformAdapter {
     return queryChain(thread, selectors.noteContainer).element?.id || undefined;
   }
 
-  getCompletionControl(): SubmitControl | null {
-    const { element } = queryChain(this.#doc, selectors.mergeButton);
-    if (!element) {
-      // Absent sur l'onglet Changes et sur une merge request fermée : c'est la norme mesurée,
-      // pas une rupture (selectors.ts, `mergeButton`). Partout ailleurs, la chaîne est journalisée.
-      const onChanges = MR_PATH.exec(this.#doc.location?.pathname ?? '')?.[4] !== undefined;
-      if (!onChanges && !queryChain(this.#doc, selectors.prSettledState).element) {
-        this.log.degraded(selectors.mergeButton, chainEvidence(this.#doc, selectors.mergeButton));
-      }
-      return null;
-    }
-    this.log.recovered(selectors.mergeButton);
-    return { element, kind: 'complete-pr' };
-  }
-
   /** Le nom se lit sur le chemin du lien du menu utilisateur (`href="/<username>"`). */
   async getCurrentUser(): Promise<UserInfo> {
     const href = queryChain(this.#doc, selectors.currentUser).element?.getAttribute('href') ?? '';
     const login = href.replace(/^\//, '').split('/')[0] ?? '';
-    return { id: `login:${login.toLowerCase()}`, login, isServiceAccount: false };
-  }
-
-  /** Aucun vérificateur n'est livré pour GitLab (§C.7) : aucune ligne cc/1 à lire. */
-  readPublishedResult(): PublishedSummary | null {
-    return null;
+    return { id: `login:${login.toLowerCase()}`, login };
   }
 
   /** Corps des commentaires publiés, cherchés DANS chaque conteneur de note — jamais à l'échelle
@@ -340,15 +305,8 @@ export class GitlabClientAdapter implements PlatformAdapter {
     const loc = this.#doc.location;
     const m = MR_PATH.exec(loc?.pathname ?? '');
     if (!m) return null;
-    // Lecture DOM seulement une fois la merge request reconnue (§9.2.3) : hors merge request,
-    // currentPr() ne coûte qu'une expression régulière.
-    const createdAt = queryChain(this.#doc, selectors.prCreatedAt).element?.getAttribute('datetime') ?? '';
-    if (createdAt) this.log.recovered(selectors.prCreatedAt);
-    // Une date inconnue vaut mieux qu'une date fausse : l'extension ne bloque alors jamais.
-    else this.log.degraded(selectors.prCreatedAt, chainEvidence(this.#doc, selectors.prCreatedAt));
     return {
       platform: 'gitlab',
-      createdAt,
       // `host` et non `hostname` : il porte le port d'une instance non standard.
       host: loc!.host,
       scope: [m[1]!, m[2]!],
@@ -368,7 +326,7 @@ export class GitlabClientAdapter implements PlatformAdapter {
    * réponse d'abord, puis modification, sinon nouveau fil — dans CET ordre. */
   #contextOf(el: Element, pr: PrRef): EditorContext {
     if (closestChain(el, selectors.reviewDrawer).element) {
-      return { zone: 'review-body', action: 'compose', pr, canCarryBlockingState: false, inScope: true };
+      return { zone: 'review-body', action: 'compose', pr, canCarryBlockingState: false };
     }
     if (closestChain(el, selectors.conversationForm).element) {
       // Sur GitLab, un commentaire général PEUT être un fil résoluble — publié par « Start thread »
@@ -376,12 +334,12 @@ export class GitlabClientAdapter implements PlatformAdapter {
       // porte donc un état bloquant, contrairement à GitHub : décision du propriétaire, 2026-11-08
       // — la réponse `false` faisait afficher W-NOT-BLOCKABLE, faux sur cette plateforme. Limite
       // écrite au §C.6 : publié par « Comment », c'est une note simple que le blocage ne voit pas.
-      return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
+      return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: true };
     }
     const thread = closestChain(el, selectors.thread).element;
     const threadId = thread ? this.#threadId(thread) : undefined;
     if (closestChain(el, selectors.replyWrapper).element) {
-      return { zone: 'reply', action: 'compose', pr, threadId, canCarryBlockingState: false, inScope: true };
+      return { zone: 'reply', action: 'compose', pr, threadId, canCarryBlockingState: false };
     }
     const note = closestChain(el, selectors.noteContainer).element;
     if (note) {
@@ -390,8 +348,8 @@ export class GitlabClientAdapter implements PlatformAdapter {
       const commentId = note.id || undefined;
       const isRoot = thread !== null && queryChain(thread, selectors.noteContainer).element === note;
       return isRoot
-        ? { zone: 'thread-root', action: 'edit', pr, threadId: threadId ?? commentId, commentId, canCarryBlockingState: true, inScope: true }
-        : { zone: 'reply', action: 'edit', pr, threadId: threadId ?? commentId, commentId, canCarryBlockingState: false, inScope: true };
+        ? { zone: 'thread-root', action: 'edit', pr, threadId: threadId ?? commentId, commentId, canCarryBlockingState: true }
+        : { zone: 'reply', action: 'edit', pr, threadId: threadId ?? commentId, commentId, canCarryBlockingState: false };
     }
     // Nouveau fil sur une ligne de diff : porte un état de résolution (§4.1). C'est le seul cas
     // mesuré qui arrive ici (`diffLineComposer`) : un champ qui n'en est pas un garde la même zone,
@@ -402,6 +360,6 @@ export class GitlabClientAdapter implements PlatformAdapter {
         chainEvidence(this.#doc, selectors.diffLineComposer, { subject: printElement(el) })
       );
     }
-    return { zone: 'thread-root', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
+    return { zone: 'thread-root', action: 'compose', pr, canCarryBlockingState: true };
   }
 }

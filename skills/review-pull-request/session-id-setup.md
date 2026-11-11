@@ -3,6 +3,15 @@
 Follow this file once per installation of the skill. It ends by writing `session-id.md`, and from
 then on the skill reads that file instead, without asking again.
 
+Run its steps in order, and run them: each one is a command or a question, never a guess. A GUID
+is the outcome of the last step, not a shortcut past the first ones.
+
+## 0. Look for a choice already recorded
+
+The repository under review may already have chosen, for an agent that reads the skill from
+another place: look for a `session-id.md` in another installation of this skill in it, such as
+`.claude/skills/review-pull-request/session-id.md`. If you find one, follow it and stop here.
+
 ## 1. Use Slugger when it already runs
 
 From the repository root, check whether Slugger already runs: `dotnet tool restore` then
@@ -12,7 +21,8 @@ command of the Slugger option below that matches the one that answered. Then, if
 record that choice (sections 3 and 4) so that later sessions skip this file; if you cannot, record
 nothing.
 
-Otherwise, go on to the question.
+Otherwise — the commands ran and failed, and you keep their output for your report — go on to the
+question.
 
 ## 2. Ask
 

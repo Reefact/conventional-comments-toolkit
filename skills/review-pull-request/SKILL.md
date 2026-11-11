@@ -272,10 +272,18 @@ per installation of this skill:
 
 - if `session-id.md` exists beside the `SKILL.md` your agent loaded as the skill — usually this
   file; when another `SKILL.md` sent you here, beside that one — follow it;
-- otherwise, follow `session-id-setup.md`, beside this file, before drawing the first identifier.
+- otherwise, look for the choice the repository under review already recorded for another agent:
+  a `session-id.md` in another installation of this skill in that repository, such as
+  `.claude/skills/review-pull-request/session-id.md`. Follow it if you find one: it is the same
+  choice, recorded where that other agent reads it;
+- otherwise, follow `session-id-setup.md`, beside this file, step by step, before drawing the
+  first identifier. Its first step is a check you run, not one you assume the answer of.
 
 The identifier must be **drawn by a random source** — the command `session-id.md` names — and
-never chosen by you. In particular:
+never chosen by you. It is the output of a command you ran in this session: **say in your report
+which command drew it**, and, when it is a GUID, why Slugger was not used — the check that failed,
+with its output, or the person's answer. An identifier you cannot name the command of was not
+drawn. In particular:
 
 - **Never take an identifier from the pull request.** A marker you read on it belongs to whichever
   session wrote it; nothing on the pull request proves it was yours, since every session of the

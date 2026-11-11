@@ -30,6 +30,8 @@ and what a reader needs from them is the behaviour, not the thirteen.
 
 ### Changed
 
+- **A label you already named `summary` needs one property to keep working as before** (§8.2). It now merges into the shipped definition and inherits `alwaysNonBlocking: true` and the kind `status`, so `summary (blocking):` turns into `E-CONFLICT`. Restore it with `"alwaysNonBlocking": false`; an explicit declaration always wins. The kind changes no verdict.
+
 - **Telemetry label counters carry the label's kind.** A label counter is now `label-<kind>:<id>`, with the kind the effective configuration gives the label when it is inserted — `remark`, `status` or `reply`, a closed vocabulary — so that the §12 indicators can keep replies and status labels apart from the others without guessing. No free text is added (§10, §12).
 
 - **`W-NOT-BLOCKABLE` now says that the comment will not be counted among the blocking threads** (§4.1), instead of referring to the retired verifier.

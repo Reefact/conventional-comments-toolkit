@@ -21,6 +21,7 @@ _La version candidate de la 1.0.0 : un label `summary` pour récapituler une rev
 
 ### 🔧 Changements
 
+- **Si votre configuration définit déjà un label `summary`, il lui faut une propriété pour continuer à fonctionner comme avant.** Votre label fusionne désormais avec celui que livre le produit et devient toujours non bloquant, si bien que `summary (blocking):` est refusé. Ajoutez `"alwaysNonBlocking": false` pour le rétablir.
 - **Le vérificateur est retiré, et ses réglages avec lui.** Le produit signale les fils bloquants non résolus d'une pull request ; il ne bloque jamais une fusion. Les clés `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` et `docUrl` ne sont plus lues, et sont signalées comme clés inconnues. Le mode `warn` fonctionne comme `assist`, avec un avis qui signale la valeur comme obsolète. Si votre configuration en contient, vous pouvez les retirer.
 - **Les décomptes de labels de la télémétrie disent de quel type de label il s'agit.** Si votre organisation collecte la télémétrie, chaque décompte de label porte désormais son type — `remark`, `status` ou `reply` — pour que réponses et récapitulatifs se comptent à part. Rien d'autre n'est ajouté.
 

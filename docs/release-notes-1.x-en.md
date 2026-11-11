@@ -21,6 +21,7 @@ _The release candidate for 1.0.0: a `summary` label to recap a review, configura
 
 ### 🔧 Changed
 
+- **If your configuration already defines a `summary` label, it needs one property to keep working as before.** Your label now merges into the shipped one and becomes always non-blocking, so `summary (blocking):` is refused. Add `"alwaysNonBlocking": false` to restore it.
 - **The verifier is retired, and its settings with it.** The product reports the unresolved blocking threads of a pull request; it never blocks a merge. The keys `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` and `docUrl` are no longer read, and are shown as unknown keys. The mode `warn` works as `assist`, with a notice saying the value is obsolete. If your configuration uses any of these, you can remove them.
 - **Telemetry label counts say what kind of label was used.** If your organization collects telemetry, each label count now carries its kind — `remark`, `status` or `reply` — so that replies and recaps can be counted apart. Nothing else is added.
 

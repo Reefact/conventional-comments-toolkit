@@ -14,3 +14,10 @@ En particulier, les sessions de revue de ce dépôt sont nommées par **Slugger*
 sans .NET, le téléchargement du binaire natif de Slugger, vérifié par son SHA-256. Ne pas passer
 par `session-id-setup.md`, et ne jamais écrire soi-même un identifiant, GUID compris — il est
 tiré par une commande, que le rapport de revue cite.
+
+## Décisions
+
+Les décisions importantes du dépôt sont consignées en IDR dans [`docs/idr/`](docs/idr/README-fr.md)
+(DEC0001). Avant de finaliser une pull request, la vérifier contre ce registre en suivant
+[`.claude/skills/idr/SKILL.md`](.claude/skills/idr/SKILL.md) : un agent propose un IDR, il ne
+l'accepte jamais lui-même, et la plupart des pull requests n'en portent aucun.

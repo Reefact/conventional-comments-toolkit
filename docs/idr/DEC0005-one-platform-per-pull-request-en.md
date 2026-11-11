@@ -6,7 +6,7 @@
 
 | Date | Status | Note | Linked minutes |
 | --- | --- | --- | --- |
-| 2026-10-27 | Accepted | Recovered on 2026-11-11 from the decision recorded in `CLAUDE.md` and commit `c08b35a` |  |
+| 2026-10-27 | Accepted | Recovered on 2026-11-11 from the decision recorded in `CLAUDE.md` and commits `c08b35a` and `2dd4a7f` | Review of pull request #78 |
 
 ## Context
 
@@ -20,7 +20,7 @@ A pull request touches a single platform, or shared code, never both, except a c
 
 Separating the shared change from the platform change makes visible what touches every platform, and protects the platforms a pull request does not target.
 
-A contract pull request is accepted because a contract change has to apply everywhere at once. Documentation, shared tests and tooling outside `packages/` are neutral; a platform's registration files are neutral only in the pull request that creates or removes it.
+A contract pull request is accepted because a contract change has to apply everywhere at once. Documentation, shared tests and tooling outside `packages/` are neutral; a platform's registration files are neutral only in the pull request that creates it. The same day, following the review of pull request #78 (commit `2dd4a7f`), the exception extends to the pull request that removes a platform: removing an adapter requires removing its registration, and no split stays green — the adapter first leaves dead imports, the registration first fails `platform-registry.test.ts`.
 
 The rule is checked by `npm run check:pr-scope`, which CI runs on every pull request.
 

@@ -12,13 +12,13 @@
 
 Le code du dépôt est mis en forme à la main, et aucun réglage ne rend Prettier idempotent sur lui : il restructure plutôt qu'il n'enroule. Un `prettier --write` lancé sur sept fichiers en cours de travail a produit environ 580 lignes de bruit dans un commit déjà poussé, qu'il a fallu défaire à la main.
 
-Un fichier `.prettierrc` avait été ajouté pour fixer le style. L'extension VS Code de Prettier a un réglage `prettier.requireConfig`, largement activé, qui refuse de formater tant qu'aucune configuration locale n'existe : ajouter le fichier faisait basculer ces postes de « ne formate pas » à « formate à chaque sauvegarde » (revue de la PR #63).
+Un fichier `.prettierrc` avait été ajouté pour fixer le style. L'extension VS Code de Prettier a un réglage `prettier.requireConfig`, largement activé, qui refuse de formater tant qu'aucune configuration locale n'existe : ajouter le fichier faisait passer de « ne formate pas » à « formate » les développeurs qui avaient aussi `editor.formatOnSave` activé (revue de la PR #63).
 
 Mesuré sur l'ensemble des sources : avec `requirePragma: true`, aucun fichier n'est réécrit ; sans lui mais avec le reste de la configuration, 106 fichiers (+3 611 / −1 122 lignes) ; sans aucune configuration, 140 fichiers (+17 850 / −10 662).
 
 ## Décision
 
-La configuration Prettier du dépôt porte `requirePragma: true`, si bien que Prettier ne formate aucun fichier qui ne le demande pas par un pragma `@format`.
+La configuration Prettier du dépôt porte `requirePragma: true`, si bien que Prettier ne formate aucun fichier qui ne le demande pas par un pragma Prettier (`@format` ou `@prettier`).
 
 ## Justification
 
@@ -28,7 +28,9 @@ Les autres clés ne font que réduire les dégâts le jour où quelqu'un retirer
 
 ## Alternatives envisagées
 
-Aucune alternative n'a été documentée au moment de la décision.
+### Alternative 1 — Un `.prettierignore` couvrant les sources
+
+L'autre option proposée dans la revue de la PR #63. Écarté par l'auteur : un fichier d'ignore couvrant réellement les sources reviendrait à énumérer tout le dépôt ; la liste vieillirait au premier répertoire ajouté, et un fichier neuf serait formaté sans que personne le remarque. Le pragma inverse la charge : c'est le fichier qui doit demander à être formaté.
 
 ## Conséquences
 

@@ -34,7 +34,7 @@ Aucune alternative n'a été documentée au moment de la décision.
 
 ### Négatives
 
-- Aucun contrôle n'empêche plus la fusion d'une pull request qui porte des fils bloquants non résolus.
+- Le toolkit lui-même n'empêche plus la fusion d'une pull request qui porte des fils bloquants non résolus ; une plateforme peut toujours l'exiger par ses propres options.
 
 ### Risques
 

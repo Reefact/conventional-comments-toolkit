@@ -6,7 +6,7 @@
 
 | Date | Statut | Note | Compte rendu lié |
 | --- | --- | --- | --- |
-| 2026-10-27 | Accepté | Reprise de la décision consignée dans `CLAUDE.md` et le commit `c08b35a`, le 2026-11-11 |  |
+| 2026-10-27 | Accepté | Reprise de la décision consignée dans `CLAUDE.md` et les commits `c08b35a` et `2dd4a7f`, le 2026-11-11 | Revue de la PR #78 |
 
 ## Contexte
 
@@ -20,7 +20,7 @@ Une pull request touche une seule plateforme, ou le code partagé, jamais les de
 
 Séparer le changement partagé du changement de plateforme rend visible ce qui touche toutes les plateformes, et protège celles qu'une pull request ne vise pas.
 
-Une pull request de contrat est admise parce qu'un changement de contrat doit être appliqué partout à la fois. La documentation, les tests partagés et l'outillage hors de `packages/` sont neutres ; les fichiers d'inscription d'une plateforme ne le sont que dans la pull request qui la crée ou la retire.
+Une pull request de contrat est admise parce qu'un changement de contrat doit être appliqué partout à la fois. La documentation, les tests partagés et l'outillage hors de `packages/` sont neutres ; les fichiers d'inscription d'une plateforme ne le sont que dans la pull request qui la crée. Le même jour, à la suite de la revue de la PR #78 (commit `2dd4a7f`), l'exception s'étend à la pull request qui retire une plateforme : retirer un adaptateur oblige à retirer son inscription, et aucun découpage ne reste vert — l'adaptateur d'abord laisse des imports morts, l'inscription d'abord fait échouer `platform-registry.test.ts`.
 
 La règle est vérifiée par `npm run check:pr-scope`, que la CI lance sur chaque pull request.
 

@@ -20,7 +20,7 @@ Avant de bloquer un envoi, quel que soit le diagnostic, l'extension relit la con
 
 ## Justification
 
-Aucun envoi n'est ainsi bloqué sur une configuration périmée, et un assouplissement du `mode` lève tout blocage dès la tentative d'envoi suivante, sans attendre l'expiration du cache.
+Aucun envoi n'est ainsi bloqué sur une configuration périmée : dès la tentative d'envoi suivante, et sans attendre l'expiration du cache, un envoi n'est plus bloqué si la configuration effective relue le permet. Un assouplissement de l'organisation ne le permet pas toujours : un dépôt qui écrit lui-même `enforce`, ou un plancher d'entreprise, gardent `enforce` effectif.
 
 Le texte d'origine ne consigne pas de raison au refus de rejouer l'envoi : il précise seulement qu'il n'y a ni rejeu ni clic synthétique, et une seule relecture en cours par éditeur, aucune pendant la frappe.
 
@@ -32,7 +32,7 @@ Aucune alternative n'a été documentée au moment de la décision.
 
 ### Positives
 
-- Un assouplissement prend effet à l'envoi suivant.
+- Un assouplissement qui change la configuration effective prend effet à l'envoi suivant.
 
 ### Négatives
 

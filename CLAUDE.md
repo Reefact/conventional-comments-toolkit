@@ -168,7 +168,7 @@ qu'il la connaît. Sinon, décrire le symptôme.
 
 Le code est mis en forme **à la main** : ne jamais lancer `prettier --write` sur ce dépôt, il le
 réécrit. `.prettierrc` porte **`requirePragma: true`**, si bien que prettier ne formate que les
-fichiers portant un pragma `@format`, et aucun n'en porte. **Ne pas retirer `requirePragma`** :
+fichiers portant un pragma Prettier (`@format` ou `@prettier`), et aucun n'en porte. **Ne pas retirer `requirePragma`** :
 c'est lui, et lui seul, qui rend la commande inoffensive, y compris dans l'éditeur des humains.
 Le fichier ne dit donc PAS que le dépôt est conforme à prettier — il dit l'inverse ; ses autres
 clés fixent le style pour le jour où l'on adopterait prettier. Les mesures et l'incident qui

@@ -20,7 +20,7 @@ Before blocking a send, whatever the diagnostic, the extension re-reads the conf
 
 ## Rationale
 
-No send is thus blocked on a stale configuration, and relaxing the `mode` lifts any block from the next send attempt, without waiting for the cache to expire.
+No send is thus blocked on a stale configuration: from the next send attempt, and without waiting for the cache to expire, a send is no longer blocked if the re-read effective configuration permits it. Relaxing the organization does not always permit it: a repository that writes `enforce` itself, or an enterprise floor, keeps `enforce` effective.
 
 The original text records no reason for not replaying the send: it states only that there is no replay and no synthetic click, and one re-read in flight per editor, none while typing.
 
@@ -32,7 +32,7 @@ No alternative was documented when the decision was made.
 
 ### Positive
 
-- A relaxation takes effect at the next send.
+- A relaxation that changes the effective configuration takes effect at the next send.
 
 ### Negative
 

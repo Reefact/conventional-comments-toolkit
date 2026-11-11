@@ -9,7 +9,7 @@ Un **Important Decision Record (IDR)** conserve une décision importante de ce d
 ## Règles
 
 - **Une décision, un IDR.** Seuls les vrais choix sont consignés : une décision dont un futur mainteneur demanderait « pourquoi a-t-on fait comme ça ? ». Si l'implémentation changeait mais que la décision tenait, l'IDR n'aurait pas à changer.
-- **Un IDR accepté ne se réécrit jamais.** Une décision qui évolue donne un nouvel IDR, et le statut de l'ancien gagne une ligne qui nomme son remplaçant.
+- **Un IDR accepté ne se réécrit jamais.** Une décision qui évolue donne un nouvel IDR ; quand ce remplaçant est accepté, et seulement alors, le statut de l'ancien gagne une ligne qui le nomme.
 - **Le statut est un historique où l'on ne fait qu'ajouter** : une ligne par changement, `Date | Statut | Note | Compte rendu lié`, aucune ligne modifiée ni supprimée. Statuts : Proposé, Accepté, Rejeté, Déprécié, Remplacé par DECxxxx.
 - **Le Contexte contient des faits, la Justification des arguments** tirés de ces faits. **La Décision tient en exactement une phrase**, sans justification.
 - **Rien n'est inventé.** Une alternative, une conséquence ou un risque n'entre dans un IDR qu'une fois validé par la personne qui porte la décision ; une alternative qui n'a jamais été documentée n'est pas reconstituée.

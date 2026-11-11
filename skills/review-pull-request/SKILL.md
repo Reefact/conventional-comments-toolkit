@@ -123,7 +123,7 @@ returns a success, against the contract.
 
 ![[P2]](https://img.shields.io/badge/P2-yellow?style=flat) No test covers this behaviour.
 
-[session:melancholy-coordinated-value-object]
+[session:melancholy-coordinated-value-object(The value object was well coordinated, yet strangely melancholy.)]
 ```
 
 The last line is your session marker (section 9).
@@ -301,8 +301,34 @@ drawn. In particular:
   same words.
 
 **Check that it is unused before the first comment.** Read every comment, review and reply of the
-pull request; if one already carries `[session:<your identifier>]`, the draw collided with another
-session: draw again, and check again.
+pull request; if one already carries `[session:<your identifier>]` or
+`[session:<your identifier>(…)]`, the draw collided with another session: draw again, and check
+again.
+
+**Describe a readable identifier, once.** When Slugger drew the identifier, write right after the
+draw one sentence that turns its words into idiomatic English, and append it to the identifier
+between parentheses — the description. Readers who use the Conventional Comments extension see the
+identifier alone, and the sentence when they hover it.
+
+```text
+disheartening-reviewed-implementation
+→ [session:disheartening-reviewed-implementation(We reviewed the implementation, and frankly, it was disheartening.)]
+```
+
+- **Write it in English**, whatever language section 0 sets for your comments: it renders the
+  slug's English words, it does not belong to the prose of the review.
+- **Use the slug's words, read as a phrase** — reorder them, inflect them, add the few words a
+  natural sentence needs. Write one sentence, ending with its punctuation, on one line, without
+  parentheses or square brackets.
+- **It is word play on a random draw, not an opinion.** It says nothing about the pull request,
+  its code or your findings, and you never adjust it to them: the slug was drawn, not chosen.
+- **Write it once per identifier, and never change it.** Every comment of the session carries the
+  same marker, character for character, description included: write it once, then copy it.
+- **A GUID gets no description.** It has no words to render: its marker stays `[session:<guid>]`.
+
+The description is part of the marker only: everything this section says of the identifier — how
+it is drawn, checked, kept, reused or renewed — applies to the identifier alone, and a new
+identifier gets a new description.
 
 **Coming back before your `reviewed:`** — after fixes or new commits — your review is still open:
 reuse the identifier you drew, which you still hold in this conversation. When you do not hold one,
@@ -334,10 +360,11 @@ discussions, verify them, and post your follow-ups under **your own** marker. Th
 another conversation are not your own findings: resolve only the threads whose finding carries an
 identifier you drew in this conversation, and leave the others for their reviewer or a human.
 
-**End every comment of the session with the marker**, on its own last line, after a blank line:
+**End every comment of the session with the marker**, on its own last line, after a blank line —
+identifier and, for a Slugger identifier, its description:
 
 ```text
-[session:melancholy-coordinated-value-object]
+[session:melancholy-coordinated-value-object(The value object was well coordinated, yet strangely melancholy.)]
 ```
 
 That covers inline findings, general findings, recaps of a pass, follow-ups, and the final

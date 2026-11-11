@@ -236,7 +236,7 @@ it: one more `.markdown-content` in every `-rempli` page.
 ## Not measured
 
 - Hosts `{org}.visualstudio.com` and Azure DevOps Server: not captured, NOT recognized by the
-  adapter (owner's decision, 2026-11-09).
+  adapter (DEC0008).
 - A COMPLETED (merged) pull request; a comment by another user (the *Delete* button, the persona);
   an interface in another language than English.
 - Note for §10: the REST API accepts the browser's session cookies, from the page and from a
@@ -253,7 +253,7 @@ The Microsoft account menu (`.mectrl_root`, `#mectrl_currentAccount_secondary`) 
 every page, closed, and carries the signed-in account's EMAIL ADDRESS. The reducer now drops that
 region for Azure DevOps (`PLATFORM_RULES.azdo.dropSelectors`), and `check:captured-pages` refuses
 any clear email address; the 25 captures were reduced again, none keeps it. The display name of
-the account stays, as comment author and in `aria-label`s (owner's decision, 2026-11-09).
+the account stays, as comment author and in `aria-label`s (DEC0009).
 
 ## Live validation (2026-11-09, extension built from this branch)
 

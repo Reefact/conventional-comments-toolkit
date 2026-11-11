@@ -10,7 +10,7 @@ retour arrière peuvent se faire dès maintenant ; le passage en `enforce`, non.
 elle seule (§2). En `enforce`, elle bloque l'**envoi** d'un commentaire non conforme dans le
 navigateur où elle est installée (§5.4) ; elle ne contrôle **pas** la complétion d'une PR. Les
 fils bloquants non résolus sont signalés par le bandeau du §5.5, jamais empêchés de fusionner
-(décision du propriétaire, 2026-11-10). Aucun statut n'est publié, aucune protection de branche
+(DEC0010). Aucun statut n'est publié, aucune protection de branche
 n'est à configurer pour l'extension, et `enforce` reste contournable par construction : l'API,
 une CLI, un autre navigateur ou un poste sans l'extension y suffisent (§2).
 

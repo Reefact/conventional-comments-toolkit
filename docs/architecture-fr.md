@@ -7,7 +7,7 @@ hors de ce paquet.
 
 Une rédaction antérieure de la spécification décrivait un second composant, un vérificateur
 exécuté dans l'intégration continue de la plateforme, avec lequel `core/` était partagé à
-l'identique. Il est retiré (décision du propriétaire, 2026-11-10), et avec lui ce qui
+l'identique. Il est retiré (DEC0010), et avec lui ce qui
 n'existait que pour lui : l'évaluation de conformité d'une PR (`evaluate()`), la gouvernance
 des résolutions, l'exemption de PR, le périmètre d'activation, l'empreinte de configuration et
 la ligne machine `cc/1`, encodeur comme décodeur. Le contrat d'adaptateur a perdu de même ce qui

@@ -9,7 +9,7 @@ real-time validation while writing review comments, an optional send guard (`enf
 and a banner counting the pull request's unresolved blocking threads (§5.5). Convenience and
 prevention; bypassable by construction.
 
-**The toolkit does not control pull request completion** (owner's decision, 2026-11-10).
+**The toolkit does not control pull request completion** ([DEC0010](docs/idr/DEC0010-the-extension-is-the-whole-product-en.md)).
 Unresolved blocking threads are *reported*, never prevented from merging. An earlier version of
 the specification described a second component, a verifier running in the platform's CI and
 publishing a required status check; it is removed, together with what existed only for it —

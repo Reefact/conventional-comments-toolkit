@@ -104,7 +104,7 @@ Keep the release tag, asset ID and checksum together when updating the pin. Repl
   trap 'rm -rf "$slugger_dir"' EXIT
   slugger="$slugger_dir/slugger"
   download() {
-    curl -fsSL --connect-timeout 5 --max-time 60 --retry 1 -o "$slugger" "$@"
+    curl -fsSL --connect-timeout 15 --max-time 60 --retry 1 -o "$slugger" "$@"
   }
   download https://github.com/Reefact/slugger/releases/download/cli-v1.1.0/slugger-linux-x64 ||
     download -H 'Accept: application/octet-stream' https://api.github.com/repos/Reefact/slugger/releases/assets/735726517

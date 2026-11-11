@@ -1435,11 +1435,12 @@ export function observePrChromeNavigation(
       missedMutation = true; // traité en une seule relance temporisée à la fin du rendu en cours
       return;
     }
-    // La clé ne demande que l'hôte, le dépôt et le numéro ; `currentPr()` lit pourtant aussi la
-    // date de création, et journaliserait son échec dans la visite PRÉCÉDENTE, que la nouvelle
-    // n'a pas encore remplacée — puis une seconde fois après `newVisit()` : une navigation
-    // comptait pour deux visites (#124). Ces deux sondes-là se taisent ; la première sonde de la
-    // nouvelle visite dira ce qu'il y a à dire.
+    // La clé ne demande que l'hôte, le dépôt et le numéro. `currentPr()` lisait aussi la date de
+    // création de la PR — retirée depuis avec le vérificateur (§2) —, et journalisait son échec
+    // dans la visite PRÉCÉDENTE, que la nouvelle n'avait pas encore remplacée, puis une seconde
+    // fois après `newVisit()` : une navigation comptait pour deux visites (#124). Ces deux
+    // sondes se taisent toujours, pour qu'une lecture que l'adaptateur y ajouterait ne recrée pas
+    // le défaut ; la première sonde de la nouvelle visite dira ce qu'il y a à dire.
     const key = prKeyFor(quietly(() => adapter.currentPr()));
     const nowMs = now();
     const navigated = !hasRendered || key !== lastPrKey;

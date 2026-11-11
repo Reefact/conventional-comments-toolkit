@@ -1,8 +1,8 @@
 // Ce que le journal sait dire d'une dégradation GitHub (§9.4, CA-11) : toute chaîne que cet
 // adaptateur PEUT journaliser déclare à quoi elle sert.
 //
-// La page d'options affiche alors « Bouton de fusion introuvable : impossible de le griser » au
-// lieu de `merge-button`. Une chaîne qui journalise sans le déclarer retombe sur son nom — la
+// La page d'options affiche alors « Corps d’un commentaire illisible : fil écarté du décompte
+// local du bandeau » au lieu de `comment-body`. Une chaîne qui journalise sans le déclarer retombe sur son nom — la
 // page marche, mais redit exactement ce que la personne ne comprenait pas.
 //
 // La liste des chaînes à annoter n'est PAS écrite ici : elle se lit dans les appels de
@@ -24,7 +24,7 @@ const known = (chain: SelectorChain | undefined): chain is SelectorChain =>
   chain !== undefined && (SELECTOR_PROBLEMS as readonly string[]).includes(chain.problem ?? '');
 
 describe('§9.4 — GitHub : chaque chaîne journalisée dit à quoi elle sert', () => {
-  // `this.#degraded(selectors.mergeButton)`, `this.#degraded(ALL_EDITORS, this.#doc, { … })`…
+  // `this.#degraded(selectors.commentBody, el)`, `this.#degraded(ALL_EDITORS, this.#doc, { … })`…
   // — et l'appel à `log.degraded(chain, …)` que fait `#degraded` lui-même, par variable. Les
   // arguments qui suivent la chaîne (racine, relevé) ne changent rien à ce qui est journalisé.
   const calls = [...SOURCE.matchAll(/(?:\.log\.degraded|this\.#degraded)\(\s*([A-Za-z_.]+)\s*[,)]/g)].map((m) => m[1]!);

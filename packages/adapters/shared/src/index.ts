@@ -767,12 +767,15 @@ export class SelectorLog {
   /** Exécute `fn` sans que rien n'y soit journalisé ni marqué rattrapé — pour une sonde dont on
    * ne veut que la RÉPONSE, posée avant de savoir à quelle visite elle appartient (#124).
    *
-   * Le cas qui l'a demandé : pour savoir si la page affichée a changé de PR, le code partagé
-   * demande `currentPr()` à l'adaptateur AVANT de déclarer la nouvelle visite (`newVisit`). Or
-   * `currentPr()` lit aussi la date de création, et la journalisait en cas d'échec — dans la
-   * visite PRÉCÉDENTE, puis encore une fois dans la nouvelle : une sonde trop précoce comptait
-   * pour deux visites, et seule la seconde pouvait être marquée rattrapée. Ce que la sonde
-   * aurait dû dire, la nouvelle visite le dira elle-même au premier appel suivant. */
+   * Le cas qui l'a demandé, HISTORIQUE : pour savoir si la page affichée a changé de PR, le code
+   * partagé demande `currentPr()` à l'adaptateur AVANT de déclarer la nouvelle visite
+   * (`newVisit`). `currentPr()` lisait alors aussi la date de création de la PR, et la
+   * journalisait en cas d'échec — dans la visite PRÉCÉDENTE, puis encore une fois dans la
+   * nouvelle : une sonde trop précoce comptait pour deux visites. Cette lecture est retirée avec
+   * le vérificateur (§2), et `currentPr()` ne journalise plus rien ; l'enrobage reste, parce
+   * qu'il borne ce que FERAIT un adaptateur qui y journaliserait de nouveau, et qu'il sert aussi
+   * au sondage périodique de la configuration (`content-internal.ts`). Ce qu'une sonde aurait dû
+   * dire, la nouvelle visite le dira elle-même au premier appel suivant. */
   quietly<T>(fn: () => T): T {
     this.#quiet++;
     try {

@@ -4,9 +4,30 @@ What changed for you, release by release. For the full record — every constrai
 every section of the specification an entry rests on — see
 [CHANGELOG.md](https://github.com/Reefact/conventional-comments-toolkit/blob/main/CHANGELOG.md).
 
-The extension starts in `assist` mode: it helps and it flags, it never blocks a submission. No
-verifier (component B) ships yet: a comment is checked only in the browser of someone who has the
-extension installed.
+The extension starts in `assist` mode: it helps and it flags, it never blocks a submission. A
+comment is checked only in the browser of someone who has the extension installed; the extension
+never blocks a merge.
+
+## 1.0.0-rc.1 — November 11, 2026
+
+_The release candidate for 1.0.0: a `summary` label to recap a review, configuration problems shown where you see them, and descriptions on session markers; the verifier is retired for good._
+
+### ✨ Features
+
+- **A `summary` label to recap a review pass.** `summary` (📋, typed as `?sum`) says what was checked and what is still open; it raises no point and answers none. It sits with `reviewed` in a new group of labels that say where a review stands, at the end of the toolbar's first row. A repository can add its own label to that group with `"kind": "status"`.
+- **Problems in your configuration are shown, in your language.** When a key is unknown or retired, when the configuration is invalid, or when your organization's policy overrides a setting, the extension used to say nothing. It now lists these notices in the status pill and on the settings page, in English or French, naming where the problem comes from: your organization's policy, the organization's document or the repository's file. They inform; they never change whether a comment is accepted.
+- **Session markers can carry a description, shown on hover.** Write `[session:<id> — *<sentence>*]`: the page shows the identifier, and the sentence appears when you hover it. The marker stays readable without the extension. Markers without a description look as before.
+- **A comment field the extension cannot place is now recorded in the journal.** Such a field used to be given a default place silently. It is still handled the same way, but a line in the settings page's journal now names it, so a page the extension misreads can be reported.
+
+### 🔧 Changed
+
+- **The verifier is retired, and its settings with it.** The product reports the unresolved blocking threads of a pull request; it never blocks a merge. The keys `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` and `docUrl` are no longer read, and are shown as unknown keys. The mode `warn` works as `assist`, with a notice saying the value is obsolete. If your configuration uses any of these, you can remove them.
+- **Telemetry label counts say what kind of label was used.** If your organization collects telemetry, each label count now carries its kind — `remark`, `status` or `reply` — so that replies and recaps can be counted apart. Nothing else is added.
+
+### 🐛 Bug fixes
+
+- **A repository can ask for a shorter configuration cache than your organization's policy.** The policy's cache duration was imposed as is, so a repository wanting fresher settings was forced back to it. It is now a maximum, as intended.
+- **On Azure DevOps, editing a comment is no longer mistaken for a new comment.**
 
 ## 1.0.0-beta.21 — November 2, 2026
 

@@ -4,9 +4,30 @@ Ce qui change pour vous, version après version. Pour le relevé complet — cha
 cas limite, chaque section de la spécification sur laquelle une entrée s'appuie — voir
 [CHANGELOG.md](https://github.com/Reefact/conventional-comments-toolkit/blob/main/CHANGELOG.md).
 
-L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. Aucun
-vérificateur (composant B) n'est encore livré : un commentaire n'est contrôlé que dans le
-navigateur des personnes ayant installé l'extension.
+L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jamais un envoi. Un
+commentaire n'est contrôlé que dans le navigateur des personnes ayant installé l'extension ; elle
+ne bloque jamais une fusion.
+
+## 1.0.0-rc.1 — 11 novembre 2026
+
+_La version candidate de la 1.0.0 : un label `summary` pour récapituler une revue, les problèmes de configuration affichés là où vous les voyez, et des descriptions sur les marqueurs de session ; le vérificateur est retiré pour de bon._
+
+### ✨ Nouveautés
+
+- **Un label `summary` pour récapituler une passe de revue.** `summary` (📋, saisi avec `?sum`) dit ce qui a été vérifié et ce qui reste ouvert ; il ne soulève aucun point et n'en clôt aucun. Il rejoint `reviewed` dans un nouveau groupe de labels qui disent où en est une revue, au bout de la première rangée de la barre d'outils. Un dépôt peut ajouter son propre label à ce groupe avec `"kind": "status"`.
+- **Les problèmes de votre configuration sont affichés, dans votre langue.** Quand une clé est inconnue ou retirée, quand la configuration est invalide, ou quand la politique de votre organisation l'emporte sur un réglage, l'extension ne disait rien. Elle liste désormais ces avis dans la pastille d'état et sur la page des réglages, en français ou en anglais, en nommant d'où vient le problème : la politique de votre organisation, le document de l'organisation ou le fichier du dépôt. Ils informent ; ils ne changent jamais l'acceptation d'un commentaire.
+- **Un marqueur de session peut porter une description, affichée au survol.** Écrivez `[session:<id> — *<phrase>*]` : la page montre l'identifiant, et la phrase apparaît au survol. Le marqueur reste lisible sans l'extension. Un marqueur sans description s'affiche comme avant.
+- **Un champ de commentaire que l'extension ne sait pas situer est désormais consigné au journal.** Un tel champ recevait jusqu'ici une place par défaut, en silence. Il est toujours traité de la même façon, mais une ligne du journal de la page des réglages le nomme, si bien qu'une page mal lue peut être signalée.
+
+### 🔧 Changements
+
+- **Le vérificateur est retiré, et ses réglages avec lui.** Le produit signale les fils bloquants non résolus d'une pull request ; il ne bloque jamais une fusion. Les clés `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` et `docUrl` ne sont plus lues, et sont signalées comme clés inconnues. Le mode `warn` fonctionne comme `assist`, avec un avis qui signale la valeur comme obsolète. Si votre configuration en contient, vous pouvez les retirer.
+- **Les décomptes de labels de la télémétrie disent de quel type de label il s'agit.** Si votre organisation collecte la télémétrie, chaque décompte de label porte désormais son type — `remark`, `status` ou `reply` — pour que réponses et récapitulatifs se comptent à part. Rien d'autre n'est ajouté.
+
+### 🐛 Corrections
+
+- **Un dépôt peut demander un cache de configuration plus court que la politique de votre organisation.** La durée fixée par la politique était imposée telle quelle, si bien qu'un dépôt voulant des réglages plus frais y était ramené. C'est désormais un maximum, comme prévu.
+- **Sur Azure DevOps, modifier un commentaire n'est plus pris pour un nouveau commentaire.**
 
 ## 1.0.0-beta.21 — 2 novembre 2026
 

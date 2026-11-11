@@ -130,18 +130,16 @@ describe('CA-53 — le marqueur reconnu est masqué là où il est, et la mentio
   });
 
   it('une description : la mention n’affiche que l’identifiant, la description telle qu’écrite au survol', () => {
-    const el = body(
-      "<p>note: x</p>\n<p>[session:Disheartening-Reviewed-Implementation(On a passé l'implémentation en revue !)]</p>"
-    );
+    const el = body('<p>note: x</p>\n<p>[session:Disheartening-Reviewed-Implementation \u2014 We reviewed it, and frankly!]</p>');
     const before = commentBodyText(el);
     decorate(el);
     expect(shown(el)).toBe('\u{1F916} session: disheartening-reviewed-implementation');
-    expect((el.querySelector('.cct-session-text') as HTMLElement).title).toBe("On a passé l'implémentation en revue !");
+    expect((el.querySelector('.cct-session-text') as HTMLElement).title).toBe('We reviewed it, and frankly!');
     expect(commentBodyText(el)).toBe(before);
   });
 
   it('sans description, rien au survol ; une description retirée emporte son infobulle', () => {
-    const el = body('<p>note: x</p>\n<p>[session:run-1(Texte)]</p>');
+    const el = body('<p>note: x</p>\n<p>[session:run-1 \u2014 Texte]</p>');
     decorate(el);
     expect((el.querySelector('.cct-session-text') as HTMLElement).title).toBe('Texte');
     el.querySelectorAll('p')[1]!.textContent = '[session:run-1]';
@@ -151,7 +149,7 @@ describe('CA-53 — le marqueur reconnu est masqué là où il est, et la mentio
   });
 
   it('l’infobulle est sur le texte seul, pas sur le bloc et son écart au-dessus', () => {
-    const el = body('<p>note: x</p>\n<p>[session:run-1(Texte)]</p>');
+    const el = body('<p>note: x</p>\n<p>[session:run-1 \u2014 Texte]</p>');
     decorate(el);
     const block = el.querySelector('.cct-session') as HTMLElement;
     expect(block.hasAttribute('title')).toBe(false);
@@ -245,6 +243,84 @@ describe('CA-53 — le marqueur reconnu est masqué là où il est, et la mentio
     decorate(el);
     expect(el.querySelectorAll('.cct-session')).toHaveLength(1);
     expect(mentionIsLast(el)).toBe(true);
+  });
+});
+
+describe('CA-53 — description en italique, la seule mise en forme admise sur la ligne (§3.6, §5.5)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  // Forme MESURÉE sur GitHub, GitLab et Azure DevOps, quelle que soit l'écriture de l'italique dans
+  // le source (docs/session-marker-rendering-fr.md) : texte, `<em>`, `]`.
+  const LINE = '[session:Run-7 \u2014 <em>The value was riveting.</em>]';
+
+  it('dans son propre paragraphe : masqué en entier, la description de l’italique au survol', () => {
+    const html = `<p>note: Some title</p>\n<p>Detail.</p>\n<p>${LINE}</p>`;
+    const el = body(html);
+    const before = commentBodyText(el);
+    decorate(el);
+    expect(el.querySelectorAll('.cct-hidden-session-block')).toHaveLength(1);
+    expect(shown(el)).toBe('\u{1F916} session: run-7');
+    expect((el.querySelector('.cct-session-text') as HTMLElement).title).toBe('The value was riveting.');
+    expect(visible(el)).not.toContain('[session:');
+    expect(visible(el)).not.toContain('riveting');
+    expect(visible(el).endsWith('\u{1F916} session: run-7')).toBe(true);
+    expect(mentionIsLast(el)).toBe(true);
+    expect(commentBodyText(el)).toBe(before);
+    clearCommentDecorations(document);
+    expect(el.innerHTML.replace(/ class=""/g, '')).toBe(html);
+  });
+
+  it('les attributs que la plateforme pose sur l’italique ne changent rien (GitLab, GitHub)', () => {
+    const el = body('<p>note: x</p>\n<p dir="auto">[session:Run-7 \u2014 <em data-sourcepos="3:1-3:9" aria-hidden="true">Phrase.</em>]</p>');
+    decorate(el);
+    expect(shown(el)).toBe('\u{1F916} session: run-7');
+    expect((el.querySelector('.cct-session-text') as HTMLElement).title).toBe('Phrase.');
+  });
+
+  it('au milieu d’un paragraphe, entre deux sauts : la ligne part avec le saut qui la termine', () => {
+    const html = `<p>note: Some title<br>\nfirst<br>\n${LINE}<br>\nsecond</p>`;
+    const el = body(html);
+    decorate(el);
+    expect(el.querySelectorAll('.cct-hidden-session')).toHaveLength(1);
+    expect(visible(el)).toBe('Some title first second\u{1F916} session: run-7');
+    const hidden = el.querySelector('.cct-hidden-session')!;
+    expect(hidden.querySelector('em')).not.toBeNull();
+    expect(hidden.lastElementChild!.tagName).toBe('BR');
+    clearCommentDecorations(document);
+    expect(el.innerHTML.replace(/ class=""/g, '')).toBe(html);
+  });
+
+  it('en dernière ligne d’un paragraphe, après un saut', () => {
+    const html = `<p>note: Some title<br>\n${LINE}</p>`;
+    const el = body(html);
+    decorate(el);
+    expect(visible(el)).toBe('Some title\u{1F916} session: run-7');
+    expect((el.querySelector('.cct-session-text') as HTMLElement).title).toBe('The value was riveting.');
+    clearCommentDecorations(document);
+    expect(el.innerHTML.replace(/ class=""/g, '')).toBe(html);
+  });
+
+  it('idempotent : un deuxième passage ne change rien au DOM', () => {
+    const el = body(`<p>note: x<br>\n${LINE}<br>\nmore</p>`);
+    decorate(el);
+    const once = el.innerHTML;
+    decorate(el);
+    expect(el.innerHTML).toBe(once);
+  });
+
+  it.each([
+    ['une autre mise en forme', '[session:Run-7 \u2014 <strong>Phrase.</strong>]'],
+    ['un italique qui ne suit pas le tiret', '[session:Run-7 <em>x</em> \u2014 Phrase.]'],
+    ['un italique mis en forme à l’intérieur', '[session:Run-7 \u2014 <em>a <code>b</code></em>]'],
+    ['du texte après le crochet', '[session:Run-7 \u2014 <em>Phrase.</em>] suite'],
+  ])('repli — %s : rien n’est projeté, la ligne reste lisible telle qu’écrite', (_label, line) => {
+    const html = `<p>note: x</p>\n<p>${line}</p>`;
+    const el = body(html);
+    decorate(el);
+    expect(el.querySelector('.cct-session')).toBeNull();
+    expect(el.querySelectorAll(HIDDEN)).toHaveLength(0);
   });
 });
 

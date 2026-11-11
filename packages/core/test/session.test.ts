@@ -30,23 +30,30 @@ describe('CA-51 — reconnaissance du marqueur de session (§3.6)', () => {
     expect(value('note: x\n   [session:indented]   ')).toBe('indented');
   });
 
-  it('une description entre parenthèses termine la valeur : identifiant et description séparés, casse gardée', () => {
-    const m = extractSessionMarker(
-      "note: x\n[session:Disheartening-Reviewed-Implementation(On a passé l'implémentation en revue, et franchement !)]"
-    )!;
+  it('une description suit le tiret cadratin : identifiant et description séparés, casse gardée', () => {
+    const line = '[session:Disheartening-Reviewed-Implementation \u2014 We reviewed the implementation, and frankly, it was disheartening.]';
+    const m = extractSessionMarker(`note: x\n${line}`)!;
     expect(m.value).toBe('Disheartening-Reviewed-Implementation');
-    expect(m.description).toBe("On a passé l'implémentation en revue, et franchement !");
-    expect(m.lines[0]!.raw).toBe(
-      "[session:Disheartening-Reviewed-Implementation(On a passé l'implémentation en revue, et franchement !)]"
-    );
+    expect(m.description).toBe('We reviewed the implementation, and frankly, it was disheartening.');
+    expect(m.lines[0]!.raw).toBe(line);
     expect(m.contentBody).toBe('note: x');
-    // Blancs de bordure retirés des deux côtés ; la première `(` sépare, la dernière `)` ferme.
-    const spaced = extractSessionMarker('note: x\n[session: run-1 ( texte (avec) parenthèses ] ) ]')!;
-    expect([spaced.value, spaced.description]).toEqual(['run-1', 'texte (avec) parenthèses ]']);
+    // Le PREMIER tiret bordé de blancs sépare : la phrase peut en contenir un, et des crochets.
+    const dashed = extractSessionMarker('note: x\n[session:run-1 \u2014 one \u2014 two ] three]')!;
+    expect([dashed.value, dashed.description]).toEqual(['run-1', 'one \u2014 two ] three']);
+    // Plusieurs blancs, ou une tabulation, de part et d'autre du tiret : même lecture.
+    const spaced = extractSessionMarker('note: x\n[session:run-1  \u2014\tPhrase.]')!;
+    expect([spaced.value, spaced.description]).toEqual(['run-1', 'Phrase.']);
   });
 
-  it('sans identifiant ou sans description, ou suivie d’autre chose, la valeur reste un identifiant entier', () => {
-    for (const v of ['run-1()', 'run-1(  )', '(texte)', 'run-1(texte) suite', 'run-1(texte']) {
+  it('l’italique de la description — `*…*`, `_…_`, `<em>…</em>` — est retiré : le source se lit comme la page', () => {
+    for (const italic of ['*Phrase, here.*', '_Phrase, here._', '<em>Phrase, here.</em>', 'Phrase, here.']) {
+      const m = extractSessionMarker(`note: x\n[session:run-1 \u2014 ${italic}]`)!;
+      expect([m.value, m.description]).toEqual(['run-1', 'Phrase, here.']);
+    }
+  });
+
+  it('sans identifiant, sans description ou sans blancs autour du tiret, la valeur reste un identifiant entier', () => {
+    for (const v of ['run-1 \u2014', '\u2014 Phrase.', 'run-1\u2014Phrase.', 'run-1 \u2014Phrase.', 'run-1(Phrase.)', 'run-1 - Phrase.']) {
       const m = extractSessionMarker(`note: x\n[session:${v}]`)!;
       expect([m.value, m.description]).toEqual([v, null]);
     }
@@ -180,7 +187,7 @@ describe('CA-54 — marqueur en double (§3.6)', () => {
     // Même valeur deux fois : c'est encore un doublon.
     expect(extractSessionMarker('note: x\n[session:a]\n[session:a]')!.value).toBeNull();
     // Les descriptions ne départagent rien : aucune n'est retenue.
-    const described = extractSessionMarker('note: x\n[session:a(un)]\n[session:a(deux)]')!;
+    const described = extractSessionMarker('note: x\n[session:a \u2014 un]\n[session:a \u2014 deux]')!;
     expect([described.value, described.description]).toEqual([null, null]);
   });
 

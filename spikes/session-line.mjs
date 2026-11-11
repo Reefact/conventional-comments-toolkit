@@ -98,6 +98,17 @@ const ANYWHERE = {
     `<p dir="auto">[session:a]<br>\nreviewed: blah<br>\n${SHORT_LOREM}<br>\nMore text.</p>`,
     `<p dir="auto">reviewed: blah<br>\n${SHORT_LOREM}<br>\nMore text.<br>\n[session:a]</p>`,
   ],
+  // Description en italique (§3.6), sous la forme mesurée sur les trois plateformes
+  // (docs/session-marker-rendering-fr.md) : la ligne masquée porte un `<em>`, et ne doit pas plus
+  // laisser de trace qu'une ligne de texte seul.
+  italicParagraph: [
+    `<p dir="auto">reviewed: blah</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">[session:a \u2014 <em>It was riveting.</em>]</p>\n<p dir="auto">More text.</p>`,
+    `<p dir="auto">reviewed: blah</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">More text.</p>\n<p dir="auto">[session:a]</p>`,
+  ],
+  italicMidLine: [
+    `<p dir="auto">reviewed: blah<br>\n${SHORT_LOREM}<br>\n[session:a \u2014 <em>It was riveting.</em>]<br>\nMore text.</p>`,
+    `<p dir="auto">reviewed: blah<br>\n${SHORT_LOREM}<br>\nMore text.<br>\n[session:a]</p>`,
+  ],
   duplicate: [
     `<p dir="auto">reviewed: blah</p>\n<p dir="auto">[session:a]</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">More text.<br>\n[session:b]</p>`,
     `<p dir="auto">reviewed: blah</p>\n<p dir="auto">${SHORT_LOREM}</p>\n<p dir="auto">More text.</p>\n<p dir="auto">[session:a]</p>`,

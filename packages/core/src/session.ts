@@ -13,9 +13,9 @@ import { splitBody } from './preprocess.js';
 /** Une ligne reconnue. `raw` est la ligne telle qu'écrite, blancs de bordure retirés (§3.4.1,
  * étape 4) — c'est elle que l'extension retrouve dans le corps rendu. `value` est l'IDENTIFIANT
  * de la session, blancs de bordure retirés, casse INTACTE : la mise en minuscules n'appartient
- * qu'à l'affichage (§5.5). `description` est le texte entre parenthèses qui termine la valeur,
- * quand elle en porte un (`[session:id(texte)]`), blancs de bordure retirés ; `null` sinon —
- * et la valeur entière est alors l'identifiant. */
+ * qu'à l'affichage (§5.5). `description` est la phrase qui suit le tiret cadratin, quand la
+ * valeur en porte une (`[session:id — phrase]`), blancs de bordure et marques d'italique
+ * retirés ; `null` sinon — et la valeur entière est alors l'identifiant. */
 export interface SessionLine {
   raw: string;
   value: string;
@@ -49,13 +49,25 @@ const strip = (s: string): string => s.replace(EDGE, '');
 // de la ligne, jamais le premier `]` rencontré.
 const MARKER_RE = /^\[session:(.*)\]$/u;
 
-// Une description termine la valeur : la PREMIÈRE parenthèse ouvrante, jusqu'à la parenthèse
-// fermante qui est son dernier caractère — la description peut donc contenir des parenthèses.
-const DESCRIBED_RE = /^([^(]*)\((.*)\)$/su;
+// La description suit le PREMIER tiret cadratin U+2014 bordé de blancs (\s+ de chaque côté) :
+// la phrase peut donc elle-même contenir un tiret. Les blancs sont exigés, sans quoi un tiret
+// collé dans un identifiant le couperait. Mesuré sur les trois plateformes : le tiret et ses deux
+// espaces arrivent intacts dans la page (docs/session-marker-rendering-fr.md).
+const DESCRIBED_RE = /^(.*?)\s+\u2014\s+(.*)$/su;
+
+// L'italique, facultatif, s'écrit `*…*`, `_…_` ou `<em>…</em>` dans le source ; dans la page, les
+// trois deviennent le même `<em>`, dont le texte n'a plus de marques. Retirées ici, la description
+// est la même lue d'un côté ou de l'autre.
+const ITALIC_RE = /^(?:\*(.+)\*|_(.+)_|<em>(.+)<\/em>)$/su;
+
+const unitalic = (s: string): string => {
+  const m = ITALIC_RE.exec(s);
+  return m === null ? s : strip(m[1] ?? m[2] ?? m[3]!);
+};
 
 /** La valeur portée par une ligne, si elle n'est QUE le marqueur ; sinon `null`. Une valeur de la
- * forme `id(texte)`, `id` et `texte` non vides, se lit identifiant et description ; toute autre
- * — `id()`, `(texte)`, `id(texte) suite` — reste un identifiant entier, tel qu'écrit. */
+ * forme `id — phrase`, `id` et `phrase` non vides, se lit identifiant et description ; toute autre
+ * — `— phrase`, `id —`, `id—phrase` — reste un identifiant entier, tel qu'écrit. */
 function markerValue(line: string): SessionLine | null {
   const raw = strip(line);
   const m = MARKER_RE.exec(raw);
@@ -65,7 +77,7 @@ function markerValue(line: string): SessionLine | null {
   const d = DESCRIBED_RE.exec(value);
   if (d !== null) {
     const id = strip(d[1]!);
-    const description = strip(d[2]!);
+    const description = unitalic(strip(d[2]!));
     if (id !== '' && description !== '') return { raw, value: id, description };
   }
   return { raw, value, description: null };

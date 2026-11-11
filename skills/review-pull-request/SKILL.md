@@ -123,7 +123,7 @@ returns a success, against the contract.
 
 ![[P2]](https://img.shields.io/badge/P2-yellow?style=flat) No test covers this behaviour.
 
-[session:melancholy-coordinated-value-object(The value object was well coordinated, yet strangely melancholy.)]
+[session:melancholy-coordinated-value-object — *The value object was well coordinated, yet strangely melancholy.*]
 ```
 
 The last line is your session marker (section 9).
@@ -302,14 +302,15 @@ drawn. In particular:
 
 **Check that it is unused before the first comment.** Read every comment, review and reply of the
 pull request; if one already carries `[session:<your identifier>]` or
-`[session:<your identifier>(…)]`, the draw collided with another session: draw again, and check
+`[session:<your identifier> — …]`, the draw collided with another session: draw again, and check
 again.
 
 **Describe a readable identifier, once.** When Slugger drew the identifier, write right after the
 draw one sentence that turns it into natural, idiomatic and lively prose, read in the context of a
-code review, and append it to the identifier between parentheses — the description. Readers who
-use the Conventional Comments extension see the identifier alone, and the sentence when they hover
-it.
+code review — the description. Append it to the identifier after a space, an em dash `—`
+(U+2014) and a space, and write it in italics with `*…*`: without the extension, the dash and the
+italics set it apart from the identifier; with it, readers see the identifier alone, and the
+sentence when they hover it.
 
 ```text
 disheartening-reviewed-implementation
@@ -327,7 +328,7 @@ ancestral-randomized-snapshot-test
 ```
 
 The marker then reads
-`[session:disheartening-reviewed-implementation(We reviewed the implementation, and frankly, it was disheartening.)]`.
+`[session:disheartening-reviewed-implementation — *We reviewed the implementation, and frankly, it was disheartening.*]`.
 
 - **Write it in the language of your comments** — the one section 0 sets: the repository's rule
   when it has one, the language of the pull request otherwise. The slug stays as drawn, in
@@ -343,8 +344,9 @@ The marker then reads
 - **Keep the slug's irony, humour or tone.**
 - **Do not make the slug more coherent than it is.** If it is odd, keep it odd, without inventing
   a context that would explain it.
-- **One sentence, on one line**, ending with its punctuation, without parentheses or square
-  brackets.
+- **One sentence, on one line**, ending with its punctuation, in italics, with no other
+  formatting inside it: any other formatting on the marker's line keeps the extension from
+  reading it.
 - **Write it once per identifier, and never change it.** Every comment of the session carries the
   same marker, character for character, description included: write it once, then copy it.
 - **A GUID gets no description.** It has no words to render: its marker stays `[session:<guid>]`.
@@ -387,7 +389,7 @@ identifier you drew in this conversation, and leave the others for their reviewe
 identifier and, for a Slugger identifier, its description:
 
 ```text
-[session:melancholy-coordinated-value-object(The value object was well coordinated, yet strangely melancholy.)]
+[session:melancholy-coordinated-value-object — *The value object was well coordinated, yet strangely melancholy.*]
 ```
 
 That covers inline findings, general findings, recaps of a pass, follow-ups, and the final

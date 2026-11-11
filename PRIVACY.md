@@ -1,6 +1,6 @@
 # Politique de confidentialité — Conventional Comments Toolkit
 
-_Dernière mise à jour : 2026-09-08._
+_Dernière mise à jour : 2026-11-11._
 
 Cette page sert de politique de confidentialité publique pour l'extension
 navigateur **Conventional Comments Toolkit**, distribuée sur le Chrome Web
@@ -37,7 +37,7 @@ plateforme.
 |---|---|---|
 | Langue d'interface et raccourcis clavier directs | `chrome.storage.sync` | **Se synchronise entre les appareils de votre compte Chrome si la synchronisation est activée** — c'est le mécanisme natif de Chrome, pas un serveur propre à l'extension. Contenu limité à ces deux préférences, jamais de contenu de commentaire ou de code. |
 | État dégradé courant (diagnostic) | `chrome.storage.local`, sur votre appareil | Non |
-| Avis de la dernière lecture de configuration (affichés dans la page d'options) : l'hôte et le chemin du dépôt lu (par exemple `github.com/organisation/depot`), et pour chaque avis sa sorte, son code, son texte en anglais et ce qu'il cite — clé ou valeur de configuration, numéro et extrait borné d'un motif d'allowlist, version, niveau en cause. Remplacés à chaque lecture, sans historique | `chrome.storage.local`, sur votre appareil | Non |
+| Avis de la dernière lecture de configuration (affichés dans la page d'options) : l'hôte et le chemin du dépôt lu (par exemple `github.com/organisation/depot`), et pour chaque avis sa sorte, son code, son texte en anglais et ce qu'il cite — clé ou valeur de configuration, numéro et extrait borné (40 caractères) d'un motif d'allowlist, version, niveau en cause —, plus, en référence, la **valeur rejetée elle-même, en entier** : motif d'allowlist ou commande d'outil, tels qu'écrits dans la configuration. Remplacés à chaque lecture, sans historique | `chrome.storage.local`, sur votre appareil | Non |
 | Domaines optionnels activés (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, géré par Chrome | Non — c'est Chrome, pas l'extension, qui tient cette liste |
 | Configuration `.conventional-comments.json` du dépôt affiché | l'extension fait une requête réseau dédiée vers la route `raw` du fichier (avec vos cookies de session, jamais un jeton propre à l'extension), mise en cache en mémoire par onglet — la navigation interne du site (d'une PR à l'autre sans rechargement) la conserve ; seul un rechargement complet ou la fermeture de l'onglet la détruit | Non — c'est une lecture, sur une route web que votre session autorise déjà de la même façon que si vous l'ouvriez vous-même dans un onglet |
 | Contenu des commentaires, du code et des diffs que vous consultez ou rédigez | reste dans la page et dans l'éditeur natif de la plateforme | **Jamais transmis nulle part par l'extension** |
@@ -116,7 +116,7 @@ Pour toute question sur cette politique de confidentialité, ouvrez une
 
 # Privacy Policy — Conventional Comments Toolkit
 
-_Last updated: 2026-09-08._
+_Last updated: 2026-11-11._
 
 This page is the public privacy policy for the **Conventional Comments
 Toolkit** browser extension, distributed on the Chrome Web Store and
@@ -151,7 +151,7 @@ visual feedback inside the platform's native comment editor.
 |---|---|---|
 | Interface language and direct keyboard shortcuts | `chrome.storage.sync` | **Syncs across your Chrome account's devices if sync is enabled** — that's Chrome's own native mechanism, not a server run by the extension. Limited to these two preferences, never comment or code content. |
 | Current degraded state (diagnostics) | `chrome.storage.local`, on your device | No |
-| Notices from the last configuration read (shown in the options page): the host and path of the repository read (for example `github.com/organization/repository`), and for each notice its kind, its code, its English text and what it cites — a configuration key or value, the index and a bounded excerpt of an allowlist pattern, a version, the level at fault. Replaced at each read, with no history | `chrome.storage.local`, on your device | No |
+| Notices from the last configuration read (shown in the options page): the host and path of the repository read (for example `github.com/organization/repository`), and for each notice its kind, its code, its English text and what it cites — a configuration key or value, the index and a bounded excerpt (40 characters) of an allowlist pattern, a version, the level at fault —, plus, as a reference, **the rejected value itself, in full**: an allowlist pattern or a tool command, as written in the configuration. Replaced at each read, with no history | `chrome.storage.local`, on your device | No |
 | Enabled optional domains (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, managed by Chrome | No — Chrome holds this list, not the extension |
 | The displayed repository's `.conventional-comments.json` configuration | the extension makes a dedicated network request to the file's `raw` route (using your session cookies, never a token of its own), cached in memory per tab — in-site navigation (moving between PRs without a reload) keeps it; only a full page reload or closing the tab destroys it | No — it's a read, on a web route your session already authorizes, the same way it would if you opened it yourself in a tab |
 | Comment, code, and diff content you view or write | stays in the page and the platform's native editor | **Never transmitted anywhere by the extension** |

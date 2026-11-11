@@ -91,9 +91,8 @@ n'y est pas joignable, et une visite anonyme ne verrait pas une préférence de 
 Dans l'issue, la vue du dernier relevé s'écrit telle que `url` la donne : `overview=true`,
 `overview=false`, ou `unknown (no overview parameter)` — jamais une vue déduite d'une trace ou
 d'une zone qui échoue. Les marqueurs du squelette s'écrivent À PART, nommés comme tels
-(« the skeleton carries the Overview markers »), sans remplacer la vue de l'URL. Les zones que l'annonce dit modifiées (zone de fusion déplacée en haut et réduite,
-donc la chaîne `merge-button` et le grisage du §6.5 ; liste des commentaires filtrable et
-triable) sont des endroits où REGARDER, pas des causes à écrire.
+(« the skeleton carries the Overview markers »), sans remplacer la vue de l'URL. Les zones que l'annonce dit modifiées (zone de fusion déplacée en haut et réduite ; liste des
+commentaires filtrable et triable) sont des endroits où REGARDER, pas des causes à écrire.
 
 Ce qui manque est une capture de la page Overview CHARGÉE dans `test/fixtures/pages/` (skill
 `plateforme`). Quand elle existera, y compter les marqueurs de la ligne « Squelette » ci-dessus,

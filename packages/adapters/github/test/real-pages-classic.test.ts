@@ -27,24 +27,14 @@ describe('§4.1, §9.2.3 — Conversation : nouveau commentaire (capture 01)', (
     expect(page.editors.map((e) => e.element.id)).not.toContain('issue-6074440789-body');
   });
 
-  it('lit la PR, sa date de création et la personne connectée dans la page', async () => {
+  it('lit la PR et la personne connectée dans la page', async () => {
     expect(page.adapter.currentPr()).toMatchObject({
       platform: 'github',
       host: 'github.com',
       scope: ['Reefact', 'just-dummies'],
       number: 331,
     });
-    expect(page.adapter.currentPr()?.createdAt).not.toBe('');
     expect((await page.adapter.getCurrentUser()).login).toBe('Reefact');
-  });
-
-  it("trouve le bouton de fusion d'une PR ouverte, et ne journalise rien (§6.5, §9.4)", () => {
-    // Avant le 2026-10-29, aucun candidat ne trouvait ce bouton Primer React : le §6.5 ne
-    // grisait plus rien sur github.com.
-    const control = page.adapter.getCompletionControl();
-    expect(control?.kind).toBe('complete-pr');
-    expect(control?.element.textContent?.trim()).toBe('Rebase and merge');
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
   });
 
   it("lit l'état que chaque fil déclare, et ne journalise pas les fils repliés (§9.2.3, §9.4)", async () => {
@@ -65,24 +55,11 @@ describe('§4.1, §9.2.3 — Conversation : nouveau commentaire (capture 01)', (
     expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('comment-author');
   });
 
-  // Les deux sondes ne font taire le journal que lorsqu'elles matchent : si GitHub les renomme,
-  // l'absence redevient une entrée — du bruit, jamais du silence. Ces deux tests altèrent la
+  // Les sondes ne font taire le journal que lorsqu'elles matchent : si GitHub les renomme,
+  // l'absence redevient une entrée — du bruit, jamais du silence. Ces tests altèrent la
   // page déjà chargée, puis la restaurent, plutôt que d'en charger une copie : chaque chargement
   // de cette capture coûte ~200 Mo de tas, et deux de plus faisaient déborder le worker en CI.
   // Un adaptateur neuf sur le même document part d'un journal vide.
-  it('journalise un bouton de fusion devenu introuvable sur une PR ouverte (§9.4)', () => {
-    const button = page.doc.querySelector('[data-testid="mergebox-partial"] button[data-variant="primary"]')!;
-    const [parent, next] = [button.parentNode!, button.nextSibling];
-    button.remove();
-    try {
-      const adapter = new GithubClientAdapter({ documentRef: page.doc });
-      expect(adapter.getCompletionControl()).toBeNull();
-      expect(adapter.log.failures.map((f) => f.chain)).toContain('merge-button');
-    } finally {
-      parent.insertBefore(button, next);
-    }
-  });
-
   it('journalise un fil sans corps ni auteur qui ne se déclare pas replié (§9.4)', async () => {
     // « Se déclarer replié », c'est porter `data-deferred-content-url` OU un contenu encore à
     // charger (`div[hidden] > include-fragment`, #117) : la rupture simulée retire les deux.
@@ -143,7 +120,7 @@ describe('§4.1 — Conversation : réponse dans un fil (capture 02)', () => {
   });
 });
 
-describe('§5.5, §6.5 — PR fusionnée, commentaires préfixés (capture 03)', () => {
+describe('§5.5 — PR fusionnée, commentaires préfixés (capture 03)', () => {
   let page: LoadedPage;
   beforeAll(() => {
     page = load('03-conversation-pr-fusionnee-commentaires-prefixes.html', '/Reefact/just-dummies/pull/294');
@@ -158,12 +135,6 @@ describe('§5.5, §6.5 — PR fusionnée, commentaires préfixés (capture 03)',
     expect(page.adapter.getRenderedComments().map((c) => c.element)).not.toContain(description);
   });
 
-  it("n'expose aucun bouton de fusion sur une PR fusionnée, et ne le journalise pas : c'est la norme (§9.4)", () => {
-    // L'inverse était attendu ici. Une entrée par PR fusionnée visitée enfouissait la seule qui
-    // comptait : le bouton d'une PR ouverte, introuvable depuis que GitHub l'a migré.
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-  });
 });
 
 describe('§4.1, §4.3 — Conversation : modification d\'un commentaire général (capture 06)', () => {
@@ -200,77 +171,10 @@ describe('§4.1, §4.3 — Conversation : modification d\'un commentaire génér
 
   it('lit ses deux fils repliés comme résolus, sans rien journaliser (§9.2.3, §9.4)', async () => {
     // La forme exacte du journal relevé le 2026-10-29 sur une PR fusionnée de ce dépôt :
-    // `comment-body` et `comment-author` à la même milliseconde, `merge-button` juste avant.
+    // `comment-body` et `comment-author` à la même milliseconde.
     const threads = await page.adapter.getThreads();
-    expect(page.adapter.getCompletionControl()).toBeNull();
     expect(threads.map((t) => t.resolution)).toEqual(['resolved', 'resolved']);
     const logged = page.adapter.log.failures.map((f) => f.chain);
-    expect(logged.filter((c) => ['merge-button', 'comment-body', 'comment-author'].includes(c))).toEqual([]);
-  });
-});
-describe('§6.5, §9.4 — Conversation : PR ouverte, fusion possible ou non (capture 03, PR 548)', () => {
-  let page: LoadedPage;
-  beforeAll(() => {
-    page = load('03-conversation-commentaires-prefixes-pr-ouverte.html', '/Reefact/just-dummies/pull/548');
-  }, T);
-
-  it('trouve « Rebase and merge » quand la page dit « Ready to merge »', () => {
-    const control = page.adapter.getCompletionControl();
-    expect(control?.element.textContent?.trim()).toBe('Rebase and merge');
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-  });
-
-  /** L'état du rapport du 2026-10-31 (#113), rejoué sur la capture : un check requis échoue, la
-   * zone de fusion n'a plus de bouton, et l'icône de mergeabilité le dit (squelette
-   * `diagnostic/2026-10-31-merge-button`, `skeletons/mvw7201i-4sm6c7.txt`). */
-  function withoutButton(iconLabel: string, run: (adapter: GithubClientAdapter) => void): void {
-    const group = page.doc.querySelector('[data-testid="mergebox-partial"] [data-component="ButtonGroup"]')!;
-    const icon = page.doc.querySelector('[data-testid="mergeability-icon-wrapper"] svg')!;
-    const [parent, next, label] = [group.parentNode!, group.nextSibling, icon.getAttribute('aria-label')!];
-    group.remove();
-    icon.setAttribute('aria-label', iconLabel);
-    try {
-      run(new GithubClientAdapter({ documentRef: page.doc }));
-    } finally {
-      icon.setAttribute('aria-label', label);
-      parent.insertBefore(group, next);
-    }
-  }
-
-  it("checks en échec : aucun bouton, et ce n'est pas une rupture (#113)", () => {
-    withoutButton('Checks failing', (adapter) => {
-      expect(adapter.getCompletionControl()).toBeNull();
-      expect(adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
-    });
-  });
-
-  it('un état NON mesuré reste journalisé : du bruit, jamais du silence', () => {
-    withoutButton('Merging is blocked', (adapter) => {
-      expect(adapter.getCompletionControl()).toBeNull();
-      expect(adapter.log.failures.map((f) => f.chain)).toContain('merge-button');
-    });
-  });
-});
-
-describe('§6.5, §9.4 — Conversation : un check NON requis en échec, la PR reste fusionnable (PR 552) — #103', () => {
-  // GitHub dit « Able to merge » et rend le même « Rebase and merge » en `data-variant="default"`,
-  // plus en `primary`. Le premier candidat exigeait `primary` : le bouton n'était pas trouvé, donc
-  // pas grisé, et `merge-button` était journalisé pour une chaîne qui n'avait rien de pourri.
-  let page: LoadedPage;
-  beforeAll(() => {
-    page = load('03-conversation-cc1-en-echec.html', '/Reefact/just-dummies/pull/552');
-  }, T);
-
-  it('la capture montre bien ce cas : icône « Able to merge », bouton en variante default', () => {
-    expect(page.doc.querySelector('[data-testid="mergeability-icon-wrapper"] svg')?.getAttribute('aria-label')).toBe('Able to merge');
-    const groupButtons = page.doc.querySelectorAll('[data-testid="mergebox-partial"] [data-component="ButtonGroup"] button');
-    expect([...groupButtons].map((b) => b.getAttribute('data-variant'))).toEqual(['default']);
-  });
-
-  it('trouve « Rebase and merge », et ne journalise rien', () => {
-    const control = page.adapter.getCompletionControl();
-    expect(control?.kind).toBe('complete-pr');
-    expect(control?.element.textContent?.trim()).toBe('Rebase and merge');
-    expect(page.adapter.log.failures.map((f) => f.chain)).not.toContain('merge-button');
+    expect(logged.filter((c) => ['comment-body', 'comment-author'].includes(c))).toEqual([]);
   });
 });

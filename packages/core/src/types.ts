@@ -4,9 +4,6 @@ export type ResolutionState = 'unresolved' | 'resolved' | 'unknown';
 
 export interface PrRef {
   platform: string; // identifiant d'adaptateur — jamais une union fermée (§9.2.1)
-  /** Retiré du §9.2.1 avec le périmètre d'activation (§2) : plus rien ne le lit. Optionnel le
-   * temps que les adaptateurs cessent de l'écrire ; retiré ensuite. */
-  createdAt?: string;
   host: string;
   scope: string[];
   number: number | string;
@@ -16,9 +13,6 @@ export interface UserInfo {
   id: string; // identifiant stable de plateforme, jamais le nom affiché
   login: string;
   displayName?: string;
-  /** Retiré du §9.2.1 avec l'indicateur du §12 qu'il servait (§2). Optionnel le temps que les
-   * adaptateurs cessent de l'écrire ; retiré ensuite. */
-  isServiceAccount?: boolean;
 }
 
 export interface CommentInfo {
@@ -40,10 +34,6 @@ export interface ThreadInfo {
   root: CommentInfo;
   replies: CommentInfo[]; // §4.1 — réponses du fil
   resolution: ResolutionState; // normalisé ici ; mapping des états bruts dans l'adaptateur
-  /** Retirés du §9.2.1 avec la gouvernance des résolutions (§6.1) : plus rien ne les lit.
-   * L'adaptateur GitLab écrit encore `resolvedBy` ; retirés quand il aura cessé. */
-  resolvedBy?: UserInfo;
-  resolvedAt?: string;
   canCarryBlockingState: boolean; // hérité de root (§4.1)
 }
 
@@ -68,22 +58,6 @@ export interface Notice {
   actor?: UserInfo;
   at?: string;
   ref?: string; // lien permanent, clé de configuration, ou numéro de ligne selon kind
-}
-
-/** Le résumé que publiait le vérificateur retiré (§2), lu par l'adaptateur GitHub jusqu'à ce
- * qu'il cesse de le faire ; retiré avec `summary.ts` ensuite. Plus rien du code partagé ne le
- * lit. */
-export interface PublishedSummary {
-  state: 'success' | 'failure' | 'neutral';
-  isDraft: boolean;
-  exempted: boolean;
-  mode: 'off' | 'assist' | 'warn' | 'enforce';
-  coreVersion: string;
-  configFingerprint: string;
-  activatedAt: string | null;
-  unresolvedBlockingCount: number; // des fils
-  nonCompliantCommentCount: number; // des commentaires
-  warningCount: number; // des diagnostics
 }
 
 export interface Disposable {

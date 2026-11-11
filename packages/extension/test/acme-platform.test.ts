@@ -58,7 +58,7 @@ const PAGE = `
   </main>`;
 
 function acmePr(): PrRef {
-  return { platform: 'acme', createdAt: '2026-01-01T00:00:00Z', host: 'acme.example', scope: ['proj', 'repo'], number: 7 };
+  return { platform: 'acme', host: 'acme.example', scope: ['proj', 'repo'], number: 7 };
 }
 
 /** Un adaptateur COMPLET au sens du contrat, et rien de plus. `implements` est vérifié par le
@@ -141,7 +141,7 @@ class AcmeClientAdapter implements PlatformAdapter {
   }
 
   async getCurrentUser(): Promise<UserInfo> {
-    return { id: 'login:alice', login: 'alice', isServiceAccount: false };
+    return { id: 'login:alice', login: 'alice' };
   }
 
   getBannerMount(): Element | null {

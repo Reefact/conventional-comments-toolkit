@@ -123,6 +123,10 @@ every earlier capture.
 
 ## Merge button (§6.5)
 
+> **Retired on 2026-11-10.** Greying the merge button left the specification with the verifier
+> (§2); the probe (`getCompletionControl()`) and its chains are removed from the adapter. The
+> table stays as a measurement record.
+
 | Page | Where | When it is absent |
 |---|---|---|
 | Classic (03 `-pr-ouverte`, 03 `-cc1-en-echec`) | `[data-testid="mergebox-partial"] [data-component="ButtonGroup"] > :first-child > button[data-component="Button"]`, *Rebase and merge* — `data-variant="primary"` when the page says *Ready to merge*, `default` when a NON-required check fails (*Able to merge*, 2026-11-10): the variant is GitHub's recommendation, not the button | merged/closed/draft (`prSettledState`); a failing required check: mergeability icon `aria-label="Checks failing"` (diagnostic skeleton of #113) — nominal |
@@ -198,7 +202,12 @@ title, as the verifier would (§A.8 at the time; the verifier is retired since, 
 check of the list is an `li` whose accessible name carries the check's name, and whose
 `span.titleDescription__…` renders the state then the title — the whole `cc/1` line. Captures
 `03-overview-checks-deplies.html`, `03-conversation-checks-deplies.html` (PR 551) and
-`03-conversation-cc1-en-echec.html` (PR 552).
+`03-conversation-cc1-en-echec.html` (PR 552), with `03-overview-cc1-en-echec.html` captured the
+next day.
+
+> **Retired on 2026-11-10.** Reading the `cc/1` line left with the verifier (§2):
+> `readPublishedResult()`, `checkRunTitles` and these four captures are removed. What follows
+> stays as a measurement record.
 
 - **Provenance.** GitHub attaches a check run published with a workflow's token to ANOTHER
   workflow's check suite, and renders it `Contributor agreement / conventional-comments

@@ -1,4 +1,4 @@
-// Version de core/ (§6.3.1, §8.1.3 règle 5) et versions de documents supportées (§8.1.5).
+// Version de core/ (§8.1.3 règle 5) et versions de documents supportées (§8.1.5).
 export const CORE_VERSION = '1.0.0';
 export const CORE_MAJOR = 1;
 
@@ -7,6 +7,3 @@ export const SUPPORTED_CONFIG_VERSION = 1;
 
 // Version de plancher supportée (§8.1.1, `floorVersion`).
 export const SUPPORTED_FLOOR_VERSION = 1;
-
-// Préfixe de version de la ligne machine d'un vérificateur retiré (§2), que `decodeSummary()` lit encore.
-export const SUMMARY_PREFIX = 'cc/1';

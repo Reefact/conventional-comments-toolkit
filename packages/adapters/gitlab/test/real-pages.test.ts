@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// L'ADAPTATEUR GITLAB SUR DE VRAIES PAGES (§4.1, §4.3, §5.5, §6.5, §9.2.3, §9.4, annexe C).
+// L'ADAPTATEUR GITLAB SUR DE VRAIES PAGES (§4.1, §4.3, §5.5, §9.2.3, §9.4, annexe C).
 //
 // Chaque test charge une page capturée sur gitlab.com le 2026-11-08 (projet de test personnel,
 // extension Conventional Comments désactivée, page réduite dans le navigateur — CAPTURES.md), à
@@ -15,7 +15,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { queryChain, SelectorLog, type EditorHandle, type SelectorEvidence } from '@cct/adapter-shared';
+import { queryChain, SelectorLog, type EditorHandle } from '@cct/adapter-shared';
 import { GitlabClientAdapter } from '../src/index.js';
 import { selectors } from '../src/selectors.js';
 
@@ -84,19 +84,17 @@ describe('§4.1, §9.2.3 — Overview : nouveau commentaire général (capture 0
     expect(submitLabels(page, editor)).toEqual(['Comment', 'Start review', 'Close merge request']);
   });
 
-  it('lit la merge request, sa date de création et la personne connectée dans la page', async () => {
+  it('lit la merge request et la personne connectée dans la page', async () => {
     expect(page.adapter.currentPr()).toEqual({
       platform: 'gitlab',
       host: 'gitlab.com',
       scope: ['Reefact', 'testing-conventional-comments'],
       number: 1,
-      createdAt: '2026-11-08T18:24:04Z',
     });
     expect((await page.adapter.getCurrentUser()).login).toBe('Reefact');
   });
 
-  it("trouve le bouton de fusion d'une merge request ouverte, et ne journalise rien (§6.5, §9.4)", () => {
-    expect(page.adapter.getCompletionControl()?.kind).toBe('complete-pr');
+  it('ne journalise rien sur une page saine (§9.4)', () => {
     expect(loggedChains(page)).toEqual([]);
   });
 
@@ -198,7 +196,7 @@ describe('§4.1 — Zone d’un champ de fil : réponse, puis modification, sino
   it('nouveau fil sur une ligne de diff — seconde merge request (04-…-mr2)', () => {
     const page = load('04-changes-commentaire-ligne-mr2.html', `${MR2}/diffs`);
     expect(editorBy(page, 'reply-field').context).toMatchObject({ zone: 'thread-root', action: 'compose' });
-    expect(page.adapter.currentPr()).toMatchObject({ number: 2, createdAt: '2026-11-08T18:24:06Z' });
+    expect(page.adapter.currentPr()).toMatchObject({ number: 2 });
   }, T);
 
   for (const [file, label] of [
@@ -259,28 +257,15 @@ describe('§4.1, §C.6 — Revue soumise en lot (captures 07)', () => {
   }, T);
 });
 
-describe('§6.5, §9.4 — Bouton de fusion : son absence est la norme hors de l’Overview ouverte', () => {
-  it('merge request fermée : pas de contrôle de complétion, rien de journalisé (08)', () => {
+describe('§9.4 — Merge request fermée, onglet Changes : rien de journalisé', () => {
+  it('merge request fermée : rien de journalisé, et « Reopen merge request » est un chemin d’envoi (08)', () => {
     const page = load('08-overview-mr-fermee.html', MR2);
-    expect(page.adapter.getCompletionControl()).toBeNull();
     expect(loggedChains(page)).toEqual([]);
     expect(submitLabels(page, editorBy(page, 'comment-field'))).toEqual(['Comment', 'Start review', 'Reopen merge request']);
   }, T);
 
-  it('Overview ouverte sans bouton de fusion : une rupture, journalisée avec son relevé (§9.4, #168)', () => {
-    const evidence = new Map<string, SelectorEvidence>();
-    const log = new SelectorLog(null, (chain, e) => evidence.set(chain.name, e));
-    const page = load('03-overview-commentaires-publies.html', MR1, log);
-    expect(page.adapter.getCompletionControl()).not.toBeNull();
-    for (const button of page.doc.querySelectorAll(selectors.mergeButton.candidates.join(', '))) button.remove();
-    expect(page.adapter.getCompletionControl()).toBeNull();
-    expect(loggedChains(page)).toContain('merge-button');
-    expect(evidence.get('merge-button')?.trace?.map((t) => t.candidate)).toEqual(selectors.mergeButton.candidates);
-  }, T);
-
-  it('onglet Changes : pas de bouton de fusion, rien de journalisé (04)', () => {
+  it('onglet Changes : rien de journalisé (04)', () => {
     const page = load('04-changes-commentaire-ligne.html', `${MR1}/diffs`);
-    expect(page.adapter.getCompletionControl()).toBeNull();
     expect(loggedChains(page)).toEqual([]);
   }, T);
 
@@ -321,8 +306,6 @@ describe('§5.5, §9.2.3 — Fils et commentaires publiés (captures 03)', () =>
     expect(reply!.id).not.toBe(threads[0]!.root.id);
     expect(reply!.author.login).toBe('Reefact');
     expect(reply!.body.trim()).toBe('ack: corrigé dans le prochain commit');
-    // Aucun fil ouvert n'a de résolveur.
-    expect(threads.every((t) => t.resolvedBy === undefined)).toBe(true);
   });
 
   it('un fil porte un état bloquant s’il est résoluble, et seulement alors (§4.1, §C.6)', async () => {
@@ -399,14 +382,6 @@ describe('§C.5 — Fil résolu', () => {
     expect(threads.filter((t) => t.resolution === 'resolved').map((t) => t.id)).toEqual(['note_4188016850']);
     expect(threads.filter((t) => t.resolution === 'unresolved')).toHaveLength(5);
     expect(loggedChains(page)).toEqual([]);
-  }, T);
-
-  it('Overview : le résolveur du fil replié est lu sur son lien, les autres fils n’en ont pas (§6.1)', async () => {
-    const page = load('03-overview-fil-resolu.html', MR1);
-    const threads = await page.adapter.getThreads();
-    const resolved = threads.find((t) => t.resolution === 'resolved')!;
-    expect(resolved.resolvedBy).toEqual({ id: 'login:reefact', login: 'Reefact', isServiceAccount: false });
-    expect(threads.filter((t) => t.resolvedBy !== undefined)).toHaveLength(1);
   }, T);
 
   it('Overview : le fil replié, sans note rendue, n’est pas offert au filtre — il reste visible (§5.5)', async () => {

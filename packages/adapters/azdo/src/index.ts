@@ -14,7 +14,6 @@ import type {
   Disposable,
   PlatformProfile,
   PrRef,
-  PublishedSummary,
   ThreadInfo,
   UserInfo,
 } from '@cct/core';
@@ -37,7 +36,6 @@ import {
   type EntryGuard,
   type PlatformAdapter,
   type RenderedBodyShape,
-  type SubmitControl,
   type SubmitControlsLookup,
   type SubmitKeystrokes,
 } from '@cct/adapter-shared';
@@ -315,32 +313,11 @@ export class AzdoClientAdapter implements PlatformAdapter {
       .map((element, i) => ({ id: this.#threadId(element) ?? `dom-thread-${i}`, element }));
   }
 
-  /** Le bouton *Complete*. Son absence est la NORME sur une PR abandonnée — où le même
-   * emplacement porte *Reactivate*, qui ne doit jamais être intercepté — et en plein écran ; elle
-   * n'est journalisée qu'ailleurs (selectors.ts). */
-  getCompletionControl(): SubmitControl | null {
-    if (queryChain(this.#doc, selectors.prSettledState).element) return null;
-    const { element } = queryChain(this.#doc, selectors.completeButton);
-    if (!element) {
-      if (!queryChain(this.#doc, selectors.fullScreen).element) {
-        this.log.degraded(selectors.completeButton, chainEvidence(this.#doc, selectors.completeButton));
-      }
-      return null;
-    }
-    this.log.recovered(selectors.completeButton);
-    return { element, kind: 'complete-pr' };
-  }
-
   /** Le nom AFFICHÉ de l'utilisateur, seule identité que la page porte — la même que celle des
    * auteurs (`commentAuthor`), si bien que les deux se comparent. Vide dans une vue qui ne rend
    * aucun champ replié (Files sans fil, MESURÉ). */
   async getCurrentUser(): Promise<UserInfo> {
     return displayUser(queryChain(this.#doc, selectors.currentUser).element?.getAttribute('aria-label') ?? '');
-  }
-
-  /** Aucun vérificateur n'est livré pour Azure DevOps (§B.7) : aucune ligne cc/1 à lire. */
-  readPublishedResult(): PublishedSummary | null {
-    return null;
   }
 
   getRenderedComments(): { element: Element; bodyText: string }[] {
@@ -388,21 +365,8 @@ export class AzdoClientAdapter implements PlatformAdapter {
     if (loc?.hostname !== PR_HOST) return null;
     const m = PR_PATH.exec(loc.pathname);
     if (!m) return null;
-    // Lecture DOM seulement une fois la PR reconnue (§9.2.3) : hors PR, currentPr() ne coûte
-    // qu'une expression régulière.
-    const createdAt =
-      queryChainAll(this.#doc, selectors.prCreatedAt)
-        .find((el) => !closestChain(el, selectors.activityCard).element)
-        ?.getAttribute('datetime') ?? '';
-    if (createdAt) this.log.recovered(selectors.prCreatedAt);
-    // Une date inconnue vaut mieux qu'une date fausse : l'extension ne bloque alors jamais. La
-    // vue Files ne porte AUCUNE date de création (MESURÉ) : son absence n'y est pas une rupture.
-    else if (!this.#isFilesView()) {
-      this.log.degraded(selectors.prCreatedAt, chainEvidence(this.#doc, selectors.prCreatedAt));
-    }
     return {
       platform: 'azdo',
-      createdAt,
       // `host` et non `hostname` : il porte le port d'une instance non standard.
       host: loc!.host,
       scope: [decodeURIComponent(m[1]!), decodeURIComponent(m[2]!), decodeURIComponent(m[3]!)],
@@ -437,14 +401,14 @@ export class AzdoClientAdapter implements PlatformAdapter {
       // La RACINE d'un fil reste 'thread-root' (§4.1, §4.3) : la classer 'reply' la soustrairait
       // à la validation par défaut.
       return comments[0] === edited
-        ? { zone: 'thread-root', action: 'edit', pr, threadId, commentId, canCarryBlockingState: true, inScope: true }
-        : { zone: 'reply', action: 'edit', pr, threadId, commentId, canCarryBlockingState: false, inScope: true };
+        ? { zone: 'thread-root', action: 'edit', pr, threadId, commentId, canCarryBlockingState: true }
+        : { zone: 'reply', action: 'edit', pr, threadId, commentId, canCarryBlockingState: false };
     }
     if (comments.length > 0) {
-      return { zone: 'reply', action: 'compose', pr, threadId, canCarryBlockingState: false, inScope: true };
+      return { zone: 'reply', action: 'compose', pr, threadId, canCarryBlockingState: false };
     }
     if (closestChain(el, selectors.diffDiscussion).element) {
-      return { zone: 'thread-root', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
+      return { zone: 'thread-root', action: 'compose', pr, canCarryBlockingState: true };
     }
     // Commentaire général : sur Azure DevOps, c'est un FIL, avec un état et un bouton *Resolve*
     // (03, les fils 1 à 4) — il porte donc un état bloquant, comme sur GitLab et contrairement à
@@ -460,12 +424,12 @@ export class AzdoClientAdapter implements PlatformAdapter {
         chainEvidence(this.#doc, selectors.generalComposer, { subject: printElement(el) })
       );
     }
-    return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: true, inScope: true };
+    return { zone: 'conversation', action: 'compose', pr, canCarryBlockingState: true };
   }
 }
 
 function displayUser(name: string): UserInfo {
-  return { id: `display:${name.toLowerCase()}`, login: name, isServiceAccount: false };
+  return { id: `display:${name.toLowerCase()}`, login: name };
 }
 
 /** Le texte d'un corps rendu, sans le bouton *Copy to clipboard* qu'Azure DevOps pose DANS le

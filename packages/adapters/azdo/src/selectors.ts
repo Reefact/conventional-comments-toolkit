@@ -213,57 +213,12 @@ export const selectors = {
     candidates: ['.repos-pr-header'],
   } satisfies SelectorChain,
 
-  /** PR ARRÊTÉE — l'absence du bouton de complétion y est la norme (§9.4). MESURÉ : la pastille
-   * d'état de l'en-tête porte `pr-status-abandoned` sur la PR abandonnée (08), `pr-status-active`
-   * partout ailleurs. Une PR TERMINÉE (fusionnée) n'est pas capturée : aucun candidat ne la
-   * décrit, et l'absence du bouton y sera journalisée — une ligne de trop, jamais un blocage de
-   * trop. */
-  prSettledState: {
-    name: 'pr-settled-state',
-    candidates: ['.repos-pr-header .pr-status-abandoned'],
-  } satisfies SelectorChain,
-
-  /** Vue Files en PLEIN ÉCRAN : l'en-tête se réduit à une ligne, sans bouton de complétion — son
-   * absence y est la norme. MESURÉ : la classe `full-screen` n'existe que dans les captures
-   * `-plein-ecran` (comparaison des classes, CAPTURES.md). */
-  fullScreen: {
-    name: 'full-screen',
-    candidates: ['.full-screen'],
-  } satisfies SelectorChain,
-
-  /** Contrôle de complétion (§6.5, §9.4) — le bouton principal du bouton scindé *Complete* de
-   * l'en-tête. MESURÉ sur toutes les captures d'une PR active, Overview et Files. Sur la PR
-   * abandonnée (08), le MÊME emplacement porte *Reactivate* : `prSettledState` doit être lu
-   * AVANT, sans quoi l'extension intercepterait une réactivation. Absent en plein écran. */
-  completeButton: {
-    name: 'complete-button',
-    problem: 'completion-control',
-    candidates: ['.repos-pr-header-complete-button > .bolt-split-button-main'],
-  } satisfies SelectorChain,
-
   /** Utilisateur courant (§6.1) — son NOM AFFICHÉ, sur la pastille posée devant chaque champ de
    * réponse replié et devant le champ général (03 : la même pastille que celle de l'auteur de ses
    * propres commentaires). Même forme que `commentAuthor` : les deux se comparent. */
   currentUser: {
     name: 'current-user',
     candidates: ['.repos-discussion-thread-reply > .bolt-coin[aria-label], .repos-comment-card .bolt-coin[aria-label]:not(.repos-comment-header-persona)'],
-  } satisfies SelectorChain,
-
-  /** Date de CRÉATION de la PR (§6.2.3). MESURÉ : la DERNIÈRE ligne du fil d'activité est
-   * l'événement de création — 20:49:08.770Z pour la PR 1, 20:49:09.564Z pour la PR 2, à la
-   * milliseconde de leur création par l'API (03, 08). La seule date de l'en-tête est celle du
-   * dernier changement d'état (21:13 sur la PR abandonnée, 08) : jamais elle. Absente de la vue
-   * Files, et d'une Overview dont la dernière ligne n'est pas encore rendue — le fil d'activité
-   * est virtualisé (CAPTURES.md) : une date inconnue, jamais une fausse. UN SEUL candidat.
-   * `time.activity-card-time` est AUSSI la date d'en-tête d'un fil de ligne dans le fil
-   * d'activité (03 : 21:02:35.377Z, dans `.comment-file-header`, à l'intérieur d'une
-   * `.bolt-card`) : si la dernière ligne était un fil, ce candidat la trouverait. L'adaptateur
-   * écarte donc tout élément situé dans une `.bolt-card` — ce que le CSS de happy-dom ne sait
-   * pas exprimer de façon fiable. */
-  prCreatedAt: {
-    name: 'pr-created-at',
-    problem: 'pr-creation-date',
-    candidates: ['tr.bolt-timeline-last-row time.activity-card-time[datetime]'],
   } satisfies SelectorChain,
 
   /** Le FIL D'ACTIVITÉ de l'Overview — un tableau dont chaque ligne est un événement ou un fil
@@ -281,12 +236,5 @@ export const selectors = {
   timelineRow: {
     name: 'timeline-row',
     candidates: ['tr.bolt-timeline-row'],
-  } satisfies SelectorChain,
-
-  /** Carte d'un fil dans le fil d'activité (03) — l'événement de création n'en a pas. Sert à
-   * écarter de `prCreatedAt` la date d'en-tête d'un fil. */
-  activityCard: {
-    name: 'activity-card',
-    candidates: ['.bolt-card'],
   } satisfies SelectorChain,
 };

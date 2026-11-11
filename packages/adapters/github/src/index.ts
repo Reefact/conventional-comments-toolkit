@@ -1,15 +1,12 @@
 // Adaptateur client GitHub (composant A, §9.2.3, annexe A). Aucun appel d'API à jeton
 // (§10) : configuration lue par la route web `raw` sur la session de l'utilisateur
-// (§A.4), fils et résultat publié lus dans le DOM de la page.
+// (§A.4), fils lus dans le DOM de la page.
 
 import {
-  decodeSummary,
-  SUMMARY_PREFIX,
   type ConfigRead,
   type Disposable,
   type PlatformProfile,
   type PrRef,
-  type PublishedSummary,
   type ThreadInfo,
   type UserInfo,
 } from '@cct/core';
@@ -23,7 +20,6 @@ import {
   printElement,
   queryChain,
   queryChainAll,
-  selectorEvidence,
   writeToTextField,
   NEUTRAL_EDITOR_CHROME,
   SelectorLog,
@@ -36,19 +32,17 @@ import {
   type EditorContext,
   type EditorHandle,
   type PlatformAdapter,
-  type SubmitControl,
   type SubmitControlsLookup,
   type SubmitKeystrokes,
 } from '@cct/adapter-shared';
 import {
-  classicCompletion,
   classicResolutionFlag,
   classicThreadNotRendered,
   inClassicConversationForm,
   inClassicPrDescription,
 } from './classic.js';
 import { configCredentials } from './descriptor.js';
-import { inOverviewPrDescription, overviewCompletion, overviewContext, overviewResolution } from './overview.js';
+import { inOverviewPrDescription, overviewContext, overviewResolution } from './overview.js';
 import { selectors } from './selectors.js';
 import { ALL_EDITORS, SURFACES, type GithubSurface } from './surfaces.js';
 import { githubView, isPullRequestPath } from './view.js';
@@ -65,15 +59,6 @@ export const GITHUB_BODY_SHAPE: RenderedBodyShape = Object.freeze({
   lineBreakTag: 'BR',
 });
 
-/** Ce que la vue React embarque d'une PR, réduit à ce qui sert à dater et à identifier — tout
- * est `unknown` jusqu'à vérification : c'est du JSON servi par la page. */
-interface EmbeddedPr {
-  number: unknown;
-  createdTime: unknown;
-  owner: unknown;
-  repo: unknown;
-}
-
 export class GithubClientAdapter implements PlatformAdapter {
   #fetch: typeof fetch;
   #doc: Document;
@@ -85,9 +70,6 @@ export class GithubClientAdapter implements PlatformAdapter {
   // ne pouvait pas poser : un châssis absent est-il le cas nominal ou une rupture ? Sans cette
   // attribution, les deux se ressemblent — c'est le défaut relevé en revue (Reefact, PR #65).
   #surfaceOf = new WeakMap<Element, GithubSurface>();
-  // `currentPr()` est appelé à chaque balayage, et le JSON embarqué pèse plusieurs centaines de
-  // kilo-octets : lu une fois par élément `<script>` — une navigation en pose un nouveau.
-  #embeddedPr = new WeakMap<Element, EmbeddedPr | null>();
 
   constructor(opts: ClientAdapterOptions = {}) {
     this.#fetch = adapterFetch(opts.fetchImpl);
@@ -459,8 +441,6 @@ export class GithubClientAdapter implements PlatformAdapter {
     // commune ne les cherche pas — nus, ou enveloppés en première position (`overviewSubmitButtons`).
     const chain = githubView(this.#doc) === 'overview' ? selectors.overviewSubmitButtons : selectors.submitButtons;
     for (const container of containers) {
-      // Jamais de contrôle `complete-pr` ici : seul getCompletionControl() l'expose, et il
-      // n'est jamais intercepté (§9.2.3).
       const controls = queryChainAll(container, chain);
       if (controls.length > 0) {
         const found = controls.map((element) => ({ element, kind: 'submit' as const }));
@@ -510,7 +490,7 @@ export class GithubClientAdapter implements PlatformAdapter {
         pr,
         root: {
           id: `${id}-root`,
-          author: { id: `login:${author.toLowerCase()}`, login: author, isServiceAccount: false },
+          author: { id: `login:${author.toLowerCase()}`, login: author },
           body: bodyEl ? commentBodyText(bodyEl) : '',
           createdAt: '',
           permalink: anchor,
@@ -551,49 +531,10 @@ export class GithubClientAdapter implements PlatformAdapter {
     return queryChain(box, selectors.resolvedMarker).element;
   }
 
-  getCompletionControl(): SubmitControl | null {
-    const view = githubView(this.#doc);
-    // Seul l'onglet Conversation porte un bouton de fusion : MESURÉ sur
-    // `04-files-commentaire-ligne-pr-ouverte.html`, Files changed d'une PR OUVERTE n'en a aucun.
-    // L'y chercher journalisait `merge-button` à chaque visite de cet onglet (#103).
-    if (view === 'other') return null;
-    // Les deux vues rangent le bouton à deux endroits sans rapport ; la chaîne journalisée reste
-    // `merge-button` dans les deux, pour qu'un relevé pris trop tôt sur une Overview encore lue
-    // `classic` soit marqué rattrapé quand le bouton arrive (`view.ts`, #127).
-    const chain = view === 'overview' ? selectors.overviewMergeButton : selectors.mergeButton;
-    const { element, nominalAbsence } = view === 'overview' ? overviewCompletion(this.#doc) : classicCompletion(this.#doc);
-    if (!element) {
-      // Fusionnée, fermée ou brouillon : GitHub ne rend aucun bouton, et ne rien trouver est
-      // le cas nominal, pas une chaîne pourrie (§9.4, `selectors.prSettledState`). De même pour
-      // une PR ouverte que la page dit non fusionnable maintenant (#113, #127).
-      if (!nominalAbsence && !queryChain(this.#doc, selectors.prSettledState).element) this.#degraded(chain);
-      return null;
-    }
-    // Trouvé : si la chaîne a été journalisée plus tôt dans cette visite, elle a été sondée
-    // avant que GitHub rende la boîte de fusion, et la ligne doit le dire (§9.4). Sans effet
-    // dans le cas nominal (`SelectorLog.recovered`).
-    this.log.recovered(chain);
-    return { element, kind: 'complete-pr' };
-  }
-
   async getCurrentUser(): Promise<UserInfo> {
     const { element } = queryChain(this.#doc, selectors.currentUser);
     const login = element?.getAttribute('content') ?? '';
-    return { id: `login:${login.toLowerCase()}`, login, isServiceAccount: false };
-  }
-
-  /** Ligne cc/1 lue dans le DOM — le titre du check run, rendu sur la page de la PR
-   * (§6.3.1, §A.8). Jamais d'appel d'API (§8.1.3, §10). */
-  readPublishedResult(): PublishedSummary | null {
-    for (const el of queryChainAll(this.#doc, selectors.checkRunTitles)) {
-      const text = el.textContent ?? '';
-      const idx = text.indexOf(SUMMARY_PREFIX + ' ');
-      if (idx === -1) continue;
-      const line = text.slice(idx).split('\n')[0]!.trim();
-      const summary = decodeSummary(line);
-      if (summary) return summary;
-    }
-    return null;
+    return { id: `login:${login.toLowerCase()}`, login };
   }
 
   /** Commentaires rendus sur la page, pour les badges du §5.5 — surface d'affichage,
@@ -711,7 +652,7 @@ export class GithubClientAdapter implements PlatformAdapter {
     }));
   }
 
-  /** PrRef depuis l'URL et la page — la date de création est lisible dans le DOM (§6.2.3). */
+  /** PrRef depuis l'URL et la page. */
   currentPr(): PrRef | null {
     const loc = this.#doc.location;
     const m = /^\/([^/]+)\/([^/]+)\/pull\/(\d+)/.exec(loc?.pathname ?? '');
@@ -720,7 +661,6 @@ export class GithubClientAdapter implements PlatformAdapter {
     const scope: [string, string] = [m[1]!, m[2]!];
     return {
       platform: 'github',
-      createdAt: this.#createdAt(scope, number),
       // `host` et non `hostname` : il PORTE LE PORT quand il est non standard. `pr.host`
       // sert à bâtir les URL de lecture de configuration (`https://${pr.host}/…`) ; une
       // instance GHES servie sur `ghes.corp:8443` verrait sinon sa configuration demandée
@@ -733,59 +673,6 @@ export class GithubClientAdapter implements PlatformAdapter {
     };
   }
 
-  /** La date de création de la PR, ou `''` quand la page ne la porte pas — l'extension ne
-   * bloque alors jamais (`resolveInScope`, §6.2.3) : une date inconnue vaut mieux qu'une date
-   * fausse, qui rangerait la PR du mauvais côté d'`activatedAt` (#84, `selectors.prCreatedAt`).
-   *
-   * Le DOM d'abord, les données embarquées ensuite, et seulement si elles désignent la PR de
-   * l'URL — dépôt ET numéro. Rien des deux : la chaîne est journalisée (§9.4) — c'est ce que le
-   * repli générique d'avant empêchait, en trouvant toujours une date. */
-  #createdAt(scope: [string, string], number: number): string {
-    const fromDom = queryChain(this.#doc, selectors.prCreatedAt).element?.getAttribute('datetime');
-    // Lue à chaque balayage : une date trouvée APRÈS une ligne journalisée dans la même visite
-    // est une date chargée tard, pas une chaîne pourrie.
-    if (fromDom) {
-      this.log.recovered(selectors.prCreatedAt);
-      return fromDom;
-    }
-    for (const script of queryChainAll(this.#doc, selectors.prEmbeddedData)) {
-      const fromData = this.#embeddedCreatedAt(script, scope, number);
-      if (fromData) {
-        this.log.recovered(selectors.prCreatedAt);
-        return fromData;
-      }
-    }
-    this.#degraded(selectors.prCreatedAt);
-    return '';
-  }
-
-  #embeddedCreatedAt(script: Element, scope: [string, string], number: number): string {
-    if (!this.#embeddedPr.has(script)) {
-      let pr: EmbeddedPr | null = null;
-      try {
-        const route = JSON.parse(script.textContent ?? '')?.payload?.pullRequestsLayoutRoute;
-        pr = route?.pullRequest
-          ? {
-              number: route.pullRequest.number,
-              createdTime: route.pullRequest.createdTime,
-              owner: route.repository?.ownerLogin,
-              repo: route.repository?.name,
-            }
-          : null;
-      } catch {
-        pr = null; // JSON illisible : comme absent
-      }
-      this.#embeddedPr.set(script, pr);
-    }
-    const pr = this.#embeddedPr.get(script);
-    // Le dépôt comparé sans la casse : GitHub sert la même PR à `/reefact/JUST-DUMMIES/…`. Un
-    // dépôt absent des données ne se présume pas — l'appartenance doit être démontrée.
-    const same = (a: unknown, b: string) => typeof a === 'string' && a.toLowerCase() === b.toLowerCase();
-    if (!pr || pr.number !== number || !same(pr.owner, scope[0]) || !same(pr.repo, scope[1])) return '';
-    if (typeof pr.createdTime !== 'string') return '';
-    const time = Date.parse(pr.createdTime);
-    return Number.isNaN(time) ? '' : new Date(time).toISOString();
-  }
 
   /** L'identifiant que la page ne met pas sur ses conteneurs, lu dans le PERMALIEN.
    *
@@ -866,7 +753,6 @@ export class GithubClientAdapter implements PlatformAdapter {
             threadId: thread.id || this.#anchorIdOf(thread) || editedId,
             commentId: editedId,
             canCarryBlockingState: true,
-            inScope: true,
           };
         }
         return {
@@ -876,7 +762,6 @@ export class GithubClientAdapter implements PlatformAdapter {
           threadId: thread.id || this.#anchorIdOf(thread) || editedId,
           commentId: editedId,
           canCarryBlockingState: false,
-          inScope: true,
         };
       }
       return {
@@ -885,17 +770,16 @@ export class GithubClientAdapter implements PlatformAdapter {
         pr,
         threadId: thread.id || this.#anchorIdOf(thread) || undefined,
         canCarryBlockingState: false,
-        inScope: true, // recalculé par l'extension avec activatedAt (§6.2.3)
       };
     }
     // Hors conteneur de fil : sur une édition, le commentaire édité est son propre fil —
     // threadId et commentId portent son identifiant (§9.2.3).
     const editIds = action === 'edit' ? { threadId: editedId, commentId: editedId } : {};
     if (closestChain(el, selectors.reviewSummaryForm).element) {
-      return { zone: 'review-body', action, pr, ...editIds, canCarryBlockingState: false, inScope: true };
+      return { zone: 'review-body', action, pr, ...editIds, canCarryBlockingState: false };
     }
     if (inClassicConversationForm(el)) {
-      return { zone: 'conversation', action, pr, ...editIds, canCarryBlockingState: false, inScope: true };
+      return { zone: 'conversation', action, pr, ...editIds, canCarryBlockingState: false };
     }
     // Commentaire inline sur une ligne de diff, ou racine de fil : porte un état de
     // résolution (§4.1). Le seul cas mesuré qui arrive ici est le nouveau commentaire de ligne
@@ -904,6 +788,6 @@ export class GithubClientAdapter implements PlatformAdapter {
     if (!closestChain(el, selectors.diffLineComposer).element) {
       this.#degraded(selectors.diffLineComposer, this.#doc, { subject: printElement(el) });
     }
-    return { zone: 'thread-root', action, pr, ...editIds, canCarryBlockingState: true, inScope: true };
+    return { zone: 'thread-root', action, pr, ...editIds, canCarryBlockingState: true };
   }
 }

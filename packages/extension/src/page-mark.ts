@@ -5,9 +5,9 @@
 // La page d'options affiche donc une MARQUE : deux lignes de même marque viennent de la même
 // page, ce qui est la seule question à laquelle le journal ne savait pas répondre.
 //
-// « Marque », et non « empreinte » : `specifications-fr.md` réserve ce mot à
-// `configFingerprint` (§6.3.1, §8.1.3), qui décide du blocage d'envoi. Deux sens pour un mot
-// dans un dépôt où l'un des deux est normatif est une dette gratuite.
+// « Marque », et non « empreinte » : le mot a désigné l'empreinte de configuration
+// (`configFingerprint`), retirée avec le vérificateur (§2, §8.1.3). Deux sens pour un mot dans
+// un même dépôt sont une dette gratuite, même quand l'un des deux est retiré.
 //
 // CE QUE LA MARQUE N'EST PAS : une protection. C'est un FNV-1a, inversible par force brute
 // sur un espace de clés énumérable, et l'adresse complète est de toute façon dans l'info-bulle

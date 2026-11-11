@@ -1570,7 +1570,7 @@ export function observePrChromeNavigation(
 
   run();
   const observer = new MutationObserver(run);
-  // `characterData` en plus de `childList` (§5.5) : la ligne cc/1 ou un fil peuvent être mis
+  // `characterData` en plus de `childList` (§5.5) : un fil peut être mis
   // à jour par une mutation de TEXTE sur un nœud déjà en place, pas seulement par un ajout/
   // retrait de nœud — sans quoi ce cas précis échapperait à l'observateur, contredisant « dès
   // qu'il est présent » (§5.5). `run()` reste bon marché sur un déclenchement sans rien de

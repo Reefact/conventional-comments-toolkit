@@ -265,7 +265,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     const { written } = installChrome();
     const captured = await bootstrapWith('https://github.com/acme/demo/pull/42?view=1');
 
-    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a', 'button.b'], problem: 'completion-control' });
+    captured.log!.degraded({ name: 'merge-button', candidates: ['button.a', 'button.b'], problem: 'submit-control' });
     await settle();
 
     // Ce que ce test dit : la forme de l'entrée LOCALE. Ce qu'il ne dit pas, et qu'il ne
@@ -294,7 +294,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
     // dans les outils du navigateur pour comprendre pourquoi aucun n'a répondu.
     expect(entry.candidates).toEqual(['button.a', 'button.b']);
     expect(entry.platform).toBe('github');
-    expect(entry.problem).toBe('completion-control');
+    expect(entry.problem).toBe('submit-control');
     expect(entry.count).toBe(1);
     expect(entry.firstAt).toBe(entry.at);
     expect(entry.urls).toEqual([entry.url]);
@@ -307,7 +307,7 @@ describe('§9.4 / CA-11 — le journal enregistre la page, pas seulement la cha�
   it('la ligne garde le relevé de la page, et dit quand la chaîne a fini par trouver', async () => {
     const { written } = installChrome();
     const captured = await bootstrapWith('https://github.com/acme/demo/pull/42');
-    const mergeButton = { name: 'merge-button', candidates: ['button.a'], problem: 'completion-control' as const };
+    const mergeButton = { name: 'merge-button', candidates: ['button.a'], problem: 'submit-control' as const };
 
     captured.log!.degraded(mergeButton, () => ({ facts: { prState: 'pullOpened' } }));
     captured.log!.recovered(mergeButton);

@@ -162,6 +162,17 @@ describe('CA-48 — les réponses sur leur propre ligne, sous un trait', () => {
     expect(bar.querySelector('.cct-reply-row')).toBeNull();
   });
 
+  it('sans aucune remarque mais avec un `status` actif, la rangée du dessus existe, et le trait sous elle', () => {
+    // Le cas qui distingue « sans `remark` » de « sans `remark` ni `status` » (revue Reefact,
+    // PR #182) : `summary` et `reviewed` suffisent à faire exister la rangée du dessus.
+    const remarks = defaultConfig().labels.filter((l) => l.kind === 'remark').map((l) => ({ id: l.id, enabled: false }));
+    const bar = toolbar(resolved({ labels: remarks }));
+    const [upper, replies] = [...bar.querySelectorAll('.cct-toolbar-row')];
+    expect(labelsIn(upper!)).toEqual(['summary', 'reviewed']);
+    expect(replies!.classList.contains('cct-reply-row')).toBe(true);
+    expect(labelsIn(replies!)).toEqual(['thanks', 'done', 'ack', 'decision', 'disagree']);
+  });
+
   it('sans AUCUN label actif, ni trait simple ni double trait : il ne reste que les décorations', () => {
     const none = defaultConfig().labels.map((l) => ({ id: l.id, enabled: false }));
     const bar = toolbar(resolved({ labels: none }));

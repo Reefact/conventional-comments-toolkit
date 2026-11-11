@@ -129,7 +129,7 @@ const fr: Record<string, string> = {
   'options.order.save': 'Enregistrer',
   'options.telemetry.heading': 'Télémétrie',
   'options.telemetry.sub':
-    'Désactivée par défaut. N’émet que des compteurs agrégés — label utilisé, code d’erreur, mode, dépôt — jamais le texte d’un commentaire, d’un code ou d’un diff, ni l’adresse de la page. Elle ne s’active que si la politique d’entreprise de votre organisation déclare un point de collecte et que vous cochez cette case. Un dépôt ne peut ni l’activer, ni choisir la destination.',
+    'Désactivée par défaut. N’émet que des compteurs agrégés — label utilisé et son type, code d’erreur, mode, dépôt — jamais le texte d’un commentaire, d’un code ou d’un diff, ni l’adresse de la page. Elle ne s’active que si la politique d’entreprise de votre organisation déclare un point de collecte et que vous cochez cette case. Un dépôt ne peut ni l’activer, ni choisir la destination.',
   'options.telemetry.optin': 'Autoriser l’envoi de compteurs agrégés à mon organisation',
   'options.status.heading': 'État',
   'options.status.sub':
@@ -385,7 +385,7 @@ const en: Record<string, string> = {
   'options.order.save': 'Save',
   'options.telemetry.heading': 'Telemetry',
   'options.telemetry.sub':
-    'Off by default. It only emits aggregate counters — label used, error code, mode, repository — never the text of a comment, of code or of a diff, nor the page address. It turns on only if your organisation’s enterprise policy declares a collection endpoint and you tick this box. A repository can neither enable it nor choose the destination.',
+    'Off by default. It only emits aggregate counters — label used and its kind, error code, mode, repository — never the text of a comment, of code or of a diff, nor the page address. It turns on only if your organisation’s enterprise policy declares a collection endpoint and you tick this box. A repository can neither enable it nor choose the destination.',
   'options.telemetry.optin': 'Allow sending aggregate counters to my organisation',
   'options.status.heading': 'Status',
   'options.status.sub':

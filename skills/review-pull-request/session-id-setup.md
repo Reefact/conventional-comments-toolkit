@@ -32,9 +32,9 @@ sessions should be named. Convey this offer, without presenting the example name
 > Each review session needs an identifier. Instead of a GUID, Slugger can draw a readable one for
 > every new session, from code-review vocabulary — names like
 > `melancholy-coordinated-value-object` or `tedious-debated-branch`, a different one each time.
-> It is a .NET tool, run from the .NET 10 SDK where a machine has it; on Linux x64 without .NET,
-> the skill downloads its native build instead, checked against a pinned SHA-256. Add Slugger to
-> this repository's .NET tools?
+> It runs from the .NET 10 SDK where a machine has it, and on Linux x64 without .NET from its
+> native build, downloaded and checked against a pinned SHA-256. Name this repository's review
+> sessions with Slugger?
 
 If they do not answer, draw a lowercase GUID for this session only, as the Slugger option says when
 Slugger cannot run, record nothing, and ask again next time.
@@ -45,15 +45,18 @@ Create `session-id.md` beside the `SKILL.md` your agent loaded as the skill: usu
 own `SKILL.md`; when another `SKILL.md` sent you to it, beside that one. Its content is **exactly**
 the text of the chosen option below, between its two markers, markers excluded. Do not reword it.
 
-If the answer is Slugger, also add it to the repository's local tool manifest, from the
-repository root:
+If the answer is Slugger and the .NET SDK runs on this machine, also add Slugger to the
+repository's local tool manifest, from the repository root:
 
 ```bash
 dotnet new tool-manifest
 dotnet tool install Slugger.Cli
 ```
 
-Skip the first command when the repository already has a manifest.
+Skip the first command when the repository already has a manifest. Without the SDK, record the
+choice all the same and leave the manifest alone: the option's native command draws the names on
+Linux x64, and a machine with the SDK can add the manifest later. Do not install the SDK to get
+there.
 
 ## 4. Commit
 

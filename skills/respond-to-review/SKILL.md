@@ -82,10 +82,10 @@ point you accept.
 ### Session marker
 
 A reviewer's comment may end with a session marker, on its own last line, sometimes with a
-description of the session between parentheses after its identifier:
+description of the session after its identifier, past an em dash `—`:
 
 ```text
-[session:melancholy-coordinated-value-object(The value object was well coordinated, yet strangely melancholy.)]
+[session:melancholy-coordinated-value-object — *The value object was well coordinated, yet strangely melancholy.*]
 ```
 
 It tells which review session the comment belongs to. When the comment you answer carries one,
@@ -96,7 +96,7 @@ done: fixed in a1b2c3d, an empty result now returns an error
 
 The code now returns the error the contract requires, with a regression test.
 
-[session:melancholy-coordinated-value-object(The value object was well coordinated, yet strangely melancholy.)]
+[session:melancholy-coordinated-value-object — *The value object was well coordinated, yet strangely melancholy.*]
 ```
 
 - Copy the marker of **the comment you are answering**, in its own thread. Several review sessions

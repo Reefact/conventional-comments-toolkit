@@ -708,14 +708,39 @@ function significantSibling(node: Node, direction: 'previousSibling' | 'nextSibl
  * nœud de texte — `[start, end)` — suivie, le cas échéant, du saut de ligne déclaré qui la termine. */
 type MarkerHit =
   | { kind: 'block'; block: Element; raw: string }
-  | { kind: 'range'; node: Text; start: number; end: number; lineBreak: Element | null; raw: string };
+  | { kind: 'range'; node: Text; start: number; end: number; lineBreak: Element | null; raw: string }
+  | {
+      kind: 'span';
+      node: Text;
+      start: number;
+      endNode: Text;
+      end: number;
+      lineBreak: Element | null;
+      raw: string;
+    };
+
+/** La description d'un marqueur, mise en italique (§3.6) : un `<em>` qui ne contient que du
+ * texte. C'est la SEULE mise en forme admise sur la ligne d'un marqueur — mesurée identique sur
+ * les trois plateformes, quelle que soit son écriture dans le source
+ * (docs/session-marker-rendering-fr.md). */
+const isItalicDescription = (n: Node | null): n is Element =>
+  n !== null &&
+  n.nodeType === 1 &&
+  (n as Element).tagName === 'EM' &&
+  n.childNodes.length > 0 &&
+  [...n.childNodes].every((c) => c.nodeType === 3);
+
+/** Le texte qui précède l'italique se termine par le tiret cadratin bordé de blancs, et celui qui
+ * le suit commence par le crochet fermant : `[session:id — <em>phrase</em>]`, rien d'autre. */
+const ENDS_WITH_SEPARATOR = /\s\u2014\s+$/u;
 
 /** Les lignes du corps rendu qui sont des marqueurs, dans l'ordre du document. Allow-list, comme
  * `firstTextNode()` : un marqueur n'est cherché que dans un paragraphe déclaré par la plateforme,
  * ou dans du texte posé directement dans le corps, et sa ligne doit être un nœud de texte ENFANT
  * DIRECT de ce bloc, bornée de part et d'autre par le bord du bloc, un saut de ligne déclaré, ou
  * une fin de ligne littérale du même nœud. Un bloc de code, une citation, une liste, une mise en
- * forme inline sur la ligne : rien n'y est cherché. Le texte vient du DOM rendu, où la syntaxe de
+ * forme inline sur la ligne : rien n'y est cherché — à une exception près, la description en
+ * italique (`isItalicDescription`), où la ligne est texte, `<em>`, texte. Le texte vient du DOM rendu, où la syntaxe de
  * ces constructions a pu disparaître — `analyze()` peut donc reconnaître un marqueur que la
  * source écrivait dans un bloc de code ; ce n'est que dans un paragraphe simple que la ligne
  * rendue est la ligne écrite. */
@@ -759,6 +784,36 @@ function markerHits(body: Element, raws: ReadonlySet<string>, shape: RenderedBod
         }
       }
     }
+    // La description en italique : la ligne va de la dernière ligne du texte qui précède l'`<em>`
+    // à la première ligne du texte qui le suit, avec les mêmes bornes qu'une ligne d'un seul nœud.
+    for (const em of [...container.children]) {
+      if (!isItalicDescription(em)) continue;
+      const before = em.previousSibling;
+      const after = em.nextSibling;
+      if (before === null || before.nodeType !== 3 || after === null || after.nodeType !== 3) continue;
+      const head = before as Text;
+      const tail = after as Text;
+      const at = head.data.lastIndexOf('\n') + 1;
+      const opening = head.data.slice(at);
+      const cut = tail.data.indexOf('\n');
+      const closing = cut === -1 ? tail.data : tail.data.slice(0, cut);
+      if (!ENDS_WITH_SEPARATOR.test(opening) || !closing.trimStart().startsWith(']')) continue;
+      const raw = `${opening}${em.textContent ?? ''}${closing}`.trim();
+      if (!raws.has(raw)) continue;
+      const first = at === 0;
+      if (first && !bounds(significantSibling(head, 'previousSibling'))) continue;
+      const last = cut === -1 || tail.data.slice(cut).trim() === '';
+      const next = last ? significantSibling(tail, 'nextSibling') : null;
+      if (last && !bounds(next)) continue;
+      if (!last) {
+        hits.push({ kind: 'span', node: head, start: at, endNode: tail, end: cut + 1, lineBreak: null, raw });
+      } else if (isBreak(next)) {
+        hits.push({ kind: 'span', node: head, start: at, endNode: tail, end: tail.data.length, lineBreak: next as Element, raw });
+      } else {
+        const start = first ? 0 : head.data.slice(0, at).trimEnd().length;
+        hits.push({ kind: 'span', node: head, start, endNode: tail, end: tail.data.length, lineBreak: null, raw });
+      }
+    }
   };
 
   for (const child of [...body.childNodes]) {
@@ -767,6 +822,19 @@ function markerHits(body: Element, raws: ReadonlySet<string>, shape: RenderedBod
     const content = [...block.childNodes].filter((n) => !isBlank(n) && !isOwn(n));
     if (content.length === 1 && content[0]!.nodeType === 3 && raws.has((content[0] as Text).data.trim())) {
       hits.push({ kind: 'block', block, raw: (content[0] as Text).data.trim() });
+      continue;
+    }
+    // Un paragraphe réduit au marqueur décrit en italique : masqué en entier, lui aussi.
+    if (
+      content.length === 3 &&
+      content[0]!.nodeType === 3 &&
+      isItalicDescription(content[1]!) &&
+      content[2]!.nodeType === 3 &&
+      ENDS_WITH_SEPARATOR.test((content[0] as Text).data) &&
+      (content[2] as Text).data.trim() === ']' &&
+      raws.has((block.textContent ?? '').trim())
+    ) {
+      hits.push({ kind: 'block', block, raw: (block.textContent ?? '').trim() });
       continue;
     }
     scan(block, false);
@@ -789,12 +857,17 @@ function hideHit(hit: MarkerHit): void {
     return;
   }
   const { node, start, end, lineBreak } = hit;
-  if (end < node.data.length) node.splitText(end);
+  // Une ligne sur plusieurs nœuds (description en italique) se termine dans `endNode`.
+  const endNode = hit.kind === 'span' ? hit.endNode : node;
+  if (end < endNode.data.length) endNode.splitText(end);
   const line = start > 0 ? node.splitText(start) : node;
   const wrapper = globalThis.document.createElement('span');
   wrapper.className = HIDDEN_SESSION_CLASS;
   line.replaceWith(wrapper);
   wrapper.appendChild(line);
+  if (hit.kind === 'span') {
+    while (wrapper.nextSibling !== null && wrapper.lastChild !== endNode) wrapper.appendChild(wrapper.nextSibling);
+  }
   if (lineBreak !== null) {
     while (wrapper.nextSibling !== null && wrapper.nextSibling !== lineBreak) wrapper.appendChild(wrapper.nextSibling);
     wrapper.appendChild(lineBreak);

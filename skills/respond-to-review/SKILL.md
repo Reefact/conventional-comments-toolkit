@@ -81,10 +81,11 @@ point you accept.
 
 ### Session marker
 
-A reviewer's comment may end with a session marker, on its own last line:
+A reviewer's comment may end with a session marker, on its own last line, sometimes with a
+description of the session between parentheses after its identifier:
 
 ```text
-[session:melancholy-coordinated-value-object]
+[session:melancholy-coordinated-value-object(The value object was well coordinated, yet strangely melancholy.)]
 ```
 
 It tells which review session the comment belongs to. When the comment you answer carries one,
@@ -95,13 +96,15 @@ done: fixed in a1b2c3d, an empty result now returns an error
 
 The code now returns the error the contract requires, with a regression test.
 
-[session:melancholy-coordinated-value-object]
+[session:melancholy-coordinated-value-object(The value object was well coordinated, yet strangely melancholy.)]
 ```
 
 - Copy the marker of **the comment you are answering**, in its own thread. Several review sessions
   may run on the same pull request, so two of your replies can carry two different markers.
 - When that comment carries no marker, add none: never make one up, and never borrow one from
   another comment or thread.
+- Copy the whole line, description included, as written: never drop it, translate it, reword it or
+  add one where the reviewer wrote none.
 - Never draw a session identifier of your own: the marker identifies the reviewer's session.
 - Write it **once**, on a line of its own, last when you can; a signature or footer your tooling
   appends after it is fine. A reply with two markers shows an error instead of a session.

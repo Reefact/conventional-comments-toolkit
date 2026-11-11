@@ -50,15 +50,19 @@ DevOps. Les points suivants relèvent d'une exécution sur les plateformes réel
 a un repli normatif **déjà codé**, si bien que l'implémentation reste correcte tant qu'ils
 ne sont pas tranchés :
 
+**Tableau daté : l'état au moment du spike**, conservé comme trace. Plusieurs lignes ont été
+tranchées depuis, sur les plateformes réelles — l'adaptateur Azure DevOps déclare par exemple
+`suggestionInfoString: 'suggestion'` —, et `CAPTURES.md` de chaque adaptateur fait foi sur ce qui
+est mesuré. Trois lignes en sont retirées avec le vérificateur (§2) : l'auteur d'une résolution
+(`resolvedBy`), la provenance des étiquettes d'exemption et l'événement de mise à jour d'une PR
+ne servaient qu'à lui.
+
 | Hypothèse (spec) | Statut | Repli implémenté |
 |---|---|---|
 | Type réel de l'éditeur Azure DevOps (§B.2) — `<textarea>` ou éditeur riche | à établir sur la plateforme | `writeToTextField()` couvre les deux ; si l'élément n'est pas un champ texte, la dégradation de sélecteur du §9.4 désactive la zone sans jamais empêcher l'usage de la plateforme |
 | Route de lecture du fichier de configuration sur la seule session Azure DevOps (§B.4) | à établir | `getRepoConfig()` renvoie `{ status: 'unreachable' }` en cas d'échec ou de réponse HTML → état dégradé du §5.4, l'extension assiste sans bloquer |
 | Info string du bloc de suggestion Azure DevOps (§B.6) | à établir (lecture, pas développement) | `PlatformProfile.suggestionInfoString = null` → pas d'étage 0 ; un `suggestion:` explicite reste accepté |
-| `resolvedBy` sur Azure DevOps (§B.5) — auteur d'une résolution | à établir ; demande ouverte de longue date | `ThreadInfo.resolvedBy` absent → résolution acceptée + `resolution-unattributed` à chaque évaluation ; la règle de gouvernance du §6.1 n'est pas appliquée sur cette plateforme, ce que le statut donne à lire |
-| Provenance des étiquettes Azure DevOps (§B.6) | non exposée par l'API documentée | chemin de repli du §6.3.2 : `labelProvenanceExposed = false`, exemption par le point d'entrée d'administration + exemption active persistée |
-| `Pull request updated` émis lors d'un changement de statut de fil (§B.7) | à établir | `threadStatusEmitsPrUpdated = false` → `enforce` avec `reconcileIntervalSeconds > 60` émet un `config-warning` ; la réconciliation reste le filet |
-| Générations de DOM GHE Server à cibler (§A.1, §A.5) | à arrêter avant P2/P5 | chaînes de sélecteurs avec repli + smoke test multi-versions (§9.4) |
+| Générations de DOM GHE Server à cibler (§A.1, §A.5) | à arrêter avant P2 | chaînes de sélecteurs avec repli + smoke test multi-versions (§9.4) |
 
 Les identités de service, les commandes slash et les marqueurs de message système sont, eux,
 **établis** par la spécification (§A.7, §B.6) et implémentés dans les profils de plateforme

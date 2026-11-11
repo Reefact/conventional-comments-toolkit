@@ -10,8 +10,9 @@ exécuté dans l'intégration continue de la plateforme, avec lequel `core/` ét
 l'identique. Il est retiré (décision du propriétaire, 2026-11-10), et avec lui ce qui
 n'existait que pour lui : l'évaluation de conformité d'une PR (`evaluate()`), la gouvernance
 des résolutions, l'exemption de PR, le périmètre d'activation, l'empreinte de configuration et
-l'encodeur de la ligne machine `cc/1`. Seul son **décodeur** (`decodeSummary()`) reste dans
-`core/`, le temps que l'adaptateur GitHub cesse de lire cette ligne.
+la ligne machine `cc/1`, encodeur comme décodeur. Le contrat d'adaptateur a perdu de même ce qui
+ne servait qu'à lui : la date de création de la PR, l'auteur d'une résolution, la sonde du bouton
+de fusion et la lecture de la ligne publiée (§9.2).
 
 ```
 packages/
@@ -21,7 +22,6 @@ packages/
 │   ├── parser.ts             #   §3.2/§3.3 labels, décorations, alias
 │   ├── validator.ts          #   §3.5 validation en étages, codes, précédence bloquante
 │   ├── session.ts            #   §3.6 marqueur de session, retiré du corps avant analyse
-│   ├── summary.ts            #   décodeur seul d'une ligne cc/1 héritée, lue par GitHub
 │   ├── config/               #   §8 défauts, schéma, fusion, plancher, résolution
 │   ├── corpus/               #   CA-06 corpus synthétique versionné (non-régression)
 │   └── i18n/                 #   fr / en

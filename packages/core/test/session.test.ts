@@ -30,9 +30,32 @@ describe('CA-51 — reconnaissance du marqueur de session (§3.6)', () => {
     expect(value('note: x\n   [session:indented]   ')).toBe('indented');
   });
 
+  it('une description entre parenthèses termine la valeur : identifiant et description séparés, casse gardée', () => {
+    const m = extractSessionMarker(
+      "note: x\n[session:Disheartening-Reviewed-Implementation(On a passé l'implémentation en revue, et franchement !)]"
+    )!;
+    expect(m.value).toBe('Disheartening-Reviewed-Implementation');
+    expect(m.description).toBe("On a passé l'implémentation en revue, et franchement !");
+    expect(m.lines[0]!.raw).toBe(
+      "[session:Disheartening-Reviewed-Implementation(On a passé l'implémentation en revue, et franchement !)]"
+    );
+    expect(m.contentBody).toBe('note: x');
+    // Blancs de bordure retirés des deux côtés ; la première `(` sépare, la dernière `)` ferme.
+    const spaced = extractSessionMarker('note: x\n[session: run-1 ( texte (avec) parenthèses ] ) ]')!;
+    expect([spaced.value, spaced.description]).toEqual(['run-1', 'texte (avec) parenthèses ]']);
+  });
+
+  it('sans identifiant ou sans description, ou suivie d’autre chose, la valeur reste un identifiant entier', () => {
+    for (const v of ['run-1()', 'run-1(  )', '(texte)', 'run-1(texte) suite', 'run-1(texte']) {
+      const m = extractSessionMarker(`note: x\n[session:${v}]`)!;
+      expect([m.value, m.description]).toEqual([v, null]);
+    }
+    expect(extractSessionMarker('note: x\n[session:run-1]')!.description).toBeNull();
+  });
+
   it('la ligne brute est gardée telle qu’écrite, et le corps sans elle est exact au caractère près', () => {
     const m = extractSessionMarker('note: x\r\n\r\n  [session:Run-7]  \r\n')!;
-    expect(m.lines).toEqual([{ raw: '[session:Run-7]', value: 'Run-7' }]);
+    expect(m.lines).toEqual([{ raw: '[session:Run-7]', value: 'Run-7', description: null }]);
     expect(m.contentBody).toBe('note: x\r\n\r\n');
   });
 
@@ -156,6 +179,9 @@ describe('CA-54 — marqueur en double (§3.6)', () => {
     expect(m.contentBody).toBe('note: x\n\nDétail.\n');
     // Même valeur deux fois : c'est encore un doublon.
     expect(extractSessionMarker('note: x\n[session:a]\n[session:a]')!.value).toBeNull();
+    // Les descriptions ne départagent rien : aucune n'est retenue.
+    const described = extractSessionMarker('note: x\n[session:a(un)]\n[session:a(deux)]')!;
+    expect([described.value, described.description]).toEqual([null, null]);
   });
 
   it('W-SESSION-MULTIPLE, un avertissement, en dernier dans la liste, et rien d’autre ne change', () => {

@@ -5,6 +5,8 @@
 // quand il y en a plusieurs. Purement client, réversible, idempotent ; dans le doute, le
 // marqueur reste visible tel qu'écrit.
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { commentBodyText } from '@cct/adapter-shared';
 import { defaultConfig, type EffectiveConfig } from '@cct/core';
@@ -125,6 +127,37 @@ describe('CA-53 — le marqueur reconnu est masqué là où il est, et la mentio
     decorate(el);
     expect(commentBodyText(el)).toBe(before);
     expect(commentBodyText(el)).toContain('[session:MiXeD]');
+  });
+
+  it('une description : la mention n’affiche que l’identifiant, la description telle qu’écrite au survol', () => {
+    const el = body(
+      "<p>note: x</p>\n<p>[session:Disheartening-Reviewed-Implementation(On a passé l'implémentation en revue !)]</p>"
+    );
+    const before = commentBodyText(el);
+    decorate(el);
+    expect(shown(el)).toBe('\u{1F916} session: disheartening-reviewed-implementation');
+    expect((el.querySelector('.cct-session') as HTMLElement).title).toBe("On a passé l'implémentation en revue !");
+    expect(commentBodyText(el)).toBe(before);
+  });
+
+  it('sans description, rien au survol ; une description retirée emporte son infobulle', () => {
+    const el = body('<p>note: x</p>\n<p>[session:run-1(Texte)]</p>');
+    decorate(el);
+    expect((el.querySelector('.cct-session') as HTMLElement).title).toBe('Texte');
+    el.querySelectorAll('p')[1]!.textContent = '[session:run-1]';
+    decorate(el);
+    expect(shown(el)).toBe('\u{1F916} session: run-1');
+    expect(el.querySelector('.cct-session')!.hasAttribute('title')).toBe(false);
+  });
+
+  it('la mention garde la flèche au survol, sur tout le bloc : `cursor: default` sur `.cct-session`', () => {
+    const css = readFileSync(resolve(process.cwd(), 'packages/extension/src/styles.css'), 'utf8').replace(
+      /\/\*[\s\S]*?\*\//g,
+      ' '
+    );
+    const rule = /\.cct-session\s*\{([^}]*)\}/.exec(css);
+    expect(rule).not.toBeNull();
+    expect(rule![1]).toMatch(/cursor\s*:\s*default\s*;/);
   });
 
   it('l’icône se configure, et un changement d’icône se reporte au passage suivant', () => {

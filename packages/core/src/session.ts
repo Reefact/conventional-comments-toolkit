@@ -11,22 +11,27 @@
 import { splitBody } from './preprocess.js';
 
 /** Une ligne reconnue. `raw` est la ligne telle qu'écrite, blancs de bordure retirés (§3.4.1,
- * étape 4) — c'est elle que l'extension retrouve dans le corps rendu. `value` est la valeur
- * entre `[session:` et `]`, blancs de bordure retirés, casse INTACTE : la mise en minuscules
- * n'appartient qu'à l'affichage (§5.5). */
+ * étape 4) — c'est elle que l'extension retrouve dans le corps rendu. `value` est l'IDENTIFIANT
+ * de la session, blancs de bordure retirés, casse INTACTE : la mise en minuscules n'appartient
+ * qu'à l'affichage (§5.5). `description` est le texte entre parenthèses qui termine la valeur,
+ * quand elle en porte un (`[session:id(texte)]`), blancs de bordure retirés ; `null` sinon —
+ * et la valeur entière est alors l'identifiant. */
 export interface SessionLine {
   raw: string;
   value: string;
+  description: string | null;
 }
 
 /** Les marqueurs d'un corps. `lines` en compte au moins un, dans l'ordre d'écriture. `value` est
- * la valeur à afficher : celle du marqueur quand il est seul, `null` quand le corps en porte
+ * l'identifiant à afficher : celui du marqueur quand il est seul, `null` quand le corps en porte
  * plusieurs — aucune session n'est alors désignée, et `W-SESSION-MULTIPLE` le dit (§3.6).
+ * `description` est celle du marqueur seul, `null` s'il n'en porte pas ou s'il y en a plusieurs.
  * `contentBody` est le corps privé de TOUTES ces lignes, chacune retirée avec sa fin de ligne :
  * rien d'autre n'y change, au caractère près. */
 export interface SessionMarker {
   lines: SessionLine[];
   value: string | null;
+  description: string | null;
   contentBody: string;
 }
 
@@ -44,13 +49,26 @@ const strip = (s: string): string => s.replace(EDGE, '');
 // de la ligne, jamais le premier `]` rencontré.
 const MARKER_RE = /^\[session:(.*)\]$/u;
 
-/** La valeur portée par une ligne, si elle n'est QUE le marqueur ; sinon `null`. */
+// Une description termine la valeur : la PREMIÈRE parenthèse ouvrante, jusqu'à la parenthèse
+// fermante qui est son dernier caractère — la description peut donc contenir des parenthèses.
+const DESCRIBED_RE = /^([^(]*)\((.*)\)$/su;
+
+/** La valeur portée par une ligne, si elle n'est QUE le marqueur ; sinon `null`. Une valeur de la
+ * forme `id(texte)`, `id` et `texte` non vides, se lit identifiant et description ; toute autre
+ * — `id()`, `(texte)`, `id(texte) suite` — reste un identifiant entier, tel qu'écrit. */
 function markerValue(line: string): SessionLine | null {
   const raw = strip(line);
   const m = MARKER_RE.exec(raw);
   if (!m) return null;
   const value = strip(m[1]!);
-  return value === '' ? null : { raw, value };
+  if (value === '') return null;
+  const d = DESCRIBED_RE.exec(value);
+  if (d !== null) {
+    const id = strip(d[1]!);
+    const description = strip(d[2]!);
+    if (id !== '' && description !== '') return { raw, value: id, description };
+  }
+  return { raw, value, description: null };
 }
 
 /** Les marqueurs de session du corps, ou `null` s'il n'en porte aucun (§3.6). Une ligne est un
@@ -73,6 +91,7 @@ export function extractSessionMarker(body: string): SessionMarker | null {
   return {
     lines,
     value: lines.length === 1 ? lines[0]!.value : null,
+    description: lines.length === 1 ? lines[0]!.description : null,
     contentBody: withoutLines(body, indexes),
   };
 }

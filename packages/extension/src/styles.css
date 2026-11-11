@@ -524,9 +524,11 @@
    la même séparation que l'en-tête, quelle que soit l'écriture : `--cct-session-gap`, calculé et
    posé par badges.ts (sessionGap) parce que l'écart normal se lit sur la page. Un `padding`,
    jamais une `margin` : une marge fusionnerait avec celle du paragraphe précédent au lieu de s'y
-   ajouter. */
+   ajouter. Le curseur reste la flèche sur tout le bloc, écart compris : la mention n'est pas un
+   texte qu'on vient lire ou sélectionner, et la description d'un marqueur s'y lit au survol. */
 .cct-session {
   display: block;
+  cursor: default;
   padding-top: var(--cct-session-gap, 1em);
   color: var(--cct-fg-muted);
   font-size: 12px;

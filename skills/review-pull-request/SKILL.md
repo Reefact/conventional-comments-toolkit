@@ -279,6 +279,12 @@ per installation of this skill:
 - otherwise, follow `session-id-setup.md`, beside this file, step by step, before drawing the
   first identifier. Its first step is a check you run, not one you assume the answer of.
 
+When the recorded choice is Slugger and neither the local nor the global command runs on Linux
+x64, use the native download block in the **Slugger** option of [session-id-setup.md](session-id-setup.md).
+Use that block even if an older `session-id.md` omits the native binary or lists only the
+direct release URL. If the direct download fails, the block tries the GitHub Releases API and
+checks the pinned SHA-256 before execution. An explicit GUID choice still applies.
+
 The identifier must be **drawn by a random source** — the command `session-id.md` names — and
 never chosen by you. It is the output of a command you ran in this session: **say in your report
 which command drew it**, and, when it is a GUID, why Slugger was not used — the check that failed,

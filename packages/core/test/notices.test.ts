@@ -175,8 +175,8 @@ const CASES: Case[] = [
     resolve: () => resolveConfig(null, absent, found({ labels: [{ id: 'issue', kind: 'x' }] })),
     code: "invalid.label-kind",
     level: "repo",
-    en: "Invalid configuration (repository file): key \"labels\": \"kind\" of label \"issue\" must be \"remark\" or \"reply\".",
-    fr: "Configuration invalide (fichier du dépôt) : clé « labels » : « kind » du label « issue » doit valoir « remark » ou « reply ».",
+    en: "Invalid configuration (repository file): key \"labels\": \"kind\" of label \"issue\" must be \"remark\", \"status\" or \"reply\".",
+    fr: "Configuration invalide (fichier du dépôt) : clé « labels » : « kind » du label « issue » doit valoir « remark », « status » ou « reply ».",
   },
   {
     title: "aliases de label",

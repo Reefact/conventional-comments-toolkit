@@ -10,25 +10,35 @@ never blocks a merge.
 
 ## 1.0.0-rc.1 — November 11, 2026
 
-_The release candidate for 1.0.0: a `summary` label to recap a review, configuration problems shown where you see them, and descriptions on session markers; the verifier is retired for good._
+_The release candidate for 1.0.0: GitLab support, GitHub's new Overview page, a working Azure DevOps, review-session markers and a `summary` label; `enforce` now really blocks, after re-reading the configuration, and the verifier is retired for good._
 
 ### ✨ Features
 
+- **GitLab (gitlab.com) is supported, without blocking.** Merge requests on gitlab.com get the toolbar, the badges, the thread filter and the banner. Enable gitlab.com from the settings page, like any other site. The extension cannot read a repository's configuration on GitLab yet, so it never blocks a comment there. GitLab Self-Managed and Dedicated are not supported yet.
+- **GitHub's new Overview page is supported.** On the Overview, the extension did not recognise the new comment field, so nothing was blocked in `enforce` mode, and many comments got no badges. Both the Overview and the classic Conversation page now work. The banner sits under the pull request header, and the thread filter above the list of threads.
+- **Review-session markers.** A line `[session:<id>]` in a comment says which review session wrote it, so that the comments of several agents or several runs can be told apart. The extension hides the line and shows a discreet `🤖 session: <id>` at the bottom of the comment; the marker never affects validation. Add a description after an em dash, `[session:<id> — *<sentence>*]`, and it appears when you hover the mention. Two markers in one comment show `#ERROR` and a warning that never blocks.
 - **A `summary` label to recap a review pass.** `summary` (📋, typed as `?sum`) says what was checked and what is still open; it raises no point and answers none. It sits with `reviewed` in a new group of labels that say where a review stands, at the end of the toolbar's first row. A repository can add its own label to that group with `"kind": "status"`.
 - **Problems in your configuration are shown, in your language.** When a key is unknown or retired, when the configuration is invalid, or when your organization's policy overrides a setting, the extension used to say nothing. It now lists these notices in the status pill and on the settings page, in English or French, naming where the problem comes from: your organization's policy, the organization's document or the repository's file. They inform; they never change whether a comment is accepted.
-- **Session markers can carry a description, shown on hover.** Write `[session:<id> — *<sentence>*]`: the page shows the identifier, and the sentence appears when you hover it. The marker stays readable without the extension. Markers without a description look as before.
-- **A comment field the extension cannot place is now recorded in the journal.** Such a field used to be given a default place silently. It is still handled the same way, but a line in the settings page's journal now names it, so a page the extension misreads can be reported.
+- **The journal records comment fields the extension could not fully understand.** A field whose send buttons were not found, or that the extension placed by default without recognising it, now leaves a line in the settings page's journal, so a page the extension misreads can be reported.
 
 ### 🔧 Changed
 
+- **In `enforce` mode, non-compliant comments are now blocked on every pull request.** Until now, `enforce` only blocked pull requests created after an activation date that was not set by default, so most installations in `enforce` never blocked anything. That condition is gone: if your repositories use `enforce`, expect comments to be blocked after this update. Before blocking, the extension re-reads the configuration, so a repository just switched back to `assist` is not blocked: the button is released and you are asked to send again.
+- **The verifier is retired, and its settings with it.** The product reports the unresolved blocking threads of a pull request; it never blocks a merge, and no longer greys the merge button. The keys `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` and `docUrl` are no longer read, and are shown as unknown keys. The mode `warn` works as `assist`, with a notice saying the value is obsolete. If your configuration uses any of these, you can remove them.
+- **The banner is collapsed by default and shows the count of unresolved blocking threads alone.**
+- **Azure DevOps is supported on `dev.azure.com` only.** Organizations on `{org}.visualstudio.com` or on Azure DevOps Server are not covered.
 - **If your configuration already defines a `summary` label, it needs one property to keep working as before.** Your label now merges into the shipped one and becomes always non-blocking, so `summary (blocking):` is refused. Add `"alwaysNonBlocking": false` to restore it.
-- **The verifier is retired, and its settings with it.** The product reports the unresolved blocking threads of a pull request; it never blocks a merge. The keys `formatSeverity`, `overrideLabel`, `resolverOverrideGroup`, `activation` and `docUrl` are no longer read, and are shown as unknown keys. The mode `warn` works as `assist`, with a notice saying the value is obsolete. If your configuration uses any of these, you can remove them.
 - **Telemetry label counts say what kind of label was used.** If your organization collects telemetry, each label count now carries its kind — `remark`, `status` or `reply` — so that replies and recaps can be counted apart. Nothing else is added.
 
 ### 🐛 Bug fixes
 
+- **Azure DevOps works.** The extension had never worked on Azure DevOps; it is rebuilt from real pages. Comment fields, send buttons and threads are recognised, the live preview gets its badges, the toolbar follows the Azure DevOps theme, a blocked button looks disabled, and the repository's configuration is read, so `enforce` applies there.
+- **Keyboard shortcuts no longer get around `enforce`.** On Azure DevOps, pressing Enter, Ctrl+Enter or Space on the Comment button published a non-compliant comment. These keys are now blocked like a click.
+- **On GitHub, "Close with comment" and the Overview's Comment button no longer get around `enforce`.**
+- **A comment that quotes code or text before its label gets its badge.**
 - **A repository can ask for a shorter configuration cache than your organization's policy.** The policy's cache duration was imposed as is, so a repository wanting fresher settings was forced back to it. It is now a maximum, as intended.
 - **On Azure DevOps, editing a comment is no longer mistaken for a new comment.**
+- **The diagnostic journal keeps the evidence of a problem that never went away,** instead of replacing it with a later observation.
 
 ## 1.0.0-beta.21 — November 2, 2026
 

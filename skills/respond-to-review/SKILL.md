@@ -147,8 +147,10 @@ Answer every finding and question, including optional findings, `(non-blocking)`
 
 ## 6. After pushing
 
-Ask the reviewer for a new pass. Any change you push reopens the reviewer's review: wait for
-their `reviewed:` again rather than assuming the earlier one still holds.
+Ask the reviewer for a new pass. Any change you push after a reviewer's `reviewed:` calls for a
+new review of the new state: wait for their `reviewed:` again rather than assuming the earlier one
+still holds. That new review usually comes under a new session marker; in the threads it opens,
+copy its marker, and in older threads keep copying the marker of the comment you answer.
 
 Report to the person you work for: what you fixed (with commits), what you acknowledged without
 changing, what you declined and why, the threads you resolved, and anything that needs a human —

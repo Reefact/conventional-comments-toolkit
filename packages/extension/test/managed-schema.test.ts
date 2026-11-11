@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { vetFloor, type Floor } from '@cct/core';
+import type { Floor } from '@cct/core';
 
 /** Toutes les clés de `Floor`, sans exception : `Required<>` interdit d'en omettre une.
  * Les valeurs n'ont aucune importance — seules les clés sont comparées. */
@@ -27,19 +27,22 @@ const everyFloorKey: Required<Floor> = {
   configCacheTtlSeconds: 3600,
 };
 
-/** Les clés retirées du plancher avec le vérificateur (§2), et LEUR SEULE raison d'être encore
- * déclarées : qu'un plancher qui les porte arrive jusqu'à l'extension, qui les ignore et le
- * signale. Les retirer du schéma supposerait de savoir ce que Chrome fait d'une clé imbriquée
- * non déclarée — l'écarter, ou rejeter tout le plancher —, ce qui n'a pas été mesuré.
+/** CE QUE CHROME FAIT D'UN PLANCHER QUI NE SUIT PAS CE SCHÉMA — MESURÉ le 2026-11-11, Chrome for
+ * Testing 153, politique `3rdparty` posée dans `/etc/opt/chrome_for_testing/policies/managed/`
+ * (le répertoire que CE binaire lit : `/etc/chromium` et `/etc/opt/chrome` ne le sont pas, et une
+ * première tentative qui y écrivait a conclu à tort que la politique n'arrivait jamais à une
+ * extension chargée par `--load-extension` — elle mesurait le harnais). Lu dans
+ * `chrome.storage.managed`, avec un schéma qui ne déclare plus les clés retirées :
  *
- * Tentative du 2026-11-11, à ne pas refaire sous cette forme : une politique `3rdparty` posée
- * dans `/etc/chromium/policies/managed/` pour l'identifiant d'une extension chargée par
- * `--load-extension` n'arrive pas. `chrome://policy` liste bien le schéma de l'extension
- * (`allowedHosts`, `floor`, `telemetry`), mais chaque clé y reste « Not set », et
- * `chrome.storage.managed` rend `{}`, avec le schéma actuel comme sans les clés retirées. La
- * mesure demande donc une extension INSTALLÉE (empaquetée, ou forcée par
- * `ExtensionInstallForcelist`), pas une extension chargée depuis un dossier. */
-const RETIRED_FLOOR_KEYS = ['activation', 'formatSeverity', 'resolverOverrideGroup'];
+ *   - une clé IMBRIQUÉE non déclarée (`formatSeverity`, `activation`, `resolverOverrideGroup`)
+ *     est écartée sans bruit, et le reste du plancher arrive intact ;
+ *   - une VALEUR hors énumération (`minimumMode: "warn"`, `warn` retiré de l'énumération) fait
+ *     écarter le plancher ENTIER : `floor` n'arrive pas du tout.
+ *
+ * D'où les deux règles ci-dessous. Les trois clés retirées avec le vérificateur (§2) ne sont plus
+ * déclarées : elles n'avaient plus aucun effet, et Chrome les retire sans toucher au reste. `warn`,
+ * lui, reste déclaré : l'en retirer ferait disparaître en silence tout le plancher d'une
+ * organisation qui l'écrit encore, là où le §7 le lit comme `assist`. */
 
 const schema = JSON.parse(
   readFileSync(fileURLToPath(new URL('../src/managed-schema.json', import.meta.url)), 'utf8')
@@ -52,23 +55,20 @@ describe('§8.1.1 — le schéma de politique managée porte tout le document de
     expect(missing).toEqual([]);
   });
 
-  it('le schéma ne déclare, hors de Floor, que les clés retirées — et chacune est signalée à la lecture', () => {
+  it('le schéma ne déclare aucune clé hors de Floor — pas même les clés retirées', () => {
     // Le sens inverse compte autant : une clé déclarée mais inexistante côté `core/` se
-    // laisserait configurer par une politique d'entreprise sans effet. Les seules admises sont
-    // les clés retirées, et seulement parce que leur lecture AVERTIT (§8.2, « Clés retirées »).
+    // laisserait configurer par une politique d'entreprise sans effet. Les clés retirées avec le
+    // vérificateur (§2) en étaient l'exception, le temps de mesurer ce que Chrome ferait d'un
+    // plancher qui les porte encore : il les écarte, sans toucher au reste (en-tête ci-dessus).
     const extra = Object.keys(schema.properties.floor.properties).filter(
       (k) => !Object.keys(everyFloorKey).includes(k)
     );
-    expect(extra.sort()).toEqual([...RETIRED_FLOOR_KEYS].sort());
-    for (const key of RETIRED_FLOOR_KEYS) {
-      const { notices } = vetFloor({ [key]: 'x' } as unknown as Floor);
-      expect(notices.map((n) => [n.kind, n.ref])).toEqual([['config-warning', key]]);
-    }
+    expect(extra).toEqual([]);
   });
 
   it('`warn` reste dans l’énumération de `minimumMode` : il est lu comme `assist` (§7)', () => {
-    // Le retirer du schéma pourrait faire rejeter par Chrome un plancher qui l'écrit encore —
-    // ce qui n'a pas été mesuré —, au lieu de le laisser lire comme `assist` et signaler.
+    // L'en retirer fait écarter par Chrome TOUT le plancher qui l'écrit encore (mesuré, en-tête
+    // ci-dessus), au lieu de le laisser lire comme `assist` et signaler.
     const minimumMode = schema.properties.floor.properties['minimumMode'] as { enum: string[] };
     expect(minimumMode.enum).toContain('warn');
   });

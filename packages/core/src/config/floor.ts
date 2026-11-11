@@ -98,7 +98,12 @@ function asClosed(value: unknown, ref: string, notices: Notice[]): boolean {
  * `formatSeverity`, `activation` et `resolverOverrideGroup` en sont sortis avec le
  * vérificateur (§2) : un plancher qui les porte encore les voit ignorées et signalées
  * (`config-warning`), comme toute clé inconnue — la même règle que le §8.2 pose pour les clés
- * retirées d'un fichier de configuration, sans repli. */
+ * retirées d'un fichier de configuration, sans repli.
+ *
+ * Sous Chrome, cet avertissement n'a pas l'occasion de partir : MESURÉ (2026-11-11), Chrome
+ * écarte une clé imbriquée que `managed-schema.json` ne déclare pas avant que l'extension lise
+ * le plancher (`extension/test/managed-schema.test.ts`). La règle vaut pour ce qui arrive
+ * jusqu'ici sans cette validation. */
 const FLOOR_KEYS = new Set([
   'floorVersion', 'configUrl', 'minimumMode', 'severities', 'labels',
   'rules', 'exemptUsers', 'allowlistPatterns', 'toolCommands', 'configCacheTtlSeconds',

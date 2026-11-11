@@ -3,13 +3,12 @@
   "properties": {
     "floor": {
       "title": "Plancher d'entreprise (§8.1.1)",
-      "description": "Document de plancher (§8.1.1). Toute clé du type Floor doit être déclarée ici : une clé non déclarée n'est pas transportable par la politique de navigateur. formatSeverity, activation et resolverOverrideGroup ne sont plus des clés du plancher (retirées avec le vérificateur, §2) : elles restent déclarées pour qu'un plancher qui les porte encore arrive jusqu'à l'extension, qui les ignore et le signale (config-warning). Ce que Chrome ferait d'une clé imbriquée NON déclarée n'a pas été mesuré.",
+      "description": "Document de plancher (§8.1.1). Toute clé du type Floor doit être déclarée ici : MESURÉ (Chrome for Testing 153, 2026-11-11), une clé imbriquée non déclarée est écartée sans bruit, le reste du plancher arrivant intact — formatSeverity, activation et resolverOverrideGroup, retirées avec le vérificateur (§2), ne sont donc plus déclarées. Une VALEUR hors énumération, elle, fait rejeter le plancher entier : warn reste dans l'énumération de minimumMode, lu comme assist (§7)",
       "type": "object",
       "properties": {
         "floorVersion": { "type": "integer" },
         "configUrl": { "type": "string" },
         "minimumMode": { "type": "string", "enum": ["off", "assist", "warn", "enforce"] },
-        "formatSeverity": { "type": "string", "enum": ["warn", "error"] },
         "severities": {
           "type": "object",
           "additionalProperties": { "type": "string", "enum": ["off", "warn", "error"] }
@@ -24,12 +23,6 @@
           "type": "object",
           "properties": {
             "minDecisionSubjectLength": { "type": "integer" }
-          }
-        },
-        "activation": {
-          "type": "object",
-          "properties": {
-            "activatedAt": { "type": "string" }
           }
         },
         "exemptUsers": {
@@ -53,7 +46,6 @@
             "closed": { "type": "boolean" }
           }
         },
-        "resolverOverrideGroup": { "type": "array", "items": { "type": "string" } },
         "configCacheTtlSeconds": { "type": "integer" }
       }
     },

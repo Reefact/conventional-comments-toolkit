@@ -25,12 +25,12 @@ import { submitLookup } from './helpers/submit-lookup.js';
 
 const PR: PrRef = { platform: 'github', host: 'github.com', scope: ['acme', 'demo'], number: 42 };
 
-/** CA-24, tel qu'il s'affiche : la phrase de `notice.floor-override.repo` (core/, i18n), la clé
- * citée, le fichier du dépôt nommé. */
+/** CA-24, tel qu'il s'affiche : la phrase de `notice.floor-override` (core/, i18n), le niveau en
+ * cause — le fichier du dépôt — et la clé citée. */
 const FLOOR_OVERRIDE_FR =
-  'Plancher d\u2019entreprise : clé « mode » du fichier de configuration du dépôt ignorée : elle assouplirait le plancher d\u2019entreprise (§8.1.1).';
+  'Plancher d\u2019entreprise (fichier du dépôt) : clé « mode » ignorée : elle assouplirait le plancher d\u2019entreprise (§8.1.1).';
 const FLOOR_OVERRIDE_EN =
-  'Enterprise floor: repository configuration key "mode" ignored: it would relax the enterprise floor (§8.1.1).';
+  'Enterprise floor (repository file): key "mode" ignored: it would relax the enterprise floor (§8.1.1).';
 
 /** La configuration résolue par le résolveur de l'extension, pour ce fichier de dépôt et ce
  * plancher — le chemin réel, adaptateur compris. */
@@ -50,8 +50,14 @@ async function resolvedFor(
   return new ClientConfigResolver(async () => withUrl).resolve(adapter, PR);
 }
 
-/** La pastille d'un éditeur réel, sur cette configuration. */
-async function pastille(resolved: ResolvedClientConfig, lang = 'fr', body = 'issue: le nom est ambigu\n\nDétail.') {
+/** La pastille d'un éditeur réel, sur cette configuration. `then` reçoit le contrôleur avant la
+ * lecture — pour lui repousser une autre configuration, comme le fait un rendu de la page. */
+async function pastille(
+  resolved: ResolvedClientConfig,
+  lang = 'fr',
+  body = 'issue: le nom est ambigu\n\nDétail.',
+  then?: (controller: EditorController) => Promise<void>
+) {
   const host = document.createElement('div');
   const textarea = document.createElement('textarea');
   const submit = document.createElement('button');
@@ -80,6 +86,7 @@ async function pastille(resolved: ResolvedClientConfig, lang = 'fr', body = 'iss
   controller.attach();
   writeToTextField(textarea, body);
   await new Promise((r) => setTimeout(r, VALIDATION_DEBOUNCE_MS + 50));
+  await then?.(controller);
   const notices = [...host.querySelectorAll<HTMLElement>('.cct-diagnostics li.cct-config-notice')].map((li) => ({
     kind: li.dataset['noticeKind'],
     text: li.textContent ?? '',
@@ -167,15 +174,16 @@ describe('§5.3, CA-24 — un `floor-override` est signalé dans la pastille ET 
     recordResolution(PR, resolved);
     expect(store[CONFIG_NOTICES_KEY]).toBeDefined();
     const page = await optionsPage();
-    expect(page.status).toBe(ui('fr', 'options.status.notices.some', { count: 1, repo: 'github.com/acme/demo' }));
+    expect(page.status).toBe('1 avis de configuration à la dernière lecture (github.com/acme/demo) :');
     expect(page.items).toEqual([{ kind: 'floor-override', text: FLOOR_OVERRIDE_FR }]);
   });
 });
 
 describe('§5.3, §10 — chaque sorte d’avis, dans la langue de l’interface, aux deux endroits', () => {
   // Le texte EXACT affiché, fr et en — dans la pastille ET dans la page d'options. Chaque phrase
-  // nomme sa sorte (« Avertissement de configuration : », « Version non prise en charge : »…) :
-  // une ligne de la pastille reste identifiable comme un avis, et non comme un diagnostic.
+  // nomme sa sorte (« Avertissement de configuration », « Version non prise en charge »…) — une
+  // ligne de la pastille reste identifiable comme un avis, et non comme un diagnostic — puis,
+  // entre parenthèses, le niveau de configuration en cause (§5.3).
   const CASES: { name: string; repo: object | null; floor?: Floor; org?: object; kind: string; fr: string; en: string }[] = [
     {
       name: 'floor-override — clé du document d’ORGANISATION (§8.1.1)',
@@ -183,44 +191,44 @@ describe('§5.3, §10 — chaque sorte d’avis, dans la langue de l’interface
       floor: { minimumMode: 'enforce' },
       org: { mode: 'off' },
       kind: 'floor-override',
-      fr: 'Plancher d\u2019entreprise : clé « mode » de la configuration d\u2019organisation ignorée : elle assouplirait le plancher d\u2019entreprise (§8.1.1).',
-      en: 'Enterprise floor: organization configuration key "mode" ignored: it would relax the enterprise floor (§8.1.1).',
+      fr: 'Plancher d\u2019entreprise (configuration d\u2019organisation) : clé « mode » ignorée : elle assouplirait le plancher d\u2019entreprise (§8.1.1).',
+      en: 'Enterprise floor (organization configuration): key "mode" ignored: it would relax the enterprise floor (§8.1.1).',
     },
     {
       name: 'config-warning — le mode obsolète `"warn"` (§7)',
       repo: { mode: 'warn' },
       kind: 'config-warning',
-      fr: 'Avertissement de configuration : valeur obsolète « warn » pour « mode », lue comme « assist » — remplacez-la par « assist » (§7).',
-      en: 'Configuration warning: obsolete value "warn" for "mode": read as "assist" — replace it with "assist" (§7).',
+      fr: 'Avertissement de configuration (fichier du dépôt) : valeur obsolète « warn » pour « mode », lue comme « assist » — remplacez-la par « assist » (§7).',
+      en: 'Configuration warning (repository file): obsolete value "warn" for "mode": read as "assist" — replace it with "assist" (§7).',
     },
     {
       name: 'config-warning — la clé retirée `activation` (§8.2)',
       repo: { activation: { activatedAt: '2026-09-01T00:00:00Z' } },
       kind: 'config-warning',
-      fr: 'Avertissement de configuration : clé de configuration inconnue « activation » ignorée.',
-      en: 'Configuration warning: unknown configuration key "activation" ignored.',
+      fr: 'Avertissement de configuration (fichier du dépôt) : clé inconnue « activation » ignorée.',
+      en: 'Configuration warning (repository file): unknown key "activation" ignored.',
     },
     {
       name: 'config-warning — une clé inconnue du PLANCHER (§8.1.1)',
       repo: null,
       floor: { minimumMod: 'enforce' } as unknown as Floor,
       kind: 'config-warning',
-      fr: 'Avertissement de configuration : clé de plancher inconnue « minimumMod » ignorée.',
-      en: 'Configuration warning: unknown floor key "minimumMod" ignored.',
+      fr: 'Avertissement de configuration (plancher d\u2019entreprise) : clé inconnue « minimumMod » ignorée.',
+      en: 'Configuration warning (enterprise floor): unknown key "minimumMod" ignored.',
     },
     {
       name: 'invalid-config — une valeur hors domaine (§8.1.5)',
       repo: { mode: 'banana' },
       kind: 'invalid-config',
-      fr: 'Configuration invalide : la clé « mode » doit valoir l\u2019une de ces valeurs : off, assist, enforce.',
-      en: 'Invalid configuration: key "mode" must be one of off, assist, enforce.',
+      fr: 'Configuration invalide (fichier du dépôt) : la clé « mode » doit valoir l\u2019une de ces valeurs : off, assist, enforce.',
+      en: 'Invalid configuration (repository file): key "mode" must be one of off, assist, enforce.',
     },
     {
       name: 'unsupported-version — une version de schéma trop récente (§8.1.5)',
       repo: { version: 99 },
       kind: 'unsupported-version',
-      fr: 'Version non prise en charge : la version de schéma 99 dépasse la version prise en charge, 1 : repli en mode assist (ou sur le plancher s\u2019il est plus strict).',
-      en: 'Unsupported version: configuration schema version 99 exceeds supported version 1: falling back to assist mode (or the floor if stricter).',
+      fr: 'Version non prise en charge (fichier du dépôt) : la version de schéma 99 dépasse la version prise en charge, 1 : repli en mode assist (ou sur le plancher s\u2019il est plus strict).',
+      en: 'Unsupported version (repository file): configuration schema version 99 exceeds supported version 1: falling back to assist mode (or the floor if stricter).',
     },
   ];
 
@@ -237,6 +245,57 @@ describe('§5.3, §10 — chaque sorte d’avis, dans la langue de l’interface
       expect((await optionsPage()).items, lang).toEqual([{ kind, text }]);
       vi.resetModules(); // la page d'options se recharge, dans l'autre langue
     }
+  });
+
+  it('la même faute dans l’organisation ET dans le dépôt : deux lignes, chacune nommant son niveau', async () => {
+    const resolved = await resolvedFor({ mode: 'warn' }, null, { mode: 'warn' });
+    const FR = (where: string) =>
+      `Avertissement de configuration (${where}) : valeur obsolète « warn » pour « mode », lue comme « assist » — remplacez-la par « assist » (§7).`;
+    const EN = (where: string) =>
+      `Configuration warning (${where}): obsolete value "warn" for "mode": read as "assist" — replace it with "assist" (§7).`;
+    const fr = [FR('configuration d\u2019organisation'), FR('fichier du dépôt')];
+    const en = [EN('organization configuration'), EN('repository file')];
+    expect((await pastille(resolved, 'fr')).notices.map((n) => n.text)).toEqual(fr);
+    expect((await pastille(resolved, 'en')).notices.map((n) => n.text)).toEqual(en);
+    for (const [lang, texts, status] of [
+      ['fr', fr, '2 avis de configuration à la dernière lecture (github.com/acme/demo) :'],
+      ['en', en, '2 configuration notices at the last read (github.com/acme/demo):'],
+    ] as const) {
+      installStorage(lang);
+      recordResolution(PR, resolved);
+      const page = await optionsPage();
+      expect(page.items.map((i) => i.text), lang).toEqual(texts);
+      expect(page.status, lang).toBe(status); // pluriel
+      vi.resetModules();
+    }
+  });
+
+  it('une seule ligne d’avis : le singulier, en français comme en anglais', async () => {
+    const resolved = await resolvedFor({ banana: 1 });
+    for (const [lang, status] of [
+      ['fr', '1 avis de configuration à la dernière lecture (github.com/acme/demo) :'],
+      ['en', '1 configuration notice at the last read (github.com/acme/demo):'],
+    ] as const) {
+      installStorage(lang);
+      recordResolution(PR, resolved);
+      expect((await optionsPage()).status, lang).toBe(status);
+      vi.resetModules();
+    }
+  });
+
+  it('une configuration repoussée à un éditeur ouvert, aux avis seuls changés, met la pastille à jour', async () => {
+    // Ce que fait un rendu de la page quand le sondage constate que seuls les avis ont changé
+    // (§5.3, revue Codex, PR #181) : la signature de rendu est la même, l'éditeur n'est pas
+    // reconstruit, `updateResolved()` lui repousse la nouvelle lecture.
+    const before = await resolvedFor(null);
+    const after = await resolvedFor({ banana: 1 });
+    expect(after.config).toEqual(before.config); // réglages effectifs identiques
+    const shown = await pastille(before, 'fr', undefined, async (controller) => {
+      controller.updateResolved(after);
+    });
+    expect(shown.notices).toEqual([
+      { kind: 'config-warning', text: 'Avertissement de configuration (fichier du dépôt) : clé inconnue « banana » ignorée.' },
+    ]);
   });
 
   it('un avis écrit par une version antérieure — sans clé de message — se rend par son message', async () => {

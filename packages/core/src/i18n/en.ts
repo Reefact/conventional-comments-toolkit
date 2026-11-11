@@ -52,120 +52,116 @@ export const en: Record<string, string> = {
   'diag.W-NOT-BLOCKABLE':
     'This label is blocking, but this area cannot hold a resolvable thread — it will not be counted among blocking threads.',
   // Avis de configuration (§5.3, §9.2.1)
-  'notice.floor-override.repo':
-    'Enterprise floor: repository configuration key "{key}" ignored: it would relax the enterprise floor (§8.1.1).',
-  'notice.floor-override.org':
-    'Enterprise floor: organization configuration key "{key}" ignored: it would relax the enterprise floor (§8.1.1).',
+  'notice.level.floor':
+    'enterprise floor',
+  'notice.level.org':
+    'organization configuration',
+  'notice.level.repo':
+    'repository file',
+  'notice.level.merged':
+    'merged configuration',
+  'notice.floor-override':
+    'Enterprise floor ({where}): key "{key}" ignored: it would relax the enterprise floor (§8.1.1).',
   'notice.invalid.json':
-    'Invalid configuration: unparseable JSON (line {line}).',
+    'Invalid configuration ({where}): unparseable JSON (line {line}).',
   'notice.invalid.json-no-line':
-    'Invalid configuration: unparseable JSON.',
+    'Invalid configuration ({where}): unparseable JSON.',
   'notice.invalid.not-object':
-    'Invalid configuration: the configuration document must be a JSON object.',
+    'Invalid configuration ({where}): the configuration document must be a JSON object.',
   'notice.invalid.positive-integer':
-    'Invalid configuration: key "{key}" must be a positive integer.',
+    'Invalid configuration ({where}): key "{key}" must be a positive integer.',
   'notice.invalid.non-negative-integer':
-    'Invalid configuration: key "{key}" must be a non-negative integer.',
+    'Invalid configuration ({where}): key "{key}" must be a non-negative integer.',
   'notice.invalid.one-of':
-    'Invalid configuration: key "{key}" must be one of {values}.',
+    'Invalid configuration ({where}): key "{key}" must be one of {values}.',
   'notice.invalid.array':
-    'Invalid configuration: key "{key}" must be an array.',
+    'Invalid configuration ({where}): key "{key}" must be an array.',
   'notice.invalid.object':
-    'Invalid configuration: key "{key}" must be an object.',
+    'Invalid configuration ({where}): key "{key}" must be an object.',
   'notice.invalid.string-array':
-    'Invalid configuration: key "{key}" must be an array of strings.',
+    'Invalid configuration ({where}): key "{key}" must be an array of strings.',
   'notice.invalid.non-empty-string':
-    'Invalid configuration: key "{key}" must be a non-empty string.',
+    'Invalid configuration ({where}): key "{key}" must be a non-empty string.',
   'notice.invalid.string-or-null':
-    'Invalid configuration: key "{key}" must be a string or null.',
+    'Invalid configuration ({where}): key "{key}" must be a string or null.',
   'notice.invalid.semver':
-    'Invalid configuration: key "{key}" must be a semver string.',
+    'Invalid configuration ({where}): key "{key}" must be a semver string.',
   'notice.invalid.label-entry':
-    'Invalid configuration: key "{key}": each entry must be an object with a string "id".',
+    'Invalid configuration ({where}): key "{key}": each entry must be an object with a string "id".',
   'notice.invalid.label-boolean':
-    'Invalid configuration: key "{key}": "{prop}" of label "{label}" must be a boolean.',
+    'Invalid configuration ({where}): key "{key}": "{prop}" of label "{label}" must be a boolean.',
   'notice.invalid.label-string':
-    'Invalid configuration: key "{key}": "{prop}" of label "{label}" must be a string.',
+    'Invalid configuration ({where}): key "{key}": "{prop}" of label "{label}" must be a string.',
   'notice.invalid.label-kind':
-    'Invalid configuration: key "{key}": "kind" of label "{label}" must be "remark" or "reply".',
+    'Invalid configuration ({where}): key "{key}": "kind" of label "{label}" must be "remark" or "reply".',
   'notice.invalid.label-aliases':
-    'Invalid configuration: key "{key}": "aliases" of label "{label}" must be an array of strings.',
+    'Invalid configuration ({where}): key "{key}": "aliases" of label "{label}" must be an array of strings.',
   'notice.invalid.prop-boolean':
-    'Invalid configuration: key "{key}": "{prop}" must be a boolean.',
+    'Invalid configuration ({where}): key "{key}": "{prop}" must be a boolean.',
   'notice.invalid.prop-array':
-    'Invalid configuration: key "{key}": "{prop}" must be an array.',
+    'Invalid configuration ({where}): key "{key}": "{prop}" must be an array.',
   'notice.invalid.prop-non-negative-integer':
-    'Invalid configuration: key "{key}": "{prop}" must be a non-negative integer.',
+    'Invalid configuration ({where}): key "{key}": "{prop}" must be a non-negative integer.',
   'notice.invalid.prop-string-or-null':
-    'Invalid configuration: key "{key}": "{prop}" must be a string or null.',
+    'Invalid configuration ({where}): key "{key}": "{prop}" must be a string or null.',
   'notice.invalid.decoration-entry':
-    'Invalid configuration: key "{key}": each known decoration must be an object with a string "id".',
+    'Invalid configuration ({where}): key "{key}": each known decoration must be an object with a string "id".',
   'notice.invalid.decoration-forces':
-    'Invalid configuration: key "{key}": "forces" of decoration "{decoration}" must be "blocking", "non-blocking" or null.',
+    'Invalid configuration ({where}): key "{key}": "forces" of decoration "{decoration}" must be "blocking", "non-blocking" or null.',
   'notice.invalid.severity':
-    'Invalid configuration: key "{key}": severity of "{code}" must be one of {values}.',
+    'Invalid configuration ({where}): key "{key}": severity of "{code}" must be one of {values}.',
   'notice.invalid.abbreviations':
-    'Invalid configuration: key "{key}": "abbreviations" must be an object mapping abbreviation to inserted text.',
+    'Invalid configuration ({where}): key "{key}": "abbreviations" must be an object mapping abbreviation to inserted text.',
   'notice.config.unknown-key':
-    'Configuration warning: unknown configuration key "{key}" ignored.',
+    'Configuration warning ({where}): unknown key "{key}" ignored.',
   'notice.config.deprecated-warn':
-    'Configuration warning: obsolete value "warn" for "{key}": read as "assist" — replace it with "assist" (§7).',
+    'Configuration warning ({where}): obsolete value "warn" for "{key}": read as "assist" — replace it with "assist" (§7).',
   'notice.config.repo-config-url':
-    'Configuration warning: "configUrl" set in the repository file is ignored: the organization configuration URL comes exclusively from the floor channel (§8.1.2).',
+    'Configuration warning ({where}): "configUrl" is ignored here: the organization configuration URL comes exclusively from the floor channel (§8.1.2).',
   'notice.config.tool-command-invalid':
-    'Configuration warning: toolCommands entry "{entry}" ignored: it must be "/*" or an exact "@handle".',
+    'Configuration warning ({where}): toolCommands entry "{entry}" ignored: it must be "/*" or an exact "@handle".',
   'notice.config.allowlist-too-many':
-    'Configuration warning: allowlist pattern ignored: more than {max} patterns.',
+    'Configuration warning ({where}): allowlist pattern #{index} "{pattern}" ignored: more than {max} patterns.',
   'notice.config.allowlist-too-long':
-    'Configuration warning: allowlist pattern ignored: longer than {max} characters.',
+    'Configuration warning ({where}): allowlist pattern #{index} "{pattern}" ignored: longer than {max} characters.',
   'notice.config.allowlist-nested':
-    'Configuration warning: allowlist pattern ignored: nested quantifiers are not allowed.',
+    'Configuration warning ({where}): allowlist pattern #{index} "{pattern}" ignored: nested quantifiers are not allowed.',
   'notice.config.allowlist-invalid':
-    'Configuration warning: allowlist pattern ignored: invalid regular expression.',
+    'Configuration warning ({where}): allowlist pattern #{index} "{pattern}" ignored: invalid regular expression.',
   'notice.config.severity-raised':
-    'Configuration warning: severity of "{code}" cannot go below "warn" (§8.2): value "off" raised to "warn".',
+    'Configuration warning ({where}): severity of "{code}" cannot go below "warn" (§8.2): value "off" raised to "warn".',
   'notice.config.session-severity-capped':
-    'Configuration warning: severity of "{code}" cannot go above "warn" (§3.6): value "error" lowered to "warn".',
+    'Configuration warning ({where}): severity of "{code}" cannot go above "warn" (§3.6): value "error" lowered to "warn".',
   'notice.config.label-case-duplicate':
-    'Configuration warning: label "{label}" ignored: its id differs from label "{prior}" only by case (§8.2).',
+    'Configuration warning ({where}): label "{label}" ignored: its id differs from label "{prior}" only by case (§8.2).',
   'notice.config.alias-is-id':
-    'Configuration warning: alias "{alias}" removed from label "{label}": it is the id of label "{other}" (§8.2).',
+    'Configuration warning ({where}): alias "{alias}" removed from label "{label}": it is the id of label "{other}" (§8.2).',
   'notice.config.alias-shared':
-    'Configuration warning: alias "{alias}" removed from label "{label}": it is also an alias of {others} (§8.2).',
-  'notice.floor.unknown-key':
-    'Configuration warning: unknown floor key "{key}" ignored.',
+    'Configuration warning ({where}): alias "{alias}" removed from label "{label}": it is also an alias of {others} (§8.2).',
   'notice.floor.string-array':
-    'Configuration warning: floor key "{key}" ignored: expected an array of strings.',
+    'Configuration warning ({where}): key "{key}" ignored: expected an array of strings.',
+  'notice.floor.non-string-entry':
+    'Configuration warning ({where}): key "{key}": {count} non-string entry ignored.',
   'notice.floor.non-string-entries':
-    'Configuration warning: floor key "{key}": {count} non-string entry(ies) ignored.',
+    'Configuration warning ({where}): key "{key}": {count} non-string entries ignored.',
   'notice.floor.closed-not-boolean':
-    'Configuration warning: floor rule "{key}" is not a boolean: the list is kept closed.',
+    'Configuration warning ({where}): rule "{key}" is not a boolean: the list is kept closed.',
   'notice.floor.non-negative-integer':
-    'Configuration warning: floor key "{key}" ignored: it must be a non-negative integer.',
+    'Configuration warning ({where}): key "{key}" ignored: it must be a non-negative integer.',
   'notice.floor.one-of':
-    'Configuration warning: floor key "{key}" ignored: it must be one of {values}.',
+    'Configuration warning ({where}): key "{key}" ignored: it must be one of {values}.',
   'notice.floor.object':
-    'Configuration warning: floor key "{key}" ignored: it must be an object.',
+    'Configuration warning ({where}): key "{key}" ignored: it must be an object.',
   'notice.floor.string-or-null':
-    'Configuration warning: floor key "{key}" ignored: it must be a string or null.',
+    'Configuration warning ({where}): key "{key}" ignored: it must be a string or null.',
   'notice.floor.severity':
-    'Configuration warning: floor severity of "{code}" ignored: it must be one of {values}.',
-  'notice.floor.tool-command-invalid':
-    'Configuration warning: floor: toolCommands entry "{entry}" ignored: it must be "/*" or an exact "@handle".',
-  'notice.floor.allowlist-too-many':
-    'Configuration warning: floor: allowlist pattern ignored: more than {max} patterns.',
-  'notice.floor.allowlist-too-long':
-    'Configuration warning: floor: allowlist pattern ignored: longer than {max} characters.',
-  'notice.floor.allowlist-nested':
-    'Configuration warning: floor: allowlist pattern ignored: nested quantifiers are not allowed.',
-  'notice.floor.allowlist-invalid':
-    'Configuration warning: floor: allowlist pattern ignored: invalid regular expression.',
+    'Configuration warning ({where}): severity of "{code}" ignored: it must be one of {values}.',
   'notice.unsupported.schema-version':
-    'Unsupported version: configuration schema version {version} exceeds supported version {supported}: falling back to assist mode (or the floor if stricter).',
+    'Unsupported version ({where}): configuration schema version {version} exceeds supported version {supported}: falling back to assist mode (or the floor if stricter).',
   'notice.unsupported.core-version':
-    'Unsupported version: coreMinVersion {required} requires core/ major {major}, this component runs {current}: falling back to assist mode (or the floor if stricter).',
+    'Unsupported version ({where}): coreMinVersion {required} requires core/ major {major}, this component runs {current}: falling back to assist mode (or the floor if stricter).',
   'notice.unsupported.floor-version':
-    'Unsupported version: floor version {version} exceeds supported version {supported}: the floor is not applied and the component falls back to assist mode (§8.1.1).',
+    'Unsupported version ({where}): floor version {version} exceeds supported version {supported}: the floor is not applied and the component falls back to assist mode (§8.1.1).',
   // Divers
   'and': 'and',
 };

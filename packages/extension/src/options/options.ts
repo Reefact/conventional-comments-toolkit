@@ -721,7 +721,11 @@ function renderConfigNotices(stored: unknown): void {
       ? ui(lang, 'options.status.notices.unread')
       : notices.length === 0
         ? ui(lang, 'options.status.notices.none', { repo })
-        : ui(lang, 'options.status.notices.some', { repo, count: notices.length }),
+        : // Singulier ou pluriel choisi par le compte, jamais « avis(s) » (zéro a sa propre phrase).
+          ui(lang, notices.length === 1 ? 'options.status.notices.one' : 'options.status.notices.some', {
+            repo,
+            count: notices.length,
+          }),
     notices.length > 0
   );
   const list = document.getElementById('config-notices-list');

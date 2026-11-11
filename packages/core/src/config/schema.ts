@@ -3,7 +3,7 @@
 // clé connue invalide le document entier — on ne peut rien en conclure (§8.1.5).
 
 import type { Notice, NoticeParams } from '../types.js';
-import { makeNotice } from './notices.js';
+import { citedValue, makeNotice, withLevel } from './notices.js';
 import { SUPPORTED_CONFIG_VERSION, CORE_MAJOR } from '../version.js';
 
 export interface ParsedDocument {
@@ -74,10 +74,14 @@ function faultyLine(text: string, error: unknown): number | undefined {
   return text.slice(0, pos).split('\n').length;
 }
 
-export function parseConfigDocument(
-  text: string,
-  opts: { level: 'repo' | 'org' }
-): ParsedDocument {
+/** Chaque avis du document porte son niveau (§5.3) — attribué ICI, à la sortie, pour qu'aucun
+ * des chemins qui signalent (les filtres d'entrée compris) ne puisse l'oublier. */
+export function parseConfigDocument(text: string, opts: { level: 'repo' | 'org' }): ParsedDocument {
+  const parsed = parseDocument(text, opts);
+  return { ...parsed, notices: parsed.notices.map((n) => withLevel(n, opts.level)) };
+}
+
+function parseDocument(text: string, opts: { level: 'repo' | 'org' }): ParsedDocument {
   const notices: Notice[] = [];
   let raw: unknown;
   try {
@@ -408,11 +412,11 @@ const TOOL_COMMAND_MENTION = /^@[A-Za-z0-9_-]+$/;
 /** Chaque entrée est comparée telle quelle, jamais interprétée comme un motif : `/*`
  * (sentinel générique) ou un handle exact `@notre-bot`. Aucune autre forme n'est admise —
  * l'entrée qui n'y correspond pas est ignorée et signalée (§4.2). */
-export function filterToolCommands(entries: string[], notices: Notice[], source: NoticeSource = 'config'): string[] {
+export function filterToolCommands(entries: string[], notices: Notice[]): string[] {
   const out: string[] = [];
   for (const e of entries) {
     if (e === '/*' || TOOL_COMMAND_MENTION.test(e)) out.push(e);
-    else notices.push(warning(`${source}.tool-command-invalid`, { entry: e }, e));
+    else notices.push(warning('config.tool-command-invalid', { entry: citedValue(e) }, e));
   }
   return out;
 }
@@ -422,31 +426,29 @@ export function filterToolCommands(entries: string[], notices: Notice[], source:
 export const ALLOWLIST_MAX_PATTERNS = 50;
 export const ALLOWLIST_MAX_LENGTH = 256;
 
-/** D'où vient l'entrée écartée : un document de configuration, ou le plancher. Le message
- * le dit — sans cela, une administration qui débogue sa politique lirait un avertissement
- * identique à celui d'un fichier de dépôt et chercherait au mauvais endroit. Les deux familles
- * de clés (`config.*`, `floor.*`) sont écrites en toutes lettres dans les catalogues. */
-export type NoticeSource = 'config' | 'floor';
-
-export function filterAllowlistPatterns(patterns: string[], notices: Notice[], source: NoticeSource = 'config'): string[] {
+/** Un motif écarté est cité par sa POSITION dans la liste (à partir de 1) et par son texte
+ * borné (`citedValue`) : deux motifs rejetés dans une liste de cinquante se distinguent, et un
+ * motif de dix mille caractères n'envahit pas la pastille. */
+export function filterAllowlistPatterns(patterns: string[], notices: Notice[]): string[] {
   const out: string[] = [];
-  for (const p of patterns) {
+  for (const [i, p] of patterns.entries()) {
+    const cited = { index: i + 1, pattern: citedValue(p) };
     if (out.length >= ALLOWLIST_MAX_PATTERNS) {
-      notices.push(warning(`${source}.allowlist-too-many`, { max: ALLOWLIST_MAX_PATTERNS }, p));
+      notices.push(warning('config.allowlist-too-many', { ...cited, max: ALLOWLIST_MAX_PATTERNS }, p));
       continue;
     }
     if (p.length > ALLOWLIST_MAX_LENGTH) {
-      notices.push(warning(`${source}.allowlist-too-long`, { max: ALLOWLIST_MAX_LENGTH }, p.slice(0, 40)));
+      notices.push(warning('config.allowlist-too-long', { ...cited, max: ALLOWLIST_MAX_LENGTH }, p.slice(0, 40)));
       continue;
     }
     if (hasNestedQuantifier(p)) {
-      notices.push(warning(`${source}.allowlist-nested`, {}, p));
+      notices.push(warning('config.allowlist-nested', cited, p));
       continue;
     }
     try {
       new RegExp(p);
     } catch {
-      notices.push(warning(`${source}.allowlist-invalid`, {}, p));
+      notices.push(warning('config.allowlist-invalid', cited, p));
       continue;
     }
     out.push(p);

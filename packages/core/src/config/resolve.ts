@@ -89,9 +89,13 @@ export function resolveConfig(
   // plancher compris : une erreur de métadonnée ne bloque jamais l'envoi.
   if (config.severities[SESSION_DIAGNOSTIC] === 'error') {
     config.severities[SESSION_DIAGNOSTIC] = 'warn';
-    notices.push(
-      makeNotice('config-warning', 'config.session-severity-capped', { code: SESSION_DIAGNOSTIC }, `severities.${SESSION_DIAGNOSTIC}`)
-    );
+    // Le plancher, s'il exige `error`, en est la cause ; sinon le document qui l'a écrit.
+    const ref = `severities.${SESSION_DIAGNOSTIC}`;
+    const level =
+      !vetted.unsupported && vetted.floor.severities?.[SESSION_DIAGNOSTIC] === 'error'
+        ? 'floor'
+        : (written.keys.get(ref) ?? 'merged');
+    notices.push(makeNotice('config-warning', 'config.session-severity-capped', { code: SESSION_DIAGNOSTIC, level }, ref));
   }
 
   // Limite basse de sévérité (§8.2), appliquée quel que soit le chemin — y compris quand
@@ -100,7 +104,8 @@ export function resolveConfig(
     if (code.startsWith('E-') && sev === 'off') {
       config.severities[code] = 'warn';
       if (!notices.some((n) => n.kind === 'config-warning' && n.ref === `severities.${code}`)) {
-        notices.push(makeNotice('config-warning', 'config.severity-raised', { code }, `severities.${code}`));
+        const level = written.keys.get(`severities.${code}`) ?? 'merged';
+        notices.push(makeNotice('config-warning', 'config.severity-raised', { code, level }, `severities.${code}`));
       }
     }
   }
@@ -137,8 +142,10 @@ export function resolveConfig(
  */
 function withoutShadowing(labels: LabelConfig[], notices: Notice[]): LabelConfig[] {
   const lower = (n: string) => n.toLowerCase();
+  // Le conflit naît de la RÉUNION des niveaux — défauts compris —, pas d'un document : il est
+  // attribué à la configuration fusionnée.
   const warn = (ref: string, code: string, params: Record<string, string>) =>
-    notices.push(makeNotice('config-warning', code, params, ref));
+    notices.push(makeNotice('config-warning', code, { ...params, level: 'merged' }, ref));
 
   // Deux `id` égaux à la casse près : le second cède.
   const out: LabelConfig[] = [];

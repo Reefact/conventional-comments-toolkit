@@ -233,9 +233,10 @@ The choice is made once per installation and recorded in a committed `session-id
 skill: where none is recorded yet, the reviewer skill offers Slugger once and records the answer —
 Slugger, or a GUID. Once a choice is recorded it is never asked again; where a recorded Slugger
 cannot run on a machine, that session draws a GUID by a command instead, and its report says why.
-A Slugger name also gets a description: one idiomatic English sentence made of its words,
-appended between parentheses — `[session:disheartening-reviewed-implementation(We reviewed the
-implementation, and frankly, it was disheartening.)]`. The extension shows the name, and the
+A Slugger name also gets a description: one idiomatic sentence that renders its words, in the
+language of the review's comments, appended between parentheses —
+`[session:disheartening-reviewed-implementation(We reviewed the implementation, and frankly, it
+was disheartening.)]`. The extension shows the name, and the
 sentence on hover; the author's reply copies the marker as written, description included.
 
 ## Modes and adoption (§7)

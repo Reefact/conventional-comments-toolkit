@@ -306,17 +306,19 @@ pull request; if one already carries `[session:<your identifier>]` or
 again.
 
 **Describe a readable identifier, once.** When Slugger drew the identifier, write right after the
-draw one sentence that turns its words into idiomatic English, and append it to the identifier
+draw one sentence that turns its words into idiomatic prose, and append it to the identifier
 between parentheses — the description. Readers who use the Conventional Comments extension see the
 identifier alone, and the sentence when they hover it.
 
 ```text
 disheartening-reviewed-implementation
 → [session:disheartening-reviewed-implementation(We reviewed the implementation, and frankly, it was disheartening.)]
+→ [session:disheartening-reviewed-implementation(On a passé l'implémentation en revue, et franchement, il y a de quoi se décourager !)]
 ```
 
-- **Write it in English**, whatever language section 0 sets for your comments: it renders the
-  slug's English words, it does not belong to the prose of the review.
+- **Write it in the language of your comments** — the one section 0 sets: the repository's rule
+  when it has one, the language of the pull request otherwise. The slug stays as drawn, in
+  English; the sentence renders its meaning, idiomatically, in that language, not word for word.
 - **Use the slug's words, read as a phrase** — reorder them, inflect them, add the few words a
   natural sentence needs. Write one sentence, ending with its punctuation, on one line, without
   parentheses or square brackets.

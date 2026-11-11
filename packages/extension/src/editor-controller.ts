@@ -223,6 +223,15 @@ export class EditorController {
    * fenêtre où l'ANCIEN contrôleur tient encore la garde en attendant son remplaçant : il y
    * applique les nouvelles règles dans l'ancienne langue, exactement comme il y garde
    * l'ancienne barre d'outils. */
+  /** « Label utilisé » (§10), compté avec le type que lui donne la configuration EFFECTIVE à
+   * cet instant (§12) : c'est elle qui sait si `recap` est un `status` déclaré par le dépôt, ou
+   * si une organisation a retypé `note`. Un identifiant absent de la configuration n'est pas
+   * compté : rien ne dirait sous quel type le ranger. */
+  #countLabel(id: string): void {
+    const label = this.config.labels.find((l) => l.id === id);
+    if (label) this.deps.telemetry?.({ kind: 'label-used', label: label.id, labelKind: label.kind });
+  }
+
   get config(): EffectiveConfig {
     return this.#config;
   }
@@ -362,7 +371,7 @@ export class EditorController {
       lang: this.deps.lang,
       // Même compteur que `insertPrefix()` : « label utilisé » ne doit pas dépendre du
       // chemin par lequel la personne l'a posé (§10, revue Codex PR #31).
-      onLabelAccepted: (id) => this.deps.telemetry?.({ kind: 'label-used', label: id }),
+      onLabelAccepted: (id) => this.#countLabel(id),
       ...(this.deps.labelOrder ? { labelOrder: this.deps.labelOrder } : {}),
     });
     this.#disposers.push(quick.dispose);
@@ -600,7 +609,7 @@ export class EditorController {
     // Et compté sous l'id CANONIQUE : « l'alias n'est pas un label distinct […] il est
     // comptabilisé sous son label canonique » (§3.2).
     if (!removed && canonicalEffective !== null && posedBefore !== canonicalEffective) {
-      this.deps.telemetry?.({ kind: 'label-used', label: canonicalEffective });
+      this.#countLabel(canonicalEffective);
     }
     this.deps.adapter.writeValue(this.deps.editor, nextValue, hasSelection ? undefined : caret);
     if (hasSelection) {

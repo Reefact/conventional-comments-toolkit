@@ -10,7 +10,7 @@
 // explicite. Chaque test ci-dessous tient l'une de ces clauses.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defaultConfig, type PrRef } from '@cct/core';
+import { defaultConfig, resolveConfig, type EffectiveConfig, type PrRef } from '@cct/core';
 import { writeToTextField, NEUTRAL_EDITOR_CHROME } from '@cct/adapter-shared';
 import { HTML_SHAPE } from './helpers/decorate.js';
 import type { EditorHandle, PlatformAdapter } from '@cct/adapter-shared';
@@ -132,8 +132,8 @@ describe('B — des COMPTEURS, agrégés, et jamais de texte libre (§10)', () =
 
   it('agrège plusieurs occurrences en un compteur, et n’émet qu’à la vidange', () => {
     const { counters, sent } = armed();
-    counters.count({ kind: 'label-used', label: 'issue' });
-    counters.count({ kind: 'label-used', label: 'issue' });
+    counters.count({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
+    counters.count({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
     counters.count({ kind: 'validation-code', code: 'E-NO-LABEL' });
     expect(sent).toEqual([]); // rien n'est parti pendant la frappe
 
@@ -144,7 +144,20 @@ describe('B — des COMPTEURS, agrégés, et jamais de texte libre (§10)', () =
       v: 1,
       mode: 'enforce',
       repo: 'github.com/acme/demo',
-      counters: { 'label:issue': 2, 'code:E-NO-LABEL': 1 },
+      counters: { 'label-remark:issue': 2, 'code:E-NO-LABEL': 1 },
+    });
+  });
+
+  it('la clé d’un label porte son type : `label-<type>:<id>`', () => {
+    const { counters, sent } = armed();
+    counters.count({ kind: 'label-used', label: 'summary', labelKind: 'status' });
+    counters.count({ kind: 'label-used', label: 'done', labelKind: 'reply' });
+    counters.count({ kind: 'label-used', label: 'praise', labelKind: 'remark' });
+    counters.flush();
+    expect(JSON.parse(sent[0]!.body).counters).toEqual({
+      'label-status:summary': 1,
+      'label-reply:done': 1,
+      'label-remark:praise': 1,
     });
   });
 
@@ -159,17 +172,17 @@ describe('B — des COMPTEURS, agrégés, et jamais de texte libre (§10)', () =
 
   it('les compteurs repartent de zéro après émission', () => {
     const { counters, sent } = armed();
-    counters.count({ kind: 'label-used', label: 'issue' });
+    counters.count({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
     counters.flush();
-    counters.count({ kind: 'label-used', label: 'issue' });
+    counters.count({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
     counters.flush();
-    expect(JSON.parse(sent[1]!.body).counters).toEqual({ 'label:issue': 1 });
+    expect(JSON.parse(sent[1]!.body).counters).toEqual({ 'label-remark:issue': 1 });
   });
 
   it('désarmé, il ne compte rien — et n’émet rien à la vidange', () => {
     const sent: unknown[] = [];
     const counters = new TelemetryCounters((e, b) => sent.push({ e, b }));
-    counters.count({ kind: 'label-used', label: 'issue' });
+    counters.count({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
     counters.flush();
     expect(counters.armed).toBe(false);
     expect(sent).toEqual([]);
@@ -177,7 +190,7 @@ describe('B — des COMPTEURS, agrégés, et jamais de texte libre (§10)', () =
 
   it('désarmer JETTE ce qui était compté, plutôt que de l’envoyer plus tard', () => {
     const { counters, sent } = armed();
-    counters.count({ kind: 'label-used', label: 'issue' });
+    counters.count({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
     counters.arm(null);
     counters.arm({ endpoint: ENDPOINT, mode: 'warn', repo: 'github.com/acme/autre' });
     counters.flush();
@@ -189,17 +202,17 @@ describe('B — des COMPTEURS, agrégés, et jamais de texte libre (§10)', () =
   // l'ancien — une donnée fausse chez le destinataire, pas seulement une imprécision.
   it('changer de cible émet d’abord ce qui a été compté pour la précédente', () => {
     const { counters, sent } = armed();
-    counters.count({ kind: 'label-used', label: 'issue' });
+    counters.count({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
     counters.arm({ endpoint: ENDPOINT, mode: 'warn', repo: 'github.com/acme/autre' });
     expect(sent).toHaveLength(1);
     expect(JSON.parse(sent[0]!.body).repo).toBe('github.com/acme/demo');
 
-    counters.count({ kind: 'label-used', label: 'todo' });
+    counters.count({ kind: 'label-used', label: 'todo', labelKind: 'remark' });
     counters.flush();
     expect(JSON.parse(sent[1]!.body)).toMatchObject({
       repo: 'github.com/acme/autre',
       mode: 'warn',
-      counters: { 'label:todo': 1 },
+      counters: { 'label-remark:todo': 1 },
     });
   });
 
@@ -208,7 +221,7 @@ describe('B — des COMPTEURS, agrégés, et jamais de texte libre (§10)', () =
   // laisserait passer un fragment de ce qu'on voulait ne jamais envoyer.
   it('une valeur qui n’est pas un identifiant est abandonnée, pas assainie', () => {
     const { counters, sent } = armed();
-    counters.count({ kind: 'label-used', label: 'le nom est ambigu, voir #42' });
+    counters.count({ kind: 'label-used', label: 'le nom est ambigu, voir #42', labelKind: 'remark' });
     counters.count({ kind: 'validation-code', code: 'E-NO-LABEL\nfuite' });
     counters.count({ kind: 'selector-degradation', chain: 'a'.repeat(200) });
     counters.flush();
@@ -220,7 +233,7 @@ describe('B — des COMPTEURS, agrégés, et jamais de texte libre (§10)', () =
       throw new Error('collecteur injoignable');
     });
     counters.arm({ endpoint: ENDPOINT, mode: 'enforce', repo: 'github.com/acme/demo' });
-    counters.count({ kind: 'label-used', label: 'issue' });
+    counters.count({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
     expect(() => counters.flush()).not.toThrow();
   });
 });
@@ -234,7 +247,7 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     number: 42,
   };
 
-  function setup(): {
+  function setup(config: EffectiveConfig = defaultConfig()): {
     controller: EditorController;
     textarea: HTMLTextAreaElement;
     events: TelemetryEvent[];
@@ -265,7 +278,6 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
       readValue: () => textarea.value,
       writeValue: (_e, text, caret) => writeToTextField(textarea, text, caret),
     };
-    const config = defaultConfig();
     config.mode = 'enforce';
     const events: TelemetryEvent[] = [];
     const controller = new EditorController({
@@ -290,8 +302,34 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     const { controller, textarea, events } = setup();
     textarea.value = 'le nom est ambigu';
     controller.insertPrefix('issue', [], false);
-    expect(events).toContainEqual({ kind: 'label-used', label: 'issue' });
+    expect(events).toContainEqual({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
     expect(JSON.stringify(events)).not.toContain('ambigu');
+  });
+
+  // §12 : le collecteur ne peut pas retrouver le type d'un label à partir de son seul
+  // identifiant — un label créé par le dépôt n'a rien de livré qui le classe, et un label livré
+  // peut être retypé. Le type part donc avec le compteur, tel que la configuration EFFECTIVE le
+  // donne à l'émission (revue Reefact, PR #182).
+  it('le label est compté avec son type effectif — livré, créé ou retypé par le dépôt', () => {
+    const config = resolveConfig(
+      null,
+      { status: 'absent' },
+      { status: 'found', text: JSON.stringify({ labels: [{ id: 'recap', kind: 'status' }, { id: 'note', kind: 'status' }] }) },
+      null,
+      false
+    ).config;
+    const { controller, textarea, events } = setup(config);
+    for (const id of ['summary', 'done', 'recap', 'note', 'issue']) {
+      textarea.value = 'un sujet assez long';
+      controller.insertPrefix(id, [], false);
+    }
+    expect(events.filter((e) => e.kind === 'label-used')).toEqual([
+      { kind: 'label-used', label: 'summary', labelKind: 'status' },
+      { kind: 'label-used', label: 'done', labelKind: 'reply' },
+      { kind: 'label-used', label: 'recap', labelKind: 'status' },
+      { kind: 'label-used', label: 'note', labelKind: 'status' },
+      { kind: 'label-used', label: 'issue', labelKind: 'remark' },
+    ]);
   });
 
   // Cliquer deux fois le même bouton pose puis RETIRE le préfixe. Compter les deux gonflait
@@ -302,7 +340,7 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     controller.insertPrefix('issue', [], true); // pose
     controller.insertPrefix('issue', [], true); // retire
     expect(events.filter((e) => e.kind === 'label-used')).toEqual([
-      { kind: 'label-used', label: 'issue' },
+      { kind: 'label-used', label: 'issue', labelKind: 'remark' },
     ]);
   });
 
@@ -323,7 +361,7 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     const afterFirstDecoration = textarea.value;
     controller.insertPrefix('issue', ['non-blocking'], false); // on change d'avis
     expect(events.filter((e) => e.kind === 'label-used')).toEqual([
-      { kind: 'label-used', label: 'issue' },
+      { kind: 'label-used', label: 'issue', labelKind: 'remark' },
     ]);
     // La ligne de préfixe a bel et bien été RÉÉCRITE à chaque appel : c'est un compteur
     // qu'on corrige, pas une insertion qu'on aurait cessé de faire.
@@ -337,8 +375,8 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     controller.insertPrefix('issue', [], false);
     controller.insertPrefix('praise', [], false);
     expect(events.filter((e) => e.kind === 'label-used')).toEqual([
-      { kind: 'label-used', label: 'issue' },
-      { kind: 'label-used', label: 'praise' },
+      { kind: 'label-used', label: 'issue', labelKind: 'remark' },
+      { kind: 'label-used', label: 'praise', labelKind: 'remark' },
     ]);
   });
 
@@ -354,7 +392,7 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
 
     controller.insertPrefix('bug', undefined, false);
     expect(events.filter((e) => e.kind === 'label-used')).toEqual([
-      { kind: 'label-used', label: 'issue' },
+      { kind: 'label-used', label: 'issue', labelKind: 'remark' },
     ]);
   });
 
@@ -397,7 +435,7 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     const option = document.querySelector('.cct-quick-list li');
     expect(option).not.toBeNull();
     option!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    expect(events).toContainEqual({ kind: 'label-used', label: 'issue' });
+    expect(events).toContainEqual({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
     controller.dispose();
   });
 
@@ -412,7 +450,7 @@ describe('C — ce que le contrôleur d’éditeur compte (§10 : label utilisé
     textarea.value = '?i';
     textarea.selectionStart = textarea.selectionEnd = 2;
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
-    expect(events).toContainEqual({ kind: 'label-used', label: 'issue' });
+    expect(events).toContainEqual({ kind: 'label-used', label: 'issue', labelKind: 'remark' });
 
     // Un dépliement qui ne pose AUCUN label du vocabulaire ne se compte pas : ce qui part
     // est un identifiant de la configuration, jamais du texte deviné.

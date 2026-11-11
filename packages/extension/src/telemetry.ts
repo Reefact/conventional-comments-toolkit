@@ -1,7 +1,9 @@
 // Télémétrie (§10, §9.4, CA-11) — désactivée par défaut, opt-in explicite, et limitée à
-// des COMPTEURS AGRÉGÉS : « label utilisé, code d'erreur, mode, dépôt — jamais de texte
-// libre » (§10). Tout ce module existe pour rendre cette phrase mécanique plutôt que
+// des COMPTEURS AGRÉGÉS : « label utilisé et son type, code d'erreur, mode, dépôt — jamais
+// de texte libre » (§10). Tout ce module existe pour rendre cette phrase mécanique plutôt que
 // déclarative : rien ne sort d'ici qui ne soit un identifiant d'un vocabulaire fermé.
+
+import type { LabelKind } from '@cct/core';
 //
 // D'OÙ VIENT LE POINT DE COLLECTE — c'est la décision qui structure tout le reste.
 //
@@ -35,9 +37,16 @@
 
 /** Ce qu'un composant peut compter. Aucune de ces valeurs n'est du texte saisi : un
  * identifiant de label vient de la configuration, un code de diagnostic de `core/`, un nom
- * de chaîne de sélecteurs de nos propres fichiers de sélecteurs. */
+ * de chaîne de sélecteurs de nos propres fichiers de sélecteurs.
+ *
+ * Un label est compté AVEC son type effectif, relevé à l'émission (§12) : le §12 sépare les
+ * labels `reply` et `status` du ratio `praise`, et le collecteur ne peut pas retrouver ce
+ * type seul. Un label créé par un dépôt n'a rien de livré qui le classe, un label livré peut
+ * être retypé par une organisation ou un dépôt, et la configuration a pu changer entre la
+ * collecte et l'analyse. Le type est un vocabulaire fermé de trois mots : il n'ajoute aucun
+ * texte libre à ce qui part (revue Reefact, PR #182). */
 export type TelemetryEvent =
-  | { kind: 'label-used'; label: string }
+  | { kind: 'label-used'; label: string; labelKind: LabelKind }
   | { kind: 'validation-code'; code: string }
   | { kind: 'selector-degradation'; chain: string };
 
@@ -110,7 +119,7 @@ const COUNTER_KEY = /^[a-z-]+:[A-Za-z0-9_.-]{1,64}$/;
 function counterKey(event: TelemetryEvent): string | null {
   const key =
     event.kind === 'label-used'
-      ? `label:${event.label}`
+      ? `label-${event.labelKind}:${event.label}`
       : event.kind === 'validation-code'
         ? `code:${event.code}`
         : `selector:${event.chain}`;

@@ -93,7 +93,7 @@ export const en: Record<string, string> = {
   'notice.invalid.label-string':
     'Invalid configuration ({where}): key "{key}": "{prop}" of label "{label}" must be a string.',
   'notice.invalid.label-kind':
-    'Invalid configuration ({where}): key "{key}": "kind" of label "{label}" must be "remark" or "reply".',
+    'Invalid configuration ({where}): key "{key}": "kind" of label "{label}" must be "remark", "status" or "reply".',
   'notice.invalid.label-aliases':
     'Invalid configuration ({where}): key "{key}": "aliases" of label "{label}" must be an array of strings.',
   'notice.invalid.prop-boolean':

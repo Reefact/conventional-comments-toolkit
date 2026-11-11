@@ -95,7 +95,7 @@ export const fr: Record<string, string> = {
   'notice.invalid.label-string':
     'Configuration invalide ({where}) : clé « {key} » : « {prop} » du label « {label} » doit être une chaîne.',
   'notice.invalid.label-kind':
-    'Configuration invalide ({where}) : clé « {key} » : « kind » du label « {label} » doit valoir « remark » ou « reply ».',
+    'Configuration invalide ({where}) : clé « {key} » : « kind » du label « {label} » doit valoir « remark », « status » ou « reply ».',
   'notice.invalid.label-aliases':
     'Configuration invalide ({where}) : clé « {key} » : « aliases » du label « {label} » doit être un tableau de chaînes.',
   'notice.invalid.prop-boolean':

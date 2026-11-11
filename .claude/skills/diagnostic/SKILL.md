@@ -5,7 +5,7 @@ description: Consigner une archive de diagnostic de l'extension (le .zip `cct-di
 
 # Consigner un diagnostic
 
-Décision du propriétaire, 2026-10-31 : les rapports de diagnostic s'accumulent en issues, et
+Décision consignée dans DEC0006 : les rapports de diagnostic s'accumulent en issues, et
 **on ne corrige rien sur `main` tant qu'il n'y a pas une trentaine d'issues `diagnostic`
 ouvertes**. L'unité est l'ISSUE, c'est-à-dire la cause distincte (§5) : deux rapports de même
 cause font une issue, pas deux, et trente rapports peuvent donc en faire bien moins. La raison

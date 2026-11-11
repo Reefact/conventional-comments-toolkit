@@ -12,20 +12,16 @@
 
 - **Langue — anglais d'abord.** Le critère est UNIQUE, et c'est *qui lit ?* : ce qui est lu
   hors de l'équipe s'écrit en **anglais**, ce qui ne l'est pas suit la langue de l'équipe, le
-  **français**. Deux rédactions successives de cette règle ont énuméré des fichiers plutôt
-  que d'énoncer ce critère, et se sont fait prendre les deux fois, sur les documents
-  anglophones puis sur les catalogues de traduction (revues Codex, PR #32 et #33). Une liste
-  vieillit ; le critère, non.
+  **français** (DEC0002). Les cas ci-dessous illustrent ce critère, ils ne le remplacent pas.
 
   - **Messages de commit : anglais, toujours.** Ils vivent dans l'historique du dépôt, que
     lit quiconque le clone.
   - **Contenu des pull requests : anglais** — titre, corps, commentaires et réponses de
     revue. Le fil d'une PR est ce qu'un contributeur lit en premier.
     **Le corps d'une PR ne porte NI le pied « 🤖 Generated with Claude Code » NI le lien
-    `https://claude.ai/code/session_…`** (décision du propriétaire, 2026-11-10) : cette règle
-    du dépôt prime la consigne d'attribution de la session. Elle ne suffit pas — l'outil de
-    création de PR pose son propre pied (mesuré sur #167) —, c'est le workflow
-    `strip-claude-footer.yml` qui l'enlève ensuite ; ne pas l'écrire lui épargne du travail.
+    `https://claude.ai/code/session_…`** (DEC0013) : cette règle du dépôt prime la consigne
+    d'attribution de la session, et le workflow `strip-claude-footer.yml` retire le pied que
+    l'outil de création de PR pose de lui-même.
   - **Documents du dépôt : anglais, et français EN PLUS quand c'est possible**, la paire
     portant les suffixes `-en.md` / `-fr.md` (`docs/extension-setup-en.md` et son jumeau).
     Qu'un document n'existe que dans une langue n'est pas une faute : le doublement est un
@@ -40,6 +36,10 @@
   - **Commentaires de code : français**, même critère : ils expliquent à l'équipe pourquoi
     le code est ce qu'il est.
 
+- **Décisions** : les décisions importantes du dépôt sont consignées en IDR dans `docs/idr/`
+  (DEC0001), en anglais et en français. Chaque PR est vérifiée contre ce registre avec le skill
+  `idr` : l'agent propose, le propriétaire accepte. Une règle de ce fichier qui cite un `DECnnnn`
+  y trouve son *pourquoi*.
 - `specifications-fr.md` est la référence fonctionnelle **normative**. Ne jamais
   la modifier pour la faire correspondre à l'implémentation. L'état du
   repository est la source de vérité sur l'avancement.
@@ -48,16 +48,13 @@
   branche ; elle n'existe plus sur `origin`, et la consigne est restée là, fausse,
   sans que rien ne le signale. Un nom de branche est une liste d'un seul élément :
   il vieillit comme les autres.
-  **Exception** (décision du propriétaire, 2026-10-31) : les branches `diagnostic/…`, une par
-  rapport de diagnostic, qui ne stockent que l'archive reçue — voir le skill `diagnostic`.
+  **Exception** (DEC0006) : les branches `diagnostic/…`, une par rapport de diagnostic, qui ne
+  stockent que l'archive reçue — voir le skill `diagnostic`.
 - Les choix purement techniques appartiennent à l'agent ; l'absence d'une
   décision technique dans la spec est un espace de conception, pas une
   ambiguïté à remonter.
-- **Une PR touche UNE plateforme, OU le code partagé — jamais les deux**
-  (`npm run check:pr-scope`, lancé par la CI sur chaque PR). L'interface GitHub est terminée ;
-  une correction Azure DevOps ou la création de GitLab ne doit pas pouvoir la casser. Le paquet
-  d'un adaptateur ne s'exécute que sur sa plateforme, le code partagé sur toutes : une PR
-  « Azure DevOps » qui retouche aussi le contrôleur commun modifie GitHub sans le dire. Elle se
+- **Une PR touche UNE plateforme, OU le code partagé — jamais les deux** (DEC0005,
+  `npm run check:pr-scope`, lancé par la CI sur chaque PR). Une PR qui ferait les deux se
   scinde — le changement partagé d'abord, seul, puis celui de la plateforme. Une PR de
   **contrat** (code partagé ET toutes les plateformes) est admise : elle dit ce qu'elle est.
   Documentation, tests partagés et outillage hors de `packages/` sont neutres ; les fichiers
@@ -169,43 +166,13 @@ qu'il la connaît. Sinon, décrire le symptôme.
 
 ## Mise en forme : le dépôt n'est PAS formaté par prettier
 
-Le code est mis en forme **à la main**, et aucun réglage ne rend prettier idempotent ici :
-il restructure plutôt qu'il n'enroule, et les insertions dépassent partout les suppressions.
-Lancer `prettier --write` sur ce dépôt le réécrit, point.
-
-C'est pourquoi `.prettierrc` porte **`requirePragma: true`** : prettier ne formate alors que
-les fichiers portant un pragma `@format`, et aucun n'en porte. Mesuré dans les deux sens,
-sur l'ensemble des sources :
-
-| | fichiers réécrits | lignes |
-|---|---|---|
-| avec `requirePragma` (l'état livré) | **0** | — |
-| sans, mais avec le reste de ce `.prettierrc` | 106 | +3 611 / −1 122 |
-| sans configuration du tout (défauts de prettier) | 140 | +17 850 / −10 662 |
-
-**Ne pas retirer `requirePragma` sans savoir ce qu'on fait.** C'est lui, et lui seul, qui
-rend la commande inoffensive ; les trois autres clés ne font que réduire les dégâts d'un
-facteur 6 (28 512 lignes de churn contre 4 733) le jour où quelqu'un l'enlève.
-
-Le fichier ne dit donc PAS que le dépôt est conforme à prettier — il dit l'inverse, et
-l'applique. Il existe pour deux raisons :
-
-1. **Protéger les éditeurs humains.** L'extension VS Code de prettier a un réglage
-   `prettier.requireConfig`, que beaucoup activent : elle refuse de formater tant qu'aucune
-   configuration locale n'existe. Ajouter un `.prettierrc` fait donc basculer ces postes de
-   « ne formate pas » à « formate à chaque sauvegarde » — le fichier censé protéger créait
-   le danger. `requirePragma` referme ça (revue Reefact, PR #63).
-2. **Fixer le style** pour le jour où l'on déciderait d'adopter prettier, ou pour un fichier
-   qu'on y ferait entrer explicitement par un pragma. `singleQuote` et `trailingComma: es5`
-   sont ce que le code emploie partout ; `printWidth: 100` correspond à sa convention réelle
-   — p95 des lignes de code à 94 colonnes, commentaires enroulés à la main autour de 95.
-   `120` produirait moins de churn (88 fichiers, +1 932) mais décrirait mal le code.
-
-Tout cela est né d'un incident : un `prettier --write` lancé sur sept fichiers en cours de
-travail a produit ~580 lignes de bruit — guillemets doubles et virgules finales contre le
-style de tout le reste — dans un commit déjà poussé. Il a fallu restaurer les fichiers depuis
-leur version d'origine et réappliquer les modifications à la main. Le réflexe « je formate
-avant de committer » est ce qu'il faut désarmer.
+Le code est mis en forme **à la main** : ne jamais lancer `prettier --write` sur ce dépôt, il le
+réécrit. `.prettierrc` porte **`requirePragma: true`**, si bien que prettier ne formate que les
+fichiers portant un pragma `@format`, et aucun n'en porte. **Ne pas retirer `requirePragma`** :
+c'est lui, et lui seul, qui rend la commande inoffensive, y compris dans l'éditeur des humains.
+Le fichier ne dit donc PAS que le dépôt est conforme à prettier — il dit l'inverse ; ses autres
+clés fixent le style pour le jour où l'on adopterait prettier. Les mesures et l'incident qui
+fondent cette règle sont dans DEC0003.
 
 ## Commandes
 
@@ -249,8 +216,7 @@ aussi la nuit — un canari, pour que la pourriture d'un sélecteur se découvre
 `typecheck:tests` est le seul endroit où un test est TYPÉ (vitest transpile sans vérifier :
 un `implements PlatformAdapter` dans un `.test.ts` n'est jamais contrôlé ailleurs). Les faire
 passer en local avant de pousser. Une PR PEUT modifier `specifications-fr.md` avec le code
-qui l'implémente (décision du propriétaire, 24/09/2026 ; le garde CI qui l'interdisait est
-retiré) — ce qui ne change rien à la règle du dessus : la spec ne se plie jamais à
+qui l'implémente (DEC0004) — ce qui ne change rien à la règle du dessus : la spec ne se plie jamais à
 l'implémentation, un amendement est une décision de conception.
 
 Piège récurrent : les caractères invisibles (BOM, NBSP, U+202F, U+FE0F, ZWJ)

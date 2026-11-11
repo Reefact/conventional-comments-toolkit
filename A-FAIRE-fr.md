@@ -10,7 +10,7 @@ partie d'aucune convention du chantier.
 
 **Le produit est l'extension, et elle seule** (§2) : elle est écrite, testée et passée par
 plusieurs revues contradictoires. Le vérificateur (ancien « composant B ») est **retiré de la
-spécification** (décision du propriétaire, 2026-11-10) : le produit ne contrôle pas la
+spécification** (DEC0010) : le produit ne contrôle pas la
 complétion d'une PR, il signale les fils bloquants non résolus sans jamais empêcher la fusion.
 
 Ce qui reste est donc surtout fait d'**étapes humaines** : essayer l'extension en vrai, la

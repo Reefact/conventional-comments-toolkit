@@ -668,8 +668,9 @@ const HIDDEN_SESSION_BLOCK_CLASS = 'cct-hidden-session-block';
 /** Ce que l'extension AFFICHE, en bas du corps. Il ajoute du texte : `commentBodyText()` l'exclut. */
 const SESSION_CLASS = 'cct-session';
 
-/** Le texte de la mention : la valeur, ou `#ERROR` quand le corps porte plusieurs marqueurs —
- * aucune session n'est alors désignée (§3.6), et `W-SESSION-MULTIPLE` dit pourquoi. */
+/** Le texte de la mention : l'identifiant — jamais sa description, montrée au survol —, ou
+ * `#ERROR` quand le corps porte plusieurs marqueurs — aucune session n'est alors désignée
+ * (§3.6), et `W-SESSION-MULTIPLE` dit pourquoi. */
 function sessionText(marker: SessionMarker, config: EffectiveConfig): string {
   return `${config.sessionIcon} session: ${marker.value === null ? '#ERROR' : marker.value.toLowerCase()}`;
 }
@@ -942,9 +943,13 @@ function applySessionProjection(
   const shown = body.querySelector(`:scope > .${SESSION_CLASS}`) as HTMLElement;
   const expected = sessionText(marker, config);
   if (shown.textContent !== expected) shown.textContent = expected; // icône changée
-  // Le doublon dit pourquoi aucune session n'est affichée, au survol : le diagnostic lui-même
-  // n'est montré qu'à la saisie, avec les autres (§5.3).
-  const title = marker.value === null ? t(lang, 'diag.W-SESSION-MULTIPLE', { count: marker.lines.length }) : '';
+  // Au survol : le doublon dit pourquoi aucune session n'est affichée — le diagnostic lui-même
+  // n'est montré qu'à la saisie, avec les autres (§5.3) —, un marqueur seul montre sa
+  // description, telle qu'écrite (§3.6).
+  const title =
+    marker.value === null
+      ? t(lang, 'diag.W-SESSION-MULTIPLE', { count: marker.lines.length })
+      : (marker.description ?? '');
   if (title === '') shown.removeAttribute('title');
   else if (shown.title !== title) shown.title = title;
 }

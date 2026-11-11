@@ -227,7 +227,9 @@ the whole review session, and the author copies it into the reply to that commen
 tell parallel review sessions apart. Each agent session draws its own identifier from a random
 source, checks that the pull request does not carry it yet, and never takes one from the pull
 request, from another session or from an earlier conversation. The identifier is a readable name drawn by
-[Slugger](https://github.com/Reefact/slugger), used without asking when it already runs; otherwise
+[Slugger](https://github.com/Reefact/slugger), used without asking when it already runs — or, on
+Linux x64 without .NET, through its native build, downloaded and checked against a pinned SHA-256;
+otherwise
 the reviewer skill offers it once, and records the answer — Slugger, or a GUID — in a committed
 `session-id.md` beside it.
 

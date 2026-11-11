@@ -306,24 +306,45 @@ pull request; if one already carries `[session:<your identifier>]` or
 again.
 
 **Describe a readable identifier, once.** When Slugger drew the identifier, write right after the
-draw one sentence that turns its words into idiomatic prose, and append it to the identifier
-between parentheses — the description. Readers who use the Conventional Comments extension see the
-identifier alone, and the sentence when they hover it.
+draw one sentence that turns it into natural, idiomatic and lively prose, read in the context of a
+code review, and append it to the identifier between parentheses — the description. Readers who
+use the Conventional Comments extension see the identifier alone, and the sentence when they hover
+it.
 
 ```text
 disheartening-reviewed-implementation
-→ [session:disheartening-reviewed-implementation(We reviewed the implementation, and frankly, it was disheartening.)]
-→ [session:disheartening-reviewed-implementation(On a passé l'implémentation en revue, et franchement, il y a de quoi se décourager !)]
+→ We reviewed the implementation, and frankly, it was disheartening.
+→ On a passé l'implémentation en revue, et franchement, il y a de quoi se décourager !
+
+long-suffering-praised-test-factory
+→ The test factory, which had endured so much over the years, received plenty of praise.
+
+unsettling-poorly-implemented-pipeline
+→ The pipeline was poorly implemented, and the result was unsettling.
+
+ancestral-randomized-snapshot-test
+→ The snapshot test had been around for ages and relied on randomized data.
 ```
+
+The marker then reads
+`[session:disheartening-reviewed-implementation(We reviewed the implementation, and frankly, it was disheartening.)]`.
 
 - **Write it in the language of your comments** — the one section 0 sets: the repository's rule
   when it has one, the language of the pull request otherwise. The slug stays as drawn, in
-  English; the sentence renders its meaning, idiomatically, in that language, not word for word.
-- **Use the slug's words, read as a phrase** — reorder them, inflect them, add the few words a
-  natural sentence needs. Write one sentence, ending with its punctuation, on one line, without
-  parentheses or square brackets.
-- **It is word play on a random draw, not an opinion.** It says nothing about the pull request,
-  its code or your findings, and you never adjust it to them: the slug was drawn, not chosen.
+  English; the sentence renders it in that language, as a developer who speaks it natively would
+  actually say it, never word for word.
+- **Keep the meaning and the nuance of every term of the slug.** Drop none, and do not soften or
+  sharpen any: `long-suffering` is more than `old`, `ancestral` more than `existing`.
+- **Add nothing the slug does not justify** — no information, no judgement, no interpretation. It
+  says nothing about the pull request, its code or your findings, and you never adjust it to
+  them: the slug was drawn, not chosen.
+- **Build a real sentence, not a minimal rewording.** Make it fluent and expressive; you may
+  develop its structure a little — a relative clause, a consequence — to get there.
+- **Keep the slug's irony, humour or tone.**
+- **Do not make the slug more coherent than it is.** If it is odd, keep it odd, without inventing
+  a context that would explain it.
+- **One sentence, on one line**, ending with its punctuation, without parentheses or square
+  brackets.
 - **Write it once per identifier, and never change it.** Every comment of the session carries the
   same marker, character for character, description included: write it once, then copy it.
 - **A GUID gets no description.** It has no words to render: its marker stays `[session:<guid>]`.

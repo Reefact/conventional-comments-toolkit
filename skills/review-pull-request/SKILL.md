@@ -240,8 +240,9 @@ Never copy one of these examples as is, and never let the sentence claim more th
 new review of the new state, under a new session identifier (section 9): examine the new changes,
 and post a new `reviewed` only once every closing condition holds again.
 
-Note the SHA of the pull request's head commit when you post `reviewed`: it is what tells, when you
-come back, whether the pull request changed since (section 9).
+When you post `reviewed`, note the state it covers: the SHA of the head commit, the base branch,
+and the title and description as you checked them. That record is what tells, when you come back,
+whether the pull request changed since (section 9).
 
 `reviewed` is your last comment on the state it covers. A recap of a pass belongs before it,
 never after: posted after it, it reads as if the review had reopened.
@@ -295,21 +296,24 @@ you are a new session: draw a new identifier, even if the person asked you to re
 review.
 
 **After your `reviewed:`**, the identifier depends on whether the pull request changed since. Tell
-it by the head commit, not by memory: compare the pull request's head with the SHA you noted when
-you posted `reviewed:` (section 8).
+it by the record you noted when you posted `reviewed:` (section 8), not by memory: compare the head
+commit, the base branch, the title and the description with the pull request as it is now. The
+head alone is not enough: retargeting the pull request to another base changes its diff, and an
+edited description changes what it claims, while the head stays the same.
 
-- **The head commit changed** — commits were pushed, the branch was rebased or force-pushed: what
-  you examine is a new state, and a new review. Draw a new identifier, check that it is unused, and
+- **Something in the record changed** — commits were pushed, the branch was rebased or
+  force-pushed, the base branch was changed, the title or description was edited: what you examine
+  is a new state, and a new review. Draw a new identifier, check that it is unused, and
   use it for every comment of that review, up to its own `reviewed:`. An identifier thus never
   carries findings after the `reviewed:` that closed it, and a reader sees each review end where
   its marker stops.
-- **The head commit is the same** — you come back because you missed something on the state you
+- **Nothing in the record changed** — you come back because you missed something on the state you
   closed on: you are reopening that review, not starting one. Keep its identifier, post what you
   missed, and close again with a new `reviewed:` once every condition of section 8 holds. Say in
   the finding that it reopens your review: the earlier `reviewed:` no longer holds.
 
-When both apply — the head moved, and you also notice something you had missed on the earlier
-state — the head decides: it is a new review, under a new identifier.
+When both apply — the pull request changed, and you also notice something you had missed on the
+earlier state — the change decides: it is a new review, under a new identifier.
 
 A new session may follow up on findings an earlier session left open: read them as existing
 discussions, verify them, and post your follow-ups under **your own** marker. Threads opened by

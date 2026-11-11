@@ -199,8 +199,8 @@ A `done:` reply, an assertion from the author or a resolved thread **does not pr
 Conversely, drop a finding when a verifiable technical justification shows it is unfounded or
 does not apply.
 
-Once you have verified the fix of one of your own findings — one that carries your session marker
-(section 9) — resolve its thread.
+Once you have verified the fix of one of your own findings — one that carries a session marker you
+drew in this conversation (section 9) — resolve its thread.
 
 **Finishing a pass does not close the review**: as long as a real finding calls for an action or
 a clarification, your review stays open.
@@ -236,9 +236,12 @@ reviewed: last pass on the migration is clean, all threads settled
 
 Never copy one of these examples as is, and never let the sentence claim more than you checked.
 
-`reviewed` covers only the state of the pull request you examined. Any later change reopens your
-review: examine the new changes, and post a new `reviewed` only once every closing condition
-holds again.
+`reviewed` covers only the state of the pull request you examined. Any later change calls for a
+new review of the new state, under a new session identifier (section 9): examine the new changes,
+and post a new `reviewed` only once every closing condition holds again.
+
+Note the SHA of the pull request's head commit when you post `reviewed`: it is what tells, when you
+come back, whether the pull request changed since (section 9).
 
 `reviewed` is your last comment on the state it covers. A recap of a pass belongs before it,
 never after: posted after it, it reads as if the review had reopened.
@@ -252,14 +255,16 @@ pull request.
 Several reviewers may work on the same pull request at once, sometimes under the same account.
 A session marker lets a reader tell which comments came from the same review session.
 
-**One agent session, one identifier, used by no one else.** A review session is the conversation
-you run in, from the moment you are asked to review until that conversation ends. Another agent
-reviewing the same pull request in parallel is another session, and so is a later conversation
-asked to review it again — even under the same account, even for the same person.
+**One review session, one identifier, used by no one else.** A review session is one review of one
+state of the pull request, run by one conversation: it starts with the first comment you publish
+and ends with the `reviewed:` that closes it (section 8). Another agent reviewing the same pull
+request in parallel is another session, and so is a later conversation asked to review it again —
+even under the same account, even for the same person. A single conversation may run several
+sessions in a row, one per `reviewed:` (see *After your `reviewed:`* below).
 
 **At the start of your session, draw its identifier once**, before you publish anything, and keep
-it for the whole session: every finding, every pass, every follow-up. Never draw a new one per
-comment or per pass.
+it for the whole session: every finding, every pass, every follow-up, up to its `reviewed:`. Never
+draw a new one per comment or per pass.
 
 How the identifier is drawn — with Slugger, or as a GUID when Slugger was declined — is settled once
 per installation of this skill:
@@ -284,14 +289,32 @@ never chosen by you. In particular:
 pull request; if one already carries `[session:<your identifier>]`, the draw collided with another
 session: draw again, and check again.
 
-**Coming back within the same session** — after fixes or new commits — you reuse the identifier
-you drew, which you still hold in this conversation. When you do not hold one, you are a new
-session: draw a new identifier, even if the person asked you to resume an earlier review.
+**Coming back before your `reviewed:`** — after fixes or new commits — your review is still open:
+reuse the identifier you drew, which you still hold in this conversation. When you do not hold one,
+you are a new session: draw a new identifier, even if the person asked you to resume an earlier
+review.
+
+**After your `reviewed:`**, the identifier depends on whether the pull request changed since. Tell
+it by the head commit, not by memory: compare the pull request's head with the SHA you noted when
+you posted `reviewed:` (section 8).
+
+- **The head commit changed** — commits were pushed, the branch was rebased or force-pushed: what
+  you examine is a new state, and a new review. Draw a new identifier, check that it is unused, and
+  use it for every comment of that review, up to its own `reviewed:`. An identifier thus never
+  carries findings after the `reviewed:` that closed it, and a reader sees each review end where
+  its marker stops.
+- **The head commit is the same** — you come back because you missed something on the state you
+  closed on: you are reopening that review, not starting one. Keep its identifier, post what you
+  missed, and close again with a new `reviewed:` once every condition of section 8 holds. Say in
+  the finding that it reopens your review: the earlier `reviewed:` no longer holds.
+
+When both apply — the head moved, and you also notice something you had missed on the earlier
+state — the head decides: it is a new review, under a new identifier.
 
 A new session may follow up on findings an earlier session left open: read them as existing
-discussions, verify them, and post your follow-ups under **your own** marker. Their threads are not
-your own findings: resolve only the threads whose finding carries your marker, and leave the others
-for their reviewer or a human.
+discussions, verify them, and post your follow-ups under **your own** marker. Threads opened by
+another conversation are not your own findings: resolve only the threads whose finding carries an
+identifier you drew in this conversation, and leave the others for their reviewer or a human.
 
 **End every comment of the session with the marker**, on its own last line, after a blank line:
 

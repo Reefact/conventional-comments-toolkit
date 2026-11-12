@@ -1,4 +1,4 @@
-# Écrire des commentaires de revue
+# Rédiger des commentaires de revue
 
 **Langues :** [English](writing-comments-en.md) | Français (ce fichier)
 
@@ -24,14 +24,14 @@ Un 404 est réessayé indéfiniment ; l'appelant n'abandonne que sur un délai d
 
 - Le **label** dit de quel type de commentaire il s'agit. Il est obligatoire
   ([labels](labels-fr.md)).
-- Une **décoration** le qualifie, le plus souvent pour dire si le point est bloquant
+- Une **décoration** précise le commentaire, le plus souvent pour dire si le point est bloquant
   ([décorations](labels-fr.md#décorations)).
 - Le **sujet** est un résumé sur une ligne. Il est obligatoire.
 - La **discussion** est tout ce qui se trouve hors de la ligne de préfixe, en Markdown libre.
 
 C'est le format de [Conventional Comments](https://conventionalcomments.org/). L'extension
-n'est plus stricte que cette page que sur la forme du préfixe, pour qu'une machine puisse le
-lire ; elle ne juge jamais la formulation de votre sujet.
+n'est plus exigeante que ce site que sur un point : la forme du préfixe, pour qu'une machine
+puisse le lire. Elle ne juge jamais la formulation de votre sujet.
 
 Quelques tolérances : les espaces avant le deux-points sont acceptées (`issue : sujet`, comme
 l'écrit la typographie française), un emoji en tête est ignoré, et `(ux,non-blocking)` est lu
@@ -39,7 +39,7 @@ comme `(ux, non-blocking)`.
 
 ## La barre d'outils
 
-Une barre d'outils est ajoutée à chaque champ de commentaire que l'extension prend en charge.
+L'extension ajoute une barre d'outils à chaque champ de commentaire qu'elle prend en charge.
 
 ![La barre d'outils au-dessus d'un champ de commentaire : les boutons de label sur deux rangées, le sélecteur de décoration, et la pastille Conforme sous le champ](../images/toolbar-fr.png)
 
@@ -59,10 +59,11 @@ couleurs du thème clair de GitHub. Ce n'est pas une capture d'écran de github.
 - **Choisir une décoration** l'ajoute au préfixe : `issue` puis `non-blocking` donne
   `issue (non-blocking): `.
 
-Chaque rangée passe à la ligne sur elle-même quand le champ est étroit ; labels et décorations
-ne partagent jamais une rangée. Vous pouvez placer en tête vos labels les plus utilisés avec
-*Ordre des boutons* dans la [page de réglages](settings-fr.md#préférences-locales), et écrire
-les préfixes sans la souris grâce à la [saisie au clavier](keyboard-input-fr.md).
+Quand le champ est étroit, chaque rangée se replie sur plusieurs lignes, mais labels et
+décorations ne partagent jamais une rangée. Vous pouvez placer en tête vos labels les plus
+utilisés avec *Ordre des boutons* dans la
+[page de réglages](settings-fr.md#préférences-locales), et écrire les préfixes sans la souris
+grâce à la [saisie au clavier](keyboard-input-fr.md).
 
 ## La pastille de validation
 
@@ -87,7 +88,7 @@ isue: le nom est ambigu
 
 Quand la configuration elle-même a un problème (une clé inconnue, un fichier invalide, une clé
 que l'organisation ne laisse pas un dépôt assouplir), la pastille le dit après les
-diagnostics. Ces avis ne changent aucun verdict.
+diagnostics. Ces avis ne changent pas le verdict (conforme ou non) du commentaire.
 
 ## Ce qui est validé, et ce qui ne l'est pas
 
@@ -101,7 +102,7 @@ diagnostics. Ces avis ne changent aucun verdict.
 | Une réponse qui porte le label `decision` | Toujours | Non |
 | La description de la pull request | Non | Non |
 
-Modifier un commentaire est validé comme l'écrire.
+Un commentaire que vous modifiez est validé comme un commentaire que vous écrivez.
 
 Un commentaire est **exempté**, et ne reçoit aucun diagnostic, quand :
 
@@ -125,29 +126,30 @@ c'est votre préfixe qui l'emporte.
 son icône, et chaque décoration sous la forme d'un badge distinct. Survoler le badge du label
 indique ce que le commentaire signifie pour qui le lit. Quand c'est possible sans rien perdre,
 le préfixe est masqué dans le texte, les badges prennent sa place et le sujet est mis en
-valeur, si bien que la ligne se lit comme un titre. Le commentaire stocké n'est jamais
-modifié : le modifier montre le préfixe tel qu'il a été écrit, et quiconque n'a pas
-l'extension voit le texte brut.
+valeur, si bien que la ligne se lit comme un titre. L'extension ne modifie jamais le
+commentaire enregistré : si vous le modifiez, vous retrouvez le préfixe tel qu'il a été écrit,
+et une personne sans l'extension voit le texte brut.
 
 **Bandeau.** En haut de la pull request, un bandeau compte les **fils bloquants non résolus**
 et renvoie à chacun d'eux. Un fil est bloquant quand son premier commentaire l'est
 ([ce qui rend un commentaire bloquant](labels-fr.md#ce-qui-rend-un-commentaire-bloquant)). Le
 bandeau informe ; il n'empêche jamais une fusion.
 
-**Filtre de fils.** Au-dessus des fils, une rangée de puces les filtre par label. Il ne
-masque les fils que sur votre écran.
+**Filtre de fils.** Au-dessus des fils, une rangée de puces les filtre par label. Le filtre
+ne masque les fils que sur votre écran.
 
-**Marqueur de session de revue.** Une ligne `[session:<nom>]`, seule sur sa ligne, dit quelle
-session de revue a écrit un commentaire, ce qui aide quand plusieurs agents IA relisent la
-même pull request ([skills de revue](review-skills-fr.md)). L'extension masque cette ligne et
-affiche une mention discrète `🤖 session: <nom>` en bas du commentaire. Le marqueur ne fait
-pas partie du commentaire pour la validation.
+**Marqueur de session de revue.** Une ligne qui ne contient que `[session:<nom>]` indique
+quelle session de revue a écrit un commentaire, ce qui aide quand plusieurs agents IA
+relisent la même pull request ([skills de revue](review-skills-fr.md)). L'extension masque
+cette ligne et affiche une mention discrète `🤖 session: <nom>` en bas du commentaire. La
+validation ignore ce marqueur, à une exception près : un commentaire qui en porte plusieurs reçoit
+l'avertissement `W-SESSION-MULTIPLE`.
 
 ## Clore un fil bloquant sans faire le changement demandé
 
-Il arrive que ceux qui portent la PR décident de ne pas traiter un point bloquant : hors
-périmètre, dette acceptée, décision prise ailleurs. C'est une décision de revue, et elle
-s'écrit dans le fil, en réponse :
+Il arrive que les responsables de la pull request décident de ne pas traiter un point
+bloquant : hors périmètre, dette acceptée, décision prise ailleurs. C'est une décision de
+revue, et elle s'écrit dans le fil, en réponse :
 
 ```text
 decision: hors périmètre de cette pull request, dette suivie en PROJ-142
@@ -157,4 +159,4 @@ L'auteur du commentaire est absent et le correctif doit être livré aujourd'hui
 
 Une `decision` doit énoncer son motif en au moins 20 caractères
 (`rules.minDecisionSubjectLength`). Elle consigne le choix là où la discussion a eu lieu ;
-elle ne résout pas le fil, ce qui reste un geste de la plateforme.
+elle ne résout pas le fil, qui se résout toujours dans l'interface de la plateforme.

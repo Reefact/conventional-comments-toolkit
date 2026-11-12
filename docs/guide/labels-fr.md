@@ -9,7 +9,7 @@ ce qui suit est ce que vous obtenez sans aucune configuration.
 ## Les labels qui soulèvent un point
 
 Ce sont les labels de [Conventional Comments](https://conventionalcomments.org/). Ils ouvrent
-un point ; ils sont d'abord ceux du relecteur.
+un point, et c'est d'abord le relecteur qui les emploie.
 
 | Label | À utiliser pour… | Exemple | Bloquant par défaut | Peut devenir bloquant |
 |---|---|---|:---:|:---:|
@@ -36,19 +36,19 @@ l'extension ne le vérifie jamais.
 ## Les labels qui ne font pas partie de Conventional Comments
 
 Conventional Comments donne un vocabulaire à la **remarque** de revue et ne dit rien de la
-**réponse** à cette remarque, et il invite les équipes à s'écarter de sa liste. L'extension
-ajoute sept labels qui lui sont propres. Ce sont des labels ordinaires : même format, mêmes
-décorations, mêmes règles. Aucun d'eux ne peut ouvrir un fil bloquant.
+**réponse** à cette remarque ; la convention invite d'ailleurs les équipes à adapter sa
+liste. L'extension ajoute sept labels qui lui sont propres. Ce sont des labels ordinaires :
+même format, mêmes décorations, mêmes règles. Aucun d'eux ne peut ouvrir un fil bloquant.
 
 ### Répondre à un point
 
 | Label | À utiliser pour… | Exemple | Aussi accepté |
 |---|---|---|---|
-| 🤝 `thanks` | Remercier, sans prendre position sur le point ni sur le code. | `thanks: merci pour la relecture attentive` | `thx` |
-| ✅ `done` | Indiquer que le code a changé à la suite de la remarque. | `done: jeton propre à la plateforme retiré` | `fixed` |
+| 🤝 `thanks` | Remercier, sans prendre position. | `thanks: merci pour la relecture attentive` | `thx` |
+| ✅ `done` | Indiquer que la correction est poussée, avec son commit. | `done: jeton propre à la plateforme retiré` | `fixed` |
 | 👌 `ack` | Accepter un point sans changer le code à ce stade. | `ack: bien noté, je garde ça pour le module suivant` | `acknowledged` |
-| ✋ `disagree` | Décliner une remarque en disant pourquoi. Un avis : il n'emporte aucune autorité et ne résout rien. | `disagree: la correspondance est volontairement indépendante de la plateforme` | |
-| ⚖️ `decision` | Acter, motif à l'appui, qu'un point ne sera **pas** traité. Écrit par ceux qui portent la PR, dans le fil qu'il clôt. | `decision: hors périmètre, dette suivie en PROJ-142` | |
+| ✋ `disagree` | Décliner une remarque en disant pourquoi. | `disagree: la correspondance est volontairement indépendante de la plateforme` | |
+| ⚖️ `decision` | Acter qu’un point ne sera pas traité, motif à l’appui. | `decision: hors périmètre, dette suivie en PROJ-142` | |
 
 ```text
 issue (blocking): les jetons CSS d'une plateforme fuient dans la feuille partagée
@@ -57,8 +57,8 @@ issue (blocking): les jetons CSS d'une plateforme fuient dans la feuille partag�
 done: jeton propre à la plateforme retiré
 ```
 
-**`done`, `ack` ou `disagree` ?** Une réponse prend position sur une seule question : le code
-a-t-il changé, et si non, est-ce que je concède le point ?
+**`done`, `ack` ou `disagree` ?** Une réponse tranche une seule question : le code a-t-il
+changé, et sinon, concédez-vous le point ?
 
 - Le code a changé → `done`.
 - Le code n'a pas changé et le point était valide (coût, périmètre, priorité, ou simplement
@@ -68,17 +68,19 @@ a-t-il changé, et si non, est-ce que je concède le point ?
 `ack` n'est pas un refus poli : `ack: juste, mais je laisse tel quel` est un `disagree`.
 
 **`disagree` n'est pas `decision`.** `disagree` est un avis, que n'importe qui peut exprimer.
-`decision` acte un choix de ceux qui portent la PR ; son sujet doit donner le motif en au
-moins 20 caractères, et il est validé même là où les réponses ne le sont pas
+`decision` acte un choix des responsables de la pull request. Son sujet doit donner le motif
+en au moins 20 caractères, et une `decision` est validée même là où les réponses ne le sont
+pas
 ([clore un fil sans faire le changement](writing-comments-fr.md#clore-un-fil-bloquant-sans-faire-le-changement-demandé)).
-Ni l'un ni l'autre ne résout le fil : cela reste un geste de la plateforme.
+Ni l'un ni l'autre ne résout le fil, qui se résout toujours dans l'interface de la
+plateforme.
 
 ### Dire où en est une revue
 
 | Label | À utiliser pour… | Exemple |
 |---|---|---|
-| 📋 `summary` | Faire le point sur une revue ou sur une passe : ce qui a été vérifié, ce qui reste ouvert. Ne clôt rien. | `summary: deux points vérifiés, un reste ouvert` |
-| 🎉 `reviewed` | Clore votre propre revue : vos points sont traités, vous n'avez rien à ajouter. N'approuve rien. | `reviewed: corrections vérifiées, rien à ajouter` |
+| 📋 `summary` | Faire le point sur une passe : vérifié, encore ouvert. Ne clôt pas la revue. | `summary: deux points vérifiés, un reste ouvert` |
+| 🎉 `reviewed` | Clore votre revue quand tous vos points sont traités. N’approuve rien. | `reviewed: corrections vérifiées, rien à ajouter` |
 
 **Quand publier `reviewed`.** Il clôt votre revue dans son ensemble, pas une passe de lecture.
 Publiez-le quand chacun de vos points est traité (corrigé et vérifié, ou écarté par une
@@ -93,8 +95,8 @@ Un `summary` ne tient jamais lieu de `reviewed`, même quand plus aucun point n'
 ### S'en tenir à Conventional Comments
 
 Six de ces sept labels forment les **labels ajoutés** : `thanks`, `done`, `ack`, `disagree`,
-`summary` et `reviewed`. Une équipe qui ne veut que la liste de l'amont les désactive dans la
-configuration du dépôt, une entrée par label. La
+`summary` et `reviewed`. Une équipe qui ne veut que la liste de Conventional Comments les
+désactive dans la configuration du dépôt, une entrée par label. La
 [page de réglages](settings-fr.md#labels-ajoutés) affiche le bloc et le copie pour vous :
 
 ```json
@@ -106,7 +108,7 @@ configuration du dépôt, une entrée par label. La
               { "id": "reviewed", "enabled": false } ] }
 ```
 
-`decision` ne fait pas partie de ce groupe, pour que retirer les ajouts ne le désactive pas.
+`decision` ne fait pas partie de ce groupe : désactiver les labels ajoutés le laisse actif.
 
 ## Décorations
 
@@ -154,9 +156,9 @@ La première règle qui s'applique l'emporte :
 
 Un commentaire bloquant ouvre un **fil bloquant** quand il est le premier commentaire d'un
 fil qui peut être résolu. Le bandeau compte ces fils tant qu'ils ne sont pas résolus
-([le bandeau](writing-comments-fr.md#une-fois-les-commentaires-publiés)). Éditer `issue:` en
-`note:` rend le fil non bloquant : l'extension lit l'état courant de la page et ne garde
-aucun historique.
+([le bandeau](writing-comments-fr.md#une-fois-les-commentaires-publiés)). Si vous modifiez
+`issue:` en `note:`, le fil devient non bloquant : l'extension lit l'état courant de la page
+et ne garde aucun historique.
 
 ## Alias
 

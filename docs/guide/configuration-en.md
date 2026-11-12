@@ -130,7 +130,7 @@ as a configuration notice.
   an unknown decoration is `E-UNKNOWN-DECORATION`.
 - `known`: decorations by `id`. `forces` is `"blocking"`, `"non-blocking"` or `null` for a
   purely descriptive decoration. Shipped: `blocking`, `non-blocking`, `if-minor`. A decoration
-  whose `forces` is not `null` gets a segment in the toolbar.
+  whose `forces` is not `null` gets its own button in the toolbar's decoration selector.
 
 ### `severities`
 
@@ -227,7 +227,7 @@ Abbreviations expanded by `Tab`, each mapped to the text inserted. See
 | No file | Uses the organisation's configuration, then the product defaults. This is normal, not an incident. |
 | Invalid JSON, or an unusable value for a known key (`"mode": "banana"`) | Falls back to the last valid level and shows an *invalid configuration* notice with the faulty line. |
 | An unknown key | Ignores that key, reports it, applies the rest. |
-| The file cannot be reached | Falls back to the level below and shows *Configuration unread*: it assists and no longer blocks. |
+| The file cannot be reached | Falls back to the next level (the organisation's configuration, then the product defaults) and shows *Configuration unread*: it assists and no longer blocks. |
 | A newer `version` or `coreMinVersion` than the extension supports | Falls back to `assist`, or to the enterprise floor if it is stricter, and reports it. |
 
 A broken file never silently removes an enterprise floor.

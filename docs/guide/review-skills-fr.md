@@ -1,15 +1,15 @@
-# Skills de revue pour agents IA
+# Skills de revue pour les agents IA
 
 **Langues :** [English](review-skills-en.md) | Français (ce fichier)
 
-Deux skills permettent à un agent IA de prendre part à une revue comme ce toolkit l'attend :
-un pour l'agent qui relit, un pour l'agent qui répond. Chacun est un répertoire sous
-[`skills/`](../../skills), dont le `SKILL.md` est chargé tel quel par Claude Code et peut être
-donné comme instructions à n'importe quel autre agent.
+Deux skills permettent à un agent IA de prendre part à une revue comme cette boîte à outils
+l'attend : un pour l'agent qui relit, un pour l'agent qui répond. Chacun est un répertoire de
+[`skills/`](../../skills) : Claude Code charge son `SKILL.md` tel quel, et vous pouvez donner
+ce fichier comme instructions à n'importe quel autre agent.
 
 | Skill | Pour | Ce que fait l'agent |
 |---|---|---|
-| [`review-pull-request`](../../skills/review-pull-request/SKILL.md) | Le **relecteur** | Publie ses constats sous forme de Conventional Comments, cotés de P0 à P3, les suit jusqu'à ce que chaque correction soit vérifiée, et clôt sa revue avec `reviewed:` quand il ne reste rien. |
+| [`review-pull-request`](../../skills/review-pull-request/SKILL.md) | Le **relecteur** | Publie ses constats sous forme de Conventional Comments, classés par priorité de P0 à P3, les suit jusqu'à ce que chaque correction soit vérifiée, et clôt sa revue avec `reviewed:` quand il ne reste rien. |
 | [`respond-to-review`](../../skills/respond-to-review/SKILL.md) | L'**auteur** de la pull request | Répond à chaque constat et à chaque question avec `done:`, `ack:`, `disagree:` ou `thanks:` (ou `note:` pour informer, `question:` pour demander en retour) et pousse les corrections. |
 
 Aucun des deux n'approuve ni ne fusionne : ces décisions restent humaines. Le skill de
@@ -21,8 +21,8 @@ les labels qu'il active.
 ## Installer
 
 Installez ou transmettez **le répertoire entier**, pas le seul `SKILL.md` : le skill du
-relecteur s'appuie sur les fichiers qui l'accompagnent, qui disent comment sont choisis les
-identifiants de session de revue.
+relecteur s'appuie sur les fichiers qui l'accompagnent, et ce sont eux qui indiquent comment
+choisir les identifiants de session de revue.
 
 ## Sessions de revue
 
@@ -47,16 +47,17 @@ la ligne et affiche `🤖 session: disheartening-reviewed-implementation` en bas
   request ne le porte pas déjà. Elle n'en reprend jamais un de la pull request, d'une autre
   session ou d'une conversation antérieure.
 - L'identifiant est un nom lisible tiré par [Slugger](https://github.com/Reefact/slugger),
-  ou un GUID. Le choix est fait une fois par installation et consigné dans un fichier
-  `session-id.md` commité à côté du skill ; quand rien n'est encore consigné, le skill du
+  ou un GUID. Ce choix se fait une fois par installation et se consigne dans un fichier
+  `session-id.md`, versionné à côté du skill ; quand rien n'est encore consigné, le skill du
   relecteur propose Slugger une fois et consigne la réponse.
-- Un nom Slugger peut porter une description, une phrase qui reprend ses mots, après un tiret
-  cadratin et en italique. L'extension affiche le nom, et la phrase au survol :
+- Un nom Slugger peut être suivi d'une description : une phrase qui reprend ses mots, placée
+  après un tiret cadratin et écrite en italique. L'extension affiche le nom, et la phrase au
+  survol :
 
   ```text
   [session:disheartening-reviewed-implementation — *We reviewed the implementation, and frankly, it was disheartening.*]
   ```
 
 Un marqueur est une métadonnée facultative. Il est retiré avant la validation et ne change
-aucun verdict ; un commentaire qui porte plus d'un marqueur ne désigne aucune session et
-reçoit un avertissement.
+pas le verdict du commentaire ; un commentaire qui porte plus d'un marqueur ne désigne aucune
+session et reçoit un avertissement.

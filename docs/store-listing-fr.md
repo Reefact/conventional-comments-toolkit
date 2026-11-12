@@ -44,9 +44,8 @@ contenu, qui elle tient sans condition.
 >   un commentaire ne respecte pas la convention.
 > - Une saisie rapide au clavier pour les personnes qui préfèrent ne pas
 >   toucher la souris.
-> - Un fonctionnement autonome, sans backend requis : l'extension assiste
->   et valide même sans le composant serveur optionnel de gouvernance
->   d'équipe.
+> - Un fonctionnement autonome, sans aucun serveur : l'extension est tout
+>   le produit.
 >
 > **Confidentialité par conception**
 > Aucun contenu de commentaire, de code ou de diff ne quitte votre
@@ -58,9 +57,10 @@ contenu, qui elle tient sans condition.
 > https://github.com/reefact/conventional-comments-toolkit/blob/main/PRIVACY.md
 >
 > **Pour les organisations**
-> Un composant serveur optionnel (non requis pour utiliser l'extension)
-> permet de faire respecter la convention comme condition de fusion des
-> pull requests, avec un mécanisme d'exemption gouverné et traçable.
+> Une configuration partagée et un plancher de règles peuvent être
+> poussés par la politique d'entreprise du navigateur. L'extension
+> signale les fils bloquants non résolus ; elle ne contrôle pas la
+> fusion des pull requests.
 >
 > Code source public sous licence Apache-2.0 :
 > https://github.com/reefact/conventional-comments-toolkit

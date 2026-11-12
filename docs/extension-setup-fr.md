@@ -198,5 +198,5 @@ n'importe quel onglet, sans repasser par `chrome://extensions`.
    le champ.
 
 Si tout ça fonctionne, l'extension est opérationnelle. Elle tourne en mode `assist` par
-défaut — elle aide et signale, mais ne bloque jamais l'envoi (voir `A-FAIRE-fr.md` à la
-racine du dépôt pour la suite : composant serveur, autres plateformes, etc.).
+défaut — elle aide et signale, mais ne bloque jamais l'envoi (voir le [guide utilisateur](README-fr.md)
+pour tout ce qu'elle fait, et `A-FAIRE-fr.md` à la racine du dépôt pour ce qui reste à faire).

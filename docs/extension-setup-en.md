@@ -190,5 +190,5 @@ extension's settings page from any tab, without going back through
    field.
 
 If all of that works, the extension is up and running. It operates in `assist` mode by
-default — it helps and flags issues, but never blocks submission (see `A-FAIRE-fr.md` at
-the repository root for what's next: the server component, other platforms, etc.).
+default — it helps and flags issues, but never blocks submission (see the [user guide](README-en.md)
+for everything it does, and `A-FAIRE-fr.md` at the repository root for what remains to be done).

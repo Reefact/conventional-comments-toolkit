@@ -47,7 +47,7 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
   it.each([
     ['issue : fix this', 'issue : ', 1],
     ['issue (blocking) : fix this', 'issue (blocking) : ', 2],
-    ['issue : fix this', 'issue : ', 1],
+    ['issue\u00A0: fix this', 'issue\u00A0: ', 1],
   ])('masque aussi les blancs avant le deux-points — %j', (body, hiddenText, badgeCount) => {
     const el = document.createElement('div');
     el.textContent = body;

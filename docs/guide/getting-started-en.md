@@ -19,8 +19,8 @@ one for Firefox.
 
 1. Open the [releases page](https://github.com/reefact/conventional-comments-toolkit/releases)
    and download `conventional-comments-toolkit-<version>-chromium.zip` (or `-firefox.zip`).
-2. Unzip it somewhere you will keep. The browser re-reads that folder at every start, so
-   deleting it disables the extension.
+2. Unzip it somewhere you will keep. The browser re-reads that folder each time it starts,
+   so deleting it disables the extension.
 3. Load it:
    - **Chrome, Edge:** open `chrome://extensions`, turn on **Developer mode**, click
      **Load unpacked** and pick the unzipped folder, the one that directly contains
@@ -35,7 +35,7 @@ loading it again. To build the extension from source instead, follow the
 
 ## 2. Allow your platform
 
-The extension's settings page opens by itself after the installation, with a short guided
+The extension's settings page opens by itself after installation, with a short guided
 tour. You can reopen it at any time by clicking the extension's icon in the browser toolbar.
 
 **The extension is inactive everywhere until you allow a domain.** It asks for no site access
@@ -66,8 +66,9 @@ the pill stays silent there.
    nitpick: this name does not say what the variable holds
    ```
 
-   The pill turns to *Compliant*.
-5. Publish the comment as usual. Once published, its label is shown as a coloured badge.
+   The pill changes to *Compliant*.
+5. Publish the comment with the platform's usual button. Once published, its label is shown
+   as a coloured badge.
 
 That is the whole loop: write, pick a label, publish.
 

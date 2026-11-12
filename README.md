@@ -30,12 +30,12 @@ uses it their own way.
 
 ## The solution
 
-The extension adds what the convention lacks to the platform's own comment field: the labels
-one click away, an answer as you type, and a readable result once published.
+The extension adds what the convention lacks to the platform's own comment field: labels one
+click away, feedback as you type, and a readable result once the comment is published.
 
 ![The toolbar above a comment field: label buttons, the decoration selector and the Compliant pill](docs/images/toolbar-en.png)
 
-A mistake is named, with its correction one click away:
+Each mistake is named, and its fix is one click away:
 
 ![A comment with a misspelt label: the E-UNKNOWN-LABEL message and its Fix button](docs/images/diagnostic-en.png)
 
@@ -68,9 +68,9 @@ of GitHub's light theme. Not screenshots of github.com.*
 1. Download the archive for your browser from the
    [releases page](https://github.com/reefact/conventional-comments-toolkit/releases), unzip
    it, and load the folder (`chrome://extensions` → Developer mode → Load unpacked).
-2. In the settings page that opens, allow your platform: the extension is inactive everywhere
-   until you allow a domain.
-3. Open a pull request and click into a new comment.
+2. The extension's settings page opens by itself. Allow your platform there: until you allow
+   a domain, the extension is inactive everywhere.
+3. Open a pull request and click into the field of a new comment.
 
 **→ [Getting started](docs/guide/getting-started-en.md)** walks through these three steps in
 ten minutes.
@@ -116,8 +116,8 @@ the send button refuses a comment with an error.
 A comment posted through the platform's API, another browser or a machine without the
 extension is not checked.
 
-**It does not control the merge.** Unresolved blocking threads are reported, never prevented
-from merging ([DEC0010](docs/idr/DEC0010-the-extension-is-the-whole-product-en.md)). A team
+**It does not control the merge.** Unresolved blocking threads are reported; the extension
+never prevents a merge ([DEC0010](docs/idr/DEC0010-the-extension-is-the-whole-product-en.md)). A team
 that wants merges gated on resolved conversations uses its platform's own settings.
 
 **It checks the form, never the content.** Whether a remark is right, useful or kind is not
@@ -142,14 +142,14 @@ and cannot be turned on by a repository. [Privacy policy](PRIVACY.md).
 | [Diagnostics](docs/guide/diagnostics-en.md) | Every code of the pill, and how to fix it |
 | [Configuration](docs/guide/configuration-en.md) | The repository file, key by key |
 | [Modes and adoption](docs/guide/modes-and-adoption-en.md) | `off`, `assist`, `enforce`, and how to get there |
-| [Deploying for an organisation](docs/guide/organization-en.md) | Shared configuration, floor, hosts, telemetry |
+| [Deploying for an organisation](docs/guide/organization-en.md) | Shared configuration, minimum rules (the floor), hosts, telemetry |
 | [FAQ and troubleshooting](docs/guide/faq-en.md) | When something does not show up |
 
 ## Labels the toolkit adds
 
 Conventional Comments gives review **feedback** a vocabulary and says nothing about
 **replying** to it. The toolkit ships labels of its own for that. They are **not part of
-Conventional Comments**; a repository that wants the upstream list only disables them.
+Conventional Comments**; a repository that wants only the upstream list disables them.
 
 | Label | Meaning | Also accepted |
 |---|---|---|

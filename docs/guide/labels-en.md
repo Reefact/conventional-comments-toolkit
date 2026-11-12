@@ -9,7 +9,7 @@ is what you get with no configuration at all.
 ## Labels that raise a point
 
 These are the labels of [Conventional Comments](https://conventionalcomments.org/). They open
-a point; they are first the reviewer's.
+a point, and are used mainly by the reviewer.
 
 | Label | Use it to… | Example | Blocking by default | Can be made blocking |
 |---|---|---|:---:|:---:|
@@ -27,7 +27,7 @@ a point; they are first the reviewer's.
 | 🪶 `quibble` | Flag a debatable detail. **Shipped disabled.** | `quibble: slightly long name` | No | Yes |
 
 `quibble` is the one label shipped disabled: Conventional Comments defines it as a `nitpick`
-under another name, and two buttons for one meaning only leave an arbitrary choice. A
+under another name, and two buttons with one meaning only force an arbitrary choice. A
 repository that wants it enables it with `{ "id": "quibble", "enabled": true }`.
 
 "Use at least one `praise` per review" is good practice, not a rule: the extension never
@@ -36,7 +36,7 @@ checks it.
 ## Labels that are not part of Conventional Comments
 
 Conventional Comments gives review **feedback** a vocabulary and says nothing about
-**replying** to it, and it invites teams to diverge from its list. The extension adds seven
+**replying** to it, and it invites teams to adapt its list. The extension adds seven
 labels of its own. They are ordinary labels: same format, same decorations, same rules. None
 of them can open a blocking thread.
 
@@ -44,11 +44,11 @@ of them can open a blocking thread.
 
 | Label | Use it to… | Example | Also accepted |
 |---|---|---|---|
-| 🤝 `thanks` | Say thank you, without taking a position on the point or the code. | `thanks: thanks for the careful review` | `thx` |
-| ✅ `done` | Say the code changed because of the remark. | `done: removed the platform-specific token` | `fixed` |
+| 🤝 `thanks` | Say thank you, without taking a position. | `thanks: thanks for the careful review` | `thx` |
+| ✅ `done` | Say the fix is pushed, citing its commit. | `done: removed the platform-specific token` | `fixed` |
 | 👌 `ack` | Accept a point without changing the code at this stage. | `ack: understood, I'll keep it in mind for the next module` | `acknowledged` |
-| ✋ `disagree` | Decline a remark and say why. An opinion: it carries no authority and resolves nothing. | `disagree: the mapping is intentionally platform-independent` | |
-| ⚖️ `decision` | Record, with a reason, that a point will **not** be addressed. Written by those who carry the pull request, in the thread it closes. | `decision: out of scope, debt tracked in PROJ-142` | |
+| ✋ `disagree` | Decline a remark and say why. | `disagree: the mapping is intentionally platform-independent` | |
+| ⚖️ `decision` | Record that a point will not be addressed, with the reason. | `decision: out of scope, debt tracked in PROJ-142` | |
 
 ```text
 issue (blocking): platform CSS tokens leak into the shared stylesheet
@@ -68,17 +68,17 @@ change, and if not, do I concede the point?
 `ack` is not a polite refusal: `ack: right, but I'm leaving it as is` is a `disagree`.
 
 **`disagree` is not `decision`.** `disagree` is an opinion anyone can voice. `decision`
-records a choice of those who carry the pull request; its subject must give the reason in at
-least 20 characters, and it is validated even where replies are not
+records a choice made by the people responsible for the pull request; its subject must give
+the reason in at least 20 characters, and it is validated even where replies are not
 ([closing a thread without making the change](writing-comments-en.md#closing-a-blocking-thread-without-making-the-change)).
-Neither resolves the thread: that stays a gesture of the platform.
+Neither resolves the thread: you still resolve it with the platform's own control.
 
 ### Saying where a review stands
 
 | Label | Use it to… | Example |
 |---|---|---|
-| 📋 `summary` | Recap a review or one pass: what was checked, what is still open. Closes nothing. | `summary: two points checked, one still open` |
-| 🎉 `reviewed` | Close your own review: your points are dealt with, you have nothing to add. Approves nothing. | `reviewed: fixes checked, nothing to add` |
+| 📋 `summary` | Recap a pass: what is checked, what is still open. Does not close the review. | `summary: two points checked, one still open` |
+| 🎉 `reviewed` | Close your review once all your points are dealt with. Approves nothing. | `reviewed: fixes checked, nothing to add` |
 
 **When to post `reviewed`.** It closes your review as a whole, not one reading pass. Post it
 once each of your points is dealt with (fixed and checked, or set aside by a reply you
@@ -92,9 +92,9 @@ A `summary` never stands in for `reviewed`, even when no point is left open.
 ### Sticking to Conventional Comments
 
 Six of these seven labels form the **added labels**: `thanks`, `done`, `ack`, `disagree`,
-`summary` and `reviewed`. A team that wants the upstream list only disables them in the
-repository's configuration, one entry each. The [settings page](settings-en.md#added-labels)
-shows the block and copies it for you:
+`summary` and `reviewed`. A team that wants only the upstream list disables them in the
+repository's configuration, with one entry per label. The
+[settings page](settings-en.md#added-labels) shows the block and copies it for you:
 
 ```json
 { "labels": [ { "id": "thanks", "enabled": false },
@@ -105,7 +105,7 @@ shows the block and copies it for you:
               { "id": "reviewed", "enabled": false } ] }
 ```
 
-`decision` is not in that group, so that removing the additions does not switch it off.
+`decision` is not in that group, so disabling the added labels leaves it on.
 
 ## Decorations
 
@@ -134,8 +134,8 @@ extension warns when they carry none of the three decorations above.
 
 The first rule that applies wins:
 
-1. A label that can never be blocking (`nitpick`, `thought`, `note` and the seven labels of
-   the extension) with `(blocking)` is an **error**, `E-CONFLICT`.
+1. A label that can never be blocking (`nitpick`, `thought`, `note` and the seven labels the
+   extension adds) with `(blocking)` is an **error**, `E-CONFLICT`.
 2. `(blocking)` together with `(non-blocking)` or `(if-minor)` is an **error**, `E-CONFLICT`.
 3. `(blocking)` alone → blocking.
 4. `(non-blocking)` or `(if-minor)` → not blocking.
@@ -160,6 +160,6 @@ keeps no history.
 ## Aliases
 
 An alias is another spelling accepted for a label: `fixed:` is read as `done:`, `thx:` as
-`thanks:`, `acknowledged:` as `ack:`. An alias produces no diagnostic; the extension offers
-to rewrite it to the label's name, without insisting. A repository can declare its own, for
+`thanks:`, `acknowledged:` as `ack:`. An alias produces no diagnostic; the extension offers,
+without insisting, to replace it with the label's name. A repository can declare its own, for
 example `bug` for `issue` ([configuration](configuration-en.md#labels)).

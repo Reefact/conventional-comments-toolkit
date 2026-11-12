@@ -4,8 +4,8 @@
 
 Two skills let an AI agent take part in a review the way this toolkit expects: one for the
 agent that reviews, one for the agent that answers. Each is a directory under
-[`skills/`](../../skills), whose `SKILL.md` Claude Code loads as is and any other agent can
-be given as instructions.
+[`skills/`](../../skills). Claude Code loads its `SKILL.md` as is; any other agent can be
+given that file as instructions.
 
 | Skill | For | What the agent does |
 |---|---|---|
@@ -48,8 +48,8 @@ comment ([writing review comments](writing-comments-en.md#once-comments-are-publ
   or a GUID. The choice is made once per installation and recorded in a `session-id.md` file
   committed beside the skill; where none is recorded yet, the reviewer's skill offers Slugger
   once and records the answer.
-- A Slugger name can carry a description, one sentence that renders its words, after an em
-  dash and in italics. The extension shows the name, and the sentence on hover:
+- A Slugger name can carry a description: one sentence built from its words, written after an
+  em dash and in italics. The extension shows the name, and the sentence on hover:
 
   ```text
   [session:disheartening-reviewed-implementation — *We reviewed the implementation, and frankly, it was disheartening.*]

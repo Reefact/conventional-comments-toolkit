@@ -37,12 +37,12 @@ Starting from a machine with none of this installed? See the step-by-step Window
 guide: [`extension-setup-en.md`](extension-setup-en.md) (French:
 [`extension-setup-fr.md`](extension-setup-fr.md)).
 
-Some commands question the **browser** rather than the code, and drive a real Chromium through
+Some commands test the **browser** rather than the code, and drive a real Chromium through
 `playwright-core`: `npm run smoke:mv3`, `npm run spike`, and most `npm run check:*` commands
 listed in [`CLAUDE.md`](../CLAUDE.md). Once per machine: `npx playwright-core install chromium`.
-`package.json` is the reference for what exists.
+`package.json` is the authoritative list of commands.
 
-The images of the documentation are produced by `npm run docs:screenshots`, from the shipped
+The documentation's images are produced by `npm run docs:screenshots`, from the shipped
 components ([`scripts/doc-screenshots.mjs`](../scripts/doc-screenshots.mjs)). Run it again
 when the toolbar, the pill or the badges change.
 
@@ -61,7 +61,8 @@ identifiers appear literally in the tests, and CI fails if that stops being true
 
 ## Continuous integration
 
-Only **CI** is meant to be a required check on `main`; the others report without gating.
+Only the **CI** workflow is meant to be a required check on `main`; the others report results
+without blocking a merge.
 [`.github/workflows/`](../.github/workflows) is the reference.
 
 | Workflow | Question it answers | When |
@@ -94,7 +95,7 @@ How a release is cut: [`release-fr.md`](release-fr.md). The changelog is
 | P1' | Programmatic-write spike (GitHub React + Azure DevOps) | Assumption validated in Chromium; remaining platform assumptions documented with their fallbacks (`spikes/p1-prime/README-fr.md`) |
 | P2 | Extension `assist` on GitHub | Implemented |
 | P3 | Azure DevOps adapter | Implemented, with the P1' fallbacks in place |
-| P4 | Opt-in telemetry and the §12 indicators | **Partly implemented.** Opt-in counters ship: a label inserted through the extension, a diagnostic code shown, a selector degradation — with mode and repository, never free text —, sent only to a collection point declared by enterprise policy and accepted by the person. **The §12 indicators do not follow from them yet**: no event counts written or submitted comments, so the compliance and warning *rates* have no denominator, and a label typed or pasted by hand is missing from the distribution. Those events and the restitution remain to be built |
+| P4 | Opt-in telemetry and the §12 indicators | **Partly implemented.** Opt-in counters ship: a label inserted through the extension, a diagnostic code shown, a selector degradation — with mode and repository, never free text —, sent only to a collection point declared by enterprise policy and accepted by the person. **The §12 indicators do not follow from them yet**: no event counts written or submitted comments, so the compliance and warning *rates* have no denominator, and a label typed or pasted by hand is missing from the distribution. Those events, and the reporting of the indicators, remain to be built |
 | P6 | `enforce` (send guard, §5.4) on a pilot repo, then rollout | **Blocked on P4** (§14). The send guard is implemented, and choosing the pilot and writing the rollback procedure can start now; switching the pilot to `enforce` waits for the §12 indicators. Rollback order: [`operations-fr.md`](operations-fr.md) |
 
 P5 (the verifier) and P0 (the baseline measurement, which only served an indicator that needed

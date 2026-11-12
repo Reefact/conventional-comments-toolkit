@@ -26,7 +26,7 @@ npm run build
 npm run checks
 ```
 
-Commands that question the browser need Chromium once per machine:
+Commands that test a real browser need Chromium, installed once per machine with
 `npx playwright-core install chromium`. See [`docs/development-en.md`](docs/development-en.md)
 for the layout, the commands and the continuous integration.
 
@@ -37,7 +37,8 @@ for the layout, the commands and the continuous integration.
   twin (`-en.md` / `-fr.md`) when possible
   ([DEC0002](docs/idr/DEC0002-english-first-language-follows-the-reader-en.md)).
 - **One platform, or the shared code, never both.** A pull request touches one platform
-  adapter, or the code they share; one that would do both is split, the shared change first
+  adapter, or the code they share; a change that needs both is split into two pull requests,
+  the shared change first
   ([DEC0005](docs/idr/DEC0005-one-platform-per-pull-request-en.md)). `npm run check:pr-scope`
   checks it, and CI runs it.
 - **The specification is normative.** [`specifications-fr.md`](specifications-fr.md) is never
@@ -47,8 +48,8 @@ for the layout, the commands and the continuous integration.
 - **Acceptance criteria are tested.** A test that covers a criterion of §11 quotes its
   identifier (`CA-NN`); the mapping lives in [`docs/ca-matrix-fr.md`](docs/ca-matrix-fr.md).
 - **A claim about the browser is measured.** What a platform's page or the browser does is
-  checked in a real Chromium, not recalled. A bug fix is verified by removing it: its test must
-  fail without it.
+  checked in a real Chromium, not stated from memory. A bug fix is verified by removing it:
+  its test must fail without the fix.
 - **No prettier.** The code is formatted by hand; never run `prettier --write`
   ([DEC0003](docs/idr/DEC0003-an-inert-prettier-configuration-en.md)).
 - **Invisible characters are written as escapes** (`\uXXXX`) in sources and tests.

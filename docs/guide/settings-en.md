@@ -2,7 +2,7 @@
 
 **Languages:** English (this file) | [Français](settings-fr.md)
 
-The extension's settings page opens by itself after the installation. Afterwards, click the
+The extension's settings page opens by itself after installation. Afterwards, click the
 extension's icon in the browser toolbar (pin it from the puzzle-piece menu if it is hidden).
 A **Guided tour** button, at the top, replays the introduction.
 
@@ -28,9 +28,9 @@ inactive everywhere.
 
 | Preference | What it does |
 |---|---|
-| **Interface language** | English or French. By default the extension follows the repository's configuration, then the platform's language; this setting comes first, for you alone. |
+| **Interface language** | English or French. By default the extension follows the `language` key of the configuration (repository file, then the organisation's), then the platform's language; this setting comes first, for you alone. |
 | **Direct shortcuts** | `Alt` + letter combinations that insert a label. One per line, such as `Alt+R=reviewed`; `Alt+D=` disables a shipped shortcut. See [keyboard input](keyboard-input-en.md#direct-shortcuts). |
-| **Button order** | Labels to put first in the toolbar, separated by commas: `suggestion,nitpick,disagree`. The labels you list come first in their own row; the others follow in the default order. The completion list follows the same order. |
+| **Button order** | Labels to put first in the toolbar, separated by commas: `suggestion,nitpick,disagree`. The labels you list come first within their group (remarks, status labels such as `summary`, replies); the others follow in the default order. The completion list follows the same order. |
 
 These preferences follow you through your browser's sync, if it is on. Shortcuts and button
 order apply to the next comment field that opens.
@@ -49,7 +49,7 @@ can be the whole file; otherwise add its six entries to the existing `labels` li
 
 ## Telemetry
 
-Off by default, and the box stays inert until your organisation declares a collection
+Off by default. The checkbox has no effect until your organisation declares a collection
 endpoint through its enterprise policy. The page shows that endpoint before you agree. Only
 aggregate counters are sent, never the text of a comment, of code or of a diff, nor the
 address of the page ([privacy policy](../../PRIVACY.md)).

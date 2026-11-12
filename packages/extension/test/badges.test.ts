@@ -41,6 +41,24 @@ describe('decorateComment() — masquage du préfixe structuré (§5.5)', () => 
     expect(hidden?.nextSibling?.textContent).toBe('fix this');
   });
 
+  // Blancs tolérés avant le deux-points (§3.4.2) : ils partent avec le préfixe masqué, et la
+  // vue publiée est la même qu'avec la forme canonique. L'insécable vient des correcteurs
+  // français ; le DOM la garde telle quelle.
+  it.each([
+    ['issue : fix this', 'issue : ', 1],
+    ['issue (blocking) : fix this', 'issue (blocking) : ', 2],
+    ['issue : fix this', 'issue : ', 1],
+  ])('masque aussi les blancs avant le deux-points — %j', (body, hiddenText, badgeCount) => {
+    const el = document.createElement('div');
+    el.textContent = body;
+    decorateWithHtmlShape(el, body, defaultConfig(), profile, 'en');
+
+    const hidden = el.querySelector('.cct-hidden-prefix');
+    expect(hidden?.textContent).toBe(hiddenText);
+    expect(hidden?.nextSibling?.textContent).toBe('fix this');
+    expect(el.querySelectorAll('.cct-badge').length).toBe(badgeCount);
+  });
+
   it('ne modifie jamais ce que commentBodyText() relit (§5.5) — analyze() reste correct au tour suivant', () => {
     const body = 'issue (blocking, security): fuite mémoire';
     const el = document.createElement('div');

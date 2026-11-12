@@ -89,22 +89,51 @@ own domain — stay direct: they need no relay.
 
 ## Screenshot shot list (not produced in this document)
 
-These require a real GitHub session and can't be generated
-automatically here. Scenarios to cover, in priority order for the store
-listing:
+These need a real session on each platform — and, for GitLab and Azure DevOps,
+the optional host permission granted. They cannot be produced from this
+repository.
 
-1. The Conventional Comments toolbar shown above a GitHub review comment
-   editor, on a real pull request.
-2. A label inserted (e.g. `suggestion:`) with the validation visual
-   feedback (compliant state, success styling).
-3. A non-compliant comment with the error visual feedback.
-4. The options page (`options.html`) showing language selection and
-   enabling an optional Azure DevOps domain.
-5. (Optional) A resolved discussion thread overview, if the
-   before/after contrast helps convey the product's value.
+**The constraint that dictates the list**: the Chrome Web Store accepts **five**
+screenshots, and the extension covers **three platforms** (appendices A, B and
+C). Each shot must therefore carry two things at once — one platform, and one
+moment of the product. The split below makes that fit without repeating itself.
 
-Chrome Web Store recommended format: 1280×800 or 640×400, PNG or JPEG,
-up to 5 screenshots.
+1. **GitHub — writing.** The toolbar (§5.1) above the native pull request
+   comment editor, a label inserted with its decoration (`suggestion
+   (non-blocking):`) and the compliant visual feedback (§5.3). This is the
+   **tile** shown in search results: frame it tight on the editor rather than
+   the whole page, and check it still reads at small size.
+2. **GitHub — reading.** An already published thread as the extension renders
+   it (§5.5): label and decoration badges, hidden prefix with the subject
+   brought forward, and the header banner counting unresolved blocking threads.
+   This is what nothing else shows — the review as it is read back, not as it
+   is written.
+3. **GitLab — validation refusing.** A non-compliant comment in a merge request
+   editor, with the error feedback (§5.3), and the send blocked (§5.4) if the
+   demonstration configuration runs in `enforce`. Double duty: the third
+   platform, and the error state.
+4. **Azure DevOps — the same thing elsewhere.** Toolbar and badges on an Azure
+   DevOps pull request, the domain having been enabled on demand. Double duty:
+   the second platform, and evidence that optional activation works — which the
+   permissions justification asserts elsewhere.
+5. **The options page** (`options.html`): language, granted domains with the
+   platform bound to each, label order. Show it **populated** — an empty page
+   demonstrates nothing.
+
+Two scenes are worth capturing **outside** the store listing, for the README or
+the website, for lack of room here: keyboard quick input (§5.2) and the
+per-label thread filter (§5.5).
+
+**Conditions that apply to all five.**
+
+- Format: PNG, exactly **1280×800** (the store also accepts 640×400).
+- **Public, invented content.** These images are published as they are: never a
+  private repository, a real customer project, or a third party's name or
+  address. Dedicated demonstration repositories, on all three platforms.
+- **A single theme** — light or dark — across the whole series.
+- **No degraded banner** (§5.4) on screen: see the next section.
+- Every shot must be **reproducible**: record the URL and the gestures that
+  produced it, next to the image.
 
 **If the "Configuration unread" banner shows up in a screenshot**: the
 diagnosis written here for several versions was right about its premise

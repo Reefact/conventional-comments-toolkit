@@ -94,22 +94,51 @@ lui-même — restent directes : elles n'ont besoin d'aucun relais.
 
 ## Liste des captures d'écran à produire (non fournies dans ce document)
 
-Ces captures nécessitent une session GitHub réelle et ne peuvent pas être
-générées automatiquement ici. Les scénarios à couvrir, dans l'ordre de
-priorité pour la fiche store :
+Ces captures demandent une session réelle sur chaque plateforme — et, pour
+GitLab et Azure DevOps, la permission d'hôte optionnelle accordée. Elles ne
+peuvent pas être produites depuis ce dépôt.
 
-1. Barre d'outils Conventional Comments affichée au-dessus d'un éditeur
-   de commentaire de revue GitHub, sur une pull request réelle.
-2. Un label inséré (ex. `suggestion:`) avec le retour visuel de
-   validation (état conforme, en vert/succès).
-3. Un commentaire non conforme avec le retour visuel d'erreur.
-4. La page de réglages (`options.html`) montrant la sélection de langue
-   et l'activation d'un domaine Azure DevOps optionnel.
-5. (Optionnel) Vue d'ensemble d'un fil de discussion résolu, si le
-   contraste avant/après aide à comprendre la valeur du produit.
+**La contrainte qui dicte la liste** : le Chrome Web Store accepte **cinq**
+captures, et l'extension couvre **trois plateformes** (annexes A, B et C).
+Chacune doit donc porter deux choses à la fois — une plateforme, et un moment
+du produit. La répartition ci-dessous le fait tenir sans rien répéter.
 
-Format recommandé par Chrome Web Store : 1280×800 ou 640×400, PNG ou JPEG,
-jusqu'à 5 captures.
+1. **GitHub — écrire.** La barre d'outils (§5.1) au-dessus de l'éditeur natif
+   d'une pull request, un label inséré avec sa décoration (`suggestion
+   (non-blocking):`) et le retour visuel conforme (§5.3). C'est la **vignette**
+   affichée dans les résultats de recherche : cadrer serré sur l'éditeur, pas
+   sur la page entière, et vérifier qu'elle reste lisible en petit.
+2. **GitHub — lire.** Un fil déjà publié tel que l'extension le rend (§5.5) :
+   badges de label et de décoration, préfixe masqué et sujet mis en avant,
+   bandeau de tête comptant les fils bloquants non résolus. C'est l'apport que
+   rien d'autre ne montre — la revue telle qu'on la relit, pas telle qu'on
+   l'écrit.
+3. **GitLab — la validation qui refuse.** Un commentaire non conforme dans
+   l'éditeur d'une merge request, avec le retour d'erreur (§5.3), et le blocage
+   d'envoi (§5.4) si la configuration de la démonstration est en mode
+   `enforce`. Double emploi : la troisième plateforme, et l'état d'erreur.
+4. **Azure DevOps — la même chose ailleurs.** Barre d'outils et badges sur une
+   pull request Azure DevOps, le domaine ayant été activé à la demande. Double
+   emploi : la deuxième plateforme, et la preuve que l'activation optionnelle
+   fonctionne — ce que la justification des permissions affirme par ailleurs.
+5. **La page de réglages** (`options.html`) : langue, domaines accordés et
+   plateforme associée à chacun, ordre des labels. La montrer **peuplée** —
+   une page vide ne démontre rien.
+
+Deux scènes valent d'être capturées **hors** fiche store, pour le README ou le
+site, faute de place ici : la saisie rapide au clavier (§5.2) et le filtre de
+fils par label (§5.5).
+
+**Conditions communes, qui valent pour les cinq.**
+
+- Format : PNG, exactement **1280×800** (le store accepte aussi 640×400).
+- **Contenu public et inventé.** Ces images sont publiées telles quelles :
+  jamais un dépôt privé, un vrai projet client, ni le nom ou l'adresse d'un
+  tiers. Des dépôts de démonstration dédiés, dans les trois plateformes.
+- **Un seul thème** — clair ou sombre — sur toute la série.
+- **Aucun bandeau dégradé** (§5.4) à l'écran : voir la section suivante.
+- Chaque capture doit être **reproductible** : consigner l'URL et les gestes
+  qui l'ont produite, à côté de l'image.
 
 **Si le bandeau « Configuration non lue » apparaît sur la capture** : le
 diagnostic écrit ici pendant plusieurs versions était juste sur son

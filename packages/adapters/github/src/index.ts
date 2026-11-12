@@ -650,19 +650,36 @@ export class GithubClientAdapter implements PlatformAdapter {
    * résolution restent lus sur le fil. */
   getRenderedThreadElements(): { id: string; element: Element; resolution: ThreadInfo['resolution'] }[] {
     const threads = queryChainAll(this.#doc, selectors.renderedThreads);
+    const cards = this.#threadCards(threads);
     return threads.map((el, i) => ({
       id: el.id || el.getAttribute('data-thread-id') || `dom-thread-${i}`,
-      element: this.#threadCard(el, threads),
+      element: cards[i]!,
       resolution: this.#resolution(el),
     }));
   }
 
-  /** La carte d'un fil, seulement si elle ne porte que LUI : un conteneur qui en porterait un
-   * autre le cacherait aussi, quel que soit son label. Sinon, le fil même (#199). */
-  #threadCard(thread: Element, threads: Element[]): Element {
-    const card = closestChain(thread, selectors.threadCard).element;
-    if (!card) return thread;
-    return threads.every((other) => other === thread || !card.contains(other)) ? card : thread;
+  /** La carte de chaque fil, seulement si elle ne porte que LUI : un conteneur qui en porterait
+   * un autre le cacherait aussi, quel que soit son label. Sinon, le fil même (#199).
+   *
+   * En UNE passe, jamais un `contains()` de chaque carte contre chaque fil : cette liste est
+   * relue à chaque mutation de la page par les deux signatures de reprise, et l'essai croisé
+   * coûtait n × (n − 1) tests de DOM (revue de la PR #200). Chaque fil compte une fois auprès
+   * des cartes qui sont ses ancêtres — n × profondeur pas —, et une carte qui en compte plus
+   * d'un n'est pas retenue : même réponse que l'essai croisé. */
+  #threadCards(threads: Element[]): Element[] {
+    const candidates = threads.map((thread) => closestChain(thread, selectors.threadCard).element);
+    const held = new Map<Element, number>();
+    for (const card of candidates) if (card) held.set(card, 0);
+    for (const thread of threads) {
+      for (let node = thread.parentElement; node; node = node.parentElement) {
+        const count = held.get(node);
+        if (count !== undefined) held.set(node, count + 1);
+      }
+    }
+    return threads.map((thread, i) => {
+      const card = candidates[i];
+      return card && held.get(card) === 1 ? card : thread;
+    });
   }
 
   /** PrRef depuis l'URL et la page. */

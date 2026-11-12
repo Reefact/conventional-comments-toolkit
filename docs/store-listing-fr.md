@@ -13,29 +13,30 @@ de revue de code, pas de la productivité générale ni des réseaux sociaux.
 
 ## Description courte (132 caractères max)
 
-> Assistant Conventional Comments pour vos revues de code sur GitHub (et Azure DevOps) : labels, validation, aucune donnée qui sort du navigateur.
+> Conventional Comments pour vos revues GitHub, GitLab et Azure DevOps : labels, validation, aucun contenu ne sort du navigateur.
 
-(144 caractères — **dépasse la limite de 132**, à raccourcir avant
-soumission. Variante conforme :)
+(127 caractères.)
 
-> Assistant Conventional Comments pour la revue de code GitHub : labels, validation, aucun code ni commentaire ne sort du navigateur.
-
-(131 caractères.)
-
-**Correction (Codex, deuxième passage) :** l'ancienne formulation « rien
-ne quitte votre navigateur » était fausse sans nuance — `language` et
+**Deux contraintes tiennent cette phrase, et elles tirent en sens
+inverse.** Les trois plateformes doivent y figurer — l'extension les
+couvre toutes les trois (annexes A, B et C), et une description qui n'en
+nomme qu'une vend un autre produit. Et la garantie doit rester celle du
+**contenu** : « rien ne quitte votre navigateur », écrit ici pendant
+plusieurs versions, était faux sans nuance — `language` et
 `directShortcuts` se synchronisent via `chrome.storage.sync` quand la
-synchronisation Chrome est active. Restreint à la garantie sur le
-contenu, qui elle tient sans condition.
+synchronisation Chrome est active. « Aucun contenu » dit ce qui tient
+sans condition, et tient dans la limite.
 
 ## Description longue
 
 > **Conventional Comments Toolkit** aide les équipes à écrire des
 > commentaires de revue de code clairs et conformes à la convention
 > [Conventional Comments](https://conventionalcomments.org/), directement
-> dans l'éditeur natif de GitHub (github.com, GitHub Enterprise Server,
-> GitHub Enterprise Cloud) — et, en option, Azure DevOps (Services et
-> Server auto-hébergé).
+> dans l'éditeur natif de la plateforme : GitHub (github.com, GitHub
+> Enterprise Server, GitHub Enterprise Cloud), GitLab (gitlab.com et
+> instances auto-hébergées) et Azure DevOps (Services et Server
+> auto-hébergé). GitHub est actif d'emblée ; les autres domaines
+> s'activent à la demande, avec votre confirmation.
 >
 > **Ce que l'extension apporte**
 > - Une barre d'outils pour insérer les labels standards
@@ -52,7 +53,8 @@ contenu, qui elle tient sans condition.
 > Aucun contenu de commentaire, de code ou de diff ne quitte votre
 > navigateur. Aucune télémétrie par défaut. Aucun jeton d'authentification
 > stocké. Permissions minimales : pas d'accès à `<all_urls>`, les domaines
-> hors GitHub (Azure DevOps, configuration d'entreprise) ne sont demandés
+> hors GitHub (GitLab, Azure DevOps, configuration d'entreprise) ne sont
+> demandés
 > qu'à la demande et avec votre confirmation explicite.
 > Politique de confidentialité complète :
 > https://github.com/reefact/conventional-comments-toolkit/blob/main/PRIVACY.md

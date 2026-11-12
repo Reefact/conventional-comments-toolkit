@@ -13,23 +13,29 @@ tools.
 
 ## Short description (132 characters max)
 
-> Conventional Comments assistant for GitHub code review: labels, validation, no code or comment content leaves your browser.
+> Conventional Comments for your code reviews on GitHub, GitLab and Azure DevOps: labels, validation, no content leaves your browser.
 
-(123 characters — within the limit.)
+(131 characters.)
 
-**Correction (Codex, second pass):** the previous unconditional "nothing
-leaves your browser" was false — `language`/`directShortcuts` sync via
-`chrome.storage.sync` when Chrome Sync is on. Narrowed to the content
-guarantee, which does hold unconditionally.
+**Two constraints hold this sentence, and they pull against each
+other.** All three platforms have to appear — the extension covers them
+all (appendices A, B and C), and a description naming one sells a
+different product. And the guarantee has to stay the one about
+**content**: "nothing leaves your browser", written here for several
+versions, was false without qualification — `language` and
+`directShortcuts` sync through `chrome.storage.sync` when Chrome Sync is
+on. "No content" states what holds unconditionally, and fits.
 
 ## Detailed description
 
 > **Conventional Comments Toolkit** helps teams write clear code review
 > comments that follow the
 > [Conventional Comments](https://conventionalcomments.org/) convention,
-> right inside GitHub's native editor (github.com, GitHub Enterprise
-> Server, GitHub Enterprise Cloud) — and, optionally, Azure DevOps
-> (Services and self-hosted Server).
+> right inside the platform's native editor: GitHub (github.com, GitHub
+> Enterprise Server, GitHub Enterprise Cloud), GitLab (gitlab.com and
+> self-hosted instances) and Azure DevOps (Services and self-hosted
+> Server). GitHub works out of the box; the other domains are enabled on
+> demand, with your confirmation.
 >
 > **What the extension brings**
 > - A toolbar to insert standard labels
@@ -46,9 +52,9 @@ guarantee, which does hold unconditionally.
 > **Privacy by design**
 > No comment, code, or diff content ever leaves your browser. No
 > telemetry by default. No authentication token stored. Minimal
-> permissions: no `<all_urls>` access — domains beyond GitHub (Azure
-> DevOps, enterprise configuration hosts) are only requested on demand,
-> with your explicit confirmation.
+> permissions: no `<all_urls>` access — domains beyond GitHub (GitLab,
+> Azure DevOps, enterprise configuration hosts) are only requested on
+> demand, with your explicit confirmation.
 > See the full privacy policy:
 > https://github.com/reefact/conventional-comments-toolkit/blob/main/PRIVACY.md
 >

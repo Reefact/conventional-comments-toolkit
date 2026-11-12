@@ -643,13 +643,26 @@ export class GithubClientAdapter implements PlatformAdapter {
    * séparation des vues : `overview.ts`, `classic.ts`, puis le marqueur dans le fil ou À CÔTÉ
    * de lui sur la vue `…/changes`). Lu de façon synchrone et sans cloner aucun corps : cette
    * liste est relue à chaque mutation de la page par la signature de reprise du code partagé,
-   * pour qui résoudre un fil sur `…/changes` ne change ni son identifiant ni son texte. */
+   * pour qui résoudre un fil sur `…/changes` ne change ni son identifiant ni son texte.
+   *
+   * `element` est ce que le filtre MASQUE : la carte du fil sur l'Overview (`threadCard`), le
+   * fil lui-même ailleurs — comme Azure DevOps rend la rangée qui porte le fil. Identifiant et
+   * résolution restent lus sur le fil. */
   getRenderedThreadElements(): { id: string; element: Element; resolution: ThreadInfo['resolution'] }[] {
-    return queryChainAll(this.#doc, selectors.renderedThreads).map((el, i) => ({
+    const threads = queryChainAll(this.#doc, selectors.renderedThreads);
+    return threads.map((el, i) => ({
       id: el.id || el.getAttribute('data-thread-id') || `dom-thread-${i}`,
-      element: el,
+      element: this.#threadCard(el, threads),
       resolution: this.#resolution(el),
     }));
+  }
+
+  /** La carte d'un fil, seulement si elle ne porte que LUI : un conteneur qui en porterait un
+   * autre le cacherait aussi, quel que soit son label. Sinon, le fil même (#199). */
+  #threadCard(thread: Element, threads: Element[]): Element {
+    const card = closestChain(thread, selectors.threadCard).element;
+    if (!card) return thread;
+    return threads.every((other) => other === thread || !card.contains(other)) ? card : thread;
   }
 
   /** PrRef depuis l'URL et la page. */

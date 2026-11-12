@@ -10,7 +10,7 @@ commentaires publiés. Elle assiste par défaut et ne bloque que là où une éq
 ## Par où commencer
 
 **Vous découvrez l'extension ?** → [**Prise en main**](guide/getting-started-fr.md) : dix
-minutes pour passer de rien d'installé à un premier commentaire écrit avec la barre d'outils.
+minutes, de l'installation au premier commentaire écrit avec la barre d'outils.
 
 ## Utiliser l'extension
 
@@ -40,8 +40,8 @@ Des pages à consulter au besoin.
 | Guide | Ce que vous y trouvez |
 |---|---|
 | [Modes et adoption](guide/modes-and-adoption-fr.md) | `off`, `assist`, `enforce` ; ce que le blocage fait et ne fait pas ; le chemin pour y arriver et le retour arrière |
-| [Déployer pour une organisation](guide/organization-fr.md) | La politique d'entreprise : configuration partagée, plancher, hôtes, télémétrie, installation forcée |
-| [Skills de revue pour les agents IA](guide/review-skills-fr.md) | Faire relire un agent, ou le faire répondre à une revue, avec ce vocabulaire |
+| [Déployer pour une organisation](guide/organization-fr.md) | La politique d'entreprise : configuration partagée, règles minimales (le plancher), hôtes, télémétrie, installation forcée |
+| [Skills de revue pour les agents IA](guide/review-skills-fr.md) | Faire relire une pull request par un agent IA, ou lui faire répondre à une revue, avec ce vocabulaire |
 | [Politique de confidentialité](../PRIVACY.md) | Ce qui est stocké, ce qui est envoyé, et ce qui ne quitte jamais le navigateur |
 | [Notes de version](release-notes-1.x-fr.md) | Ce qui a changé, version par version, pour les personnes qui utilisent l'extension |
 

@@ -1,9 +1,9 @@
-# Premiers pas
+# Prise en main
 
 **Langues :** [English](getting-started-en.md) | Français (ce fichier)
 
-Dix minutes pour passer de rien d'installé à un premier commentaire de revue écrit avec la
-barre d'outils.
+Dix minutes, de l'installation au premier commentaire de revue écrit avec la barre
+d'outils.
 
 ## Ce qu'il vous faut
 
@@ -31,17 +31,17 @@ navigateurs Chromium et une pour Firefox.
      retire un module temporaire à sa fermeture.
 
 Une extension chargée de cette façon ne se met pas à jour toute seule : pour une nouvelle
-version, il faut la télécharger et la charger à nouveau. Pour construire l'extension depuis
+version, téléchargez-la et chargez-la à nouveau. Pour construire l'extension depuis
 les sources, suivez plutôt le [guide de construction pas à pas](../extension-setup-fr.md).
 
 ## 2. Autoriser votre plateforme
 
 La page de réglages de l'extension s'ouvre d'elle-même après l'installation, avec une courte
-visite guidée. Vous pouvez la rouvrir à tout moment en cliquant sur l'icône de l'extension
-dans la barre d'outils du navigateur.
+visite guidée. Pour la rouvrir à tout moment, cliquez sur l'icône de l'extension dans la
+barre d'outils du navigateur.
 
 **L'extension est inactive partout tant que vous n'avez pas autorisé un domaine.** Elle ne
-demande aucun accès aux sites à l'installation ; vous l'accordez un domaine à la fois.
+demande aucun accès aux sites à l'installation ; vous autorisez les domaines un par un.
 
 - Sous **Domaines connus**, cliquez sur la plateforme que vous utilisez : GitHub.com, Azure
   DevOps Services (`dev.azure.com`) ou GitLab.com. Le navigateur vous demande de confirmer.
@@ -56,7 +56,7 @@ moment. Le guide de la [page de réglages](settings-fr.md) décrit le reste de c
 
 Ouvrez une pull request sur le domaine que vous avez autorisé, rechargez la page si elle
 était déjà ouverte, et cliquez dans le champ d'un **nouveau** commentaire. Les réponses dans
-un fil ne sont pas validées par défaut : la pastille y reste donc muette.
+un fil ne sont pas validées par défaut : la pastille n'y signale donc rien.
 
 1. Une **barre d'outils** apparaît, avec un bouton par label : `praise`, `nitpick`,
    `suggestion`, `issue`…
@@ -70,16 +70,16 @@ un fil ne sont pas validées par défaut : la pastille y reste donc muette.
    ```
 
    La pastille passe à *Conforme*.
-5. Publiez le commentaire comme d'habitude. Une fois publié, son label s'affiche sous la
-   forme d'un badge coloré.
+5. Publiez le commentaire avec le bouton d'envoi de la plateforme. Une fois publié, son
+   label s'affiche sous la forme d'un badge coloré.
 
 Voilà toute la boucle : écrire, choisir un label, publier.
 
 ## Ce que l'extension fait par défaut
 
 - Elle **assiste et ne bloque jamais**. Le mode par défaut est `assist` : un commentaire non
-  conforme est signalé et part quand même. Bloquer est un choix qu'une équipe fait pour un
-  dépôt ([modes et adoption](modes-and-adoption-fr.md)).
+  conforme est signalé et part quand même. Le blocage est un choix qu'une équipe fait, dépôt
+  par dépôt ([modes et adoption](modes-and-adoption-fr.md)).
 - Elle fonctionne **sans aucun fichier de configuration**. Un dépôt qui veut ses propres
   labels ou ses propres règles ajoute un fichier `.conventional-comments.json`
   ([configuration](configuration-fr.md)).
@@ -90,7 +90,7 @@ Voilà toute la boucle : écrire, choisir un label, publier.
 
 | Pour… | Lisez |
 |---|---|
-| connaître chaque partie de la barre d'outils, de la pastille, des badges et du bandeau | [Écrire des commentaires de revue](writing-comments-fr.md) |
+| connaître chaque partie de la barre d'outils, de la pastille, des badges et du bandeau | [Rédiger des commentaires de revue](writing-comments-fr.md) |
 | écrire les labels sans la souris | [Saisie au clavier](keyboard-input-fr.md) |
 | choisir le bon label | [Labels et décorations](labels-fr.md) |
 | comprendre un message de la pastille | [Diagnostics](diagnostics-fr.md) |

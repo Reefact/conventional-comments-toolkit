@@ -32,7 +32,7 @@ mal, ou l'emploie à sa façon.
 ## La solution
 
 L'extension ajoute au champ de commentaire de la plateforme ce qui manque à la convention :
-les labels à un clic, une réponse pendant la frappe, et un résultat lisible une fois publié.
+les labels à un clic, un retour pendant la frappe, et un résultat lisible une fois publié.
 
 ![La barre d'outils au-dessus d'un champ de commentaire : boutons de label, sélecteur de décoration et pastille Conforme](docs/images/toolbar-fr.png)
 
@@ -61,8 +61,8 @@ thème clair de GitHub. Ce ne sont pas des captures de github.com.*
   `disagree`, `thanks`, plus `summary` et `reviewed` pour dire où en est une revue. Ce sont
   des ajouts de cette boîte à outils, activés par défaut, qu'un dépôt peut désactiver.
 - **Des règles par dépôt**, dans un seul fichier JSON, et au besoin par organisation.
-- **Un blocage de l'envoi facultatif** (mode `enforce`), qui arrête un commentaire non
-  conforme avant sa publication.
+- **Un blocage facultatif de l'envoi** (mode `enforce`) : un commentaire non conforme est
+  arrêté avant sa publication.
 - Une interface **en français et en anglais**.
 
 ## Installer
@@ -111,7 +111,7 @@ fichier `.conventional-comments.json` à la racine de sa branche par défaut :
 
 ## Ce qu'elle est, et ce qu'elle n'est pas
 
-**Elle assiste par défaut et ne bloque jamais.** En mode `assist`, un commentaire non
+**Par défaut, elle assiste et ne bloque jamais.** En mode `assist`, un commentaire non
 conforme est signalé et part quand même. Une équipe qui veut davantage passe un dépôt en
 `enforce`, où le bouton d'envoi refuse un commentaire en erreur.
 
@@ -119,8 +119,8 @@ conforme est signalé et part quand même. Une équipe qui veut davantage passe 
 installée. Un commentaire publié par l'API de la plateforme, un autre navigateur ou un poste
 sans l'extension n'est pas contrôlé.
 
-**Elle ne contrôle pas la fusion.** Les fils bloquants non résolus sont signalés, jamais
-empêchés de fusionner
+**Elle ne contrôle pas la fusion.** Elle signale les fils bloquants non résolus, mais
+n'empêche jamais de fusionner
 ([DEC0010](docs/idr/DEC0010-the-extension-is-the-whole-product-fr.md)). Une équipe qui veut
 conditionner la fusion à la résolution des conversations s'appuie sur les réglages de sa
 plateforme.
@@ -131,8 +131,8 @@ n'est pas son affaire.
 ## Confidentialité
 
 Aucun contenu de commentaire, de code ou de diff ne quitte votre navigateur. Aucun jeton
-n'est stocké. Aucun accès à un site n'est demandé à l'installation : vous l'accordez domaine
-par domaine. La télémétrie est désactivée par défaut, et un dépôt ne peut pas l'activer.
+n'est stocké. Aucun accès à un site n'est demandé à l'installation : vous autorisez les
+domaines un par un. La télémétrie est désactivée par défaut, et un dépôt ne peut pas l'activer.
 [Politique de confidentialité](PRIVACY.md).
 
 ## Documentation
@@ -148,7 +148,7 @@ par domaine. La télémétrie est désactivée par défaut, et un dépôt ne peu
 | [Diagnostics](docs/guide/diagnostics-fr.md) | Chaque code de la pastille, et comment le corriger |
 | [Configuration](docs/guide/configuration-fr.md) | Le fichier du dépôt, clé par clé |
 | [Modes et adoption](docs/guide/modes-and-adoption-fr.md) | `off`, `assist`, `enforce`, et comment y arriver |
-| [Déployer pour une organisation](docs/guide/organization-fr.md) | Configuration partagée, plancher, hôtes, télémétrie |
+| [Déployer pour une organisation](docs/guide/organization-fr.md) | Configuration partagée, règles minimales (le plancher), hôtes, télémétrie |
 | [FAQ et dépannage](docs/guide/faq-fr.md) | Quand quelque chose ne s'affiche pas |
 
 ## Les labels que la boîte à outils ajoute

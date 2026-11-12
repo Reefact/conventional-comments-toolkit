@@ -1,6 +1,6 @@
 # Politique de confidentialité — Conventional Comments Toolkit
 
-_Dernière mise à jour : 2026-11-11._
+_Dernière mise à jour : 2026-11-12._
 
 Cette page sert de politique de confidentialité publique pour l'extension
 navigateur **Conventional Comments Toolkit**, distribuée sur le Chrome Web
@@ -13,21 +13,18 @@ Résumé en une phrase : **l'extension elle-même ne collecte, ne stocke sur
 un serveur distant, ni ne transmet aucun contenu de code, de commentaire
 ou de diff que vous consultez ou rédigez.**
 
-**Périmètre de ce document.** Le tableau ci-dessous couvre exclusivement
-l'**extension navigateur** — c'est elle qui est distribuée sur les stores
-et pour laquelle ce document sert de politique de confidentialité
-publique. Le produit inclut aussi un **composant serveur optionnel**,
-auto-hébergé et exploité par chaque organisation qui choisit de le
-déployer (§10, §14 de la spécification) : voir la section dédiée plus bas
-plutôt que le tableau, qui ne l'engloble pas champ par champ — c'est un
-composant à la surface de persistance propre, sous le contrôle de
-l'organisation qui l'exploite, pas de l'éditeur de l'extension.
+**Périmètre de ce document.** Le produit est l'extension navigateur, et
+elle seule : il ne comporte aucun composant serveur. Une rédaction
+antérieure de cette page décrivait un composant serveur optionnel,
+auto-hébergé par chaque organisation ; il a été retiré du produit
+([DEC0010](docs/idr/DEC0010-the-extension-is-the-whole-product-fr.md)),
+et la section qui le décrivait avec lui.
 
 ## Ce que l'extension fait
 
 Conventional Comments Toolkit assiste la rédaction de commentaires de
-revue de code conformes à la convention Conventional Comments, sur GitHub
-et, en option, Azure DevOps : barre d'outils d'insertion de labels,
+revue de code conformes à la convention Conventional Comments, sur GitHub,
+Azure DevOps et GitLab : barre d'outils d'insertion de labels,
 validation du format à la saisie, retour visuel dans l'éditeur natif de la
 plateforme.
 
@@ -35,7 +32,7 @@ plateforme.
 
 | Donnée | Où elle vit | Sort-elle du navigateur ? |
 |---|---|---|
-| Langue d'interface et raccourcis clavier directs | `chrome.storage.sync` | **Se synchronise entre les appareils de votre compte Chrome si la synchronisation est activée** — c'est le mécanisme natif de Chrome, pas un serveur propre à l'extension. Contenu limité à ces deux préférences, jamais de contenu de commentaire ou de code. |
+| Langue d'interface, raccourcis clavier directs et ordre des boutons de label | `chrome.storage.sync` | **Se synchronise entre les appareils de votre compte Chrome si la synchronisation est activée** — c'est le mécanisme natif de Chrome, pas un serveur propre à l'extension. Contenu limité à ces trois préférences, jamais de contenu de commentaire ou de code. |
 | État dégradé courant (diagnostic) | `chrome.storage.local`, sur votre appareil | Non |
 | Avis de la dernière lecture de configuration (affichés dans la page d'options) : l'hôte et le chemin du dépôt lu (par exemple `github.com/organisation/depot`), et pour chaque avis sa sorte, son code, son texte en anglais et ce qu'il cite — clé ou valeur de configuration, numéro et extrait borné (40 caractères) d'un motif d'allowlist, version, niveau en cause —, plus, en référence, la **valeur rejetée elle-même, en entier** : motif d'allowlist ou commande d'outil, tels qu'écrits dans la configuration. Remplacés à chaque lecture, sans historique | `chrome.storage.local`, sur votre appareil | Non |
 | Domaines optionnels activés (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, géré par Chrome | Non — c'est Chrome, pas l'extension, qui tient cette liste |
@@ -50,36 +47,6 @@ L'extension ne stocke **aucun jeton d'authentification ni secret**. Elle
 ne s'authentifie auprès d'aucune API à jeton : les seules données qu'elle
 lit hors du DOM de la page sont celles accessibles par la route web déjà
 autorisée par votre session de navigation.
-
-## Composant serveur optionnel (auto-hébergé par votre organisation)
-
-**Non requis pour utiliser l'extension.** Une organisation peut déployer
-ce composant pour faire respecter la convention comme condition de
-fusion des pull requests, avec un mécanisme d'exemption gouverné. S'il
-est déployé, il persiste — sur l'infrastructure de l'organisation, pas
-sur un service tiers de l'éditeur de l'extension — des catégories de
-données propres à son fonctionnement, entre autres :
-- le journal et l'état actif des exemptions de PR (identifiant de PR,
-  action, personne à l'origine, horodatage, et **un motif en texte libre
-  si la personne en saisit un** — susceptible de contenir des
-  informations personnelles ou sensibles) ;
-- des enregistrements d'évaluation de conformité par PR, qui incluent un
-  **court extrait** (jusqu'à ~80 caractères) du commentaire racine de
-  chaque fil bloquant non résolu, avec l'identifiant de son auteur ;
-- des compteurs d'usage agrégés par dépôt et par PR (répartition des
-  labels, nombre de fils non résolus, etc.), **indépendants du réglage
-  `telemetry.enabled`** de l'extension — ce sont deux mécanismes
-  distincts ;
-- un état opérationnel courant (configuration en cache, séquencement des
-  publications, alias de chemin de PR) nécessaire au fonctionnement du
-  composant.
-
-**Cette liste illustre les catégories, elle n'est pas exhaustive et n'a
-pas vocation à l'être** : le code de ce composant évolue, et une
-organisation qui le déploie en est l'opérateur au sens du RGPD (ou du
-cadre équivalent) — c'est à elle, pas à ce document, de fournir la
-politique de confidentialité applicable à ses utilisateurs pour cette
-instance, avec sa propre destination et durée de conservation.
 
 ## Permissions et pourquoi
 
@@ -116,7 +83,7 @@ Pour toute question sur cette politique de confidentialité, ouvrez une
 
 # Privacy Policy — Conventional Comments Toolkit
 
-_Last updated: 2026-11-11._
+_Last updated: 2026-11-12._
 
 This page is the public privacy policy for the **Conventional Comments
 Toolkit** browser extension, distributed on the Chrome Web Store and
@@ -128,28 +95,25 @@ One-sentence summary: **the extension itself does not collect, store on
 a remote server, or transmit any code, comment, or diff content you view
 or write.**
 
-**Scope of this document.** The table below covers the **browser
-extension** only — that's what's distributed on the stores and what this
-document serves as the public privacy policy for. The product also
-includes an **optional server component**, self-hosted and operated by
-each organization that chooses to deploy it (§10, §14 of the functional
-spec): see the dedicated section below instead of the table, which
-doesn't try to enumerate it field by field — it's a component with its
-own persistence surface, under the control of the organization running
-it, not of the extension's publisher.
+**Scope of this document.** The product is the browser extension, and
+only the extension: it has no server component. An earlier version of
+this page described an optional server component, self-hosted by each
+organization; it was removed from the product
+([DEC0010](docs/idr/DEC0010-the-extension-is-the-whole-product-en.md)),
+and the section describing it went with it.
 
 ## What the extension does
 
 Conventional Comments Toolkit assists writing code review comments that
-follow the Conventional Comments convention, on GitHub and, optionally,
-Azure DevOps: a toolbar for inserting labels, input validation, and
+follow the Conventional Comments convention, on GitHub, Azure DevOps
+and GitLab: a toolbar for inserting labels, input validation, and
 visual feedback inside the platform's native comment editor.
 
 ## Data processed by the browser extension
 
 | Data | Where it lives | Does it leave the browser? |
 |---|---|---|
-| Interface language and direct keyboard shortcuts | `chrome.storage.sync` | **Syncs across your Chrome account's devices if sync is enabled** — that's Chrome's own native mechanism, not a server run by the extension. Limited to these two preferences, never comment or code content. |
+| Interface language, direct keyboard shortcuts and label button order | `chrome.storage.sync` | **Syncs across your Chrome account's devices if sync is enabled** — that's Chrome's own native mechanism, not a server run by the extension. Limited to these two preferences, never comment or code content. |
 | Current degraded state (diagnostics) | `chrome.storage.local`, on your device | No |
 | Notices from the last configuration read (shown in the options page): the host and path of the repository read (for example `github.com/organization/repository`), and for each notice its kind, its code, its English text and what it cites — a configuration key or value, the index and a bounded excerpt (40 characters) of an allowlist pattern, a version, the level at fault —, plus, as a reference, **the rejected value itself, in full**: an allowlist pattern or a tool command, as written in the configuration. Replaced at each read, with no history | `chrome.storage.local`, on your device | No |
 | Enabled optional domains (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, managed by Chrome | No — Chrome holds this list, not the extension |
@@ -164,33 +128,6 @@ The extension stores **no authentication token or secret**. It does not
 authenticate against any token-based API: the only data it reads outside
 the page DOM is what is reachable via the web route your browsing session
 already authorizes.
-
-## Optional server component (self-hosted by your organization)
-
-**Not required to use the extension.** An organization may deploy this
-component to enforce the convention as a merge requirement for pull
-requests, with a governed exemption mechanism. If deployed, it persists
-— on the organization's own infrastructure, not a third-party service run
-by the extension's publisher — categories of data specific to its
-operation, including but not limited to:
-- the PR exemption log and active-exemption state (PR id, action, actor,
-  timestamp, and **a free-text reason if one was entered** — potentially
-  containing personal or sensitive information);
-- compliance-evaluation records per PR, which include a **short excerpt**
-  (up to ~80 characters) of the root comment of each unresolved blocking
-  thread, along with its author's identifier;
-- aggregated usage counters per repository and PR (label distribution,
-  unresolved-thread counts, etc.), **independent of the extension's
-  `telemetry.enabled` setting** — these are two distinct mechanisms;
-- operational state (cached configuration, publication sequencing, PR
-  path aliases) needed for the component to function.
-
-**This list illustrates categories; it is not exhaustive and isn't meant
-to be** — the code of this component evolves, and an organization that
-deploys it is the operator, under GDPR or an equivalent framework: it is
-that organization's responsibility, not this document's, to provide the
-applicable privacy policy to its own users for that deployment, with its
-own destination and retention terms.
 
 ## Permissions and why
 

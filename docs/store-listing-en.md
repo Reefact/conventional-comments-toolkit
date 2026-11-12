@@ -39,9 +39,8 @@ guarantee, which does hold unconditionally.
 >   doesn't follow the convention.
 > - A keyboard-driven quick-input mode for people who'd rather not touch
 >   the mouse.
-> - Works standalone, no backend required: the extension assists and
->   validates even without the optional team-governance server
->   component.
+> - Works standalone, with no server at all: the extension is the whole
+>   product.
 >
 > **Privacy by design**
 > No comment, code, or diff content ever leaves your browser. No
@@ -53,9 +52,9 @@ guarantee, which does hold unconditionally.
 > https://github.com/reefact/conventional-comments-toolkit/blob/main/PRIVACY.md
 >
 > **For organizations**
-> An optional server component (not required to use the extension) lets
-> teams enforce the convention as a merge requirement for pull requests,
-> with a governed and auditable exemption mechanism.
+> A shared configuration and a floor of rules can be pushed through the
+> browser's enterprise policy. The extension reports unresolved blocking
+> threads; it does not control the merging of pull requests.
 >
 > Public source code under the Apache-2.0 license:
 > https://github.com/reefact/conventional-comments-toolkit

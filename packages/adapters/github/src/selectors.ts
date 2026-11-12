@@ -574,6 +574,21 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
+  /** La CARTE d'un fil de l'Overview — ce que le filtre local du §5.5 masque, en-tête de fichier
+   * et diff compris. Le `review-thread` ne porte que les commentaires : masqué seul, il laissait
+   * à l'écran une carte vide, nom de fichier et diff sans commentaire (#199).
+   *
+   * MESURÉ le 2026-11-12 sur les 31 captures : en mode `All`, l'élément de chronologie ne contient
+   * que la carte du fil (même texte) ; dans les autres modes, il n'existe pas et la carte est
+   * l'`article`. Chacun n'entoure jamais qu'UN fil, et aucun des deux n'entoure un fil de la
+   * Conversation classique ni de *Files changed*, où le fil reste ce qu'on masque.
+   * `getRenderedThreadElements()` vérifie encore, page vivante, que le conteneur trouvé ne porte
+   * qu'un fil : masquer un conteneur partagé cacherait des fils du label choisi. */
+  threadCard: {
+    name: 'thread-card',
+    candidates: ['[data-testid="timeline-item"]', 'article'],
+  } satisfies SelectorChain,
+
   /** Brouillon — décide de rien côté A, affiché seulement. */
   draftBadge: {
     name: 'draft-badge',

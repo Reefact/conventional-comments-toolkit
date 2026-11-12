@@ -179,7 +179,8 @@ describe('§5.5 — le filtre de fils se place au niveau de la LISTE, hors des b
   ])('%s : avant la carte entière du premier fil, diff compris', (file) => {
     const page = load(file, '/Reefact/deskmate/pull/2');
     const mount = page.adapter.getThreadFilterMount();
-    const first = page.adapter.getRenderedThreadElements()[0]!.element;
+    // Le fil lui-même, pas l'élément rendu : celui-ci EST désormais la carte (#199).
+    const first = page.doc.querySelector('[data-testid="review-thread"]')!;
     expect(first.closest('[data-testid="timeline-item"]')).toBeNull();
     expect(mount?.tagName).toBe('ARTICLE');
     expect(mount?.contains(first)).toBe(true);

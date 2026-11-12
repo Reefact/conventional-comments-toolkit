@@ -8,6 +8,19 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 comment is checked only in the browser of someone who has the extension installed; the extension
 never blocks a merge.
 
+## 1.0.0-rc.2 — November 12, 2026
+
+_Two fixes to the thread filter on GitHub's new Overview page._
+
+### 🐛 Bug fixes
+
+- **On GitHub's Overview, the thread filter is no longer placed inside a thread.** When the Comments section showed `Unresolved` or `Mine`, the filter's chips appeared in the middle of the first thread, between its code and its comment. They now sit above the first thread, as in `All`.
+- **On GitHub's Overview, filtering by label hides the whole thread.** A thread that did not match the chosen label lost its comments but kept its file name and code on screen, as an empty box. It now disappears entirely, and comes back when you choose `all`.
+
+### 🔧 Changed
+
+- **The reviewer skill installs Slugger under its new name.** The tool that `skills/review-pull-request` uses to name review sessions is now published as `Slugger` instead of `Slugger.Cli`; the command is still `slugger`. An installation made under the old name keeps working, and the skill's setup step says how to move to the new one.
+
 ## 1.0.0-rc.1 — November 11, 2026
 
 _The release candidate for 1.0.0: GitLab support, GitHub's new Overview page, a working Azure DevOps, review-session markers and a `summary` label; `enforce` now really blocks, after re-reading the configuration, and the verifier is retired for good._

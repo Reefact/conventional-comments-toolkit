@@ -8,6 +8,19 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 commentaire n'est contrôlé que dans le navigateur des personnes ayant installé l'extension ; elle
 ne bloque jamais une fusion.
 
+## 1.0.0-rc.2 — 12 novembre 2026
+
+_Deux corrections du filtre des fils sur la nouvelle page Overview de GitHub._
+
+### 🐛 Corrections
+
+- **Sur l'Overview de GitHub, le filtre des fils ne se place plus à l'intérieur d'un fil.** Quand la section Comments affichait `Unresolved` ou `Mine`, les puces du filtre apparaissaient au milieu du premier fil, entre son code et son commentaire. Elles se placent désormais au-dessus du premier fil, comme en `All`.
+- **Sur l'Overview de GitHub, filtrer par label masque le fil entier.** Un fil qui ne portait pas le label choisi perdait ses commentaires mais gardait à l'écran son nom de fichier et son code, comme une boîte vide. Il disparaît désormais en entier, et revient quand vous choisissez `tous`.
+
+### 🔧 Changements
+
+- **Le skill de revue installe Slugger sous son nouveau nom.** L'outil que `skills/review-pull-request` utilise pour nommer les sessions de revue est désormais publié sous le nom `Slugger` au lieu de `Slugger.Cli` ; la commande reste `slugger`. Une installation faite sous l'ancien nom continue de fonctionner, et l'étape de configuration du skill dit comment passer au nouveau.
+
 ## 1.0.0-rc.1 — 11 novembre 2026
 
 _La version candidate de la 1.0.0 : la prise en charge de GitLab et de la nouvelle page Overview de GitHub, un Azure DevOps qui fonctionne, les marqueurs de session de revue et un label `summary` ; `enforce` bloque désormais vraiment, après avoir relu la configuration, et le vérificateur est retiré pour de bon._

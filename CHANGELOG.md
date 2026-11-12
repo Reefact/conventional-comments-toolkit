@@ -12,6 +12,18 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [1.0.0-rc.2] - 2026-11-12
+
+### Changed
+
+- **The reviewer skill installs Slugger under its new package name.** `skills/review-pull-request` draws review-session names with [Slugger](https://github.com/Reefact/slugger), whose .NET tool package is published as `Slugger` from version 1.2.0; it was `Slugger.Cli` through 1.1.0. The command is `slugger` either way. The setup step now installs `Slugger` and says how a tool manifest that still lists `slugger.cli` moves to it: uninstall, then install, since renaming the key alone asks for a version never published as a tool. Such a manifest keeps working as it is. The native download for Linux x64 is pinned to `cli-v1.2.0`, with its SHA-256.
+
+### Fixed
+
+- **On GitHub's Overview, the thread filter sits above the first thread card in the `Unresolved` and `Mine` modes of the Comments section** (#198). In those modes GitHub renders a list of thread cards with no timeline item around them, and the filter fell inside the first card, between its diff and its first comment. It now sits before that card, as it already did in `All` mode. Measured on captured pages of both modes (§5.5).
+
+- **On GitHub's Overview, a thread the filter sets aside is hidden with its whole card** (#199). The filter hid a thread's comments only: its file header and diff stayed on screen as an empty card, in all three modes of the Comments section. The card is now hidden whole, and comes back when the filter returns to `all`. A container that held more than one thread would not be hidden. The classic Conversation page and Files changed, where a thread has no such card, are unchanged (§5.5).
+
 ## [1.0.0-rc.1] - 2026-11-11
 
 ### Added
@@ -795,6 +807,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[1.0.0-rc.2]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.21...v1.0.0-rc.1
 [1.0.0-beta.21]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.20...v1.0.0-beta.21
 [1.0.0-beta.20]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.19...v1.0.0-beta.20

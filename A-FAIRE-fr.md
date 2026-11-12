@@ -133,7 +133,8 @@ du pilote en `enforce` (2c). Les autres sont des
 
 ## 5. Où trouver le reste
 
-- `README.md` — vue d'ensemble, commandes, statut par phase (§14).
+- `README.md` — présentation du produit ; `docs/README-fr.md` — index de la documentation,
+  guide utilisateur compris ; `docs/development-en.md` — commandes, CI, statut par phase (§14).
 - `docs/architecture-fr.md` — la découpe en paquets et ce que `core/` garantit.
 - `docs/operations-fr.md` — trajectoire, prérequis avant `enforce`, procédure de retour
   arrière.

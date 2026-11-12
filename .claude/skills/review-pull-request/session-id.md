@@ -34,9 +34,9 @@ condition of an `if` or the left side of `||`. A non-zero exit means no identifi
   download() {
     curl -fsSL --connect-timeout 15 --max-time 60 --retry 1 -o "$slugger" "$@"
   }
-  { download https://github.com/Reefact/slugger/releases/download/cli-v1.1.0/slugger-linux-x64 ||
-    download -H 'Accept: application/octet-stream' https://api.github.com/repos/Reefact/slugger/releases/assets/735726517; } &&
-    echo "c31f988bf3e76e51a68e3a087bc4d9663f804362923bb21bba84d443eff37664  $slugger" | sha256sum -c - >&2 &&
+  { download https://github.com/Reefact/slugger/releases/download/cli-v1.2.0/slugger-linux-x64 ||
+    download -H 'Accept: application/octet-stream' https://api.github.com/repos/Reefact/slugger/releases/assets/736054118; } &&
+    echo "72e642fc83689214585304c16643e8ced08d811756f8aaadee4b0dbec5ac9cae  $slugger" | sha256sum -c - >&2 &&
     chmod +x "$slugger" &&
     "$slugger" --theme-dir '<skill-dir>' --theme code-review --oneshot
 )

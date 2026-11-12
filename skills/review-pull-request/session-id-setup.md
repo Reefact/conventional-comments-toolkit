@@ -53,9 +53,10 @@ dotnet new tool-manifest
 dotnet tool install Slugger
 ```
 
-Skip the first command when the repository already has a manifest. Until version `1.1.0` the
-command was published as `Slugger.Cli`: a manifest that still lists `slugger.cli` keeps working,
-and moves to the new id with `dotnet tool uninstall Slugger.Cli` then
+Skip the first command when the repository already has a manifest. Through version `1.1.0`, the
+tool package was published as `Slugger.Cli`; starting with version `1.2.0`, it is published as
+`Slugger`. The command is `slugger` either way. A manifest that still lists `slugger.cli` keeps
+working, and moves to the new package with `dotnet tool uninstall Slugger.Cli` then
 `dotnet tool install Slugger`. Renaming its key alone asks for a version of `Slugger` that was
 never published as a tool. Without the SDK, record the
 choice all the same and leave the manifest alone: the option's native command draws the names on
@@ -113,9 +114,9 @@ condition of an `if` or the left side of `||`. A non-zero exit means no identifi
   download() {
     curl -fsSL --connect-timeout 15 --max-time 60 --retry 1 -o "$slugger" "$@"
   }
-  { download https://github.com/Reefact/slugger/releases/download/cli-v1.1.0/slugger-linux-x64 ||
-    download -H 'Accept: application/octet-stream' https://api.github.com/repos/Reefact/slugger/releases/assets/735726517; } &&
-    echo "c31f988bf3e76e51a68e3a087bc4d9663f804362923bb21bba84d443eff37664  $slugger" | sha256sum -c - >&2 &&
+  { download https://github.com/Reefact/slugger/releases/download/cli-v1.2.0/slugger-linux-x64 ||
+    download -H 'Accept: application/octet-stream' https://api.github.com/repos/Reefact/slugger/releases/assets/736054118; } &&
+    echo "72e642fc83689214585304c16643e8ced08d811756f8aaadee4b0dbec5ac9cae  $slugger" | sha256sum -c - >&2 &&
     chmod +x "$slugger" &&
     "$slugger" --theme-dir '<skill-dir>' --theme code-review --oneshot
 )

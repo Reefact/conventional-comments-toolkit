@@ -15,6 +15,16 @@ describe('§5.1 / CA-02 — insertion et remplacement de préfixe', () => {
     expect(nextValue.slice(0, caret)).toBe('todo (blocking): ');
   });
 
+  it('blancs avant le deux-points (§3.4.2) : le préfixe existant est remplacé, pas doublé', () => {
+    // Le préfixe est réécrit sous sa forme canonique ; l'espace avant le deux-points part avec lui.
+    expect(computePrefixInsertion('issue : le nom est ambigu', { label: 'todo' }).nextValue).toBe(
+      'todo: le nom est ambigu'
+    );
+    expect(computePrefixInsertion('issue (blocking)\u00A0: sujet', { label: 'todo' }).nextValue).toBe(
+      'todo (blocking): sujet'
+    );
+  });
+
   it('remplace le label en apportant une nouvelle décoration', () => {
     const { nextValue } = computePrefixInsertion('issue (blocking): sujet', {
       label: 'suggestion',

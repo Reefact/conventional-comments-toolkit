@@ -15,7 +15,9 @@ export const REFERENCE_REGEX_SOURCE =
   `^(?:${EMOJI_TOKEN_SOURCE}[ \\t]*)?` +
   '(?<label>[A-Za-z]+)' +
   '(?:[ \\t]*\\((?<decorations>[^)\\r\\n]*)\\))?' +
-  ':(?:[ \\t]+(?<subject>.*?)[ \\t]*)?$';
+  // Blancs tolérés avant le deux-points : `issue : sujet` est conforme (§3.4.2). L'amont
+  // n'interdit pas cette forme, et la typographie française la produit d'elle-même.
+  '[ \\t]*:(?:[ \\t]+(?<subject>.*?)[ \\t]*)?$';
 
 export const REFERENCE_REGEX_FLAGS = 'u';
 

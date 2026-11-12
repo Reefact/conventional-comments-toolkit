@@ -8,8 +8,6 @@ export const en: Record<string, string> = {
     'Malformed prefix: a closing parenthesis appears without an opening one. Open the decoration list, e.g. "{fix}".',
   'diag.E-MALFORMED-PREFIX.missing-colon':
     'Malformed prefix: the colon after the label is missing. Write "{fix}".',
-  'diag.E-MALFORMED-PREFIX.space-before-colon':
-    'Malformed prefix: no space is allowed before the colon. Write "{fix}".',
   'diag.E-MALFORMED-PREFIX.missing-space-after-colon':
     'Malformed prefix: the colon must be followed by at least one space. Write "{fix}".',
   'diag.E-MALFORMED-PREFIX.unexpected-character':

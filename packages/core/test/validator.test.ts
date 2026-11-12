@@ -12,8 +12,11 @@ describe('§3.5.1 — temps 1, reconnaissance du préfixe (séquentiel et exclus
   });
 
   it('CA-17 : trois messages non interchangeables', () => {
-    // Attention n'est pas un label, l'espace avant le deux-points prouve la phrase → E-NO-LABEL.
-    expect(codes(validate(vInput('Attention : le build casse'), config()))).toEqual(['E-NO-LABEL']);
+    // Aucune forme `label: sujet` → E-NO-LABEL, avec le format attendu.
+    expect(codes(validate(vInput('Le build casse depuis ce matin'), config()))).toEqual(['E-NO-LABEL']);
+    // Les blancs avant le deux-points sont tolérés : `Attention :` a la forme d'un préfixe,
+    // et son label est inconnu (§3.5.1).
+    expect(codes(validate(vInput('Attention : le build casse'), config()))).toEqual(['E-UNKNOWN-LABEL']);
     // Forme correcte, label inconnu → E-UNKNOWN-LABEL avec la liste des labels.
     const unknown = validate(vInput('attention: le build casse'), config());
     expect(codes(unknown)).toEqual(['E-UNKNOWN-LABEL']);
@@ -28,26 +31,33 @@ describe('§3.5.1 — temps 1, reconnaissance du préfixe (séquentiel et exclus
     const unclosed = validate(vInput('issue (blocking: x'), config());
     expect(codes(unclosed)).toEqual(['E-MALFORMED-PREFIX']);
     expect(unclosed[0]!.message).toMatch(/parenth/i);
-    const spaceBefore = validate(vInput('issue : le nom est ambigu'), config());
-    expect(codes(spaceBefore)).toEqual(['E-MALFORMED-PREFIX']);
-    expect(spaceBefore[0]!.fix?.replacement).toBe('issue: le nom est ambigu');
+    const noSpaceAfter = validate(vInput('issue :pas-d-espace'), config());
+    expect(codes(noSpaceAfter)).toEqual(['E-MALFORMED-PREFIX']);
+    expect(noSpaceAfter[0]!.fix?.replacement).toBe('issue : pas-d-espace');
+  });
+
+  it('CA-38 : blancs avant le deux-points tolérés — typographie française, aucun diagnostic', () => {
+    expect(validate(vInput('issue : le nom est ambigu\n\ndétail'), config())).toEqual([]);
+    expect(validate(vInput('issue (blocking) : le nom est ambigu\n\ndétail'), config())).toEqual([]);
+    expect(validate(vInput('issue\u00A0: le nom est ambigu\n\ndétail'), config())).toEqual([]);
   });
 
   it('motifs de E-MALFORMED-PREFIX, évalués dans l’ordre (§3.5.1)', () => {
     expect(malformedMotif('issue (blocking: x')).toBe('unclosed-paren'); // 1
     expect(malformedMotif('issue blocking): x')).toBe('unopened-paren'); // 2
     expect(malformedMotif('issue (blocking) x')).toBe('missing-colon'); // 3 — parens fermées
-    expect(malformedMotif('issue : le nom est ambigu')).toBe('space-before-colon'); // 4
-    expect(malformedMotif('issue:pas-d-espace')).toBe('missing-space-after-colon'); // 5
-    expect(malformedMotif('issue2: x')).toBe('unexpected-character'); // 6
-    expect(malformedMotif('issue (ux) (perf): x')).toBe('unexpected-character'); // 6
+    expect(malformedMotif('issue:pas-d-espace')).toBe('missing-space-after-colon'); // 4
+    expect(malformedMotif('issue :pas-d-espace')).toBe('missing-space-after-colon'); // 4
+    expect(malformedMotif('issue2: x')).toBe('unexpected-character'); // 5
+    expect(malformedMotif('issue2 : x')).toBe('unexpected-character'); // 5
+    expect(malformedMotif('issue (ux) (perf): x')).toBe('unexpected-character'); // 5
   });
 
   it('étage 1b : tentative détectée via alias aussi', () => {
     const cfg = config((c) => {
       c.labels.find((l) => l.id === 'issue')!.aliases = ['bug'];
     });
-    expect(codes(validate(vInput('bug : x'), cfg))).toEqual(['E-MALFORMED-PREFIX']);
+    expect(codes(validate(vInput('bug (blocking: x'), cfg))).toEqual(['E-MALFORMED-PREFIX']);
   });
 
   it('E-EMPTY-SUBJECT sur `issue:` et `issue: ` — même diagnostic, même chemin (§3.4.2)', () => {
@@ -322,7 +332,7 @@ describe('§3.5.1 — étages −2 et −1', () => {
 
   it('étage −2 : une réponse au préfixe mal formé ne porte pas le label decision → non validée', () => {
     expect(
-      validate(vInput('decision : trop court', { zone: 'reply', canCarryBlockingState: false }), config())
+      validate(vInput('decision (final: trop court', { zone: 'reply', canCarryBlockingState: false }), config())
     ).toEqual([]);
   });
 

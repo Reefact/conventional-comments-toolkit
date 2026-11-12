@@ -14,7 +14,8 @@ Check, in this order:
 3. **You are in a comment field of a pull request.** The description of the pull request,
    issues and work items are out of scope.
 4. **On GitLab, you are in the Markdown editor.** The rich text editor is not handled; switch
-   back under the field ([platforms](platforms-en.md#gitlab)).
+   back with *Switch to plain text editing* under the field
+   ([platforms](platforms-en.md#gitlab)).
 5. **The repository is not in `off` mode.** A repository can switch the extension off for
    itself.
 
@@ -67,7 +68,8 @@ it before blocking and releases the button.
 ### I changed the configuration file and nothing changed
 
 The extension caches what it read, one hour by default. It always re-reads before blocking a
-send, so a rule is never enforced stale; the display can lag until the cache expires.
+send, so a send is never blocked by an outdated rule; but the pill and the banner can show the
+old rules until the cache expires.
 
 ### A direct shortcut does nothing
 
@@ -82,7 +84,7 @@ send, so a rule is never enforced stale; the display can lag until the cache exp
 
 Yes, and the product says so. The extension only acts in the browser where it is installed;
 the platform's API, another browser or a disabled extension goes straight through. `enforce`
-prevents the inattentive mistake, which is the common case
+catches careless mistakes, which are the common case
 ([modes](modes-and-adoption-en.md#what-enforce-does-not-do)).
 
 ### Does it prevent a merge while blocking threads are open?
@@ -103,8 +105,8 @@ No. They are additions of this extension, enabled by default, that a repository 
 ### What leaves my browser?
 
 No comment, code or diff content, ever. The extension reads the configuration file of the
-repository you are looking at, on your own session; it stores no token. Your language and
-shortcuts sync through your browser if its sync is on. Telemetry is off unless your
+repository you are looking at, using your own signed-in session; it stores no token. Your
+language and shortcuts sync through your browser if its sync is on. Telemetry is off unless your
 organisation declares an endpoint **and** you agree. The details are in the
 [privacy policy](../../PRIVACY.md).
 

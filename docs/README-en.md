@@ -3,8 +3,8 @@
 **Languages:** English (this file) | [Français](README-fr.md)
 
 The toolkit is a browser extension that helps a team write
-[Conventional Comments](https://conventionalcomments.org/) in code reviews: a toolbar and a
-validation while you write, badges and a banner once comments are published. It assists by
+[Conventional Comments](https://conventionalcomments.org/) in code reviews: a toolbar and
+validation as you write, badges and a banner once comments are published. It assists by
 default and blocks only where a team asks it to.
 
 ## Start here
@@ -14,7 +14,7 @@ from nothing installed to a first comment written with the toolbar.
 
 ## Using the extension
 
-Read them in order the first time.
+The first time, read these guides in order.
 
 | Guide | What you get |
 |---|---|
@@ -40,7 +40,7 @@ Look-up material.
 | Guide | What you get |
 |---|---|
 | [Modes and adoption](guide/modes-and-adoption-en.md) | `off`, `assist`, `enforce`; what blocking does and does not do; the path to it and the way back |
-| [Deploying for an organisation](guide/organization-en.md) | The enterprise policy: shared configuration, floor, hosts, telemetry, forced installation |
+| [Deploying for an organisation](guide/organization-en.md) | The enterprise policy: shared configuration, minimum rules (the floor), hosts, telemetry, forced installation |
 | [Review skills for AI agents](guide/review-skills-en.md) | Letting an agent review, or answer a review, with this vocabulary |
 | [Privacy policy](../PRIVACY.md) | What is stored, what is sent, and what never leaves the browser |
 | [Release notes](release-notes-1.x-en.md) | What changed, version by version, for people who use the extension |

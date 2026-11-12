@@ -23,8 +23,8 @@ extension's settings page.
 
 ## What `enforce` does
 
-When a comment has at least one **error**, the send button is greyed out and its activation
-is intercepted, with the mouse and with the keyboard (`Ctrl+Enter`, `Cmd+Enter`). The reason
+When a comment has at least one **error**, the send button is greyed out, and the extension
+intercepts every attempt to send, by mouse or keyboard (`Ctrl+Enter`, `Cmd+Enter`). The reason
 is announced to screen readers, and the button stays reachable with `Tab`. Warnings never
 block.
 
@@ -43,11 +43,11 @@ invites you to send again.
 
 **The extension is a guard rail, not a wall.** It runs in the browser where it is installed.
 A comment posted through the platform's API, a command-line tool, an IDE, another browser or
-a machine without the extension is not checked. Nothing in the product controls that
-downstream.
+a machine without the extension is not checked. Nothing in the product checks those
+comments afterwards.
 
-**It does not control the merge.** Unresolved blocking threads are *reported* by the banner,
-never prevented from merging
+**It does not control the merge.** Unresolved blocking threads are *reported* by the banner;
+the extension never prevents a merge
 ([DEC0010](../idr/DEC0010-the-extension-is-the-whole-product-en.md)). A team that wants
 merges gated on resolved conversations uses its platform's own settings, such as required
 conversation resolution.
@@ -83,7 +83,8 @@ Before the switch, check the cases that would otherwise surprise people:
 ## Rolling back
 
 Relaxing the mode lifts the blocking at the next send attempt, with no cache to wait for.
-The order matters, because a lower level cannot relax what a higher one imposes:
+The order matters: a floor at `enforce` overrides everything below it, and a repository that
+writes its own `mode` overrides the organisation's configuration:
 
 1. the enterprise floor, if it imposes `enforce`;
 2. the organisation's configuration, which covers every repository that does not write its
@@ -91,6 +92,6 @@ The order matters, because a lower level cannot relax what a higher one imposes:
 3. each repository that writes `"mode": "enforce"` in its own file. List them before the
    switch, not during the incident.
 
-To check: on a test pull request, send a comment without a label. It must go out.
+To check the rollback: on a test pull request, send a comment without a label. It must go out.
 
 The operating procedures in full, in French: [`operations-fr.md`](../operations-fr.md).

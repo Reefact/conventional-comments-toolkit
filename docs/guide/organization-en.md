@@ -3,9 +3,9 @@
 **Languages:** English (this file) | [Français](organization-fr.md)
 
 What an administrator can set for every workstation: a configuration shared by all
-repositories, a floor no repository can go below, the hosts the extension serves, and
-telemetry. Everything on this page is optional; a team can use the extension with a
-repository file alone, or with nothing.
+repositories, a floor of minimum rules that no repository can go below, the hosts the
+extension serves, and telemetry. Everything on this page is optional; a team can use the
+extension with a repository file alone, or with nothing.
 
 ## The channel: the browser's enterprise policy
 
@@ -45,8 +45,8 @@ the key itself.
 
 ## The floor
 
-The floor bounds what the levels below may write. It is not a configuration: it sets no
-default, and a key left out is not bounded.
+The floor limits what the organisation's configuration and repository files may set. It is not
+a configuration: it sets no default, and a key left out of it is not limited.
 
 ```json
 {
@@ -71,18 +71,18 @@ default, and a key left out is not bounded.
 | `severities` | Lower the severity of the listed codes. |
 | `labels.minimum` | Disable these labels, make them non-blocking by default, or forbid `(blocking)` on them. |
 | `rules.minDecisionSubjectLength` | Accept a shorter reason for a `decision`. |
-| `exemptUsers`, `allowlistPatterns`, `toolCommands` | Remove an entry of `minimum`. With `closed: true`, add any entry at all. |
+| `exemptUsers`, `allowlistPatterns`, `toolCommands` | Remove an entry of `minimum`. With `closed: true`, also add any entry not in `minimum`. |
 | `configCacheTtlSeconds` | Keep a configuration in cache **longer** than this. |
 
 Tightening is always allowed below the floor; relaxing is not. A repository that writes
 `{"mode": "off"}` under a floor at `enforce` keeps `enforce`, and everyone sees a notice
 saying the key was ignored.
 
-`labels.minimum` matters more than it looks: without it, a repository can disable `issue`,
+`labels.minimum` matters more than it seems: without it, a repository can disable `issue`,
 `todo` and `chore`, after which no thread is blocking any more.
 
 A floor whose `floorVersion` is newer than the extension supports is never dropped
-silently: the extension falls back on `assist`, or on the floor it knew before if that one was
+silently: the extension falls back to `assist`, or to the floor it knew before if that one was
 stricter, and reports it.
 
 ## The hosts
@@ -100,9 +100,9 @@ has to classify it by hand in the settings page:
 Each entry must name its platform; an entry without one activates nothing. A subdomain
 wildcard is accepted in `host` (`*.ghe.com`).
 
-Site access itself, the permission each person otherwise grants from the settings page, is a
-matter for your browser's extension-management policy. A host the policy classifies is shown
-as such in the settings page, marked *enterprise policy*.
+Site access itself (the permission each person otherwise grants from the settings page) is
+set through your browser's extension-management policy, not through this one. A host the
+policy classifies is shown as such in the settings page, marked *enterprise policy*.
 
 ## Telemetry
 
@@ -110,9 +110,9 @@ Off by default. It turns on only when **both** hold: the policy declares
 `"enabled": true` with an `https:` `endpoint`, **and** the person ticks the box in their
 settings page. A repository can neither enable it nor choose the destination.
 
-It sends aggregate counters: a label inserted through the extension and its kind, a
-diagnostic code shown, a selector that found nothing, with the mode and the repository. Never
-the text of a comment, of code or of a diff, nor the address of the page.
+It sends aggregate counters: a label inserted through the extension and its kind (remark,
+reply or status), a diagnostic code shown, a selector that found nothing, with the mode and
+the repository. Never the text of a comment, of code or of a diff, nor the address of the page.
 
 These counters do not yet allow a compliance rate to be computed: no event counts comments
 written or sent. The full list of what is collected is in the

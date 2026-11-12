@@ -15,7 +15,7 @@ and only in `enforce` mode ([modes](modes-and-adoption-en.md)).
 2. **The content is checked**: decorations, subject, discussion. These checks add up, and the
    pill lists them all, so that fixing one does not reveal the next.
 
-Each message answers what you just typed. `The build is broken since this morning` gets the
+Each message matches what you just typed. `The build is broken since this morning` gets the
 expected format (`E-NO-LABEL`). `attention: the build is broken` has the right shape and gets
 the list of labels (`E-UNKNOWN-LABEL`).
 
@@ -74,10 +74,10 @@ no verdict.
 
 | Notice | Meaning |
 |---|---|
-| Key ignored: it would relax the enterprise floor | The repository or the organisation wrote a value below what the enterprise policy allows. The floor applies. |
+| Key ignored: it would relax the enterprise floor | The repository or the organisation set a value below the minimum that the enterprise policy imposes (the floor). The floor applies. |
 | Unknown or retired key, obsolete value | The key is ignored; the rest of the file applies. `"mode": "warn"` is read as `"assist"`. |
-| Invalid configuration | The file cannot be parsed or a known key has an unusable value. The extension falls back on the last valid level: the organisation's configuration, then the product defaults. |
-| Unsupported version | The file was written for a newer version of the extension. The extension falls back on `assist`, or on the enterprise floor if it is stricter. |
+| Invalid configuration | The file cannot be parsed or a known key has an unusable value. The extension falls back to the last valid level: the organisation's configuration, then the product defaults. |
+| Unsupported version | The file was written for a newer version of the extension. The extension falls back to `assist`, or to the enterprise floor if it is stricter. |
 
 *Configuration unread* is different: the extension could not reach the file at all. It then
 assists without blocking ([FAQ](faq-en.md#the-pill-says-configuration-unread)).

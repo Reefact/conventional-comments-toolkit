@@ -29,11 +29,11 @@ A 404 is retried forever; the caller only gives up on a timeout.
 - The **discussion** is everything outside the prefix line, in free Markdown.
 
 This is the format of [Conventional Comments](https://conventionalcomments.org/). The
-extension is stricter than that page on the shape of the prefix only, so that a machine can
-read it; it never judges the wording of your subject.
+extension is stricter than that page only about the shape of the prefix, so that a machine
+can read it; it never judges the wording of your subject.
 
-Small tolerances: spaces before the colon are accepted (`issue : subject`, as French
-typography writes it), a leading emoji is ignored, and `(ux,non-blocking)` is read like
+A few variations are tolerated: spaces before the colon are accepted (`issue : subject`, as
+French typography writes it), a leading emoji is ignored, and `(ux,non-blocking)` is read like
 `(ux, non-blocking)`.
 
 ## The toolbar
@@ -58,8 +58,8 @@ GitHub's light theme. Not a screenshot of github.com.*
 - **Choosing a decoration** adds it to the prefix: `issue` then `non-blocking` gives
   `issue (non-blocking): `.
 
-Every row wraps on itself when the field is narrow; labels and decorations never share a row.
-You can put your most used labels first with *Button order* in the
+Each row wraps onto further lines when the field is narrow; labels and decorations never share
+a row. You can put your most-used labels first with *Button order* in the
 [settings page](settings-en.md#local-preferences), and write prefixes without the mouse with
 the [keyboard input](keyboard-input-en.md).
 
@@ -74,7 +74,7 @@ A pill under the field says where the comment stands, as you type:
 | ❌ *Non-compliant* | At least one error. In `enforce` mode the comment cannot be sent ([modes](modes-and-adoption-en.md)). |
 | *Configuration unread* | The extension could not read the repository's rules. It assists without knowing them and does not block. |
 
-The border of the field takes the colour of the state. Under the pill, each problem is listed
+The field's border takes the colour of the current state. Under the pill, each problem is listed
 with its code and a message; when the correction can be computed, a **Fix** button applies it
 in one click. The [diagnostics reference](diagnostics-en.md) explains every code.
 
@@ -85,8 +85,8 @@ isue: the name is ambiguous
 ![A comment with a misspelt label: red border, Non-compliant pill, the E-UNKNOWN-LABEL message and its Fix button](../images/diagnostic-en.png)
 
 When the configuration itself has a problem (an unknown key, an invalid file, a key the
-organisation does not let a repository relax), the pill says so after the diagnostics. These
-notices change no verdict.
+organisation does not let a repository relax), the pill reports it after the diagnostics. These
+notices do not change the verdict.
 
 ## What is validated, and what is not
 
@@ -104,7 +104,7 @@ Editing a comment is validated like writing it.
 
 A comment is **exempt**, and gets no diagnostic at all, when:
 
-- its body is empty (approving without a text stays possible);
+- its body is empty (so you can still approve without writing anything);
 - nothing is left once code blocks and quotations are removed;
 - it starts with a command addressed to a tool, such as `/rebase` or `@dependabot rebase`,
   when the repository declares them in `toolCommands`;
@@ -134,17 +134,17 @@ reports; it never prevents a merge.
 **Thread filter.** Above the threads, a row of chips filters them by label. It only hides
 threads on your screen.
 
-**Review-session marker.** A line `[session:<name>]` alone on its line says which review
+**Review-session marker.** A line that contains only `[session:<name>]` says which review
 session wrote a comment, which helps when several AI agents review the same pull request
 ([review skills](review-skills-en.md)). The extension hides that line and shows a discreet
-`🤖 session: <name>` at the bottom of the comment. The marker is not part of the comment for
-validation.
+`🤖 session: <name>` at the bottom of the comment. Validation ignores the marker,
+except that a comment carrying more than one gets the warning `W-SESSION-MULTIPLE`.
 
 ## Closing a blocking thread without making the change
 
-Sometimes those who carry the pull request decide not to address a blocking point: out of
-scope, debt accepted, decision taken elsewhere. That is a review decision, and it is written
-in the thread, as a reply:
+Sometimes the people responsible for the pull request decide not to address a blocking point:
+out of scope, debt accepted, decision taken elsewhere. That is a review decision, and it is
+recorded in the thread, as a reply:
 
 ```text
 decision: out of scope for this pull request, debt tracked in PROJ-142
@@ -153,5 +153,5 @@ The author of the comment is away and the fix must ship today.
 ```
 
 A `decision` must give its reason in at least 20 characters
-(`rules.minDecisionSubjectLength`). It records the choice where the discussion took place; it
-does not resolve the thread, which remains a gesture of the platform.
+(`rules.minDecisionSubjectLength`). It records the choice where the discussion took place. It
+does not resolve the thread: you still resolve it with the platform's own control.

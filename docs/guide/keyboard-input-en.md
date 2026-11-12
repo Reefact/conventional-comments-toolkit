@@ -71,9 +71,9 @@ repository enables `quibble`, and `?do` does nothing in a repository that disabl
 
 ### Add your own
 
-The table belongs to the team. It lives in the repository's `.conventional-comments.json`,
-under `shortcuts.abbreviations`. Each entry maps an abbreviation to the text inserted, colon
-and space included:
+The abbreviation table belongs to the team. It lives in the repository's
+`.conventional-comments.json`, under `shortcuts.abbreviations`. Each entry maps an
+abbreviation to the text inserted, colon and space included:
 
 ```json
 {
@@ -136,12 +136,12 @@ Alt+D=
 - The shipped shortcuts you do not mention stay as they are.
 
 A shortcut is `Alt` plus one letter, and its label is written by its identifier (`reviewed`,
-not an alias). The preference follows you through your browser's sync, and applies to the next
+not an alias). The preference follows you through your browser's sync. It applies to the next
 comment field that opens, not to those already open.
 
 ### Known limit on macOS
 
 The extension recognises a shortcut by the character the key produces. On macOS, `Option`
 plus a letter usually types a special character instead of the letter, so a direct shortcut
-may not fire there. This has not been measured on a Mac. The completion list and the
+may not fire there. This has not been tested on a Mac. The completion list and the
 abbreviations do not depend on `Alt` and are not affected.

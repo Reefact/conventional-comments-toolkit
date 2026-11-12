@@ -14,7 +14,7 @@ the three adapters; each is active only on the domains you allowed.
 | Banner of unresolved blocking threads | Yes | Yes | Yes |
 | Thread filter | Yes | Yes | Yes, except on the *Changes* tab |
 | Reads the repository's `.conventional-comments.json` | Yes | Yes | **Not yet** |
-| Send guard (`enforce`) | Yes | Yes | **No** |
+| Send guard (`enforce`) | Yes | Yes | **Not yet** |
 | A general comment can open a blocking thread | No | Yes | Yes, when published with *Start thread* |
 | Body of a review submitted as a whole | Yes | Does not exist | Yes |
 | Suggestion block read as a `suggestion` | Yes | Yes | Not yet |
@@ -38,8 +38,8 @@ host you use.
 
 ## GitHub
 
-- Both pull request pages are supported: the classic *Conversation* page and the newer
-  *Overview*, and *Files changed*.
+- Both versions of the pull request page are supported, the classic *Conversation* page and
+  the newer *Overview*, as well as *Files changed*.
 - The general conversation of a pull request has no "resolve" button, so a blocking label
   written there cannot open a blocking thread. The pill says so with `W-NOT-BLOCKABLE`.
 - Submitting a review validates its body (`scope.validateReviewSummary`); approving with no

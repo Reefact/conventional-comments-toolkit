@@ -113,7 +113,7 @@ fil `issue (blocking)` non résolu sur `RetryPolicy.cs:18`, `.conventional-comme
 - GitHub `Reefact/deskmate` : branches `demo/store-base`, `demo/http-retry`, PR #2 ouverte ;
   commentaires de Codex supprimés.
 - GitHub `Reefact/just-dummies` : PR #558 **fermée**, branches `demo/store-base` et
-  `demo/http-retry` encore présentes.
+  `demo/http-retry` supprimées le 2026-11-12.
 - GitLab `Reefact/testing-conventional-comments` : commit `.conventional-comments.json` sur `main`,
   branche `demo/http-retry`, MR !3 ouverte.
 - Azure DevOps `sylva-cct-test/cct-test` : commit sur `main` (clé `activation` retirée de la

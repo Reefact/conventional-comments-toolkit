@@ -169,4 +169,23 @@ describe('§5.5 — le filtre de fils se place au niveau de la LISTE, hors des b
     // Hors de toute boîte de fil ou de revue : aucun ancêtre n'est un élément de chronologie.
     expect(mount?.parentElement?.closest(item)).toBeNull();
   }, T);
+
+  // Modes `Unresolved` et `Mine` de la section Comments : aucun élément de chronologie, le filtre
+  // tombait dans la carte du premier fil, entre son diff et son commentaire (Reefact/deskmate#2,
+  // remarque du propriétaire, 2026-11-12).
+  it.each([
+    ['03-overview-commentaires-prefixes-unresolved.html'],
+    ['03-overview-commentaires-prefixes-mine.html'],
+  ])('%s : avant la carte entière du premier fil, diff compris', (file) => {
+    const page = load(file, '/Reefact/deskmate/pull/2');
+    const mount = page.adapter.getThreadFilterMount();
+    const first = page.adapter.getRenderedThreadElements()[0]!.element;
+    expect(first.closest('[data-testid="timeline-item"]')).toBeNull();
+    expect(mount?.tagName).toBe('ARTICLE');
+    expect(mount?.contains(first)).toBe(true);
+    // La carte porte l'en-tête de fichier et le diff, que le fil seul ne contient pas.
+    expect(mount?.querySelector('table')).not.toBeNull();
+    expect(first.querySelector('table')).toBeNull();
+    expect(mount?.parentElement?.closest('article')).toBeNull();
+  }, T);
 });

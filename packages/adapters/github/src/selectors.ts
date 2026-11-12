@@ -563,6 +563,14 @@ export const selectors = {
     candidates: [
       '[data-testid="timeline-item"]',
       '.js-timeline-item', // CLASSIQUE
+      // La CARTE du fil, quand la section Comments de l'Overview n'est pas en mode `All` :
+      // en `Unresolved` (`?comments:mode=thread-previews`) et `Mine` (`?comments:mode=mine`),
+      // GitHub rend une liste de cartes sans élément de chronologie, et le filtre se repliait
+      // sur le `review-thread` lui-même — dans la carte, entre le diff et le commentaire.
+      // MESURÉ le 2026-11-12 sur les 31 captures : un `article` n'entoure un fil que sur
+      // l'Overview, n'en contient jamais qu'un, et vient APRÈS `timeline-item`, qui gagne donc
+      // toujours en mode `All` (`03-overview-commentaires-prefixes-{unresolved,mine}.html`).
+      'article',
     ],
   } satisfies SelectorChain,
 

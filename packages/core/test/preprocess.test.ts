@@ -41,7 +41,7 @@ describe('§3.4.1 — prétraitement normatif', () => {
   });
 
   it('étape 5 : blancs Unicode internes hors espace/tab → espace ordinaire, sans diagnostic', () => {
-    // Une insécable avant le deux-points devient une espace : le motif 4 devient exact (§3.4.1).
+    // Une insécable avant le deux-points devient une espace, que la regex tolère (§3.4.1).
     expect(normalizePrefixLine('issue\u00A0: x')).toBe('issue : x');
     expect(normalizePrefixLine('issue:\u202Fsujet')).toBe('issue: sujet');
   });
@@ -49,7 +49,7 @@ describe('§3.4.1 — prétraitement normatif', () => {
   it('étape 6 : U+FEFF interne supprimé, jamais remplacé par une espace', () => {
     // `issue` + BOM + `:` doit retomber sur `issue: x`, qui est conforme (§3.4.1).
     expect(normalizePrefixLine('issue\uFEFF: x')).toBe('issue: x');
-    // Placé après le deux-points : disparaît et laisse `issue:sujet` (motif 5 exact).
+    // Placé après le deux-points : disparaît et laisse `issue:sujet` (motif 4 exact).
     expect(normalizePrefixLine('issue:\uFEFFsujet')).toBe('issue:sujet');
   });
 

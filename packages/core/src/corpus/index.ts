@@ -41,7 +41,7 @@ export const corpus: CorpusCase[] = [
   { id: 'trailing-blanks', body: 'issue: le nom est ambigu   \t\n\nDétail.\n\n', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'bom-at-head', body: '\uFEFFissue: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'bom-before-colon', body: 'issue\uFEFF: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
-  { id: 'nbsp-before-colon', body: 'issue\u00A0: le nom est ambigu', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-MALFORMED-PREFIX', 'error']] },
+  { id: 'nbsp-before-colon', body: 'issue\u00A0: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'nnbsp-after-colon', body: 'issue:\u202Fle nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'emoji-simple', body: '🔥 issue: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'emoji-flag', body: '🇫🇷 issue: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
@@ -54,14 +54,16 @@ export const corpus: CorpusCase[] = [
   { id: 'malformed-unclosed-paren', body: 'issue (blocking: x', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-MALFORMED-PREFIX', 'error']] },
   { id: 'malformed-unopened-paren', body: 'issue blocking): x', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-MALFORMED-PREFIX', 'error']] },
   { id: 'malformed-missing-colon', body: 'issue (blocking) x', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-MALFORMED-PREFIX', 'error']] },
-  { id: 'malformed-space-before-colon', body: 'issue : le nom est ambigu', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-MALFORMED-PREFIX', 'error']] },
   { id: 'malformed-no-space-after-colon', body: 'issue:pas-d-espace', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-MALFORMED-PREFIX', 'error']] },
   { id: 'malformed-unexpected-char', body: 'issue2: x', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-MALFORMED-PREFIX', 'error']] },
 
   // ————— Étages 1b, 2, 3 —————
-  { id: 'no-label-sentence', body: 'Attention : le build casse', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-NO-LABEL', 'error']] },
+  { id: 'no-label-sentence', body: 'Le build casse depuis ce matin', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-NO-LABEL', 'error']] },
+  { id: 'unknown-label-french-sentence', body: 'Attention : le build casse', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-UNKNOWN-LABEL', 'error']] },
   { id: 'unknown-label', body: 'attention: le build casse', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-UNKNOWN-LABEL', 'error']] },
   { id: 'unknown-label-typo', body: 'isue: fuite mémoire\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['E-UNKNOWN-LABEL', 'error']] },
+  { id: 'space-before-colon', body: 'issue : le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
+  { id: 'space-before-colon-decorated', body: 'issue (blocking) : le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [] },
   { id: 'case-label', body: 'Issue: le nom est ambigu\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', expected: [['W-CASE', 'warn']] },
   { id: 'alias-case', body: 'Bug: fuite mémoire\n\nDétail.', zone: 'thread-root', canCarryBlockingState: true, platform: 'github', configDoc: { labels: [{ id: 'issue', aliases: ['bug'] }] }, expected: [['W-CASE', 'warn']] },
 
@@ -92,7 +94,7 @@ export const corpus: CorpusCase[] = [
 
   // ————— Étages −2 et −1 (§4.1, §4.2) —————
   { id: 'reply-free-text', body: 'Corrigé, merci !', zone: 'reply', canCarryBlockingState: false, platform: 'github', expected: [] },
-  { id: 'reply-malformed-decision', body: 'decision : trop court', zone: 'reply', canCarryBlockingState: false, platform: 'github', expected: [] },
+  { id: 'reply-malformed-decision', body: 'decision (final: trop court', zone: 'reply', canCarryBlockingState: false, platform: 'github', expected: [] },
   { id: 'review-body-validated', body: 'du texte libre de revue', zone: 'review-body', canCarryBlockingState: false, platform: 'github', expected: [['E-NO-LABEL', 'error']] },
   { id: 'empty-body', body: '', zone: 'review-body', canCarryBlockingState: false, platform: 'github', expected: [] },
   { id: 'blank-body', body: '   \n\t\n', zone: 'review-body', canCarryBlockingState: false, platform: 'github', expected: [] },

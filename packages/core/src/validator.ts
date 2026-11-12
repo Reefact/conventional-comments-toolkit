@@ -66,7 +66,6 @@ export type MalformedMotif =
   | 'unclosed-paren'
   | 'unopened-paren'
   | 'missing-colon'
-  | 'space-before-colon'
   | 'missing-space-after-colon'
   | 'unexpected-character';
 
@@ -591,10 +590,9 @@ export function malformedMotif(line: string): MalformedMotif {
   if (hasClose && !hasOpen) return 'unopened-paren'; // motif 2
   const colon = line.indexOf(':');
   if (colon === -1) return 'missing-colon'; // motif 3
-  if (colon > 0 && /[ \t]/.test(line[colon - 1]!)) return 'space-before-colon'; // motif 4
   const after = line[colon + 1];
-  if (after !== undefined && !/[ \t]/.test(after)) return 'missing-space-after-colon'; // motif 5
-  return 'unexpected-character'; // motif 6
+  if (after !== undefined && !/[ \t]/.test(after)) return 'missing-space-after-colon'; // motif 4
+  return 'unexpected-character'; // motif 5
 }
 
 function malformedPrefixDiagnostic(line: string, lang: string | null): Diagnostic {
@@ -628,10 +626,6 @@ function malformedFix(line: string, motif: MalformedMotif): string | null {
       const m = /^([A-Za-z]+)[ \t]+(.*)$/.exec(line);
       if (!m) return null;
       return `${m[1]}: ${m[2]}`;
-    }
-    case 'space-before-colon': {
-      const colon = line.indexOf(':');
-      return line.slice(0, colon).trimEnd() + line.slice(colon);
     }
     case 'missing-space-after-colon': {
       const colon = line.indexOf(':');

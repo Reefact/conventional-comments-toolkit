@@ -861,7 +861,7 @@ const RAW_PREFIX_LOCATOR = new RegExp(
   `^(?<head>[\\p{White_Space}\\uFEFF]*(?:${EMOJI_TOKEN_SOURCE}[\\p{White_Space}\\uFEFF]*)?)` +
     '(?<label>[A-Za-z]+)' +
     '(?:[\\p{White_Space}\\uFEFF]*\\([^)\\r\\n]*\\))?' +
-    ':[\\p{White_Space}\\uFEFF]*',
+    '[\\p{White_Space}\\uFEFF]*:[\\p{White_Space}\\uFEFF]*',
   'u'
 );
 

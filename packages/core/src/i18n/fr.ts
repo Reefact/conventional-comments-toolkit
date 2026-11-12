@@ -8,8 +8,6 @@ export const fr: Record<string, string> = {
     'Préfixe mal formé : une parenthèse fermante apparaît sans parenthèse ouvrante. Ouvrez la liste de décorations, par exemple « {fix} ».',
   'diag.E-MALFORMED-PREFIX.missing-colon':
     'Préfixe mal formé : le deux-points après le label est manquant. Écrivez « {fix} ».',
-  'diag.E-MALFORMED-PREFIX.space-before-colon':
-    'Préfixe mal formé : aucune espace n’est admise avant le deux-points. Écrivez « {fix} ».',
   'diag.E-MALFORMED-PREFIX.missing-space-after-colon':
     'Préfixe mal formé : le deux-points doit être suivi d’au moins une espace. Écrivez « {fix} ».',
   'diag.E-MALFORMED-PREFIX.unexpected-character':

@@ -43,8 +43,14 @@ describe('§3.4.2 — expression régulière de référence', () => {
     expect(matchPrefix('Issue: x')!.label).toBe('Issue');
   });
 
-  it('aucune espace avant le deux-points, au moins une après', () => {
-    expect(matchPrefix('issue : x')).toBeNull(); // typographie française → pas un préfixe
+  it('blancs tolérés avant le deux-points, au moins une espace après', () => {
+    // Typographie française : l'amont n'interdit pas la forme, la regex l'accepte (§3.4.2).
+    expect(matchPrefix('issue : x')!.label).toBe('issue');
+    expect(matchPrefix('issue : x')!.subject).toBe('x');
+    expect(matchPrefix('issue (blocking) : x')!.decorations).toBe('blocking');
+    expect(matchPrefix('issue \t: x')!.label).toBe('issue');
+    expect(matchPrefix('issue :')!.subject).toBeNull();
+    expect(matchPrefix('issue :x')).toBeNull();
     expect(matchPrefix('issue:x')).toBeNull();
     expect(matchPrefix('http://example.com')).toBeNull(); // écarte les URL
   });
@@ -70,6 +76,9 @@ describe('§3.4.2 — expression régulière de référence', () => {
     const pathological = 'issue (' + ' '.repeat(300_000);
     const start = performance.now();
     matchPrefix(pathological);
+    // Blancs avant le deux-points, désormais tolérés (§3.4.2) : jamais suivis du `:` attendu.
+    matchPrefix('issue' + ' '.repeat(300_000));
+    matchPrefix('issue (x)' + ' '.repeat(300_000) + 'y');
     const elapsed = performance.now() - start;
     expect(elapsed).toBeLessThan(50); // marge large sur le ≤ 1,2 ms mesuré par la spec
   });

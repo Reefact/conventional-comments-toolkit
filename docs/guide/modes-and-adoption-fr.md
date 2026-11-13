@@ -70,8 +70,17 @@ assist  →  enforce sur un dépôt pilote  →  généralisation
 2. **Fixez les règles tant que vous êtes en `assist`.** Ajustez les labels, les sévérités,
    les exemptions pour les bots et les commandes. Un changement s'applique aussitôt aux pull
    requests ouvertes : c'est le moment de voir ce que signalent la pastille et le bandeau.
-3. **Passez un dépôt pilote en `enforce`**, avec `{ "mode": "enforce" }` dans son fichier.
-4. **Généralisez**, dépôt par dépôt ou par la configuration d'organisation.
+3. **Réunissez les prérequis avant qu'un dépôt passe en `enforce` :**
+   - la [procédure de retour arrière](#retour-arrière) est écrite et la personne qui
+     l'exécute est désignée, avec la liste des dépôts qui écrivent leur propre `mode` ;
+   - les indicateurs qui disent si le pilote est prêt (taux de conformité, taux
+     d'avertissement) sont calculables. **Ils ne le sont pas encore :** la télémétrie, sur
+     consentement, compte les labels insérés par l'extension et les diagnostics affichés,
+     mais aucun événement ne compte les commentaires écrits ou envoyés ; aucun taux n'a donc
+     de dénominateur. D'ici là, choisissez le pilote et écrivez la procédure, mais laissez le
+     pilote en `assist`.
+4. **Passez un dépôt pilote en `enforce`**, avec `{ "mode": "enforce" }` dans son fichier.
+5. **Généralisez**, dépôt par dépôt ou par la configuration d'organisation.
 
 Avant la bascule, vérifiez ces cas, qui vous surprendraient sinon :
 
@@ -85,8 +94,8 @@ Avant la bascule, vérifiez ces cas, qui vous surprendraient sinon :
 ## Retour arrière
 
 Assouplir le mode lève le blocage dès la tentative d'envoi suivante, sans attendre
-l'expiration du cache. Assouplissez dans cet ordre : un plancher à `enforce` l'emporte sur tout le reste, et un dépôt
-qui écrit son propre `mode` l'emporte sur la configuration d'organisation :
+l'expiration du cache. Assouplissez dans cet ordre : un plancher à `enforce` l'emporte sur tout
+le reste, et un dépôt qui écrit son propre `mode` l'emporte sur la configuration d'organisation :
 
 1. le plancher d'entreprise, s'il impose `enforce` ;
 2. la configuration d'organisation, qui couvre tous les dépôts qui n'écrivent pas leur propre

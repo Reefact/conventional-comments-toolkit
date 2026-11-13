@@ -69,8 +69,16 @@ assist  →  enforce on a pilot repository  →  rollout
 2. **Settle the rules while still in `assist`.** Adjust labels, severities, exemptions for
    bots and commands. A change applies at once to open pull requests, so this is the moment to
    see what the pill and the banner report.
-3. **Switch one pilot repository to `enforce`**, with `{ "mode": "enforce" }` in its file.
-4. **Roll out**, repository by repository or through the organisation's configuration.
+3. **Meet the prerequisites before any repository moves to `enforce`:**
+   - the [rollback procedure](#rolling-back) is written and the person who runs it is named,
+     with the list of repositories that write their own `mode`;
+   - the indicators that tell whether the pilot is ready (compliance rate, warning rate) can
+     be computed. **They cannot yet:** the opt-in telemetry counts labels inserted through
+     the extension and diagnostics shown, but no event counts the comments written or sent,
+     so no rate has a denominator. Until it does, choose the pilot and write the procedure,
+     but keep the pilot in `assist`.
+4. **Switch one pilot repository to `enforce`**, with `{ "mode": "enforce" }` in its file.
+5. **Roll out**, repository by repository or through the organisation's configuration.
 
 Before the switch, check the cases that would otherwise surprise people:
 

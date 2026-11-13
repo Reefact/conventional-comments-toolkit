@@ -344,7 +344,10 @@ export function startTour(doc: Document = document, lang = 'en'): TourHandle | n
     // personne. Mesuré, pas supposé : `spikes/options-tour.mjs` vérifie que chaque étape
     // tient réellement dans la fenêtre.
     const bottomOfView = (view?.scrollY ?? 0) + (view?.innerHeight ?? 0);
-    const height = popover.offsetHeight;
+    // La hauteur RÉELLE, fractions comprises : `offsetHeight` l'arrondit à l'entier, et une
+    // fiche de 226,3 px jugée en tenir 226 dépassait le bas de la fenêtre de 0,2 px — mesuré
+    // dans la CI sur l'étape « Labels ajoutés » (`spikes/options-tour.mjs`).
+    const height = popover.getBoundingClientRect().height;
     if (height > 0 && rect.bottom + gap + height > bottomOfView) {
       // Le plancher est le HAUT DE LA FENÊTRE, pas celui du document : les coordonnées sont
       // absolues, et `Math.max(0, …)` laissait passer une fiche au-dessus du bord visible dès

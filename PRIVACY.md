@@ -113,7 +113,7 @@ visual feedback inside the platform's native comment editor.
 
 | Data | Where it lives | Does it leave the browser? |
 |---|---|---|
-| Interface language, direct keyboard shortcuts and label button order | `chrome.storage.sync` | **Syncs across your Chrome account's devices if sync is enabled** — that's Chrome's own native mechanism, not a server run by the extension. Limited to these two preferences, never comment or code content. |
+| Interface language, direct keyboard shortcuts and label button order | `chrome.storage.sync` | **Syncs across your Chrome account's devices if sync is enabled** — that's Chrome's own native mechanism, not a server run by the extension. Limited to these three preferences, never comment or code content. |
 | Current degraded state (diagnostics) | `chrome.storage.local`, on your device | No |
 | Notices from the last configuration read (shown in the options page): the host and path of the repository read (for example `github.com/organization/repository`), and for each notice its kind, its code, its English text and what it cites — a configuration key or value, the index and a bounded excerpt (40 characters) of an allowlist pattern, a version, the level at fault —, plus, as a reference, **the rejected value itself, in full**: an allowlist pattern or a tool command, as written in the configuration. Replaced at each read, with no history | `chrome.storage.local`, on your device | No |
 | Enabled optional domains (Azure DevOps, GitHub Enterprise, etc.) | `chrome.permissions`, managed by Chrome | No — Chrome holds this list, not the extension |

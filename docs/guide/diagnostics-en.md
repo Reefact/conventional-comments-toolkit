@@ -4,9 +4,11 @@
 
 Every code the status pill can show, what triggers it and how to fix it.
 
-A code starting with `E-` is an **error**: the comment is non-compliant. A code starting with
-`W-` is a **warning**: the comment stays compliant. Warnings never block a send; errors do,
-and only in `enforce` mode ([modes](modes-and-adoption-en.md)).
+The prefix of a code gives its **default** severity: `E-` for an error, `W-` for a warning. A
+repository or an organisation can change it ([change a severity](#change-a-severity)), so what
+counts is the **effective** severity the pill shows. A comment with at least one effective
+error is non-compliant; a comment with warnings only stays compliant. Warnings never block a
+send; errors do, and only in `enforce` mode ([modes](modes-and-adoption-en.md)).
 
 ## How a comment is checked
 

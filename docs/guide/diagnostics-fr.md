@@ -4,8 +4,11 @@
 
 Tous les codes que la pastille peut afficher, ce qui les déclenche et comment les corriger.
 
-Un code qui commence par `E-` est une **erreur** : le commentaire est non conforme. Un code
-qui commence par `W-` est un **avertissement** : le commentaire reste conforme. Les
+Le préfixe d'un code donne sa sévérité **par défaut** : `E-` pour une erreur, `W-` pour un
+avertissement. Un dépôt ou une organisation peut la changer
+([changer une sévérité](#changer-une-sévérité)) ; ce qui compte est donc la sévérité
+**effective** qu'affiche la pastille. Un commentaire qui porte au moins une erreur effective est
+non conforme ; un commentaire qui ne porte que des avertissements reste conforme. Les
 avertissements ne bloquent jamais un envoi ; les erreurs le bloquent, et seulement en mode
 `enforce` ([modes](modes-and-adoption-fr.md)).
 

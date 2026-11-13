@@ -83,7 +83,7 @@ ten minutes.
 | Badges, banner, thread filter | Yes | Yes | Yes |
 | Repository configuration, send guard | Yes | Yes | Not yet |
 
-GitHub.com, Enterprise Cloud and Enterprise Server; Azure DevOps Services and Server;
+GitHub.com, Enterprise Cloud and Enterprise Server; Azure DevOps Services on `dev.azure.com`;
 gitlab.com. Chrome, Edge and other Chromium browsers, Firefox 128 or later.
 [What works where, in detail](docs/guide/platforms-en.md).
 

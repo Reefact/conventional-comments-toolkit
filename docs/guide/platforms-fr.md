@@ -28,8 +28,8 @@ que vous avez autorisés.
 | GitHub Enterprise Cloud avec résidence des données | votre propre sous-domaine de `ghe.com` | *Autres domaines* : saisissez-le, choisissez GitHub |
 | GitHub Enterprise Server | votre propre domaine | *Autres domaines* : saisissez-le, choisissez GitHub |
 | Azure DevOps Services | `dev.azure.com` | *Domaines connus*, un clic |
-| Azure DevOps Services, ancienne URL | `<organisation>.visualstudio.com` | *Autres domaines* : saisissez-le, choisissez Azure DevOps |
-| Azure DevOps Server | votre propre domaine | *Autres domaines* : saisissez-le, choisissez Azure DevOps |
+| Azure DevOps Services, ancienne URL | `<organisation>.visualstudio.com` | *Autres domaines* : saisissez-le, choisissez Azure DevOps. **Non vérifié.** |
+| Azure DevOps Server | votre propre domaine | *Autres domaines* : saisissez-le, choisissez Azure DevOps. **Non vérifié.** |
 | GitLab.com | `gitlab.com` | *Domaines connus*, un clic |
 | GitLab Self-Managed, GitLab Dedicated | votre propre domaine | *Autres domaines* : saisissez-le, choisissez GitLab. **Non vérifié.** |
 
@@ -51,6 +51,11 @@ domaine : l'extension n'obtient accès qu'à l'hôte que vous utilisez.
   fonctionnent pour toute personne connectée qui y a accès.
 
 ## Azure DevOps
+
+Vérifié sur `dev.azure.com` seulement. L'adaptateur a été construit sur des pages capturées
+sur cet hôte ; `<organisation>.visualstudio.com` et Azure DevOps Server n'ont pas été capturés,
+et rien ne dit que ses sélecteurs y trouvent leurs éléments
+([DEC0008](../idr/DEC0008-azure-devops-on-dev-azure-com-only-fr.md)).
 
 - Tous les boutons d'envoi passent par la validation : *Comment*, *Reply*, *Reply & resolve*,
   *Update*, *Update & resolve*, *Reply & reactivate*.

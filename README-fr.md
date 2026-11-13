@@ -86,7 +86,7 @@ minutes.
 | Badges, bandeau, filtre des fils | Oui | Oui | Oui |
 | Configuration du dépôt, blocage de l'envoi | Oui | Oui | Pas encore |
 
-GitHub.com, Enterprise Cloud et Enterprise Server ; Azure DevOps Services et Server ;
+GitHub.com, Enterprise Cloud et Enterprise Server ; Azure DevOps Services sur `dev.azure.com` ;
 gitlab.com. Chrome, Edge et les autres navigateurs Chromium, Firefox 128 ou supérieur.
 [Ce qui fonctionne où, en détail](docs/guide/platforms-fr.md).
 

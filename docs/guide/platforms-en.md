@@ -27,8 +27,8 @@ the three adapters; each is active only on the domains you allowed.
 | GitHub Enterprise Cloud with data residency | your own subdomain of `ghe.com` | *Other domains*: type it, choose GitHub |
 | GitHub Enterprise Server | your own domain | *Other domains*: type it, choose GitHub |
 | Azure DevOps Services | `dev.azure.com` | *Known domains*, one click |
-| Azure DevOps Services, legacy URL | `<organisation>.visualstudio.com` | *Other domains*: type it, choose Azure DevOps |
-| Azure DevOps Server | your own domain | *Other domains*: type it, choose Azure DevOps |
+| Azure DevOps Services, legacy URL | `<organisation>.visualstudio.com` | *Other domains*: type it, choose Azure DevOps. **Not measured.** |
+| Azure DevOps Server | your own domain | *Other domains*: type it, choose Azure DevOps. **Not measured.** |
 | GitLab.com | `gitlab.com` | *Known domains*, one click |
 | GitLab Self-Managed, GitLab Dedicated | your own domain | *Other domains*: type it, choose GitLab. **Not measured.** |
 
@@ -49,6 +49,11 @@ host you use.
   anyone signed in with access to them.
 
 ## Azure DevOps
+
+Measured on `dev.azure.com` only. The adapter was built on captured pages of that host;
+`<organisation>.visualstudio.com` and Azure DevOps Server have not been captured, so nothing
+says its selectors find their pages
+([DEC0008](../idr/DEC0008-azure-devops-on-dev-azure-com-only-en.md)).
 
 - Every send button goes through validation: *Comment*, *Reply*, *Reply & resolve*, *Update*,
   *Update & resolve*, *Reply & reactivate*.

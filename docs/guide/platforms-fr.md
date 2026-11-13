@@ -28,14 +28,12 @@ que vous avez autorisés.
 | GitHub Enterprise Cloud avec résidence des données | votre propre sous-domaine de `ghe.com` | *Autres domaines* : saisissez-le, choisissez GitHub |
 | GitHub Enterprise Server | votre propre domaine | *Autres domaines* : saisissez-le, choisissez GitHub |
 | Azure DevOps Services | `dev.azure.com` | *Domaines connus*, un clic |
-| Azure DevOps Services, ancienne URL | `<organisation>.visualstudio.com` | *Autres domaines* : saisissez-le, choisissez Azure DevOps. **Non vérifié.** |
-| Azure DevOps Server | votre propre domaine | *Autres domaines* : saisissez-le, choisissez Azure DevOps. **Non vérifié.** |
+| Azure DevOps Server | votre propre domaine | **Pas encore pris en charge** : l'adaptateur n'y reconnaît aucune page |
 | GitLab.com | `gitlab.com` | *Domaines connus*, un clic |
 | GitLab Self-Managed, GitLab Dedicated | votre propre domaine | *Autres domaines* : saisissez-le, choisissez GitLab. **Non vérifié.** |
 
-L'installation n'autorise aucun domaine, pas même `github.com`. Pour `ghe.com` et
-`visualstudio.com`, vous saisissez votre propre sous-domaine plutôt que d'autoriser tout le
-domaine : l'extension n'obtient accès qu'à l'hôte que vous utilisez.
+L'installation n'autorise aucun domaine, pas même `github.com`. Pour `ghe.com`, vous
+saisissez votre propre sous-domaine plutôt que d'autoriser tout le domaine : l'extension n'obtient accès qu'à l'hôte que vous utilisez.
 
 ## GitHub
 
@@ -52,10 +50,16 @@ domaine : l'extension n'obtient accès qu'à l'hôte que vous utilisez.
 
 ## Azure DevOps
 
-Vérifié sur `dev.azure.com` seulement. L'adaptateur a été construit sur des pages capturées
-sur cet hôte ; `<organisation>.visualstudio.com` et Azure DevOps Server n'ont pas été capturés,
-et rien ne dit que ses sélecteurs y trouvent leurs éléments
+Sur `dev.azure.com` seulement. L'adaptateur a été construit sur des pages capturées sur cet
+hôte, et ne reconnaît aucune pull request ailleurs
 ([DEC0008](../idr/DEC0008-azure-devops-on-dev-azure-com-only-fr.md)).
+
+- **Les anciennes URL `<organisation>.visualstudio.com` ne sont pas prises en charge, et ne le
+  seront pas.** La boîte à outils prend en charge la forme actuelle de chaque plateforme ;
+  Microsoft présente ces URL comme l'ancienne forme de `dev.azure.com`, vers laquelle une
+  organisation peut basculer depuis ses réglages.
+- **Azure DevOps Server n'est pas encore pris en charge** : aucune de ses pages n'a été
+  capturée.
 
 - Tous les boutons d'envoi passent par la validation : *Comment*, *Reply*, *Reply & resolve*,
   *Update*, *Update & resolve*, *Reply & reactivate*.

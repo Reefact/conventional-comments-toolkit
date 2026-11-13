@@ -43,8 +43,7 @@ at installation; you grant it one domain at a time.
 
 - Under **Known domains**, click the platform you use: GitHub.com, Azure DevOps Services
   (`dev.azure.com`) or GitLab.com. The browser asks you to confirm.
-- For a host of your own (GitHub Enterprise Server, Azure DevOps Server, a
-  `visualstudio.com` organisation, GitLab Self-Managed), type its domain under **Other
+- For a host of your own (GitHub Enterprise Server, GitLab Self-Managed), type its domain under **Other
   domains** and choose the platform that serves it **before** clicking **Allow**.
 
 The domain then appears under **Configured domains**, where you can withdraw the access at

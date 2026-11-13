@@ -45,8 +45,7 @@ demande aucun accès aux sites à l'installation ; vous autorisez les domaines u
 
 - Sous **Domaines connus**, cliquez sur la plateforme que vous utilisez : GitHub.com, Azure
   DevOps Services (`dev.azure.com`) ou GitLab.com. Le navigateur vous demande de confirmer.
-- Pour un hôte qui vous est propre (GitHub Enterprise Server, Azure DevOps Server, une
-  organisation `visualstudio.com`, GitLab Self-Managed), saisissez son domaine sous **Autres
+- Pour un hôte qui vous est propre (GitHub Enterprise Server, GitLab Self-Managed), saisissez son domaine sous **Autres
   domaines** et choisissez la plateforme qui le sert **avant** de cliquer sur **Autoriser**.
 
 Le domaine apparaît alors sous **Domaines configurés**, où vous pouvez retirer l'accès à tout

@@ -134,6 +134,14 @@ try {
       const box = root.querySelector('.tour-popover').getBoundingClientRect();
       return {
         title: root.querySelector('.tour-title')?.textContent,
+        // La géométrie mesurée, pour qu'un échec dise de combien et de quel côté la fiche sort,
+        // et pas seulement laquelle — la CI ne se rejoue pas en local au pixel près.
+        box: {
+          top: Math.round(box.top * 10) / 10,
+          bottom: Math.round(box.bottom * 10) / 10,
+          viewport: window.innerHeight,
+          scrollY: window.scrollY,
+        },
         inside:
           box.top >= 0 &&
           box.left >= 0 &&
@@ -151,7 +159,7 @@ try {
     }
     await sleep(200);
   }
-  const outside = walked.filter((s) => !s.inside).map((s) => s.title);
+  const outside = walked.filter((s) => !s.inside).map((s) => `${s.title} ${JSON.stringify(s.box)}`);
   assert(
     'chaque étape place sa fiche DANS la fenêtre',
     outside.length === 0 && clickFailure === null,

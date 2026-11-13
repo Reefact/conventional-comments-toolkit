@@ -346,7 +346,12 @@ export function startTour(doc: Document = document, lang = 'en'): TourHandle | n
     const bottomOfView = (view?.scrollY ?? 0) + (view?.innerHeight ?? 0);
     const height = popover.offsetHeight;
     if (height > 0 && rect.bottom + gap + height > bottomOfView) {
-      popover.style.top = `${Math.max(0, rect.top - gap - height)}px`;
+      // Le plancher est le HAUT DE LA FENÊTRE, pas celui du document : les coordonnées sont
+      // absolues, et `Math.max(0, …)` laissait passer une fiche au-dessus du bord visible dès
+      // que la page avait défilé. Mesuré sur l'étape « Labels ajoutés » : cible plus haute que
+      // la place laissée au-dessus d'elle, fiche à 1 px au-dessus de la fenêtre
+      // (`spikes/options-tour.mjs`).
+      popover.style.top = `${Math.max(view?.scrollY ?? 0, rect.top - gap - height)}px`;
     }
   }
 

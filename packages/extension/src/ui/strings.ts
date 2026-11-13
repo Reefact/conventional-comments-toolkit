@@ -98,7 +98,7 @@ const fr: Record<string, string> = {
   'options.known.empty': 'Tous les domaines connus sont déjà autorisés.',
   'options.other.heading': 'Autres domaines',
   'options.other.sub.1':
-    'Pour GitHub Enterprise Server, Azure DevOps Server, GitLab Self-Managed, une organisation historique',
+    'Pour GitHub Enterprise Server, Azure DevOps Server, GitLab Self-Managed',
   'options.other.sub.2':
     'ou tout autre hôte propre à votre organisation : choisissez la plateforme avant d’autoriser l’accès.',
   'options.other.host.aria': 'Domaine à autoriser',
@@ -219,7 +219,7 @@ const fr: Record<string, string> = {
   'options.status.selectors.copy.manual':
     'Copie automatique impossible : le texte est sélectionné ci-dessous, copiez-le avec Ctrl+C (⌘C sur Mac).',
   'options.platform.github': 'GitHub Enterprise Server / GHE Cloud',
-  'options.platform.azdo': 'Azure DevOps Server ou organisation visualstudio.com',
+  'options.platform.azdo': 'Azure DevOps Server',
   'options.platform.gitlab': 'GitLab Self-Managed',
   'options.platform.config': 'Hôte de configuration uniquement',
   'options.platform.github.option': 'GitHub Enterprise Server / GHE Cloud (résidence)',
@@ -358,7 +358,7 @@ const en: Record<string, string> = {
   'options.known.empty': 'Every known domain is already allowed.',
   'options.other.heading': 'Other domains',
   'options.other.sub.1':
-    'For GitHub Enterprise Server, Azure DevOps Server, GitLab Self-Managed, a legacy organisation',
+    'For GitHub Enterprise Server, Azure DevOps Server, GitLab Self-Managed',
   'options.other.sub.2':
     'or any other host of your own: choose the platform before granting access.',
   'options.other.host.aria': 'Domain to allow',
@@ -478,7 +478,7 @@ const en: Record<string, string> = {
   'options.status.selectors.copy.manual':
     'Automatic copy failed: the text is selected below, copy it with Ctrl+C (⌘C on Mac).',
   'options.platform.github': 'GitHub Enterprise Server / GHE Cloud',
-  'options.platform.azdo': 'Azure DevOps Server or visualstudio.com organisation',
+  'options.platform.azdo': 'Azure DevOps Server',
   'options.platform.gitlab': 'GitLab Self-Managed',
   'options.platform.config': 'Configuration host only',
   'options.platform.github.option': 'GitHub Enterprise Server / GHE Cloud (residency)',

@@ -27,14 +27,12 @@ the three adapters; each is active only on the domains you allowed.
 | GitHub Enterprise Cloud with data residency | your own subdomain of `ghe.com` | *Other domains*: type it, choose GitHub |
 | GitHub Enterprise Server | your own domain | *Other domains*: type it, choose GitHub |
 | Azure DevOps Services | `dev.azure.com` | *Known domains*, one click |
-| Azure DevOps Services, legacy URL | `<organisation>.visualstudio.com` | *Other domains*: type it, choose Azure DevOps. **Not measured.** |
-| Azure DevOps Server | your own domain | *Other domains*: type it, choose Azure DevOps. **Not measured.** |
+| Azure DevOps Server | your own domain | **Not supported yet**: the adapter recognises no page there |
 | GitLab.com | `gitlab.com` | *Known domains*, one click |
 | GitLab Self-Managed, GitLab Dedicated | your own domain | *Other domains*: type it, choose GitLab. **Not measured.** |
 
 No domain is granted at installation, `github.com` included. You type your own subdomain
-rather than allowing all of `ghe.com` or `visualstudio.com`: the extension only gets the one
-host you use.
+rather than allowing all of `ghe.com`: the extension only gets the one host you use.
 
 ## GitHub
 
@@ -50,10 +48,14 @@ host you use.
 
 ## Azure DevOps
 
-Measured on `dev.azure.com` only. The adapter was built on captured pages of that host;
-`<organisation>.visualstudio.com` and Azure DevOps Server have not been captured, so nothing
-says its selectors find their pages
+On `dev.azure.com` only. The adapter was built on captured pages of that host, and
+recognises no pull request anywhere else
 ([DEC0008](../idr/DEC0008-azure-devops-on-dev-azure-com-only-en.md)).
+
+- **Legacy `<organisation>.visualstudio.com` URLs are not supported, and will not be.** The
+  toolkit supports the current form of each platform; Microsoft presents those URLs as the
+  legacy form of `dev.azure.com`, to which an organisation can switch in its settings.
+- **Azure DevOps Server is not supported yet**: none of its pages has been captured.
 
 - Every send button goes through validation: *Comment*, *Reply*, *Reply & resolve*, *Update*,
   *Update & resolve*, *Reply & reactivate*.

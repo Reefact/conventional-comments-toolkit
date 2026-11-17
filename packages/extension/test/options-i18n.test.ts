@@ -105,14 +105,13 @@ describe('application du catalogue à la vraie page', () => {
     }
   });
 
-  it('les segments d’une phrase coupée par un <code> se traduisent tous les deux', () => {
-    // Ces phrases sont découpées parce que le catalogue ne transporte pas de balisage. Le
-    // risque du découpage est d'en oublier une moitié, qui reste alors dans l'autre langue
-    // au milieu de la phrase.
+  it('les deux segments d’une phrase découpée se traduisent tous les deux', () => {
+    // La phrase est portée par deux clés : elle encadrait un `<code>`, que le catalogue ne
+    // transporte pas. Le risque du découpage est d'en oublier une moitié, qui reste alors dans
+    // l'autre langue au milieu de la phrase.
     applyStaticStrings(document, 'en');
     const paragraph = document.querySelector('[data-i18n="options.other.sub.1"]')?.closest('p');
     expect(paragraph?.textContent).toContain(ui('en', 'options.other.sub.1'));
     expect(paragraph?.textContent).toContain(ui('en', 'options.other.sub.2'));
-    expect(paragraph?.textContent).toContain('visualstudio.com');
   });
 });

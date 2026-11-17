@@ -1553,9 +1553,11 @@ Couvre Azure DevOps Services et Azure DevOps Server.
 | | Cloud | Auto-hébergé |
 |---|---|---|
 | **Offre** | Azure DevOps Services | Azure DevOps Server |
-| **Domaine** | `dev.azure.com`, ou `*.visualstudio.com` pour les organisations historiques | Domaine on-premise, variable par instance |
+| **Domaine** | `dev.azure.com` — les URL historiques `{organisation}.visualstudio.com` sont hors périmètre (ci-dessous) | Domaine on-premise, variable par instance |
 | **Rythme de mise à jour du produit** | Continu | Par release |
 | **Version minimale supportée** | — | *à définir avec la même méthode qu'en A.1* |
+
+**Les URL historiques `{organisation}.visualstudio.com` sont hors périmètre.** La boîte à outils prend en charge la forme actuelle de chaque plateforme, pas les formes que la plateforme elle-même a remplacées : Microsoft présente ces URL comme l'ancienne forme de `dev.azure.com`, vers laquelle une organisation bascule depuis ses réglages. L'extension n'y reconnaît aucune page et ne propose pas de les autoriser (décision du propriétaire, 2026-11-13).
 
 ### B.2 Éditeur et écriture programmatique
 
@@ -1570,10 +1572,9 @@ SPA — pas d'équivalent de Turbo : l'adaptateur observe le conteneur racine vi
 
 ### B.4 Domaines et lecture de la configuration
 
-`dev.azure.com`, `{organisation}.visualstudio.com`, ou domaine on-premise pour Azure DevOps Server → `optional_host_permissions` dans **tous** les cas, selon la règle unique du §A.4. Le critère y étant l'hôte concret et non l'offre, les deux domaines cloud d'Azure DevOps ne se rangent pas du même côté :
+`dev.azure.com`, ou domaine on-premise pour Azure DevOps Server → `optional_host_permissions` dans **tous** les cas, selon la règle unique du §A.4 :
 
 - **`dev.azure.com`** est un hôte fixe — l'organisation vit dans le CHEMIN. Il va donc au catalogue, et l'autoriser est le minimum possible pour ce domaine.
-- **`{organisation}.visualstudio.com`** (URLs historiques) donne au contraire un sous-domaine PAR organisation. Il relève du cas « suffixe connu, hôte inconnu » : l'hôte concret se saisit, exactement comme un sous-domaine de `ghe.com`. Le mettre au catalogue reviendrait à demander `https://*.visualstudio.com/*`, donc l'accès à toutes les organisations sur URLs historiques quand un poste n'en sert qu'une — ce que §2 interdit.
 - Le **domaine on-premise** se saisit de même, plateforme choisie avant l'octroi.
 
 **Lecture du fichier de configuration par l'extension** (`getRepoConfig()`, §9.2.3, §10) : Azure DevOps n'expose pas de route de fichier brut équivalente à celle de GitHub ; l'accès au contenu d'un fichier passe par le point d'API `items` du dépôt — `/{organisation}/{projet}/_apis/git/repositories/{dépôt}/items?path=/.conventional-comments.json&api-version=7.1`, qui sert le fichier de la branche par défaut. **Mesuré le 2026-11-10** sur un vrai tenant (`packages/adapters/azdo/CAPTURES.md`) : sur la session de l'utilisateur, il répond **200 sans redirection, avec le contenu brut** du fichier — à condition de ne pas demander `Accept: application/json`, qui rend des métadonnées — et **404 sans redirection** pour un fichier absent ; sans session, il **redirige vers la connexion** Microsoft. La requête reste donc de même origine pour une session ouverte, ce qu'un script de contenu peut lire (`check:content-script-cors`), et un 404 y dit vraiment « pas de fichier ». Toute autre réponse — autre code, page HTML, exception — vaut `{ status: 'unreachable' }`, et l'extension y est alors en **état dégradé** au sens du §5.4 — elle assiste sans bloquer (§10).

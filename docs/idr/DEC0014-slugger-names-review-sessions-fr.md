@@ -7,6 +7,7 @@
 | Date | Statut | Note | Compte rendu lié |
 | --- | --- | --- | --- |
 | 2026-11-11 | Accepté | Reprise de la décision consignée dans la PR #188 et ses fils de revue, le 2026-11-11 |  |
+| 2026-11-17 | Remplacé par DEC0015 |  |  |
 
 ## Contexte
 

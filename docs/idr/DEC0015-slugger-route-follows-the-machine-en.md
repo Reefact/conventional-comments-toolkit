@@ -7,6 +7,7 @@
 | Date | Status | Note | Linked minutes |
 | --- | --- | --- | --- |
 | 2026-11-17 | Proposed | Proposes to supersede DEC0014; DEC0014 stays the decision in force until this one is accepted |  |
+| 2026-11-17 | Accepted |  |  |
 
 ## Context
 

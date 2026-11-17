@@ -7,6 +7,7 @@
 | Date | Statut | Note | Compte rendu lié |
 | --- | --- | --- | --- |
 | 2026-11-17 | Proposé | Propose de remplacer DEC0014 ; DEC0014 reste la décision en vigueur tant que celle-ci n'est pas acceptée |  |
+| 2026-11-17 | Accepté |  |  |
 
 ## Contexte
 

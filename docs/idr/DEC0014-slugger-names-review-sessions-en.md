@@ -7,6 +7,7 @@
 | Date | Status | Note | Linked minutes |
 | --- | --- | --- | --- |
 | 2026-11-11 | Accepted | Recovered on 2026-11-11 from the decision recorded in pull request #188 and its review threads |  |
+| 2026-11-17 | Superseded by DEC0015 |  |  |
 
 ## Context
 

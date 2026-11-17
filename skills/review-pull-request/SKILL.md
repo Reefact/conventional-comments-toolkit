@@ -202,11 +202,11 @@ while True:
 
 ### Choosing the route
 
-1. Go through the routes in order and skip the ones that do not apply. The first route that draws an identifier ends the search.
-2. A route that applies and fails (a host refused, a checksum mismatch, a command error) does not stop you: keep its command and its output for your report and go on to the next route. A checksum mismatch goes **first** in your report, before anything else: it means the downloaded file is not the one pinned here.
+1. Go through routes 1 and 2 in order and skip the one that does not apply. The first that draws an identifier ends the search: route 3 is never tried after it.
+2. A route that applies and fails (a host refused, a checksum mismatch, a command error) does not stop you: keep its command and its output for your report and go on to the next of routes 1 and 2. A checksum mismatch goes **first** in your report, before anything else: it means the downloaded file is not the one pinned here.
 3. When no route 1 or 2 applied, draw with route 3 straight away, and say in your report why they did not apply.
-4. When route 1 or 2 applied, failed, and nothing else drew an identifier, **do not fall back on your own**: say so to the person, with the commands and their output, and **ask explicitly which they want**: (a) **retry** (after the problem is fixed, for example once a host is reachable), or (b) **the Python draw**. Use AskUserQuestion when you have it, plain text otherwise. Publish nothing until they answer. If nobody can answer (unattended run), publish nothing and report the failure. After a retry that fails again, ask again.
-5. When `python3` does not run either, publish nothing and report it. Never write an identifier yourself, a GUID included.
+4. When route 1 or 2 applied, failed, and neither drew an identifier, **route 3 is not yours to start, even if `python3` runs**: say so to the person, with the commands and their output, and **ask explicitly which they want**: (a) **retry** (after the problem is fixed, for example once a host is reachable), or (b) **the Python draw**. Use AskUserQuestion when you have it, plain text otherwise. Publish nothing until they answer. If nobody can answer (unattended run), publish nothing and report the failure. After a retry that fails again, ask again.
+5. When route 3 is reached, by item 3 or by the person's answer, and `python3` does not run, publish nothing and report it. Never write an identifier yourself, a GUID included.
 
 In your report, name the route that drew the identifier and its command. For route 3, also say which theme file it read and which routes did not draw (not applicable, or the failed command and its output). Everything else in this section applies unchanged to an identifier drawn by any route: unused check, description, marker.
 

@@ -44,10 +44,12 @@ comment ([writing review comments](writing-comments-en.md#once-comments-are-publ
 - Each session draws its own identifier from a random source and checks that the pull
   request does not carry it yet. It never takes one from the pull request, from another
   session or from an earlier conversation.
-- The identifier is a readable name drawn by [Slugger](https://github.com/Reefact/slugger),
-  or a GUID. The choice is made once per installation and recorded in a `session-id.md` file
-  committed beside the skill; where none is recorded yet, the reviewer's skill offers Slugger
-  once and records the answer.
+- The identifier is a readable name drawn by [Slugger](https://github.com/Reefact/slugger):
+  its native build on Linux x64, otherwise its .NET tool when a .NET 10 SDK is present,
+  otherwise a Python script that draws from the same word list, shipped with the skill. The
+  skill never runs anything that comes from the repository under review. When a route fits
+  the machine but fails, for example because a host is unreachable, the skill asks you
+  whether to retry or to use the Python draw; it never falls back on a GUID.
 - A Slugger name can carry a description: one sentence built from its words, written after an
   em dash and in italics. The extension shows the name, and the sentence on hover:
 

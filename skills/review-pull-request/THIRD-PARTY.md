@@ -3,6 +3,8 @@
 `code-review.json` is the `code-review` theme of [Slugger](https://github.com/Reefact/slugger),
 version 1.0.1, copied unchanged from
 [`themes/code-review.json`](https://github.com/Reefact/slugger/blob/main/themes/code-review.json).
+Its SHA-256 is `bdc2f9d2853a57010577eda2cf4fc324b82cdc202d963831f2c34ae04e464ea1`: any other value
+means the file was changed.
 It is distributed under the Apache License 2.0, whose text is in `code-review.LICENSE`.
 
 It ships with this skill so that drawing a review session identifier needs no download and no

@@ -46,3 +46,4 @@ DEC0002 to DEC0014 were recovered on 2026-11-11 from the "owner's decision" ment
 | [DEC0012](DEC0012-re-read-the-configuration-before-blocking-en.md) | Re-read the configuration before blocking | Accepted | 2026-11-10 |
 | [DEC0013](DEC0013-no-claude-code-footer-in-pull-requests-en.md) | No Claude Code footer in pull requests | Accepted | 2026-11-10 |
 | [DEC0014](DEC0014-slugger-names-review-sessions-en.md) | Slugger names review sessions | Accepted | 2026-11-11 |
+| [DEC0015](DEC0015-slugger-route-follows-the-machine-en.md) | Slugger route follows the machine | Proposed | 2026-11-17 |

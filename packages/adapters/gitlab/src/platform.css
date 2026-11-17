@@ -60,10 +60,14 @@
    (Le garde `check:platform-isolation` ne l'aurait pas vu : il vérifie les feuilles présentes,
    pas l'absence d'une feuille — mesuré à la création de cette plateforme.)
 
-   À remplacer par de vraies mesures : sur une page de merge request, relever le retrait propre
-   du conteneur de commentaire, puis juger la gouttière et l'écart de la pastille. D'ici là, ces
-   chiffres disent « un rendu cohérent avec les autres plateformes », jamais « ce qu'il faut
-   rendre ici ». */
+   UN SEUL de ces chiffres a été jugé sur GitLab : `--cct-frame-padding`, 8 px. Le propriétaire a
+   comparé 0, 4, 8, 12 px sur le rendu et retenu 8 px (2026-11-17), après avoir constaté sur une
+   instance Self-Managed que les boutons touchaient la bordure — le cadre n'était alors pas
+   retrouvé, voir `composerFrame` (selectors.ts). C'est un choix de rendu, pas une mesure de
+   GitLab. La gouttière et l'écart de la pastille restent à juger : sur une page de merge
+   request, relever le retrait propre du conteneur de commentaire, puis les régler à l'œil. D'ici
+   là, ces deux chiffres disent « un rendu cohérent avec les autres plateformes », jamais « ce
+   qu'il faut rendre ici ». */
 :root[data-cct-platform='gitlab'] {
   --cct-frame-padding: 8px;
   --cct-inner-gutter: 8px;

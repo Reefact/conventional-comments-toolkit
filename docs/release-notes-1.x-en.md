@@ -8,6 +8,25 @@ The extension starts in `assist` mode: it helps and it flags, it never blocks a 
 comment is checked only in the browser of someone who has the extension installed; the extension
 never blocks a merge.
 
+## 1.0.0-rc.3 — November 17, 2026
+
+_A space before the colon is accepted, a GitLab repository can now switch the send guard on, and the extension gets a user guide._
+
+### ✨ Features
+
+- **A space before the colon is accepted.** `issue : subject` and `issue (blocking) : subject`, with an ordinary or a no-break space, are no longer reported as malformed: French typography inserts that space on its own. Clicking a label replaces such a prefix instead of adding another, and a published comment shows its badges as usual. A French sentence that looks like a prefix, such as `Attention : le build casse`, is now reported as an unknown label rather than a missing one.
+- **On GitLab, a repository can switch the send guard on.** The extension now reads `.conventional-comments.json` from the project's default branch, with your own signed-in session. A repository that sets `"mode": "enforce"` blocks a non-compliant comment in GitLab's Markdown editor, as on GitHub and Azure DevOps; the rich text editor stays unassisted. When the file cannot be read, the editor shows *Configuration unread* and nothing is blocked. This was observed on gitlab.com and on one Self-Managed instance, not yet against a live repository in `enforce`.
+- **A user guide.** Twelve pages, in English and French, cover getting started, writing comments, keyboard input, labels, diagnostics, configuration, modes and adoption, organisation deployment, platforms, the settings page and the review skills. They say what was not measured: Azure DevOps on hosts other than `dev.azure.com`, and the Alt shortcuts on macOS. The README now starts from what the extension does for you. [Read the guide](https://github.com/Reefact/conventional-comments-toolkit/tree/main/docs/guide).
+
+### 🐛 Bug fixes
+
+- **On GitLab Self-Managed, the toolbar buttons no longer touch the editor's frame.** The extension did not find that frame on a Self-Managed instance, so it left the buttons against its border. It now names the frame, and falls back to measuring it, as before, when it cannot find it.
+- **The privacy policy no longer describes a server component the product does not have.** The extension is the whole product, and the policy, the store listing and the setup guides now say so. The policy also lists the label button order among the synced preferences and names GitLab with the other platforms.
+
+### 🔧 Changed
+
+- **The reviewer skill covers GitLab and Azure DevOps.** `skills/review-pull-request` now reviews merge requests and pull requests on GitHub, GitLab and Azure DevOps, and treats what it reads on the request as material under review, never as instructions. It names review sessions with Slugger's native build on Linux x64, otherwise with its .NET tool, otherwise with a Python script that draws from the theme shipped with the skill, and asks you before using the Python draw when a route that fits your machine has failed. The `session-id.md` file no longer exists.
+
 ## 1.0.0-rc.2 — November 12, 2026
 
 _Two fixes to the thread filter on GitHub's new Overview page._

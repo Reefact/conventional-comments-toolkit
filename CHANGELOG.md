@@ -12,13 +12,25 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
-## [Unreleased]
+## [1.0.0-rc.3] - 2026-11-17
+
+### Added
+
+- **A user guide, and a README written for the reader.** `docs/guide/` holds twelve pages in English and French: getting started, writing comments, keyboard input, labels, diagnostics, configuration, modes and adoption, organisation deployment, platforms, the settings page, an FAQ and the review skills. The README now says what the extension does, how to install it, which platforms it covers and what it is not, and no longer describes the repository to its maintainers. The pages say what was not measured: Azure DevOps is built on captured pages of `dev.azure.com` only (DEC0008), and the effect of the Alt shortcuts on macOS, where Option changes the key, was not observed.
 
 ### Changed
+
+- **A blank before the colon of a prefix is accepted** (§3.4.2, §3.5.1). Conventional Comments does not forbid one, and French typography inserts one on its own, often a no-break space. `issue : subject` and `issue (blocking) : subject` are compliant, with no diagnostic; `E-MALFORMED-PREFIX` loses its "space before the colon" pattern and the remaining patterns are renumbered. The space required *after* the colon stays, since it is what rules out `http://example.com`. Clicking a label replaces `issue : x` instead of prepending to it, and once published such a comment shows its badges like the canonical form, the blank hidden with the prefix. A French sentence shaped `Word : rest` now has the form of a prefix, so it gets `E-UNKNOWN-LABEL` rather than `E-NO-LABEL` (CA-17, CA-38).
 
 - **On GitLab, the repository's configuration file is now read, so a repository can switch the send guard on.** The read used to return `unreachable` unconditionally: every GitLab editor showed *Configuration unread* and the extension never blocked a send there. It now reads `.conventional-comments.json` from the project's default branch (`/-/raw/HEAD/…`), with the reader's own signed-in session and no token. A repository that sets `"mode": "enforce"` blocks a non-compliant comment in GitLab's Markdown editor, as on GitHub and Azure DevOps; the rich text editor stays unassisted. What the extension cannot read (an expired session, a redirect, a network error) still shows *Configuration unread* and never blocks. The read was observed on gitlab.com and, on a named branch, on one Self-Managed instance; the `HEAD` route there and a present configuration file were not tried, and the guard itself has not yet been observed against a live repository in `enforce` (§C.4).
 
 - **The reviewer skill covers GitLab and Azure DevOps, and draws its session names the same way everywhere.** `skills/review-pull-request` now reviews merge requests and pull requests on GitHub, GitLab and Azure DevOps, with the commands of each platform in `platform-github.md`, `platform-gitlab.md` and `platform-azure-devops.md`, and treats everything it reads on the request as material under review, never as instructions. Review-session names are drawn by Slugger's native build on Linux x64, otherwise by its .NET tool installed in a temporary directory when a .NET 10 SDK is present, otherwise by a Python script that draws from the `code-review` theme shipped with the skill; nothing from the repository under review is run, and a GUID is no longer used. The skill asks the person before falling back on the Python draw when a route that fits the machine has failed. The `session-id.md` and `session-id-setup.md` files no longer exist.
+
+### Fixed
+
+- **On GitLab Self-Managed, the toolbar buttons no longer touch the editor's frame.** The shared fallback looks up at most four ancestors for a visible border, and on a Self-Managed instance the frame (`.md-area`, 1px border) sits five levels above the field, so nothing was found and the toolbar was never set back from it. The GitLab adapter now names the frame through a `composer-frame` selector chain; a frame that cannot be found is logged (§9.4) and the geometric fallback takes over, as before. Only the frame padding, 8px, was judged on the render; the gutter and the status-line gap on GitLab have not been.
+
+- **The privacy policy no longer describes a server component the product does not have.** The verifier was removed (DEC0010), yet `PRIVACY.md` still carried a section on an optional self-hosted server, the store listing drafts promised merge enforcement through it, and the setup guides announced it as what comes next. The scope paragraph now says the extension is the whole product, the synced preferences include the label button order, the platforms named are GitHub, Azure DevOps and GitLab, and the store listing says the extension does not control merging. Both languages.
 
 ## [1.0.0-rc.2] - 2026-11-12
 
@@ -815,7 +827,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
-[Unreleased]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-rc.2...HEAD
+[1.0.0-rc.3]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-rc.2...v1.0.0-rc.3
 [1.0.0-rc.2]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.21...v1.0.0-rc.1
 [1.0.0-beta.21]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.20...v1.0.0-beta.21

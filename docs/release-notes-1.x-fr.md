@@ -8,6 +8,25 @@ L'extension démarre en mode `assist` : elle aide et signale, elle ne bloque jam
 commentaire n'est contrôlé que dans le navigateur des personnes ayant installé l'extension ; elle
 ne bloque jamais une fusion.
 
+## 1.0.0-rc.3 — 17 novembre 2026
+
+_Une espace avant le deux-points est acceptée, un dépôt GitLab peut désormais activer le blocage à l'envoi, et l'extension a un guide utilisateur._
+
+### ✨ Nouveautés
+
+- **Une espace avant le deux-points est acceptée.** `issue : sujet` et `issue (blocking) : sujet`, avec une espace ordinaire ou insécable, ne sont plus signalés comme mal formés : la typographie française insère cette espace d'elle-même. Cliquer sur un label remplace un tel préfixe au lieu d'en ajouter un autre, et un commentaire publié affiche ses badges comme d'habitude. Une phrase française qui a la forme d'un préfixe, comme `Attention : le build casse`, est désormais signalée comme un label inconnu plutôt que comme un label manquant.
+- **Sur GitLab, un dépôt peut activer le blocage à l'envoi.** L'extension lit désormais `.conventional-comments.json` sur la branche par défaut du projet, avec votre propre session ouverte. Un dépôt qui fixe `"mode": "enforce"` bloque un commentaire non conforme dans l'éditeur Markdown de GitLab, comme sur GitHub et Azure DevOps ; l'éditeur de texte enrichi reste sans assistance. Quand le fichier est illisible, l'éditeur affiche *Configuration non lue* et rien n'est bloqué. Cela a été observé sur gitlab.com et sur une instance Self-Managed, pas encore sur un dépôt réel en `enforce`.
+- **Un guide utilisateur.** Douze pages, en anglais et en français, couvrent la prise en main, la rédaction des commentaires, la saisie au clavier, les labels, les diagnostics, la configuration, les modes et l'adoption, le déploiement en organisation, les plateformes, la page des réglages et les skills de revue. Elles disent ce qui n'a pas été mesuré : Azure DevOps sur d'autres hôtes que `dev.azure.com`, et les raccourcis Alt sur macOS. Le README part désormais de ce que l'extension fait pour vous. [Lire le guide](https://github.com/Reefact/conventional-comments-toolkit/tree/main/docs/guide).
+
+### 🐛 Corrections
+
+- **Sur GitLab Self-Managed, les boutons de la barre d'outils ne touchent plus le cadre de l'éditeur.** L'extension ne trouvait pas ce cadre sur une instance Self-Managed et laissait les boutons contre sa bordure. Elle le désigne désormais par son nom, et retombe sur la mesure, comme avant, quand elle ne le trouve pas.
+- **La politique de confidentialité ne décrit plus un composant serveur que le produit n'a pas.** L'extension est tout le produit, et la politique, la fiche de la boutique et les guides d'installation le disent désormais. La politique range aussi l'ordre des boutons de labels parmi les préférences synchronisées et nomme GitLab avec les autres plateformes.
+
+### 🔧 Changements
+
+- **Le skill de revue couvre GitLab et Azure DevOps.** `skills/review-pull-request` relit désormais les merge requests et pull requests de GitHub, GitLab et Azure DevOps, et traite ce qu'il lit sur la demande comme matière à relire, jamais comme des instructions. Il nomme les sessions de revue avec le binaire natif de Slugger sur Linux x64, sinon avec son outil .NET, sinon avec un script Python qui tire dans le thème livré avec le skill, et vous demande avant d'utiliser le tirage Python quand une voie adaptée à votre machine a échoué. Le fichier `session-id.md` n'existe plus.
+
 ## 1.0.0-rc.2 — 12 novembre 2026
 
 _Deux corrections du filtre des fils sur la nouvelle page Overview de GitHub._

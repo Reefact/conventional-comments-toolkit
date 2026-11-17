@@ -1,6 +1,6 @@
 # Publishing on GitLab (`glab`)
 
-Companion of `SKILL.md`, section 9 (Mechanics). The PR of the skill is a merge request (MR) here. Use the authenticated `glab` CLI or, when the session provides them, GitLab tools with the same effect. `<iid>` is the MR's number in its URL; `<project>` is the project id or its URL-encoded path (`group%2Fproject`); inside a clone, `glab api` also replaces `:fullpath` with the current project's path. Send every body as a JSON file, for every write:
+Companion of `SKILL.md`, section 9 (Mechanics). The PR of the skill is a merge request (MR) here. Use the authenticated `glab` CLI or, when the session provides them, GitLab tools with the same effect. `<iid>` is the MR's number in its URL; `<project>` is the project id or its URL-encoded path (`group%2Fproject`) and `<repo>` the same project written `group/project` (or its full URL), the only form `glab mr diff` accepts, through `--repo`; inside a clone, `glab api` also replaces `:fullpath` with the current project's path. Send every body as a JSON file, for every write:
 
 ```text
 glab api -X <METHOD> <endpoint> --input body.json --header "Content-Type: application/json"
@@ -17,12 +17,13 @@ Never put a comment body inside the command line.
 
 ```text
 glab api projects/<project>/merge_requests/<iid>
-glab mr diff <iid>
+glab mr diff <iid> --repo <repo>
 glab api projects/<project>/merge_requests/<iid>/closes_issues
 glab api --paginate projects/<project>/merge_requests/<iid>/discussions
 ```
 
 - The first gives `title`, `description`, `target_branch` (the base) and `diff_refs`: `base_sha`, `start_sha` and `head_sha` (the head commit). Keep the three, inline comments need them.
+- The diff is read in a second call: without `--repo`, `glab mr diff` reads the merge request with that IID in the clone's own project, which may not be the one you review, and fails outside a clone. A push may land between the two reads: before you publish, read the merge request again and check that `diff_refs.head_sha` is still the one you kept (`SKILL.md`, section 9, on anchoring).
 - The last lists the threads. Each discussion has an `id` (the thread id) and `notes[]`: `id`, `body`, `author`, `resolvable`, `resolved`, and `position` for an inline note. A thread is resolved when all its resolvable notes are.
 
 ## Publish, one comment at a time

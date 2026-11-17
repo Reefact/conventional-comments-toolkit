@@ -12,6 +12,12 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Changed
+
+- **On GitLab, the repository's configuration file is now read, so a repository can switch the send guard on.** The read used to return `unreachable` unconditionally: every GitLab editor showed *Configuration unread* and the extension never blocked a send there. It now reads `.conventional-comments.json` from the project's default branch (`/-/raw/HEAD/…`), with the reader's own signed-in session and no token. A repository that sets `"mode": "enforce"` blocks a non-compliant comment in GitLab's Markdown editor, as on GitHub and Azure DevOps; the rich text editor stays unassisted. What the extension cannot read (an expired session, a redirect, a network error) still shows *Configuration unread* and never blocks. The read was observed on gitlab.com and, on a named branch, on one Self-Managed instance; the `HEAD` route there and a present configuration file were not tried, and the guard itself has not yet been observed against a live repository in `enforce` (§C.4).
+
 ## [1.0.0-rc.2] - 2026-11-12
 
 ### Changed
@@ -807,6 +813,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[Unreleased]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-rc.2...HEAD
 [1.0.0-rc.2]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.21...v1.0.0-rc.1
 [1.0.0-beta.21]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.20...v1.0.0-beta.21

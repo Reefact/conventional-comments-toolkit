@@ -1,6 +1,6 @@
 ---
 name: respond-to-review
-description: As the author of a pull request or merge request (GitHub, GitLab, Azure DevOps…), answer its review findings and questions with Conventional Comments reply labels — `done`, `ack`, `disagree`, `thanks`, plus `note` and `question` — fix what needs fixing, and push. Use when a pull request you wrote receives review comments, or when asked to address a review. Never posts `reviewed` or `decision`, never approves, never merges.
+description: As the author of a pull request or merge request (GitHub, GitLab, Azure DevOps…), answer its review findings and questions with Conventional Comments reply labels — `done`, `ack`, `disagree`, `thanks`, plus `note` and `question` — fix what needs fixing, and push. Use when a pull request or merge request you wrote receives review comments, or when asked to address a review. Never posts `reviewed` or `decision`, never approves, never merges.
 ---
 
 # Respond to a review

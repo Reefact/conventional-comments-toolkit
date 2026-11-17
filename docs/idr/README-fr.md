@@ -45,5 +45,5 @@ DEC0002 à DEC0014 ont été reprises le 2026-11-11 des mentions « décision du
 | [DEC0011](DEC0011-publishing-keystrokes-declared-per-platform-fr.md) | Raccourcis de publication déclarés par plateforme | Accepté | 2026-11-10 |
 | [DEC0012](DEC0012-re-read-the-configuration-before-blocking-fr.md) | Relecture de la configuration avant tout blocage | Accepté | 2026-11-10 |
 | [DEC0013](DEC0013-no-claude-code-footer-in-pull-requests-fr.md) | Pas de pied Claude Code dans les pull requests | Accepté | 2026-11-10 |
-| [DEC0014](DEC0014-slugger-names-review-sessions-fr.md) | Slugger pour nommer les sessions de revue | Accepté | 2026-11-11 |
-| [DEC0015](DEC0015-slugger-route-follows-the-machine-fr.md) | La voie de Slugger suit la machine | Proposé | 2026-11-17 |
+| [DEC0014](DEC0014-slugger-names-review-sessions-fr.md) | Slugger pour nommer les sessions de revue | Remplacé par DEC0015 | 2026-11-11 |
+| [DEC0015](DEC0015-slugger-route-follows-the-machine-fr.md) | La voie de Slugger suit la machine | Accepté | 2026-11-17 |

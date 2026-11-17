@@ -87,9 +87,8 @@ Avant la bascule, vérifiez ces cas, qui vous surprendraient sinon :
 - les commandes adressées aux bots (`@dependabot rebase`, `/retest`) ont besoin de
   `toolCommands`, sans quoi elles sont refusées comme n'importe quel commentaire sans label ;
 - les comptes qui commentent automatiquement ont besoin de `exemptUsers` ;
-- sur GitLab, le blocage de l'envoi ne s'applique pas encore, et les personnes qui utilisent
-  l'éditeur de texte enrichi de GitLab ne reçoivent aucune assistance
-  ([plateformes](platforms-fr.md)).
+- sur GitLab, les personnes qui utilisent l'éditeur de texte enrichi de GitLab ne reçoivent
+  aucune assistance ([plateformes](platforms-fr.md)).
 
 ## Retour arrière
 

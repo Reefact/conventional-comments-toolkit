@@ -13,8 +13,8 @@ the three adapters; each is active only on the domains you allowed.
 | Badges on published comments | Yes | Yes | Yes |
 | Banner of unresolved blocking threads | Yes | Yes | Yes |
 | Thread filter | Yes | Yes | Yes, except on the *Changes* tab |
-| Reads the repository's `.conventional-comments.json` | Yes | Yes | **Not yet** |
-| Send guard (`enforce`) | Yes | Yes | **Not yet** |
+| Reads the repository's `.conventional-comments.json` | Yes | Yes | Yes |
+| Send guard (`enforce`) | Yes | Yes | Yes, see [GitLab](#gitlab) |
 | A general comment can open a blocking thread | No | Yes | Yes, when published with *Start thread* |
 | Body of a review submitted as a whole | Yes | Does not exist | Yes |
 | Suggestion block read as a `suggestion` | Yes | Yes | Not yet |
@@ -67,11 +67,14 @@ says its selectors find their pages
 
 ## GitLab
 
-Measured on gitlab.com only.
+Measured on gitlab.com. The reading of the repository file was also checked on one GitLab
+Self-Managed instance.
 
-- **The extension does not read the repository file on GitLab yet.** It applies the product
-  defaults, shows *Configuration unread*, and therefore **never blocks a send** there, whatever
-  the mode.
+- **The extension reads the repository file** from the project's default branch, with your own
+  signed-in session. What it cannot read (an expired session, a redirect, a network error)
+  shows *Configuration unread*, and it **does not block a send** then, whatever the mode.
+- **The send guard follows the configuration**, as on the other platforms. It has been tested
+  on captured pages and with a fake network, not yet against a live repository in `enforce`.
 - **Only the Markdown editor is handled.** GitLab lets each person switch to a rich text
   editor and remembers the choice. In that editor the extension stays out entirely: no
   toolbar, no validation. Switch back with *Switch to plain text editing* under the field.
@@ -80,7 +83,8 @@ Measured on gitlab.com only.
   warning says so.
 - On the *Changes* tab, the thread filter is not shown, and resolved threads are not in the
   page for the extension to read.
-- GitLab Self-Managed and GitLab Dedicated have not been measured.
+- Apart from reading the repository file, GitLab Self-Managed and GitLab Dedicated have not
+  been measured.
 
 ## Browsers
 

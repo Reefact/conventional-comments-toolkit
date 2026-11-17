@@ -14,8 +14,8 @@ que vous avez autorisés.
 | Badges sur les commentaires publiés | Oui | Oui | Oui |
 | Bandeau des fils bloquants non résolus | Oui | Oui | Oui |
 | Filtre des fils | Oui | Oui | Oui, sauf dans l'onglet *Changes* |
-| Lit le `.conventional-comments.json` du dépôt | Oui | Oui | **Pas encore** |
-| Blocage de l'envoi (`enforce`) | Oui | Oui | **Pas encore** |
+| Lit le `.conventional-comments.json` du dépôt | Oui | Oui | Oui |
+| Blocage de l'envoi (`enforce`) | Oui | Oui | Oui, voir [GitLab](#gitlab) |
 | Un commentaire général peut ouvrir un fil bloquant | Non | Oui | Oui, s'il est publié avec *Start thread* |
 | Corps d'une revue soumise en bloc | Oui | N'existe pas | Oui |
 | Bloc de suggestion lu comme une `suggestion` | Oui | Oui | Pas encore |
@@ -69,11 +69,16 @@ et rien ne dit que ses sélecteurs y trouvent leurs éléments
 
 ## GitLab
 
-Vérifié sur gitlab.com seulement.
+Vérifié sur gitlab.com. La lecture du fichier du dépôt a aussi été vérifiée sur une instance
+GitLab Self-Managed.
 
-- **L'extension ne lit pas encore le fichier du dépôt sur GitLab.** Elle applique les valeurs
-  par défaut du produit, affiche *Configuration non lue*, et **ne bloque donc jamais un
-  envoi** sur cette plateforme, quel que soit le mode.
+- **L'extension lit le fichier du dépôt**, sur la branche par défaut du projet, avec votre
+  propre session ouverte. Ce qu'elle ne peut pas lire (session expirée, redirection, erreur
+  réseau) affiche *Configuration non lue*, et elle **ne bloque alors pas l'envoi**, quel que
+  soit le mode.
+- **Le blocage de l'envoi suit la configuration**, comme sur les autres plateformes. Il a été
+  testé sur des pages capturées et avec un faux réseau, pas encore sur un dépôt réel en
+  `enforce`.
 - **Seul l'éditeur Markdown est géré.** GitLab laisse chaque personne basculer vers un éditeur
   de texte enrichi et mémorise ce choix. Dans cet éditeur, l'extension n'intervient pas du
   tout : ni barre d'outils, ni validation. Pour revenir à l'éditeur Markdown, cliquez sur
@@ -83,7 +88,8 @@ Vérifié sur gitlab.com seulement.
   compté, et aucun avertissement ne le dit.
 - Dans l'onglet *Changes*, le filtre des fils n'est pas affiché, et la page ne contient pas
   les fils résolus : l'extension ne peut donc pas les lire.
-- GitLab Self-Managed et GitLab Dedicated n'ont pas été vérifiés.
+- Hormis la lecture du fichier du dépôt, GitLab Self-Managed et GitLab Dedicated n'ont pas été
+  vérifiés.
 
 ## Navigateurs
 

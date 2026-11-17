@@ -1634,7 +1634,15 @@ Application à vues dynamiques : les onglets *Overview* et *Changes* d'une merge
 
 `gitlab.com` est un hôte fixe — le groupe et le projet vivent dans le CHEMIN : il va au catalogue de la page d'options, selon la règle du §A.4. Un domaine Self-Managed se saisit, plateforme choisie avant l'octroi ; l'hôte de Dedicated, de même, à vérifier.
 
-**Lecture du fichier de configuration par l'extension** (`getRepoConfig()`, §9.2.3, §10) : **à établir par une mesure**, avec les questions que le dépôt a appris à poser (`check:content-script-cors`, `check:relay-cors`) — quelle route, si elle redirige, ce que la cible répond en CORS, ce qu'elle exige en `credentials`. Une route de fichier brut de la forme `/{groupe}/{projet}/-/raw/{branche}/…` est à vérifier, jusqu'à son existence même. Tant que la lecture n'est pas mesurée, `getRepoConfig()` y renvoie `{ status: 'unreachable' }` et l'extension y est en état dégradé au sens du §5.4.
+**Lecture du fichier de configuration par l'extension** (`getRepoConfig()`, §9.2.3, §10) : la route de fichier brut `/{groupe}[/{sous-groupe}…]/{projet}/-/raw/HEAD/.conventional-comments.json`, lue en `credentials: 'same-origin'`. Les questions que le dépôt a appris à poser (`check:content-script-cors`, `check:relay-cors`) — la route redirige-t-elle, que répond la cible en CORS, qu'exige-t-elle en `credentials` — ont été mesurées le 2026-11-17 :
+
+- **gitlab.com**, projet public, requête portant un `Origin` : `HEAD` est accepté comme référence ; un fichier présent rend 200 en `text/plain`, un fichier absent 404. **Aucune redirection et aucun `Access-Control-Allow-Origin`** : la requête est de même origine que la page, et aucune frontière CORS n'est à franchir — à l'inverse de la route `raw` de GitHub.
+- **Une instance Self-Managed**, page de merge request connectée, `fetch` depuis la page, sur la branche `develop` : même forme (200 pour un fichier présent, 404 pour un fichier absent, `redirected: false`), avec et sans cookies — le projet y était lisible sans connexion.
+- **Sans session**, sur un projet de gitlab.com dont la lecture anonyme est refusée : 302 vers `/users/sign_in`, que `fetch` suit jusqu'à la page de connexion en 200 HTML. Une session expirée ressemble donc à un fichier lisible, et c'est ce que la règle ci-dessous refuse.
+
+La règle : **404 → `absent`** ; 200 sans redirection et dont le corps n'est pas du HTML → `found` ; **tout le reste** — autre statut, redirection, HTML, erreur réseau — → `unreachable`, état dégradé au sens du §5.4, sans blocage. Le 404 est le seul signe de « pas de fichier » : il n'est fiable que parce que la requête part avec la session de la personne, qui doit être connectée pour commenter.
+
+**Non mesuré** : `HEAD` comme référence sur une instance Self-Managed (la mesure y a utilisé une branche nommée) ; le cas « fichier présent » sur Self-Managed ; le contexte du service worker pour un `configUrl` d'organisation ; un projet privé lu avec une session ouverte. Aucun garde exécutable ne tient encore ces mesures en CI.
 
 ### C.5 Résolution de fil
 

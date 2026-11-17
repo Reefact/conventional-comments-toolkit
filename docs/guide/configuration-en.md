@@ -24,9 +24,6 @@ session, without any token.
 shape of every key. It is an example, **not** the product defaults: it lists only a handful of
 labels and turns one warning off to illustrate an override.
 
-> On GitLab, the extension does not read the repository file yet: the product defaults apply
-> there ([platforms](platforms-en.md)).
-
 ## Where the values come from
 
 Values come from three levels; for each key, the first level that sets it wins:

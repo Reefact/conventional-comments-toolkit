@@ -92,6 +92,13 @@ describe('§C.4 — lecture de la configuration de dépôt sur GitLab', () => {
     expect((await adapter.getRepoConfig(PROJECT)).status).toBe('unreachable');
   });
 
+  // Le 404 de la CIBLE d'une redirection n'est pas celui du fichier : le classer `absent` ferait
+  // croire à une lecture réussie (revue Reefact, PR #214).
+  it('un 404 obtenu après une redirection reste injoignable, jamais un fichier absent', async () => {
+    const { adapter } = adapterWith(() => redirectedTo(new Response('<html>Not found</html>', { status: 404 })));
+    expect(await adapter.getRepoConfig(PROJECT)).toEqual({ status: 'unreachable', reason: 'redirected instead of the file' });
+  });
+
   it('du HTML servi sans redirection n’est pas non plus un fichier de configuration', async () => {
     const { adapter } = adapterWith(() => new Response('  \n<html>proxy</html>', { status: 200 }));
     expect(await adapter.getRepoConfig(PROJECT)).toEqual({ status: 'unreachable', reason: 'HTML instead of the file' });

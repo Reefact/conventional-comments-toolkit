@@ -67,8 +67,9 @@ says its selectors find their pages
 
 ## GitLab
 
-Measured on gitlab.com. The reading of the repository file was also checked on one GitLab
-Self-Managed instance.
+Measured on gitlab.com. On one GitLab Self-Managed instance, a file read through the same raw
+route was observed, on a named branch; the `HEAD` route the extension uses, and a present
+`.conventional-comments.json`, were not tried there.
 
 - **The extension reads the repository file** from the project's default branch, with your own
   signed-in session. What it cannot read (an expired session, a redirect, a network error)
@@ -83,8 +84,8 @@ Self-Managed instance.
   warning says so.
 - On the *Changes* tab, the thread filter is not shown, and resolved threads are not in the
   page for the extension to read.
-- Apart from reading the repository file, GitLab Self-Managed and GitLab Dedicated have not
-  been measured.
+- Apart from that observation, GitLab Self-Managed and GitLab Dedicated have not been
+  measured.
 
 ## Browsers
 

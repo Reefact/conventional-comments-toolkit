@@ -92,9 +92,11 @@ export class GitlabClientAdapter implements PlatformAdapter {
    *     référence ; un fichier présent rend 200 en `text/plain`, un fichier absent 404 — AUCUNE
    *     redirection, AUCUN `Access-Control-Allow-Origin`, donc aucune frontière CORS à franchir ;
    *   - une instance Self-Managed, page de merge request connectée, `fetch` depuis la page, sur
-   *     la branche `develop` : même réponse directe (`redirected: false`, 200 puis 404), avec et
-   *     sans cookies. `HEAD` n'y a pas été essayé : le 404 d'un `HEAD` refusé se lirait « fichier
-   *     absent » sans que rien ne le signale — à vérifier sur chaque version.
+   *     la branche `develop` : un `README.md` présent rend 200, `.conventional-comments.json` et
+   *     un fichier inexistant rendent 404, sans redirection (`redirected: false`), avec et sans
+   *     cookies. Ni `HEAD` ni un `.conventional-comments.json` PRÉSENT n'y ont été essayés : le
+   *     404 d'un `HEAD` refusé se lirait « fichier absent » sans que rien ne le signale — à
+   *     vérifier sur chaque version.
    *
    * `same-origin` : l'hôte est celui de la page, le cookie de session part, un projet privé est
    * lisible par qui peut ouvrir la merge request. Le même appel SANS session n'aboutit pas à un
@@ -103,16 +105,20 @@ export class GitlabClientAdapter implements PlatformAdapter {
    * fichier : une session expirée est `unreachable`, jamais `absent` et jamais une configuration
    * invalide. Le 404 reste donc le seul signe de « pas de fichier ».
    *
-   * Une redirection est refusée même sans HTML : la route de fichier brut n'en a aucune dans les
-   * mesures, une redirection est donc un fait nouveau (projet renommé, connexion, proxy) que
-   * l'extension ne sait pas lire — elle le dit plutôt que de le deviner (§5.4). */
+   * Une redirection est refusée même sans HTML, et quel que soit le statut rendu : la route de
+   * fichier brut n'en a aucune dans les mesures, une redirection est donc un fait nouveau (projet
+   * renommé, connexion, proxy) que l'extension ne sait pas lire — elle le dit plutôt que de le
+   * deviner (§5.4). Un 404 obtenu après redirection reste donc `unreachable`. */
   async getRepoConfig(pr: PrRef, opts?: { bypassCache: boolean }): Promise<ConfigRead> {
     const url = `https://${pr.host}/${pr.scope.join('/')}/-/raw/HEAD/.conventional-comments.json`;
     try {
       const res = await this.#fetch(url, { credentials: 'same-origin', ...bypassCacheInit(opts) });
+      // La redirection d'abord, avant tout statut : un 404 rendu par la CIBLE d'une redirection ne
+      // dit rien du fichier demandé — c'est la page où la route a mené, pas la route. Classé
+      // `absent`, il ferait croire à une lecture réussie (revue Reefact, PR #214).
+      if (res.redirected) return { status: 'unreachable', reason: 'redirected instead of the file' };
       if (res.status === 404) return { status: 'absent' };
       if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
-      if (res.redirected) return { status: 'unreachable', reason: 'redirected instead of the file' };
       const text = await res.text();
       // Garde de repli : une page HTML n'est jamais un fichier de configuration JSON. Elle se
       // lirait sinon comme une configuration invalide, et non comme une lecture manquée.

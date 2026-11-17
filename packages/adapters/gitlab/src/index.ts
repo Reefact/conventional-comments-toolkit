@@ -5,8 +5,9 @@
 // où elle s'applique :
 // - l'éditeur de texte enrichi n'est pas observé (§C.2) : ni lecture ni écriture tant que la
 //   façon d'y écrire n'est pas mesurée ;
-// - la lecture du fichier de configuration du dépôt n'est pas mesurée (§C.4) : `unreachable`,
-//   et l'extension est en état dégradé au sens du §5.4 — elle assiste sans bloquer ;
+// - la lecture du fichier de configuration du dépôt est mesurée (§C.4) sur gitlab.com et sur une
+//   instance Self-Managed ; ce qu'elle ne peut pas lire (redirection, page de connexion, erreur
+//   réseau) est `unreachable`, état dégradé au sens du §5.4 — l'extension assiste sans bloquer ;
 // - pas d'étage 0 : le marqueur du bloc de suggestion n'est pas fixé pour GitLab (§C.6).
 
 import type {
@@ -83,13 +84,43 @@ export class GitlabClientAdapter implements PlatformAdapter {
     return { id: 'gitlab', suggestionInfoString: null };
   }
 
-  /** §C.4 — non mesurée. Une route de fichier brut existe peut-être ; ce qu'elle fait depuis un
-   * script de contenu (redirection, CORS, cookies) n'a pas été mesuré, et le dépôt a appris ce
-   * que coûte une lecture supposée (`check:content-script-cors`). D'ici là : `unreachable`, donc
-   * état dégradé — l'extension assiste sans bloquer (§5.4). Aucune requête ne part, si bien que
-   * `bypassCache` n'a rien à contourner ici. */
-  async getRepoConfig(_pr: PrRef): Promise<ConfigRead> {
-    return { status: 'unreachable', reason: 'GitLab repository config read not measured yet (spec §C.4)' };
+  /** §C.4 — le fichier de configuration du dépôt, lu par la route de fichier brut de GitLab :
+   * `/<groupe>[/<sous-groupe>…]/<projet>/-/raw/HEAD/.conventional-comments.json`.
+   *
+   * MESURÉ, et c'est ce qui sépare cette lecture de celle que ce dépôt a dû défaire sur GitHub :
+   *   - gitlab.com, projet public, requête avec `Origin` (2026-11-17) : `HEAD` est accepté comme
+   *     référence ; un fichier présent rend 200 en `text/plain`, un fichier absent 404 — AUCUNE
+   *     redirection, AUCUN `Access-Control-Allow-Origin`, donc aucune frontière CORS à franchir ;
+   *   - une instance Self-Managed, page de merge request connectée, `fetch` depuis la page, sur
+   *     la branche `develop` : même réponse directe (`redirected: false`, 200 puis 404), avec et
+   *     sans cookies. `HEAD` n'y a pas été essayé : le 404 d'un `HEAD` refusé se lirait « fichier
+   *     absent » sans que rien ne le signale — à vérifier sur chaque version.
+   *
+   * `same-origin` : l'hôte est celui de la page, le cookie de session part, un projet privé est
+   * lisible par qui peut ouvrir la merge request. Le même appel SANS session n'aboutit pas à un
+   * 404 : MESURÉ sur gitlab.com, la route redirige alors vers `/users/sign_in`. Suivie, cette
+   * redirection rend la page de connexion en 200 HTML — que ce code refuse de prendre pour un
+   * fichier : une session expirée est `unreachable`, jamais `absent` et jamais une configuration
+   * invalide. Le 404 reste donc le seul signe de « pas de fichier ».
+   *
+   * Une redirection est refusée même sans HTML : la route de fichier brut n'en a aucune dans les
+   * mesures, une redirection est donc un fait nouveau (projet renommé, connexion, proxy) que
+   * l'extension ne sait pas lire — elle le dit plutôt que de le deviner (§5.4). */
+  async getRepoConfig(pr: PrRef, opts?: { bypassCache: boolean }): Promise<ConfigRead> {
+    const url = `https://${pr.host}/${pr.scope.join('/')}/-/raw/HEAD/.conventional-comments.json`;
+    try {
+      const res = await this.#fetch(url, { credentials: 'same-origin', ...bypassCacheInit(opts) });
+      if (res.status === 404) return { status: 'absent' };
+      if (!res.ok) return { status: 'unreachable', reason: `HTTP ${res.status}` };
+      if (res.redirected) return { status: 'unreachable', reason: 'redirected instead of the file' };
+      const text = await res.text();
+      // Garde de repli : une page HTML n'est jamais un fichier de configuration JSON. Elle se
+      // lirait sinon comme une configuration invalide, et non comme une lecture manquée.
+      if (text.trimStart().startsWith('<')) return { status: 'unreachable', reason: 'HTML instead of the file' };
+      return { status: 'found', text };
+    } catch (e) {
+      return { status: 'unreachable', reason: String(e) };
+    }
   }
 
   async getOrgConfig(url: string | null, opts?: { bypassCache: boolean }): Promise<ConfigRead> {

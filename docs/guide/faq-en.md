@@ -47,9 +47,9 @@ plain text, `issue (blocking): …`, readable by everyone.
 The extension could not read the repository's or the organisation's configuration. It keeps
 assisting with the rules it has and **does not block**, whatever the mode.
 
-- On **GitLab**, this is the normal state for now: the repository file is not read there.
-- On GitHub and Azure DevOps, check that you are signed in and that the network reaches the
-  platform. For an organisation's configuration on another host, that host must be allowed.
+- Check that you are signed in and that the network reaches the platform. On GitLab, an expired
+  session redirects to the sign-in page, and the file cannot be read until you sign in again.
+- For an organisation's configuration on another host, that host must be allowed.
 
 A repository with **no** configuration file does not cause this: an absent file is normal.
 

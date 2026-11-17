@@ -50,10 +50,10 @@ par tout le monde.
 L'extension n'a pas pu lire la configuration du dépôt ou de l'organisation. Elle continue
 d'assister avec les règles dont elle dispose et **ne bloque pas**, quel que soit le mode.
 
-- Sur **GitLab**, c'est l'état normal pour l'instant : le fichier du dépôt n'y est pas lu.
-- Sur GitHub et Azure DevOps, vérifiez que vous êtes connecté et que le réseau atteint la
-  plateforme. Pour une configuration d'organisation placée sur un autre hôte, cet hôte doit
-  être autorisé.
+- Vérifiez que vous êtes connecté et que le réseau atteint la plateforme. Sur GitLab, une
+  session expirée redirige vers la page de connexion, et le fichier reste illisible tant que
+  vous ne vous êtes pas reconnecté.
+- Pour une configuration d'organisation placée sur un autre hôte, cet hôte doit être autorisé.
 
 Un dépôt **sans** fichier de configuration ne provoque pas ce message : un fichier absent est
 normal.

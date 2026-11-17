@@ -71,11 +71,10 @@ const PAGES: Record<string, Partial<Record<Zone, { file: string; url: string }>>
 };
 
 /** La route que chaque adaptateur appelle pour le fichier de dépôt — celle que leurs propres
- * tests figent (extension/test/repo-config-read.test.ts, azdo/test/repo-config.test.ts). GitLab
- * n'en a aucune : la lecture n'est pas mesurée (§C.4), son adaptateur rend `unreachable` sans
- * requête, et l'extension y est en état dégradé — ce que le test vérifie à la place. */
-const REPO_ROUTE: Record<string, string | null> = {
-  gitlab: null,
+ * tests figent (extension/test/repo-config-read.test.ts, azdo/test/repo-config.test.ts,
+ * gitlab/test/repo-config.test.ts). */
+const REPO_ROUTE: Record<string, string> = {
+  gitlab: 'https://gitlab.com/Reefact/testing-conventional-comments/-/raw/HEAD/.conventional-comments.json',
   github: 'https://github.com/Reefact/just-dummies/raw/HEAD/.conventional-comments.json',
   azdo:
     'https://dev.azure.com/sylva-cct-test/cct-test/_apis/git/repositories/cct-test/items' +
@@ -156,8 +155,9 @@ async function extensionVerdict(c: CorpusCase, body: string, via: 'repo' | 'org'
   p.serve.org = via === 'org' ? document : null;
   const floor: Floor | null = via === 'org' ? { configUrl: ORG_URL } : null;
   const resolved = await new ClientConfigResolver(async () => floor).resolve(p.adapter, pr);
-  // Sans route mesurée, le fichier de dépôt est illisible : état dégradé, jamais un faux `absent`.
-  expect(resolved.degraded, 'état dégradé').toBe(REPO_ROUTE[c.platform] === null);
+  // Le fichier de dépôt est lu sur les trois plateformes : un `absent` ou un `found` n'est pas un
+  // état dégradé.
+  expect(resolved.degraded, 'état dégradé').toBe(false);
 
   if (c.authorLogin) p.setUser(c.authorLogin);
   const currentUserLogin = (await p.adapter.getCurrentUser()).login;
@@ -187,11 +187,8 @@ describe('CA-06 — le corpus traverse les frontières d’adaptateur de SA plat
       expect([p.editor.context.zone, p.editor.context.canCarryBlockingState]).toEqual([c.zone, c.canCarryBlockingState]);
       expect(p.adapter.platformProfile().id).toBe(c.platform);
 
-      const before = p.requested.length;
       const lf = await extensionVerdict(c, c.body, 'repo');
-      const route = REPO_ROUTE[c.platform];
-      if (route) expect(p.requested.at(-1), 'fichier de dépôt lu à la route de la plateforme').toBe(route);
-      else expect(p.requested.length, 'aucune requête sans route mesurée').toBe(before);
+      expect(p.requested.at(-1), 'fichier de dépôt lu à la route de la plateforme').toBe(REPO_ROUTE[c.platform]);
       expect(lf, 'verdict de la forme champ (LF)').toEqual(c.expected);
 
       // La même configuration, lue cette fois comme document d'organisation (§8.1.2, niveau 2).

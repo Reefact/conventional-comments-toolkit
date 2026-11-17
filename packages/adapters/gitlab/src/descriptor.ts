@@ -14,7 +14,9 @@ export const gitlabDescriptor = {
   // Seul l'hôte mesuré. Un motif du genre « commence par gitlab. » attraperait beaucoup
   // d'instances Self-Managed — et tout autre site qui suit la même convention : une supposition.
   inferHost: (host: string) => host === 'gitlab.com',
-  // Aucune règle mesurée sur la lecture de configuration (§C.4) : la règle commune s'applique.
+  // Aucune règle mesurée sur la lecture d'un `configUrl` d'organisation par le relais (§C.4) : la
+  // règle commune s'applique. La lecture du fichier de DÉPÔT n'en dépend pas : elle est de même
+  // origine que la page, et `getRepoConfig()` choisit ses `credentials` lui-même.
   configCredentials: () => null,
   // Les vues d'une merge request se distinguent par le CHEMIN — `/-/merge_requests/<n>` pour
   // l'Overview, `/-/merge_requests/<n>/diffs` pour Changes (URLs des captures) —, pas par un

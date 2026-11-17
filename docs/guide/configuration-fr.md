@@ -25,9 +25,6 @@ request, grâce à sa session sur la plateforme et sans aucun jeton.
 forme de chaque clé. C'est un exemple, **pas** les valeurs par défaut du produit : il ne liste
 qu'une poignée de labels et désactive un avertissement pour illustrer une surcharge.
 
-> Sur GitLab, l'extension ne lit pas encore le fichier du dépôt : les valeurs par défaut du
-> produit s'y appliquent ([plateformes](platforms-fr.md)).
-
 ## D'où viennent les valeurs
 
 Les valeurs viennent de trois niveaux ; pour chaque clé, le premier niveau qui la renseigne

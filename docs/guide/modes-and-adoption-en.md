@@ -85,8 +85,8 @@ Before the switch, check the cases that would otherwise surprise people:
 - commands addressed to bots (`@dependabot rebase`, `/retest`) need `toolCommands`, or they
   are refused like any comment without a label;
 - accounts that comment automatically need `exemptUsers`;
-- on GitLab, the send guard does not apply yet, and people using GitLab's rich text editor
-  get no assistance at all ([platforms](platforms-en.md)).
+- on GitLab, people using GitLab's rich text editor get no assistance at all
+  ([platforms](platforms-en.md)).
 
 ## Rolling back
 

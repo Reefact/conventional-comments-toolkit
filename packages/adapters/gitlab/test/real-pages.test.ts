@@ -103,9 +103,8 @@ describe('§4.1, §9.2.3 — Overview : nouveau commentaire général (capture 0
     expect(page.adapter.renderedBodyShape()).toEqual({ paragraphTags: ['P'], lineBreakTag: 'BR' });
   });
 
-  it("n'a pas d'étage 0, et lit la configuration du dépôt comme injoignable (§C.4, §C.6)", async () => {
+  it("n'a pas d'étage 0 (§C.6)", () => {
     expect(page.adapter.platformProfile()).toEqual({ id: 'gitlab', suggestionInfoString: null });
-    expect((await page.adapter.getRepoConfig(page.adapter.currentPr()!)).status).toBe('unreachable');
   });
 });
 

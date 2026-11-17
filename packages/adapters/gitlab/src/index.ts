@@ -129,9 +129,19 @@ export class GitlabClientAdapter implements PlatformAdapter {
     return { dispose: () => observer.disconnect() };
   }
 
-  /** Le châssis de l'éditeur n'a pas été mesuré (styles, géométrie) : réponse neutre, et le code
-   * partagé applique ses règles géométriques — comme pour Azure DevOps. */
-  getEditorChrome(_editor: EditorHandle): EditorChrome {
+  /** Le CADRE du composeur est nommé (`selectors.composerFrame`) ; le point d'insertion de la barre
+   * et le trait d'état ne sont pas mesurés : réponse neutre pour eux, et le code partagé applique
+   * ses règles géométriques — comme pour Azure DevOps.
+   *
+   * Un cadre qui ne se retrouve plus est une rupture, tracée (§9.4) ; le repli géométrique prend
+   * alors le relais, comme avant que le cadre soit nommé. */
+  getEditorChrome(editor: EditorHandle): EditorChrome {
+    const framed = closestChain(editor.element, selectors.composerFrame).element;
+    if (framed) return { ...NEUTRAL_EDITOR_CHROME, framedContainer: framed };
+    this.log.degraded(
+      selectors.composerFrame,
+      chainEvidence(this.#doc, selectors.composerFrame, { subject: printElement(editor.element) })
+    );
     return NEUTRAL_EDITOR_CHROME;
   }
 

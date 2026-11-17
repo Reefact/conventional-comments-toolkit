@@ -40,6 +40,25 @@ export const selectors = {
     ],
   } satisfies SelectorChain,
 
+  /** Le CADRE du composeur Markdown — le conteneur qui dessine la bordure autour de l'en-tête
+   * natif (Preview, gras, italique…), du champ et de ce que l'extension injecte, et à qui
+   * l'extension donne son retrait intérieur (`getEditorChrome`, `cct-host`).
+   *
+   * Pourquoi un NOM plutôt que la règle géométrique du code partagé (`framedAncestor`, qui remonte
+   * au plus quatre niveaux jusqu'à une bordure visible) : sur une instance Self-Managed, le cadre
+   * est au CINQUIÈME niveau au-dessus du champ — un `div-dropzone` de plus que sur les captures —,
+   * et la règle ne trouvait rien : aucun retrait, boutons collés à la bordure.
+   *
+   * MESURÉ sur cette instance par `getComputedStyle` sur les ancêtres du champ : `md-area`
+   * (`js-vue-markdown-field md-area gfm-form`) est le premier ancêtre à bordure visible (1 px), à
+   * cinq niveaux ; ses voisins n'ont aucune bordure. Présent sur toutes les captures de
+   * gitlab.com (01 à 09, quatre niveaux, bordure non mesurable : les pages sont réduites sans CSS) —
+   * la classe est la même, pas sa profondeur, et c'est pourquoi on la nomme. */
+  composerFrame: {
+    name: 'composer-frame',
+    candidates: ['.md-area'],
+  } satisfies SelectorChain,
+
   /** Éditeur de TEXTE ENRICHI (ProseMirror), qui remplace la <textarea> quand l'utilisateur a
    * choisi ce mode — choix mémorisé pour son compte (§C.2). MESURÉ : 01-…-texte-riche,
    * 04-…-texte-riche, 05-…-texte-riche, 06-overview-…-texte-riche ; `aria-label` « Comment » ou

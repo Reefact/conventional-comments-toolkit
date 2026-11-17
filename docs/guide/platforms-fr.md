@@ -69,8 +69,9 @@ et rien ne dit que ses sélecteurs y trouvent leurs éléments
 
 ## GitLab
 
-Vérifié sur gitlab.com. La lecture du fichier du dépôt a aussi été vérifiée sur une instance
-GitLab Self-Managed.
+Vérifié sur gitlab.com. Sur une instance GitLab Self-Managed, la lecture d'un fichier par la
+même route brute a été observée, sur une branche nommée ; la route en `HEAD` qu'utilise
+l'extension, et un `.conventional-comments.json` présent, n'y ont pas été essayés.
 
 - **L'extension lit le fichier du dépôt**, sur la branche par défaut du projet, avec votre
   propre session ouverte. Ce qu'elle ne peut pas lire (session expirée, redirection, erreur
@@ -88,8 +89,7 @@ GitLab Self-Managed.
   compté, et aucun avertissement ne le dit.
 - Dans l'onglet *Changes*, le filtre des fils n'est pas affiché, et la page ne contient pas
   les fils résolus : l'extension ne peut donc pas les lire.
-- Hormis la lecture du fichier du dépôt, GitLab Self-Managed et GitLab Dedicated n'ont pas été
-  vérifiés.
+- Hormis cette observation, GitLab Self-Managed et GitLab Dedicated n'ont pas été vérifiés.
 
 ## Navigateurs
 

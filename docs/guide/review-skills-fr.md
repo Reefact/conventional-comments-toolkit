@@ -46,10 +46,12 @@ la ligne et affiche `🤖 session: disheartening-reviewed-implementation` en bas
 - Chaque session tire son propre identifiant d'une source aléatoire et vérifie que la pull
   request ne le porte pas déjà. Elle n'en reprend jamais un de la pull request, d'une autre
   session ou d'une conversation antérieure.
-- L'identifiant est un nom lisible tiré par [Slugger](https://github.com/Reefact/slugger),
-  ou un GUID. Ce choix se fait une fois par installation et se consigne dans un fichier
-  `session-id.md`, versionné à côté du skill ; quand rien n'est encore consigné, le skill du
-  relecteur propose Slugger une fois et consigne la réponse.
+- L'identifiant est un nom lisible tiré par [Slugger](https://github.com/Reefact/slugger) :
+  son binaire natif sur Linux x64, sinon son outil .NET quand un SDK .NET 10 est présent,
+  sinon un script Python qui tire dans la même liste de mots, livrée avec le skill. Le skill
+  n'exécute jamais rien qui vienne du dépôt relu. Quand une voie convient à la machine mais
+  échoue, par exemple parce qu'un hôte est injoignable, le skill demande s'il faut réessayer
+  ou passer au tirage Python ; il ne se rabat jamais sur un GUID.
 - Un nom Slugger peut être suivi d'une description : une phrase qui reprend ses mots, placée
   après un tiret cadratin et écrite en italique. L'extension affiche le nom, et la phrase au
   survol :

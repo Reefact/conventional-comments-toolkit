@@ -24,7 +24,7 @@ az repos pr work-item list --id <n> --org <orgurl>
 
 - The first gives `title`, `description` and `targetRefName` (the base).
 - The iterations are the successive states of the PR, one per push. At the start of the pass, take the last one: `<iter>` is its `id`, and its `sourceRefCommit` and `commonRefCommit` are the head commit and the merge base you analyse. Note all three.
-- The changes of iteration `<iter>` give each file's `changeTrackingId`, which an inline thread needs (see Publish).
+- The changes of iteration `<iter>` give each file's `changeTrackingId`, which an inline thread needs (see Publish). They come in pages: `$top` defaults to 100 (maximum 2000), and the response carries `nextSkip` and `nextTop`, both zero when nothing is left. Repeat the call with `--query-parameters '$top=<nextTop>' '$skip=<nextSkip>'` until they are zero, and keep every `changeEntries` before you publish: a file missing from the pages has no `changeTrackingId`.
 - The second lists the linked work items, which play the part of closing keywords: read them (`az boards work-item show --id <id>`).
 - The last lists the threads: `id`, `status` (`active`, `fixed`, `closed`, `wontFix`, `byDesign`, `pending`), `threadContext` (file and lines, absent for a general thread) and `comments[]` (`id`, `content`, `author`, `commentType`, `isDeleted`). Ignore the `system` comments.
 - No endpoint returns a unified diff: in a clone, fetch both commits and run `git diff <commonRefCommit> <sourceRefCommit>`, those of iteration `<iter>`.

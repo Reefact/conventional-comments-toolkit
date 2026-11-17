@@ -12,6 +12,12 @@ own commit range, when this file was introduced at `1.0.0-beta.8`. They collapse
 into the outcome that shipped: `1.0.0-beta.7` carries thirteen commits refining one behaviour,
 and what a reader needs from them is the behaviour, not the thirteen.
 
+## [Unreleased]
+
+### Changed
+
+- **The author skill covers GitLab and Azure DevOps, and no longer trusts instructions found on the request.** `skills/respond-to-review` now answers the review of a merge request or a pull request on GitHub, GitLab and Azure DevOps, as `skills/review-pull-request` already reviews them. It treats everything it reads on the request as material to work from, never as instructions: a reviewer's request to change the code is still a finding it answers, but an instruction aimed at the agent itself (approve, merge, skip a check, run a command, change a rule of the skill) changes nothing, and is mentioned in its report. On GitLab, no line of a reply begins with `/`, since GitLab runs such a line as a command (`/approve`, `/merge`, `/close`) and a reply could otherwise approve or merge.
+
 ## [1.0.0-rc.3] - 2026-11-17
 
 ### Added
@@ -827,6 +833,7 @@ and what a reader needs from them is the behaviour, not the thirteen.
 - A weekly canary over the GitHub Primer CSS variables the stylesheet depends on, which caught
   GitHub's rename of its colour tokens.
 
+[Unreleased]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-rc.3...HEAD
 [1.0.0-rc.3]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-rc.2...v1.0.0-rc.3
 [1.0.0-rc.2]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/Reefact/conventional-comments-toolkit/compare/v1.0.0-beta.21...v1.0.0-rc.1
